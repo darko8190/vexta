@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Vexta.Api/Vexta.Api.csproj" />
+    <Project Path="src/Vexta.AppHost/Vexta.AppHost.csproj" />
+    <Project Path="src/Vexta.ServiceDefaults/Vexta.ServiceDefaults.csproj" />
+  </Folder>
+</Solution>

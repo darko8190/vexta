@@ -1,0 +1,24 @@
+# .NET
+bin/
+obj/
+*.user
+.vs/
+*.data-protection-keys/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+.pnpm-store/
+
+# Env / secrets
+.env
+.env.local
+.env.*.local
+
+# Aspire
+**/apphost.secrets.json
+
+# OS / editor
+.DS_Store
+Thumbs.db

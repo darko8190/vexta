@@ -1,0 +1,169 @@
+"use client";
+
+import { useState } from "react";
+import { FolderKanban, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
+import { EmptyState } from "@/components/layout/empty-state";
+import { PageHeader } from "@/components/layout/page-header";
+import { PaginationBar } from "@/components/layout/pagination-bar";
+import { SearchInput } from "@/components/layout/search-input";
+import { ProjectFormSheet } from "@/components/projects/project-form-sheet";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { useDeleteProject, useProjectsQuery } from "@/hooks/use-projects";
+import { projectStatusBadgeVariant, projectStatusLabels } from "@/lib/labels";
+import type { ProjectRecord } from "@/lib/types";
+
+function formatCurrency(amount: number | null) {
+  if (amount == null) return "—";
+  return new Intl.NumberFormat("fr-CA", { style: "currency", currency: "CAD" }).format(amount);
+}
+
+export default function ProjectsPage() {
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search);
+
+  const { data, isLoading } = useProjectsQuery(page, debouncedSearch);
+  const deleteProject = useDeleteProject();
+
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<ProjectRecord | undefined>(undefined);
+  const [deleteTarget, setDeleteTarget] = useState<ProjectRecord | undefined>(undefined);
+
+  function openCreate() {
+    setEditingProject(undefined);
+    setFormOpen(true);
+  }
+
+  function openEdit(project: ProjectRecord) {
+    setEditingProject(project);
+    setFormOpen(true);
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    try {
+      await deleteProject.mutateAsync(deleteTarget.id);
+      toast.success("Projet supprimé.");
+      setDeleteTarget(undefined);
+    } catch {
+      toast.error("Impossible de supprimer ce projet.");
+    }
+  }
+
+  return (
+    <div>
+      <PageHeader
+        title="Projets"
+        description="Suivez l'avancement des mandats pour vos clients."
+        action={
+          <Button onClick={openCreate}>
+            <Plus />
+            Nouveau projet
+          </Button>
+        }
+      />
+
+      <div className="mb-4">
+        <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Rechercher un projet…" />
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      ) : !data || data.items.length === 0 ? (
+        <EmptyState
+          icon={FolderKanban}
+          title={debouncedSearch ? "Aucun projet trouvé" : "Aucun projet pour l'instant"}
+          description={
+            debouncedSearch ? "Essayez une autre recherche." : "Créez votre premier projet pour un client."
+          }
+          action={
+            !debouncedSearch && (
+              <Button onClick={openCreate}>
+                <Plus />
+                Nouveau projet
+              </Button>
+            )
+          }
+        />
+      ) : (
+        <div className="overflow-hidden rounded-lg border border-border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Projet</TableHead>
+                <TableHead>Client</TableHead>
+                <TableHead>Statut</TableHead>
+                <TableHead>Échéancier</TableHead>
+                <TableHead>Budget</TableHead>
+                <TableHead className="w-10" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data.items.map((projectItem) => (
+                <TableRow key={projectItem.id}>
+                  <TableCell className="font-medium">{projectItem.name}</TableCell>
+                  <TableCell className="text-muted-foreground">{projectItem.clientName}</TableCell>
+                  <TableCell>
+                    <Badge variant={projectStatusBadgeVariant[projectItem.status]}>
+                      {projectStatusLabels[projectItem.status]}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {projectItem.startDate ?? "—"} → {projectItem.endDate ?? "—"}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{formatCurrency(projectItem.budget)}</TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label="Actions" />}>
+                        <MoreHorizontal />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onSelect={() => openEdit(projectItem)}>
+                          <Pencil />
+                          Modifier
+                        </DropdownMenuItem>
+                        <DropdownMenuItem variant="destructive" onSelect={() => setDeleteTarget(projectItem)}>
+                          <Trash2 />
+                          Supprimer
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      <PaginationBar result={data} onPageChange={setPage} />
+
+      <ProjectFormSheet open={formOpen} onOpenChange={setFormOpen} project={editingProject} />
+
+      <ConfirmDeleteDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => !open && setDeleteTarget(undefined)}
+        title="Supprimer ce projet ?"
+        description={`« ${deleteTarget?.name} » et ses factures liées seront détachés. Cette action est définitive.`}
+        onConfirm={confirmDelete}
+        pending={deleteProject.isPending}
+      />
+    </div>
+  );
+}

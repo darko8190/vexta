@@ -1,0 +1,118 @@
+"use client";
+
+import { useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Controller, useForm } from "react-hook-form";
+import * as z from "zod";
+import { Button } from "@/components/ui/button";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
+import { PasswordInput } from "@/components/auth/password-input";
+import { useAuth } from "@/lib/auth-context";
+
+const formSchema = z.object({
+  email: z.string().min(1, "Le courriel est requis.").email("Courriel invalide."),
+  password: z.string().min(1, "Le mot de passe est requis."),
+});
+
+type FormValues = z.infer<typeof formSchema>;
+
+export default function LoginPage() {
+  const { login } = useAuth();
+  const router = useRouter();
+  const [serverError, setServerError] = useState<string | null>(null);
+
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: { email: "", password: "" },
+  });
+
+  async function onSubmit(values: FormValues) {
+    setServerError(null);
+    try {
+      await login(values.email, values.password);
+      router.push("/tableau-de-bord");
+    } catch (error) {
+      setServerError(error instanceof Error ? error.message : "Une erreur est survenue.");
+    }
+  }
+
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-12">
+      <div className="mb-8 flex flex-col items-center gap-2">
+        <Image src="/vexta-logo.png" alt="Vexta" width={180} height={90} priority className="h-auto w-44" />
+      </div>
+
+      <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-8 shadow-sm">
+        <h1 className="text-center text-xl font-semibold text-card-foreground">Connexion</h1>
+        <p className="mt-1 text-center text-sm text-muted-foreground">
+          Accédez à votre espace Vexta.
+        </p>
+
+        <form className="mt-6" onSubmit={form.handleSubmit(onSubmit)} noValidate>
+          <FieldGroup>
+            <Controller
+              name="email"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor="login-email">Courriel</FieldLabel>
+                  <Input
+                    {...field}
+                    id="login-email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="vous@entreprise.com"
+                    aria-invalid={fieldState.invalid}
+                  />
+                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              )}
+            />
+
+            <Controller
+              name="password"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <div className="flex items-center justify-between">
+                    <FieldLabel htmlFor="login-password">Mot de passe</FieldLabel>
+                  </div>
+                  <PasswordInput
+                    {...field}
+                    id="login-password"
+                    placeholder="••••••••••"
+                    aria-invalid={fieldState.invalid}
+                  />
+                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              )}
+            />
+
+            {serverError && (
+              <p className="text-sm font-medium text-destructive" role="alert">
+                {serverError}
+              </p>
+            )}
+
+            <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+              {form.formState.isSubmitting && <Spinner />}
+              Se connecter
+            </Button>
+          </FieldGroup>
+        </form>
+
+        <p className="mt-6 text-center text-sm text-muted-foreground">
+          Pas encore de compte ?{" "}
+          <Link href="/inscription" className="font-medium text-primary hover:underline">
+            Créer votre espace Vexta
+          </Link>
+        </p>
+      </div>
+    </div>
+  );
+}

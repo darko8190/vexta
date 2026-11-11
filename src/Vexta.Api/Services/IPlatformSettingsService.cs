@@ -1,0 +1,63 @@
+using Microsoft.EntityFrameworkCore;
+using Vexta.Api.Data;
+using Vexta.Api.Domain;
+
+namespace Vexta.Api.Services;
+
+public interface IPlatformSettingsService
+{
+    Task<string?> GetAsync(string key, CancellationToken ct = default);
+    Task<Dictionary<string, string?>> GetManyAsync(IEnumerable<string> keys, CancellationToken ct = default);
+    Task SetAsync(string key, string? value, CancellationToken ct = default);
+    Task SetManyAsync(Dictionary<string, string?> values, CancellationToken ct = default);
+}
+
+public class PlatformSettingsService(VextaDbContext db, ISecretProtector protector) : IPlatformSettingsService
+{
+    public async Task<string?> GetAsync(string key, CancellationToken ct = default)
+    {
+        var setting = await db.PlatformSettings.FindAsync([key], ct);
+        return setting is null ? null : protector.Unprotect(setting.EncryptedValue);
+    }
+
+    public async Task<Dictionary<string, string?>> GetManyAsync(IEnumerable<string> keys, CancellationToken ct = default)
+    {
+        var keySet = keys.ToHashSet();
+        var settings = await db.PlatformSettings.Where(s => keySet.Contains(s.Key)).ToListAsync(ct);
+        var result = keySet.ToDictionary(k => k, _ => (string?)null);
+        foreach (var setting in settings)
+        {
+            result[setting.Key] = protector.Unprotect(setting.EncryptedValue);
+        }
+        return result;
+    }
+
+    public async Task SetAsync(string key, string? value, CancellationToken ct = default)
+    {
+        await SetManyAsync(new Dictionary<string, string?> { [key] = value }, ct);
+    }
+
+    public async Task SetManyAsync(Dictionary<string, string?> values, CancellationToken ct = default)
+    {
+        foreach (var (key, value) in values)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                continue; // don't overwrite an existing secret with a blank field left untouched by the UI
+            }
+
+            var setting = await db.PlatformSettings.FindAsync([key], ct);
+            var encrypted = protector.Protect(value);
+            if (setting is null)
+            {
+                db.PlatformSettings.Add(new PlatformSetting { Key = key, EncryptedValue = encrypted });
+            }
+            else
+            {
+                setting.EncryptedValue = encrypted;
+                setting.UpdatedAt = DateTimeOffset.UtcNow;
+            }
+        }
+        await db.SaveChangesAsync(ct);
+    }
+}

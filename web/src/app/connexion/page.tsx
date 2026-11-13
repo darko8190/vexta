@@ -44,7 +44,9 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-12">
       <div className="mb-8 flex flex-col items-center gap-2">
-        <Image src="/vexta-logo.png" alt="Vexta" width={180} height={90} priority className="h-auto w-44" />
+        <Link href="/" aria-label="Vexta — accueil" className="transition-opacity hover:opacity-70">
+          <Image src="/vexta-logo.png" alt="Vexta" width={180} height={90} priority className="h-auto w-44" />
+        </Link>
       </div>
 
       <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-8 shadow-sm">

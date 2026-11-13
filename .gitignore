@@ -19,6 +19,9 @@ out/
 # Aspire
 **/apphost.secrets.json
 
+# Tooling
+.playwright-mcp/
+
 # OS / editor
 .DS_Store
 Thumbs.db

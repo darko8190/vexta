@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
 using Vexta.Api.Data;
 using Vexta.Api.Domain;
@@ -17,7 +18,7 @@ public class PlatformSettingsService(VextaDbContext db, ISecretProtector protect
     public async Task<string?> GetAsync(string key, CancellationToken ct = default)
     {
         var setting = await db.PlatformSettings.FindAsync([key], ct);
-        return setting is null ? null : protector.Unprotect(setting.EncryptedValue);
+        return setting is null ? null : TryUnprotect(setting.EncryptedValue);
     }
 
     public async Task<Dictionary<string, string?>> GetManyAsync(IEnumerable<string> keys, CancellationToken ct = default)
@@ -27,9 +28,23 @@ public class PlatformSettingsService(VextaDbContext db, ISecretProtector protect
         var result = keySet.ToDictionary(k => k, _ => (string?)null);
         foreach (var setting in settings)
         {
-            result[setting.Key] = protector.Unprotect(setting.EncryptedValue);
+            result[setting.Key] = TryUnprotect(setting.EncryptedValue);
         }
         return result;
+    }
+
+    // A value encrypted under a key that is no longer in the data protection key ring (e.g. the
+    // ring was reset) must not take down the whole settings page — treat it as unset instead.
+    private string? TryUnprotect(string encryptedValue)
+    {
+        try
+        {
+            return protector.Unprotect(encryptedValue);
+        }
+        catch (CryptographicException)
+        {
+            return null;
+        }
     }
 
     public async Task SetAsync(string key, string? value, CancellationToken ct = default)

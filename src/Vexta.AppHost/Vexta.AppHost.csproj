@@ -7,6 +7,9 @@
     <Nullable>enable</Nullable>
     <AspireUseCliBundle>true</AspireUseCliBundle>
     <UserSecretsId>6e3ffb01-373a-41a2-af69-6a58dc5a74ac</UserSecretsId>
+    <!-- No native launcher: Windows Smart App Control blocks freshly built unsigned .exe files,
+         so the build emits only the managed .dll and dotnet.exe (signed) runs it. -->
+    <UseAppHost>false</UseAppHost>
   </PropertyGroup>
 
   <ItemGroup>

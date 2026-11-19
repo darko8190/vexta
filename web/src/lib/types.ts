@@ -11,6 +11,7 @@ export interface User {
   tenantId: string | null;
   tenantName: string | null;
   tenantSubscriptionStatus: TenantSubscriptionStatus | null;
+  isImpersonating: boolean;
 }
 
 export interface PagedResult<T> {

@@ -9,7 +9,7 @@ namespace Vexta.Api.Features.Invoices;
 
 [ApiController]
 [Route("api/invoices")]
-[Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.TenantUser)}")]
+[Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.TenantUser)},{nameof(UserRole.SuperAdmin)}")]
 [RequireActiveSubscription]
 public class InvoicesController(VextaDbContext db, ICurrentUserService currentUser) : ControllerBase
 {

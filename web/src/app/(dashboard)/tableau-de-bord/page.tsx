@@ -63,7 +63,7 @@ function SuperAdminDashboard() {
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const isSuperAdmin = user?.role === "SuperAdmin";
+  const isSuperAdmin = user?.role === "SuperAdmin" && !user.isImpersonating;
 
   return (
     <div>

@@ -2,16 +2,22 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Vexta.Api.Auth;
 using Vexta.Api.Common;
 using Vexta.Api.Data;
 using Vexta.Api.Domain;
+using Vexta.Api.Features.Auth;
 
 namespace Vexta.Api.Features.Tenants;
 
 [ApiController]
 [Route("api/admin/tenants")]
 [Authorize(Roles = nameof(UserRole.SuperAdmin))]
-public class TenantsController(VextaDbContext db, UserManager<ApplicationUser> userManager) : ControllerBase
+public class TenantsController(
+    VextaDbContext db,
+    UserManager<ApplicationUser> userManager,
+    ITokenService tokenService,
+    ICurrentUserService currentUser) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<PagedResult<TenantDto>>> List([FromQuery] PagingQuery query)
@@ -92,6 +98,35 @@ public class TenantsController(VextaDbContext db, UserManager<ApplicationUser> u
         tenant.SubscriptionStatus = request.Status;
         await db.SaveChangesAsync();
         return NoContent();
+    }
+
+    [HttpPost("{id:guid}/impersonate")]
+    public async Task<ActionResult<AuthResponse>> Impersonate(Guid id)
+    {
+        var tenant = await db.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.Id == id);
+        if (tenant is null) return NotFound();
+
+        var superAdmin = await CurrentSuperAdminAsync();
+        if (superAdmin is null) return Unauthorized();
+
+        var token = tokenService.CreateAccessToken(superAdmin, impersonatedTenantId: tenant.Id);
+        return Ok(new AuthResponse(token, UserDto.ForImpersonation(superAdmin, tenant)));
+    }
+
+    [HttpPost("exit-impersonation")]
+    public async Task<ActionResult<AuthResponse>> ExitImpersonation()
+    {
+        var superAdmin = await CurrentSuperAdminAsync();
+        if (superAdmin is null) return Unauthorized();
+
+        var token = tokenService.CreateAccessToken(superAdmin);
+        return Ok(new AuthResponse(token, UserDto.ForUser(superAdmin)));
+    }
+
+    private async Task<ApplicationUser?> CurrentSuperAdminAsync()
+    {
+        if (currentUser.UserId is not { } userId) return null;
+        return await userManager.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Id == userId);
     }
 
     private static string SlugFor(string name)

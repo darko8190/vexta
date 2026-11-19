@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
@@ -11,6 +10,8 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/c
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { PasswordInput } from "@/components/auth/password-input";
+import { VextaLogo } from "@/components/brand/vexta-logo";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { useAuth } from "@/lib/auth-context";
 
 const formSchema = z.object({
@@ -43,10 +44,14 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-12">
+    <div className="relative flex min-h-screen flex-col items-center justify-center bg-background px-4 py-12">
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
+
       <div className="mb-8 flex flex-col items-center gap-2">
         <Link href="/" aria-label="Vexta — accueil" className="transition-opacity hover:opacity-70">
-          <Image src="/vexta-logo.png" alt="Vexta" width={180} height={90} priority className="h-auto w-44" />
+          <VextaLogo className="w-44" priority />
         </Link>
       </div>
 

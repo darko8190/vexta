@@ -31,6 +31,6 @@ const superAdminNav: NavItem[] = [
   { href: "/admin/parametres", label: "Intégrations", icon: Settings },
 ];
 
-export function getNavItems(role: UserRole | undefined): NavItem[] {
-  return role === "SuperAdmin" ? superAdminNav : tenantNav;
+export function getNavItems(role: UserRole | undefined, isImpersonating = false): NavItem[] {
+  return role === "SuperAdmin" && !isImpersonating ? superAdminNav : tenantNav;
 }

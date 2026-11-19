@@ -9,7 +9,7 @@ namespace Vexta.Api.Features.Clients;
 
 [ApiController]
 [Route("api/clients")]
-[Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.TenantUser)}")]
+[Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.TenantUser)},{nameof(UserRole.SuperAdmin)}")]
 [RequireActiveSubscription]
 public class ClientsController(VextaDbContext db, ICurrentUserService currentUser) : ControllerBase
 {

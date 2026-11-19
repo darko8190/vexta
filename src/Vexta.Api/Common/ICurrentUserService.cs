@@ -9,6 +9,7 @@ public interface ICurrentUserService
     Guid? TenantId { get; }
     UserRole? Role { get; }
     bool IsSuperAdmin { get; }
+    bool IsImpersonating { get; }
 }
 
 public class CurrentUserService(IHttpContextAccessor accessor) : ICurrentUserService
@@ -21,14 +22,19 @@ public class CurrentUserService(IHttpContextAccessor accessor) : ICurrentUserSer
     public Guid? TenantId =>
         Guid.TryParse(User?.FindFirstValue(VextaClaimTypes.TenantId), out var id) ? id : null;
 
+    // ClaimTypes.Role, not VextaClaimTypes.Role: the bearer handler maps the short "role" claim
+    // onto the standard one on the way in, so the short name never survives to here.
     public UserRole? Role =>
-        Enum.TryParse<UserRole>(User?.FindFirstValue(VextaClaimTypes.Role), out var role) ? role : null;
+        Enum.TryParse<UserRole>(User?.FindFirstValue(ClaimTypes.Role), out var role) ? role : null;
 
     public bool IsSuperAdmin => Role == UserRole.SuperAdmin;
+
+    public bool IsImpersonating => User?.FindFirstValue(VextaClaimTypes.Impersonating) == "true";
 }
 
 public static class VextaClaimTypes
 {
     public const string TenantId = "tenant_id";
     public const string Role = "role";
+    public const string Impersonating = "impersonating";
 }

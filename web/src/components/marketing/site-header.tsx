@@ -1,9 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
+import { VextaLockup } from "@/components/brand/vexta-logo";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { useAuth } from "@/lib/auth-context";
 
 const sections = [
@@ -23,7 +24,7 @@ export function SiteHeader() {
           aria-label="Vexta — accueil"
           className="flex items-center transition-opacity hover:opacity-70"
         >
-          <Image src="/vexta-logo.png" alt="Vexta" width={120} height={60} priority className="h-7 w-auto" />
+          <VextaLockup iconClassName="size-7" priority />
         </Link>
 
         <nav className="hidden items-center gap-6 md:flex">
@@ -39,15 +40,18 @@ export function SiteHeader() {
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
+          <ThemeToggle />
           {loading ? null : user ? (
             <Link href="/tableau-de-bord" className={cn(buttonVariants(), "h-9 px-4")}>
               Mon espace
             </Link>
           ) : (
             <>
+              {/* Hidden on phones so the bar fits 375px — the hero and the footer
+                  both carry a "Se connecter" link. */}
               <Link
                 href="/connexion"
-                className={cn(buttonVariants({ variant: "ghost" }), "h-9 px-3")}
+                className={cn(buttonVariants({ variant: "ghost" }), "hidden h-9 px-3 sm:inline-flex")}
               >
                 Se connecter
               </Link>

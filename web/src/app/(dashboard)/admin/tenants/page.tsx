@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Building2, Plus } from "lucide-react";
+import { Building2, LogIn, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CreateTenantDialog } from "@/components/admin/create-tenant-dialog";
@@ -15,6 +16,7 @@ import { PaginationBar } from "@/components/layout/pagination-bar";
 import { SearchInput } from "@/components/layout/search-input";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useTenantsQuery, useUpdateTenantSubscriptionStatus } from "@/hooks/use-tenants";
+import { useAuth } from "@/lib/auth-context";
 import { tenantStatusBadgeVariant, tenantStatusLabels } from "@/lib/labels";
 import type { TenantSubscriptionStatus } from "@/lib/types";
 
@@ -28,6 +30,8 @@ export default function TenantsPage() {
   const { data, isLoading } = useTenantsQuery(page, debouncedSearch);
   const updateStatus = useUpdateTenantSubscriptionStatus();
   const [createOpen, setCreateOpen] = useState(false);
+  const [enteringId, setEnteringId] = useState<string | null>(null);
+  const { enterTenant } = useAuth();
 
   async function onStatusChange(id: string, status: TenantSubscriptionStatus) {
     try {
@@ -35,6 +39,16 @@ export default function TenantsPage() {
       toast.success("Statut d'abonnement mis à jour.");
     } catch {
       toast.error("Impossible de mettre à jour le statut.");
+    }
+  }
+
+  async function onEnterTenant(id: string) {
+    setEnteringId(id);
+    try {
+      await enterTenant(id);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Impossible d'entrer dans ce locataire.");
+      setEnteringId(null);
     }
   }
 
@@ -83,6 +97,7 @@ export default function TenantsPage() {
                 <TableHead className="text-center">Utilisateurs</TableHead>
                 <TableHead className="text-center">Clients</TableHead>
                 <TableHead>Créé le</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -114,6 +129,17 @@ export default function TenantsPage() {
                   <TableCell className="text-center text-muted-foreground">{tenantItem.clientCount}</TableCell>
                   <TableCell className="text-muted-foreground">
                     {new Date(tenantItem.createdAt).toLocaleDateString("fr-CA")}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={enteringId !== null}
+                      onClick={() => onEnterTenant(tenantItem.id)}
+                    >
+                      {enteringId === tenantItem.id ? <Spinner /> : <LogIn />}
+                      Entrer
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}

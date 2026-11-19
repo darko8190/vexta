@@ -9,7 +9,7 @@ namespace Vexta.Api.Features.Projects;
 
 [ApiController]
 [Route("api/projects")]
-[Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.TenantUser)}")]
+[Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.TenantUser)},{nameof(UserRole.SuperAdmin)}")]
 [RequireActiveSubscription]
 public class ProjectsController(VextaDbContext db, ICurrentUserService currentUser) : ControllerBase
 {

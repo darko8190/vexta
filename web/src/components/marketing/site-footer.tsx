@@ -1,5 +1,5 @@
-import Image from "next/image";
 import Link from "next/link";
+import { VextaLockup } from "@/components/brand/vexta-logo";
 
 const columns = [
   {
@@ -25,7 +25,7 @@ export function SiteFooter() {
       <div className="mx-auto w-full max-w-6xl px-4 py-12 sm:px-6">
         <div className="flex flex-col gap-10 md:flex-row md:justify-between">
           <div className="max-w-xs">
-            <Image src="/vexta-logo.png" alt="Vexta" width={120} height={60} className="h-7 w-auto" />
+            <VextaLockup iconClassName="size-7" />
             <p className="mt-4 text-sm text-muted-foreground">
               Clients, adresses, projets et factures réunis dans un seul outil.
             </p>

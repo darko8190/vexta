@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
-import { LogOut } from "lucide-react";
+import { Eye, LogOut } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import {
   DropdownMenu,
@@ -15,8 +16,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { VextaIcon, VextaLockup } from "@/components/brand/vexta-logo";
 import { getNavItems } from "@/components/layout/nav-config";
 import { NavLinks } from "@/components/layout/nav-links";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { useAuth } from "@/lib/auth-context";
 
 function initials(firstName: string, lastName: string) {
@@ -24,16 +27,29 @@ function initials(firstName: string, lastName: string) {
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const { user, logout } = useAuth();
+  const { user, logout, exitTenant } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
 
   if (!user) return null;
 
-  const navItems = getNavItems(user.role);
+  const navItems = getNavItems(user.role, user.isImpersonating);
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen flex-col bg-background">
+      {user.isImpersonating && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-primary/30 bg-primary/10 px-4 py-2 md:px-6">
+          <Eye className="size-4 shrink-0 text-primary" />
+          <p className="text-sm text-foreground">
+            Vous êtes dans <span className="font-medium">{user.tenantName}</span> en tant que super admin.
+          </p>
+          <Button variant="outline" size="sm" className="ml-auto" onClick={handleExitTenant}>
+            Quitter le locataire
+          </Button>
+        </div>
+      )}
+
+      <div className="flex min-h-0 flex-1">
       <aside
         className={cn(
           "hidden shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-150 md:flex",
@@ -47,11 +63,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             onClick={() => setDesktopSidebarOpen((open) => !open)}
             className="flex items-center rounded-lg transition-opacity hover:opacity-70"
           >
-            {desktopSidebarOpen ? (
-              <Image src="/vexta-logo.png" alt="Vexta" width={120} height={60} className="h-7 w-auto" />
-            ) : (
-              <Image src="/vexta-icon.png" alt="Vexta" width={28} height={28} className="size-7" />
-            )}
+            {desktopSidebarOpen ? <VextaLockup iconClassName="size-7" /> : <VextaIcon className="size-7" />}
           </button>
         </div>
         <div className={cn("flex-1 overflow-y-auto py-2", desktopSidebarOpen ? "px-3" : "px-2")}>
@@ -69,7 +81,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               onClick={() => setMobileOpen(false)}
               className="flex items-center rounded-lg transition-opacity hover:opacity-70"
             >
-              <Image src="/vexta-logo.png" alt="Vexta" width={120} height={60} className="h-7 w-auto" />
+              <VextaLockup iconClassName="size-7" />
             </button>
           </div>
           <div className="flex-1 overflow-y-auto px-3 py-2">
@@ -86,18 +98,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             onClick={() => setMobileOpen(true)}
             className="flex items-center rounded-lg transition-opacity hover:opacity-70"
           >
-            <Image src="/vexta-logo.png" alt="Vexta" width={100} height={50} className="h-6 w-auto" />
+            <VextaLockup iconClassName="size-7" />
           </button>
           <div className="flex-1" />
+          <ThemeToggle />
           <UserAvatarMenu />
         </header>
-        <header className="hidden h-16 items-center justify-end border-b border-border px-6 md:flex">
+        <header className="hidden h-16 items-center justify-end gap-2 border-b border-border px-6 md:flex">
+          <ThemeToggle />
           <UserAvatarMenu />
         </header>
-        <main className="flex-1 overflow-x-hidden px-4 py-6 md:px-8 md:py-8">{children}</main>
+        <main className="flex-1 overflow-x-hidden px-4 py-6 md:px-8 md:py-8">
+          <div className="mx-auto w-full max-w-6xl">{children}</div>
+        </main>
+      </div>
       </div>
     </div>
   );
+
+  async function handleExitTenant() {
+    try {
+      await exitTenant();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Impossible de quitter ce locataire.");
+    }
+  }
 
   function UserAvatarMenu() {
     return (

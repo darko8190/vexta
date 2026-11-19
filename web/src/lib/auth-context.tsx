@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import type { User } from "@/lib/types";
 
 interface RegisterTenantInput {
@@ -19,6 +20,8 @@ interface AuthContextValue {
   registerTenant: (input: RegisterTenantInput) => Promise<{ checkoutUrl: string }>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
+  enterTenant: (tenantId: string) => Promise<void>;
+  exitTenant: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -27,6 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const refresh = useCallback(async () => {
     try {
@@ -75,11 +79,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     setUser(null);
+    queryClient.clear();
     router.push("/connexion");
-  }, [router]);
+  }, [queryClient, router]);
+
+  // Entering or leaving a tenant swaps the token, so every cached query belongs to the old
+  // context and has to go.
+  const enterTenant = useCallback(async (tenantId: string) => {
+    const response = await fetch("/api/auth/impersonate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tenantId }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data?.message ?? "Impossible d'entrer dans ce locataire.");
+    }
+    queryClient.clear();
+    setUser(data.user);
+    router.push("/tableau-de-bord");
+  }, [queryClient, router]);
+
+  const exitTenant = useCallback(async () => {
+    const response = await fetch("/api/auth/impersonate", { method: "DELETE" });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data?.message ?? "Impossible de quitter ce locataire.");
+    }
+    queryClient.clear();
+    setUser(data.user);
+    router.push("/admin/tenants");
+  }, [queryClient, router]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, registerTenant, logout, refresh }}>
+    <AuthContext.Provider
+      value={{ user, loading, login, registerTenant, logout, refresh, enterTenant, exitTenant }}
+    >
       {children}
     </AuthContext.Provider>
   );

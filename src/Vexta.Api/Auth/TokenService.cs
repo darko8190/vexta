@@ -10,14 +10,16 @@ namespace Vexta.Api.Auth;
 
 public interface ITokenService
 {
-    string CreateAccessToken(ApplicationUser user);
+    // impersonatedTenantId scopes a super admin's token to one tenant: the EF query filters and
+    // every controller read it from the tenant_id claim, so the whole tenant app works as-is.
+    string CreateAccessToken(ApplicationUser user, Guid? impersonatedTenantId = null);
 }
 
 public class TokenService(IOptions<JwtOptions> options) : ITokenService
 {
     private readonly JwtOptions _options = options.Value;
 
-    public string CreateAccessToken(ApplicationUser user)
+    public string CreateAccessToken(ApplicationUser user, Guid? impersonatedTenantId = null)
     {
         var claims = new List<Claim>
         {
@@ -28,7 +30,12 @@ public class TokenService(IOptions<JwtOptions> options) : ITokenService
             new("name", $"{user.FirstName} {user.LastName}")
         };
 
-        if (user.TenantId is { } tenantId)
+        if (impersonatedTenantId is { } impersonated)
+        {
+            claims.Add(new Claim(VextaClaimTypes.TenantId, impersonated.ToString()));
+            claims.Add(new Claim(VextaClaimTypes.Impersonating, "true"));
+        }
+        else if (user.TenantId is { } tenantId)
         {
             claims.Add(new Claim(VextaClaimTypes.TenantId, tenantId.ToString()));
         }

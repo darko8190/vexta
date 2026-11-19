@@ -17,6 +17,7 @@ public class AuthController(
     VextaDbContext db,
     ITokenService tokenService,
     IStripeService stripeService,
+    ICurrentUserService currentUser,
     IConfiguration configuration) : ControllerBase
 {
     [HttpPost("login")]
@@ -96,25 +97,26 @@ public class AuthController(
         var user = await userManager.Users.Include(u => u.Tenant).FirstOrDefaultAsync(u => u.Id.ToString() == userId);
         if (user is null) return Unauthorized();
 
-        return Ok(ToUserDto(user));
+        // Keeps an impersonation session alive across page reloads: the tenant lives in the token,
+        // not in the super admin's own row.
+        if (currentUser.IsImpersonating && currentUser.TenantId is { } tenantId)
+        {
+            var tenant = await db.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.Id == tenantId);
+            if (tenant is not null)
+            {
+                return Ok(UserDto.ForImpersonation(user, tenant));
+            }
+        }
+
+        return Ok(UserDto.ForUser(user));
     }
 
     private async Task<AuthResponse> BuildAuthResponseAsync(ApplicationUser user)
     {
         await db.Entry(user).Reference(u => u.Tenant).LoadAsync();
         var token = tokenService.CreateAccessToken(user);
-        return new AuthResponse(token, ToUserDto(user));
+        return new AuthResponse(token, UserDto.ForUser(user));
     }
-
-    private static UserDto ToUserDto(ApplicationUser user) => new(
-        user.Id,
-        user.Email ?? string.Empty,
-        user.FirstName,
-        user.LastName,
-        user.Role.ToString(),
-        user.TenantId,
-        user.Tenant?.Name,
-        user.Tenant?.SubscriptionStatus.ToString());
 
     private static string SlugFor(string name)
     {

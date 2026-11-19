@@ -12,6 +12,7 @@ export interface User {
   tenantName: string | null;
   tenantSubscriptionStatus: TenantSubscriptionStatus | null;
   isImpersonating: boolean;
+  tenantKind: "Business" | "Personal" | null;
 }
 
 export interface PagedResult<T> {
@@ -112,6 +113,7 @@ export interface TenantRecord {
   id: string;
   name: string;
   slug: string;
+  kind: "Business" | "Personal";
   subscriptionStatus: TenantSubscriptionStatus;
   currentPeriodEnd: string | null;
   createdAt: string;

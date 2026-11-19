@@ -16,6 +16,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
+import { UpgradeCta } from "@/components/layout/upgrade-cta";
+import { useCanCreate } from "@/hooks/use-can-create";
 import { PaginationBar } from "@/components/layout/pagination-bar";
 import { SearchInput } from "@/components/layout/search-input";
 import { ProjectFormSheet } from "@/components/projects/project-form-sheet";
@@ -30,6 +32,7 @@ function formatCurrency(amount: number | null) {
 }
 
 export default function ProjectsPage() {
+  const canCreate = useCanCreate();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search);
@@ -68,10 +71,14 @@ export default function ProjectsPage() {
         title="Projets"
         description="Suivez l'avancement des mandats pour vos clients."
         action={
-          <Button onClick={openCreate}>
-            <Plus />
-            Nouveau projet
-          </Button>
+          canCreate ? (
+            <Button onClick={openCreate}>
+              <Plus />
+              Nouveau projet
+            </Button>
+          ) : (
+            <UpgradeCta />
+          )
         }
       />
 
@@ -90,15 +97,22 @@ export default function ProjectsPage() {
           icon={FolderKanban}
           title={debouncedSearch ? "Aucun projet trouvé" : "Aucun projet pour l'instant"}
           description={
-            debouncedSearch ? "Essayez une autre recherche." : "Créez votre premier projet pour un client."
+            debouncedSearch
+              ? "Essayez une autre recherche."
+              : canCreate
+                ? "Créez votre premier projet pour un client."
+                : "La création de fiches est réservée aux comptes entreprise."
           }
           action={
-            !debouncedSearch && (
+            !debouncedSearch &&
+            (canCreate ? (
               <Button onClick={openCreate}>
                 <Plus />
                 Nouveau projet
               </Button>
-            )
+            ) : (
+              <UpgradeCta />
+            ))
           }
         />
       ) : (

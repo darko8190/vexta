@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, LogOut } from "lucide-react";
+import Link from "next/link";
+import { Eye, LogOut, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -144,6 +145,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </DropdownMenuLabel>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
+          {/* Settings live here rather than in the sidebar: they are about the account, not a
+              module you work in. */}
+          {user!.role !== "SuperAdmin" && (
+            <DropdownMenuGroup>
+              <DropdownMenuItem render={<Link href="/parametres" />}>
+                <Settings />
+                Paramètres
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+          )}
           <DropdownMenuGroup>
             <DropdownMenuItem variant="destructive" onSelect={() => logout()}>
               <LogOut />

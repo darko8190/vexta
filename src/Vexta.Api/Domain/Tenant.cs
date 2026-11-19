@@ -6,6 +6,8 @@ public class Tenant
     public required string Name { get; set; }
     public required string Slug { get; set; }
 
+    public TenantKind Kind { get; set; } = TenantKind.Business;
+
     public TenantSubscriptionStatus SubscriptionStatus { get; set; } = TenantSubscriptionStatus.Incomplete;
     public string? StripeCustomerId { get; set; }
     public string? StripeSubscriptionId { get; set; }

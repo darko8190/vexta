@@ -489,6 +489,9 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<DateTimeOffset?>("CurrentPeriodEnd")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");

@@ -50,6 +50,7 @@ public class InvoicesController(VextaDbContext db, ICurrentUserService currentUs
     }
 
     [HttpPost]
+    [RequireBusinessTenant]
     public async Task<ActionResult<InvoiceDto>> Create(UpsertInvoiceRequest request)
     {
         var clientExists = await db.Clients.AnyAsync(c => c.Id == request.ClientId);

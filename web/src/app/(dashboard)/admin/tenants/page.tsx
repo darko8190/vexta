@@ -103,8 +103,20 @@ export default function TenantsPage() {
             <TableBody>
               {data.items.map((tenantItem) => (
                 <TableRow key={tenantItem.id}>
-                  <TableCell className="font-medium">{tenantItem.name}</TableCell>
+                  <TableCell className="font-medium">
+                    {tenantItem.name}
+                    {tenantItem.kind === "Personal" && (
+                      <span className="ml-2 align-middle text-xs font-normal text-muted-foreground">
+                        Personnel
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell>
+                    {/* A personal space is free and has no Stripe subscription, so there is no
+                        status to set here. */}
+                    {tenantItem.kind === "Personal" ? (
+                      <Badge variant="outline">Gratuit</Badge>
+                    ) : (
                     <Select
                       value={tenantItem.subscriptionStatus}
                       onValueChange={(status) => onStatusChange(tenantItem.id, status as TenantSubscriptionStatus)}
@@ -124,6 +136,7 @@ export default function TenantsPage() {
                         ))}
                       </SelectContent>
                     </Select>
+                    )}
                   </TableCell>
                   <TableCell className="text-center text-muted-foreground">{tenantItem.userCount}</TableCell>
                   <TableCell className="text-center text-muted-foreground">{tenantItem.clientCount}</TableCell>

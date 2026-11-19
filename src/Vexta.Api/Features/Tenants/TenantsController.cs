@@ -36,7 +36,7 @@ public class TenantsController(
             .Skip((query.Page - 1) * query.PageSize)
             .Take(query.PageSize)
             .Select(t => new TenantDto(
-                t.Id, t.Name, t.Slug, t.SubscriptionStatus.ToString(), t.CurrentPeriodEnd, t.CreatedAt,
+                t.Id, t.Name, t.Slug, t.Kind.ToString(), t.SubscriptionStatus.ToString(), t.CurrentPeriodEnd, t.CreatedAt,
                 db.Users.IgnoreQueryFilters().Count(u => u.TenantId == t.Id),
                 db.Clients.IgnoreQueryFilters().Count(c => c.TenantId == t.Id)))
             .ToListAsync();
@@ -86,7 +86,7 @@ public class TenantsController(
 
         await db.SaveChangesAsync();
 
-        return Ok(new TenantDto(tenant.Id, tenant.Name, tenant.Slug, tenant.SubscriptionStatus.ToString(), null, tenant.CreatedAt, 1, 0));
+        return Ok(new TenantDto(tenant.Id, tenant.Name, tenant.Slug, tenant.Kind.ToString(), tenant.SubscriptionStatus.ToString(), null, tenant.CreatedAt, 1, 0));
     }
 
     [HttpPatch("{id:guid}/subscription-status")]

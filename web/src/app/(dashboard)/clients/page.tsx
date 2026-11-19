@@ -17,6 +17,8 @@ import { ClientFormSheet } from "@/components/clients/client-form-sheet";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
+import { UpgradeCta } from "@/components/layout/upgrade-cta";
+import { useCanCreate } from "@/hooks/use-can-create";
 import { PaginationBar } from "@/components/layout/pagination-bar";
 import { SearchInput } from "@/components/layout/search-input";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
@@ -24,6 +26,7 @@ import { useClientsQuery, useDeleteClient } from "@/hooks/use-clients";
 import type { ClientRecord } from "@/lib/types";
 
 export default function ClientsPage() {
+  const canCreate = useCanCreate();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search);
@@ -62,10 +65,14 @@ export default function ClientsPage() {
         title="Clients"
         description="Gérez le répertoire de vos clients."
         action={
-          <Button onClick={openCreate}>
-            <Plus />
-            Nouveau client
-          </Button>
+          canCreate ? (
+            <Button onClick={openCreate}>
+              <Plus />
+              Nouveau client
+            </Button>
+          ) : (
+            <UpgradeCta />
+          )
         }
       />
 
@@ -86,15 +93,20 @@ export default function ClientsPage() {
           description={
             debouncedSearch
               ? "Essayez une autre recherche."
-              : "Ajoutez votre premier client pour commencer à gérer vos projets et factures."
+              : canCreate
+                ? "Ajoutez votre premier client pour commencer à gérer vos projets et factures."
+                : "La création de fiches est réservée aux comptes entreprise."
           }
           action={
-            !debouncedSearch && (
+            !debouncedSearch &&
+            (canCreate ? (
               <Button onClick={openCreate}>
                 <Plus />
                 Nouveau client
               </Button>
-            )
+            ) : (
+              <UpgradeCta />
+            ))
           }
         />
       ) : (

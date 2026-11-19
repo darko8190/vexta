@@ -26,3 +26,12 @@ export async function clearToken() {
 export function apiBaseUrl(): string {
   return process.env.API_INTERNAL_URL ?? "http://localhost:5241";
 }
+
+/**
+ * The URL the browser itself is sent to. Social sign-in is the one flow the browser cannot
+ * proxy: Google redirects the browser, not our server, so the API's callback has to be
+ * reachable from outside. In dev the internal URL already is.
+ */
+export function apiPublicUrl(): string {
+  return process.env.API_PUBLIC_URL ?? apiBaseUrl();
+}

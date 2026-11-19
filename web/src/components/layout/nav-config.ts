@@ -1,6 +1,5 @@
 import {
   Building2,
-  CreditCard,
   FileText,
   FolderKanban,
   LayoutDashboard,
@@ -22,7 +21,6 @@ const tenantNav: NavItem[] = [
   { href: "/adresses", label: "Adresses", icon: MapPin },
   { href: "/projets", label: "Projets", icon: FolderKanban },
   { href: "/factures", label: "Factures", icon: FileText },
-  { href: "/facturation", label: "Facturation", icon: CreditCard },
 ];
 
 const superAdminNav: NavItem[] = [

@@ -11,13 +11,17 @@ interface RegisterTenantInput {
   lastName: string;
   email: string;
   password: string;
+  kind: "Business" | "Personal";
 }
+
+/** A business sign-up goes to Stripe; a free personal one comes back already signed in. */
+type RegisterTenantResult = { checkoutUrl: string; user?: never } | { user: User; checkoutUrl?: never };
 
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  registerTenant: (input: RegisterTenantInput) => Promise<{ checkoutUrl: string }>;
+  registerTenant: (input: RegisterTenantInput) => Promise<RegisterTenantResult>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
   enterTenant: (tenantId: string) => Promise<void>;
@@ -73,7 +77,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!response.ok) {
       throw new Error(data?.message ?? "Erreur lors de l'inscription.");
     }
-    return data as { checkoutUrl: string };
+    // A free sign-up already holds a session cookie, so adopt the user straight away.
+    if (data?.user) setUser(data.user as User);
+    return data as RegisterTenantResult;
   }, []);
 
   const logout = useCallback(async () => {

@@ -49,6 +49,7 @@ public class AddressesController(VextaDbContext db, ICurrentUserService currentU
     }
 
     [HttpPost]
+    [RequireBusinessTenant]
     public async Task<ActionResult<AddressDto>> Create(UpsertAddressRequest request)
     {
         var clientExists = await db.Clients.AnyAsync(c => c.Id == request.ClientId);

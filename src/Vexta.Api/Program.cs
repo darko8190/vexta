@@ -32,6 +32,7 @@ builder.Services.AddScoped<ISecretProtector, SecretProtector>();
 builder.Services.AddScoped<IPlatformSettingsService, PlatformSettingsService>();
 builder.Services.AddScoped<IMailgunService, MailgunService>();
 builder.Services.AddScoped<IStripeService, StripeService>();
+builder.Services.AddScoped<ITenantSignupService, TenantSignupService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 
 builder.Services
@@ -44,17 +45,28 @@ builder.Services
         options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
     })
     .AddRoles<IdentityRole<Guid>>()
-    .AddEntityFrameworkStores<VextaDbContext>();
+    .AddEntityFrameworkStores<VextaDbContext>()
+    // SignInManager is what reads the provider's response back out of the external cookie
+    // (GetExternalLoginInfoAsync). IdentityCore alone does not register it.
+    .AddSignInManager();
 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
     ?? throw new InvalidOperationException("Configuration Jwt manquante.");
 
-builder.Services.AddAuthentication(options =>
-    {
-        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-    })
+var authenticationBuilder = builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    // Only the external handshake signs in with a cookie, and only for the one redirect
+    // between the provider and our callback. Every API request still authenticates with
+    // the bearer token.
+    options.DefaultSignInScheme = IdentityConstants.ExternalScheme;
+});
+
+authenticationBuilder.AddIdentityCookies(_ => { });
+
+authenticationBuilder
     .AddJwtBearer(options =>
     {
         options.TokenValidationParameters = new TokenValidationParameters
@@ -69,6 +81,30 @@ builder.Services.AddAuthentication(options =>
             ClockSkew = TimeSpan.FromMinutes(1)
         };
     });
+
+// Each provider is registered only when its credentials are configured, so a deployment that
+// has not set them up yet still boots. ExternalAuthController reports which ones are live.
+var googleAuth = builder.Configuration.GetSection("Authentication:Google");
+if (!string.IsNullOrWhiteSpace(googleAuth["ClientId"]))
+{
+    authenticationBuilder.AddGoogle(options =>
+    {
+        options.ClientId = googleAuth["ClientId"]!;
+        options.ClientSecret = googleAuth["ClientSecret"]
+            ?? throw new InvalidOperationException("Authentication:Google:ClientSecret manquant.");
+    });
+}
+
+var microsoftAuth = builder.Configuration.GetSection("Authentication:Microsoft");
+if (!string.IsNullOrWhiteSpace(microsoftAuth["ClientId"]))
+{
+    authenticationBuilder.AddMicrosoftAccount(options =>
+    {
+        options.ClientId = microsoftAuth["ClientId"]!;
+        options.ClientSecret = microsoftAuth["ClientSecret"]
+            ?? throw new InvalidOperationException("Authentication:Microsoft:ClientSecret manquant.");
+    });
+}
 
 builder.Services.AddAuthorization();
 

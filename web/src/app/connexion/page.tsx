@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
@@ -11,6 +12,7 @@ import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { PasswordInput } from "@/components/auth/password-input";
+import { SocialButtons } from "@/components/auth/social-buttons";
 import { VextaLogo } from "@/components/brand/vexta-logo";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { useAuth } from "@/lib/auth-context";
@@ -21,6 +23,24 @@ const formSchema = z.object({
 });
 
 type FormValues = z.infer<typeof formSchema>;
+
+const externalErrors: Record<string, string> = {
+  externe: "La connexion avec ce fournisseur n'a pas abouti. Réessayez.",
+  "courriel-absent": "Ce fournisseur n'a pas partagé votre courriel, sans quoi nous ne pouvons pas vous reconnaître.",
+  "fournisseur-inconnu": "Ce fournisseur n'est pas activé sur Vexta.",
+};
+
+// Its own component because useSearchParams suspends, and the form must not wait on it.
+function ExternalError() {
+  const code = useSearchParams().get("erreur");
+  if (!code) return null;
+
+  return (
+    <p className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
+      {externalErrors[code] ?? "La connexion n'a pas abouti. Réessayez."}
+    </p>
+  );
+}
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -60,7 +80,14 @@ export default function LoginPage() {
           Accédez à votre espace Vexta.
         </p>
 
-        <form className="mt-6" onSubmit={form.handleSubmit(onSubmit)} noValidate>
+        <div className="mt-6">
+          <Suspense fallback={null}>
+            <ExternalError />
+          </Suspense>
+          <SocialButtons action="login" />
+        </div>
+
+        <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
           <FieldGroup>
             <Controller
               name="email"

@@ -47,6 +47,7 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
     }
 
     [HttpPost]
+    [RequireBusinessTenant]
     public async Task<ActionResult<ProjectDto>> Create(UpsertProjectRequest request)
     {
         var clientExists = await db.Clients.AnyAsync(c => c.Id == request.ClientId);

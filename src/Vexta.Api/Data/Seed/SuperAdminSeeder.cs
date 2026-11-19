@@ -22,7 +22,8 @@ public static class SuperAdminSeeder
         {
             logger.LogWarning(
                 "SuperAdmin:Email / SuperAdmin:Password non définis — aucun super admin n'a été créé. " +
-                "Définissez les variables d'environnement SUPERADMIN_EMAIL et SUPERADMIN_PASSWORD puis redémarrez.");
+                "Définissez les variables d'environnement SuperAdmin__Email et SuperAdmin__Password " +
+                "(double tiret bas : c'est ainsi qu'ASP.NET Core les relie aux clés de configuration) puis redémarrez.");
             return;
         }
 

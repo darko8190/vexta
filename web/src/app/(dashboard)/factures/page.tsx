@@ -17,6 +17,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
+import { UpgradeCta } from "@/components/layout/upgrade-cta";
+import { useCanCreate } from "@/hooks/use-can-create";
 import { PaginationBar } from "@/components/layout/pagination-bar";
 import { SearchInput } from "@/components/layout/search-input";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
@@ -29,6 +31,7 @@ function formatCurrency(amount: number, currency: string) {
 }
 
 export default function InvoicesPage() {
+  const canCreate = useCanCreate();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search);
@@ -54,10 +57,14 @@ export default function InvoicesPage() {
         title="Factures"
         description="Créez et suivez vos factures clients."
         action={
-          <Button render={<Link href="/factures/nouvelle" />}>
-            <Plus />
-            Nouvelle facture
-          </Button>
+          canCreate ? (
+            <Button render={<Link href="/factures/nouvelle" />}>
+              <Plus />
+              Nouvelle facture
+            </Button>
+          ) : (
+            <UpgradeCta />
+          )
         }
       />
 
@@ -76,15 +83,22 @@ export default function InvoicesPage() {
           icon={FileText}
           title={debouncedSearch ? "Aucune facture trouvée" : "Aucune facture pour l'instant"}
           description={
-            debouncedSearch ? "Essayez une autre recherche." : "Créez votre première facture pour un client."
+            debouncedSearch
+              ? "Essayez une autre recherche."
+              : canCreate
+                ? "Créez votre première facture pour un client."
+                : "La création de fiches est réservée aux comptes entreprise."
           }
           action={
-            !debouncedSearch && (
+            !debouncedSearch &&
+            (canCreate ? (
               <Button render={<Link href="/factures/nouvelle" />}>
                 <Plus />
                 Nouvelle facture
               </Button>
-            )
+            ) : (
+              <UpgradeCta />
+            ))
           }
         />
       ) : (

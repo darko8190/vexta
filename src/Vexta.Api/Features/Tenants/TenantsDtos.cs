@@ -6,6 +6,7 @@ public record TenantDto(
     Guid Id,
     string Name,
     string Slug,
+    string Kind,
     string SubscriptionStatus,
     DateTimeOffset? CurrentPeriodEnd,
     DateTimeOffset CreatedAt,

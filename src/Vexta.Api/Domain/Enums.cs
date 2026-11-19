@@ -15,6 +15,16 @@ public enum TenantSubscriptionStatus
     Canceled = 3
 }
 
+/// <summary>
+/// Personal spaces belong to a travailleur autonome and are free: they never get a Stripe
+/// subscription, so the subscription gate has to let them through on this instead of on status.
+/// </summary>
+public enum TenantKind
+{
+    Business = 0,
+    Personal = 1
+}
+
 public enum AddressType
 {
     Facturation = 0,

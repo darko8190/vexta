@@ -42,12 +42,20 @@ public class RequireActiveSubscriptionFilter(ICurrentUserService currentUser, Ve
             return;
         }
 
-        var status = await db.Tenants
+        var tenant = await db.Tenants
             .Where(t => t.Id == currentUser.TenantId)
-            .Select(t => t.SubscriptionStatus)
+            .Select(t => new { t.Kind, t.SubscriptionStatus })
             .FirstOrDefaultAsync();
 
-        if (status != TenantSubscriptionStatus.Active)
+        // A personal space is free and never carries a Stripe subscription, so there is nothing
+        // here to check.
+        if (tenant?.Kind == TenantKind.Personal)
+        {
+            await next();
+            return;
+        }
+
+        if (tenant?.SubscriptionStatus != TenantSubscriptionStatus.Active)
         {
             context.Result = new ObjectResult(new { message = "Abonnement requis pour accéder à ce module." })
             {

@@ -17,6 +17,8 @@ import { AddressFormSheet } from "@/components/addresses/address-form-sheet";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
+import { UpgradeCta } from "@/components/layout/upgrade-cta";
+import { useCanCreate } from "@/hooks/use-can-create";
 import { PaginationBar } from "@/components/layout/pagination-bar";
 import { SearchInput } from "@/components/layout/search-input";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
@@ -25,6 +27,7 @@ import { addressTypeLabels } from "@/lib/labels";
 import type { AddressRecord } from "@/lib/types";
 
 export default function AddressesPage() {
+  const canCreate = useCanCreate();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search);
@@ -63,10 +66,14 @@ export default function AddressesPage() {
         title="Adresses"
         description="Gérez les adresses de facturation et de livraison de vos clients."
         action={
-          <Button onClick={openCreate}>
-            <Plus />
-            Nouvelle adresse
-          </Button>
+          canCreate ? (
+            <Button onClick={openCreate}>
+              <Plus />
+              Nouvelle adresse
+            </Button>
+          ) : (
+            <UpgradeCta />
+          )
         }
       />
 
@@ -85,15 +92,22 @@ export default function AddressesPage() {
           icon={MapPin}
           title={debouncedSearch ? "Aucune adresse trouvée" : "Aucune adresse pour l'instant"}
           description={
-            debouncedSearch ? "Essayez une autre recherche." : "Ajoutez une adresse à l'un de vos clients."
+            debouncedSearch
+              ? "Essayez une autre recherche."
+              : canCreate
+                ? "Ajoutez une adresse à l'un de vos clients."
+                : "La création de fiches est réservée aux comptes entreprise."
           }
           action={
-            !debouncedSearch && (
+            !debouncedSearch &&
+            (canCreate ? (
               <Button onClick={openCreate}>
                 <Plus />
                 Nouvelle adresse
               </Button>
-            )
+            ) : (
+              <UpgradeCta />
+            ))
           }
         />
       ) : (

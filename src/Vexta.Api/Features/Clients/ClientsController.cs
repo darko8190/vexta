@@ -56,6 +56,7 @@ public class ClientsController(VextaDbContext db, ICurrentUserService currentUse
         db.Clients.AsNoTracking().Where(c => c.Id == id).Select(ToDto()).FirstOrDefaultAsync();
 
     [HttpPost]
+    [RequireBusinessTenant]
     public async Task<ActionResult<ClientDto>> Create(UpsertClientRequest request)
     {
         var client = new Client

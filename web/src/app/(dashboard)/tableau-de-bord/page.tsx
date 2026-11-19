@@ -72,9 +72,13 @@ export default function DashboardPage() {
         description={
           isSuperAdmin
             ? "Vue d'ensemble de la plateforme Vexta."
-            : user?.tenantSubscriptionStatus
-              ? `${user.tenantName} — abonnement ${tenantStatusLabels[user.tenantSubscriptionStatus]}`
-              : undefined
+            : // A personal space has no subscription, so showing its status would read as a
+              // problem where there is none.
+              user?.tenantKind === "Personal"
+              ? `${user.tenantName} — espace personnel gratuit`
+              : user?.tenantSubscriptionStatus
+                ? `${user.tenantName} — abonnement ${tenantStatusLabels[user.tenantSubscriptionStatus]}`
+                : undefined
         }
       />
       {isSuperAdmin ? <SuperAdminDashboard /> : <TenantDashboard />}

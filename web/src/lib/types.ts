@@ -129,5 +129,73 @@ export interface PlatformSettings {
   mailgunRegion: string;
   stripeConfigured: boolean;
   stripePublishableKey: string | null;
-  stripeMonthlyPriceId: string | null;
+  r2Configured: boolean;
+  r2AccountId: string | null;
+  r2Bucket: string | null;
+  r2PublicBaseUrl: string | null;
+}
+
+export interface ModuleRecord {
+  id: string;
+  icon: string;
+  title: string;
+  description: string;
+  sortOrder: number;
+  isPublished: boolean;
+}
+
+export interface PlanRecord {
+  id: string;
+  name: string;
+  description: string | null;
+  amountCents: number;
+  currency: string;
+  isPublished: boolean;
+  sortOrder: number;
+  /** Null when Stripe could not be reached: such a plan cannot be published. */
+  stripePriceId: string | null;
+  modules: ModuleRecord[];
+  tenantCount: number;
+}
+
+export interface PublicModule {
+  id: string;
+  icon: string;
+  title: string;
+  description: string;
+}
+
+export interface PublicPlan {
+  id: string;
+  name: string;
+  description: string | null;
+  amountCents: number;
+  currency: string;
+  modules: PublicModule[];
+}
+
+export interface MediaAssetRecord {
+  id: string;
+  fileName: string;
+  contentType: string;
+  /** What R2 stores, which is what Cloudflare bills for. */
+  sizeBytes: number;
+  /** What the file weighed before compression; equal to sizeBytes when stored as-is. */
+  originalSizeBytes: number;
+  /** "gzip" when the file is stored compressed, otherwise null. */
+  contentEncoding: string | null;
+  createdAt: string;
+}
+
+/** The three images the super admin can replace. */
+export type BrandingSlot = "logo-light" | "logo-dark" | "icon";
+
+export interface BrandingSlotInfo {
+  slot: BrandingSlot;
+  /** True when an image was uploaded; false when the slot falls back to the environment. */
+  isUploaded: boolean;
+  /** Changes on every upload, which is what busts the browser's cache for the preview. */
+  eTag: string | null;
+  width: number;
+  height: number;
 }

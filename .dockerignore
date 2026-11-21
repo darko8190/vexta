@@ -1,0 +1,35 @@
+# The API image is built from the repository root because it needs src/Vexta.ServiceDefaults.
+# Everything the build does not read is excluded, so an edit to the front end does not bust
+# the API image's layer cache (and the other way round).
+
+**/bin
+**/obj
+**/node_modules
+**/.next
+**/out
+**/.pnpm-store
+
+.git
+.gitignore
+.agents
+.playwright-mcp
+.mcp.json
+.vs
+**/*.user
+
+# Secrets must never enter a build context: anything copied in is recoverable from the image.
+.env
+.env.*
+**/apphost.secrets.json
+**/*.data-protection-keys
+
+# The AppHost is for local development only; production is composed by compose.*.yaml.
+src/Vexta.AppHost
+
+# The front end has its own build context (./web) and its own .dockerignore. Keeping it out of
+# this one means a front-end edit does not invalidate the API image's cache.
+web
+
+compose.*.yaml
+Dockerfile
+.dockerignore

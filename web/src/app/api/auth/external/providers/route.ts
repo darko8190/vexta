@@ -1,16 +1,22 @@
 import { NextResponse } from "next/server";
-import { apiBaseUrl } from "@/lib/session";
+import { apiFetch } from "@/lib/api-server";
 
-/** Which providers this deployment has credentials for. Empty means "hide the buttons". */
+/**
+ * Which providers this deployment has credentials for. Empty means "hide the buttons".
+ *
+ * The deadline is short on purpose: these buttons are decoration until the API answers,
+ * and the sign-in form behind them must not wait on them.
+ */
 export async function GET() {
+  const response = await apiFetch("/api/auth/external/providers", { timeoutMs: 2_500 });
+
+  // A social button that cannot work is worse than no button, so any failure — including an
+  // API that never answered — hides them.
+  if (!response.ok) return NextResponse.json([]);
+
   try {
-    const response = await fetch(`${apiBaseUrl()}/api/auth/external/providers`, {
-      cache: "no-store",
-    });
-    if (!response.ok) return NextResponse.json([]);
     return NextResponse.json(await response.json());
   } catch {
-    // A social button that cannot work is worse than no button, so a failure here hides them.
     return NextResponse.json([]);
   }
 }

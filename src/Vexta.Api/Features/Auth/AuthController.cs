@@ -47,6 +47,7 @@ public class AuthController(
         var result = await tenantSignup.CreateAsync(
             request.CompanyName,
             request.Kind,
+            request.PlanId,
             request.FirstName,
             request.LastName,
             request.Email,

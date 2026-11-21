@@ -148,11 +148,11 @@ export default function ProjectsPage() {
                         <MoreHorizontal />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onSelect={() => openEdit(projectItem)}>
+                        <DropdownMenuItem onClick={() => openEdit(projectItem)}>
                           <Pencil />
                           Modifier
                         </DropdownMenuItem>
-                        <DropdownMenuItem variant="destructive" onSelect={() => setDeleteTarget(projectItem)}>
+                        <DropdownMenuItem variant="destructive" onClick={() => setDeleteTarget(projectItem)}>
                           <Trash2 />
                           Supprimer
                         </DropdownMenuItem>

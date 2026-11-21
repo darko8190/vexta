@@ -14,9 +14,12 @@ public record BillingStateDto(
     string Kind,
     string SubscriptionStatus,
     DateTimeOffset? CurrentPeriodEnd,
-    bool CanManage);
+    bool CanManage,
+    string? PlanName,
+    long? PlanAmountCents,
+    string? PlanCurrency);
 
-public record UpgradeToBusinessRequest(string CompanyName);
+public record UpgradeToBusinessRequest(string CompanyName, Guid PlanId);
 
 [ApiController]
 [Route("api/billing")]
@@ -36,12 +39,19 @@ public class BillingController(
         var tenant = await CurrentTenantAsync();
         if (tenant is null) return NotFound();
 
+        var plan = tenant.PlanId is null
+            ? null
+            : await db.Plans.AsNoTracking().FirstOrDefaultAsync(p => p.Id == tenant.PlanId);
+
         return Ok(new BillingStateDto(
             tenant.Name,
             tenant.Kind.ToString(),
             tenant.SubscriptionStatus.ToString(),
             tenant.CurrentPeriodEnd,
-            currentUser.Role == UserRole.TenantAdmin || currentUser.IsImpersonating));
+            currentUser.Role == UserRole.TenantAdmin || currentUser.IsImpersonating,
+            plan?.Name,
+            plan?.AmountCents,
+            plan?.Currency));
     }
 
     [HttpPost("checkout-session")]
@@ -56,7 +66,13 @@ public class BillingController(
             return BadRequest(new { message = "Un espace personnel est gratuit. Passez à un compte entreprise pour vous abonner." });
         }
 
-        return await StartCheckoutAsync(tenant, null);
+        var plan = await db.Plans.FirstOrDefaultAsync(p => p.Id == tenant.PlanId && p.StripePriceId != null);
+        if (plan is null)
+        {
+            return BadRequest(new { message = "Aucun forfait n'est rattaché à cet espace. Contactez l'administrateur." });
+        }
+
+        return await StartCheckoutAsync(tenant, plan.StripePriceId!, null);
     }
 
     /// <summary>
@@ -80,9 +96,18 @@ public class BillingController(
             return BadRequest(new { message = "Cet espace est déjà un compte entreprise." });
         }
 
-        return await StartCheckoutAsync(tenant, new Dictionary<string, string>
+        var plan = await db.Plans.FirstOrDefaultAsync(
+            p => p.Id == request.PlanId && p.IsPublished && p.StripePriceId != null);
+
+        if (plan is null)
         {
-            [StripeService.UpgradeNameKey] = request.CompanyName.Trim()
+            return BadRequest(new { message = "Ce forfait n'est plus offert. Choisissez-en un autre." });
+        }
+
+        return await StartCheckoutAsync(tenant, plan.StripePriceId!, new Dictionary<string, string>
+        {
+            [StripeService.UpgradeNameKey] = request.CompanyName.Trim(),
+            [StripeService.UpgradePlanKey] = plan.Id.ToString()
         });
     }
 
@@ -92,6 +117,7 @@ public class BillingController(
     /// </summary>
     private async Task<ActionResult<object>> StartCheckoutAsync(
         Tenant tenant,
+        string priceId,
         IDictionary<string, string>? metadata)
     {
         try
@@ -99,6 +125,7 @@ public class BillingController(
             var checkoutUrl = await stripeService.CreateCheckoutSessionAsync(
                 tenant,
                 CurrentEmail(),
+                priceId,
                 successUrl: $"{FrontendUrl}/parametres?abonnement=succes",
                 cancelUrl: $"{FrontendUrl}/parametres",
                 sessionMetadata: metadata);

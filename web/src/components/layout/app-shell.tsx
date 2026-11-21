@@ -156,7 +156,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </DropdownMenuGroup>
           )}
           <DropdownMenuGroup>
-            <DropdownMenuItem variant="destructive" onSelect={() => logout()}>
+            <DropdownMenuItem variant="destructive" onClick={() => logout()}>
               <LogOut />
               Se déconnecter
             </DropdownMenuItem>

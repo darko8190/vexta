@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { apiBaseUrl, getToken, setToken } from "@/lib/session";
+import { getToken, setToken } from "@/lib/session";
+import { apiFetch, isUnreachable } from "@/lib/api-server";
 
 const ACCESS_TOKEN_SECONDS = 60 * 60 * 12;
 
@@ -9,11 +10,12 @@ async function swapToken(path: string) {
     return NextResponse.json({ message: "Non authentifié." }, { status: 401 });
   }
 
-  const response = await fetch(`${apiBaseUrl()}${path}`, {
+  const response = await apiFetch(path, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
-    cache: "no-store",
   });
+
+  if (isUnreachable(response)) return response;
 
   const data = await response.json().catch(() => null);
 

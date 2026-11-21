@@ -27,12 +27,13 @@ public interface ITenantSignupService
 {
     /// <summary>
     /// Creates the tenant and its first admin. A business space also gets a Stripe checkout
-    /// session; a personal one is free and never reaches Stripe. Pass a password for the email
-    /// form, or an external login for a provider sign-up — never both.
+    /// session for the plan it chose; a personal one is free and never reaches Stripe. Pass a
+    /// password for the email form, or an external login for a provider sign-up — never both.
     /// </summary>
     Task<TenantSignupResult> CreateAsync(
         string spaceName,
         TenantKind kind,
+        Guid? planId,
         string firstName,
         string lastName,
         string email,
@@ -51,6 +52,7 @@ public class TenantSignupService(
     public async Task<TenantSignupResult> CreateAsync(
         string spaceName,
         TenantKind kind,
+        Guid? planId,
         string firstName,
         string lastName,
         string email,
@@ -65,13 +67,25 @@ public class TenantSignupService(
             return TenantSignupResult.Failed("Un compte existe déjà avec ce courriel.");
         }
 
+        Plan? plan = null;
+        if (kind == TenantKind.Business)
+        {
+            plan = await db.Plans.FirstOrDefaultAsync(
+                p => p.Id == planId && p.IsPublished && p.StripePriceId != null, ct);
+
+            if (plan is null)
+            {
+                return TenantSignupResult.Failed("Ce forfait n'est plus offert. Choisissez-en un autre.");
+            }
+        }
+
         var slug = await TenantSlug.UniqueAsync(
             spaceName,
             candidate => db.Tenants.AnyAsync(t => t.Slug == candidate, ct));
 
         // SubscriptionStatus is left alone: it describes a Stripe subscription, and a personal
         // space has none. Access is granted on Kind, not by pretending it pays.
-        var tenant = new Tenant { Name = spaceName.Trim(), Slug = slug, Kind = kind };
+        var tenant = new Tenant { Name = spaceName.Trim(), Slug = slug, Kind = kind, PlanId = plan?.Id };
         db.Tenants.Add(tenant);
 
         var user = new ApplicationUser
@@ -123,6 +137,7 @@ public class TenantSignupService(
             var checkoutUrl = await stripeService.CreateCheckoutSessionAsync(
                 tenant,
                 user.Email!,
+                plan!.StripePriceId!,
                 successUrl: $"{frontendUrl}/inscription/succes",
                 cancelUrl: $"{frontendUrl}/inscription/annule",
                 ct: ct);

@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Stripe;
 using Stripe.Checkout;
@@ -9,6 +10,13 @@ namespace Vexta.Api.Services;
 public interface IStripeService
 {
     Task<bool> IsConfiguredAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Creates the monthly Stripe price a plan will charge. Stripe prices are immutable, so
+    /// changing a plan's amount means a new price; subscriptions already running keep billing the
+    /// old one until they are migrated in Stripe.
+    /// </summary>
+    Task<string> CreateRecurringPriceAsync(long amountCents, CancellationToken ct = default);
     /// <summary>
     /// <paramref name="sessionMetadata"/> rides along to the webhook, which is the only place we
     /// learn the payment actually went through.
@@ -16,6 +24,7 @@ public interface IStripeService
     Task<string> CreateCheckoutSessionAsync(
         Tenant tenant,
         string customerEmail,
+        string priceId,
         string successUrl,
         string cancelUrl,
         IDictionary<string, string>? sessionMetadata = null,
@@ -29,6 +38,12 @@ public class StripeService(IPlatformSettingsService settings, ILogger<StripeServ
     /// <summary>Checkout session metadata key carrying the company name of a personal→business upgrade.</summary>
     public const string UpgradeNameKey = "upgrade_company_name";
 
+    /// <summary>Checkout session metadata key carrying the plan chosen for that upgrade.</summary>
+    public const string UpgradePlanKey = "upgrade_plan_id";
+
+    private const string Currency = "cad";
+    private const string ProductName = "Abonnement Vexta";
+
     private async Task<string?> GetSecretKeyAsync(CancellationToken ct) =>
         await settings.GetAsync(PlatformSettingKeys.StripeSecretKey, ct);
 
@@ -37,22 +52,72 @@ public class StripeService(IPlatformSettingsService settings, ILogger<StripeServ
         var values = await settings.GetManyAsync(
         [
             PlatformSettingKeys.StripeSecretKey,
-            PlatformSettingKeys.StripeWebhookSecret,
-            PlatformSettingKeys.StripeMonthlyPriceId
+            PlatformSettingKeys.StripeWebhookSecret
         ], ct);
         return values.Values.All(v => !string.IsNullOrWhiteSpace(v));
     }
 
+    public async Task<string> CreateRecurringPriceAsync(long amountCents, CancellationToken ct = default)
+    {
+        var secretKey = await GetSecretKeyAsync(ct);
+        if (string.IsNullOrWhiteSpace(secretKey))
+        {
+            throw new InvalidOperationException("Ajoutez la clé secrète Stripe avant de fixer un tarif.");
+        }
+
+        var client = new StripeClient(secretKey);
+        var productId = await settings.GetAsync(PlatformSettingKeys.StripeProductId, ct);
+        if (string.IsNullOrWhiteSpace(productId))
+        {
+            productId = await CreateProductAsync(client, ct);
+        }
+
+        Price price;
+        try
+        {
+            price = await CreatePriceAsync(client, productId, amountCents, ct);
+        }
+        catch (StripeException ex) when (ex.StripeError?.Code == "resource_missing")
+        {
+            // The stored product belongs to another Stripe account — the usual cause is swapping a
+            // test key for a live one. Start a fresh product rather than failing the save.
+            logger.LogWarning(ex, "Produit Stripe {ProductId} introuvable; création d'un nouveau produit.", productId);
+            productId = await CreateProductAsync(client, ct);
+            price = await CreatePriceAsync(client, productId, amountCents, ct);
+        }
+
+        logger.LogInformation("Prix Stripe {PriceId} créé pour {AmountCents} {Currency}.", price.Id, amountCents, Currency);
+        return price.Id;
+    }
+
+    private async Task<string> CreateProductAsync(StripeClient client, CancellationToken ct)
+    {
+        var product = await new ProductService(client).CreateAsync(
+            new ProductCreateOptions { Name = ProductName }, cancellationToken: ct);
+        await settings.SetAsync(PlatformSettingKeys.StripeProductId, product.Id, ct);
+        return product.Id;
+    }
+
+    private static Task<Price> CreatePriceAsync(
+        StripeClient client, string productId, long amountCents, CancellationToken ct) =>
+        new PriceService(client).CreateAsync(new PriceCreateOptions
+        {
+            Product = productId,
+            Currency = Currency,
+            UnitAmount = amountCents,
+            Recurring = new PriceRecurringOptions { Interval = "month" }
+        }, cancellationToken: ct);
+
     public async Task<string> CreateCheckoutSessionAsync(
         Tenant tenant,
         string customerEmail,
+        string priceId,
         string successUrl,
         string cancelUrl,
         IDictionary<string, string>? sessionMetadata = null,
         CancellationToken ct = default)
     {
         var secretKey = await GetSecretKeyAsync(ct);
-        var priceId = await settings.GetAsync(PlatformSettingKeys.StripeMonthlyPriceId, ct);
         if (string.IsNullOrWhiteSpace(secretKey) || string.IsNullOrWhiteSpace(priceId))
         {
             throw new InvalidOperationException("Stripe n'est pas configuré. Contactez l'administrateur de la plateforme.");
@@ -105,7 +170,7 @@ public class StripeService(IPlatformSettingsService settings, ILogger<StripeServ
                 tenant.SubscriptionStatus = TenantSubscriptionStatus.Active;
 
                 // A personal space becomes a business one only once the money has actually
-                // arrived — the name was parked in the session when checkout started.
+                // arrived — the name and plan were parked in the session when checkout started.
                 if (session.Metadata is not null
                     && session.Metadata.TryGetValue(UpgradeNameKey, out var companyName)
                     && !string.IsNullOrWhiteSpace(companyName))
@@ -115,6 +180,12 @@ public class StripeService(IPlatformSettingsService settings, ILogger<StripeServ
                     tenant.Slug = await TenantSlug.UniqueAsync(
                         companyName,
                         candidate => db.Tenants.AnyAsync(t => t.Slug == candidate && t.Id != tenant.Id, ct));
+
+                    if (session.Metadata.TryGetValue(UpgradePlanKey, out var planId)
+                        && Guid.TryParse(planId, out var parsedPlanId))
+                    {
+                        tenant.PlanId = parsedPlanId;
+                    }
                 }
 
                 await db.SaveChangesAsync(ct);

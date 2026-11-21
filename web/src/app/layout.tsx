@@ -18,6 +18,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Vexta",
   description: "Vexta — plateforme de gestion de clients, projets et facturation.",
+  // Points at the route, not at app/icon.png, so the super admin's uploaded icon becomes the
+  // browser tab icon too. The route falls back to that same bundled file when nothing is set.
+  icons: { icon: "/branding/icon", apple: "/branding/icon" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

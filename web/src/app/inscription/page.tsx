@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import * as z from "zod";
@@ -16,11 +16,15 @@ import { SocialButtons } from "@/components/auth/social-buttons";
 import { VextaLogo } from "@/components/brand/vexta-logo";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { useAuth } from "@/lib/auth-context";
+import { usePublicPlansQuery } from "@/hooks/use-catalog";
+import { formatCents } from "@/lib/money";
+import { cn } from "@/lib/utils";
 
 const formSchema = z
   .object({
     accountType: z.enum(["business", "personal"]),
     companyName: z.string(),
+    planId: z.string(),
     firstName: z.string().min(1, "Prénom requis."),
     lastName: z.string().min(1, "Nom requis."),
     email: z.string().min(1, "Le courriel est requis.").email("Courriel invalide."),
@@ -30,6 +34,10 @@ const formSchema = z
   .refine((values) => values.accountType === "personal" || values.companyName.trim().length >= 2, {
     message: "Nom d'entreprise requis.",
     path: ["companyName"],
+  })
+  .refine((values) => values.accountType === "personal" || values.planId.length > 0, {
+    message: "Choisissez un forfait.",
+    path: ["planId"],
   });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -41,16 +49,36 @@ function spaceNameFor(values: FormValues) {
     : values.companyName.trim();
 }
 
+/**
+ * The plan can arrive in the URL from the pricing section. Read in its own component so the
+ * Suspense boundary Next requires around useSearchParams does not wrap the whole form, and so
+ * the value reaches the form as a default rather than through an effect.
+ */
 export default function RegisterPage() {
+  return (
+    <Suspense fallback={null}>
+      <RegisterPageWithParams />
+    </Suspense>
+  );
+}
+
+function RegisterPageWithParams() {
+  const initialPlanId = useSearchParams().get("forfait") ?? "";
+  return <RegisterForm initialPlanId={initialPlanId} />;
+}
+
+function RegisterForm({ initialPlanId }: { initialPlanId: string }) {
   const { registerTenant } = useAuth();
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
+  const { data: plans, isLoading: plansLoading } = usePublicPlansQuery();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       accountType: "business",
       companyName: "",
+      planId: initialPlanId,
       firstName: "",
       lastName: "",
       email: "",
@@ -73,6 +101,7 @@ export default function RegisterPage() {
         email: values.email,
         password: values.password,
         kind: values.accountType === "personal" ? "Personal" : "Business",
+        planId: values.accountType === "personal" ? null : values.planId,
       });
 
       // Free spaces skip Stripe entirely and land straight in the app.
@@ -141,6 +170,64 @@ export default function RegisterPage() {
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="reg-company">Nom de l&apos;entreprise</FieldLabel>
                     <Input {...field} id="reg-company" placeholder="Acme inc." aria-invalid={fieldState.invalid} />
+                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  </Field>
+                )}
+              />
+            )}
+
+            {!isPersonal && (
+              <Controller
+                name="planId"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel>Forfait</FieldLabel>
+
+                    {plansLoading ? (
+                      <FieldDescription>Chargement des forfaits…</FieldDescription>
+                    ) : !plans || plans.length === 0 ? (
+                      <FieldDescription>
+                        Aucun forfait n&apos;est offert pour le moment. Créez un espace personnel
+                        gratuit, ou écrivez-nous.
+                      </FieldDescription>
+                    ) : (
+                      <div role="radiogroup" aria-label="Forfait" className="space-y-2">
+                        {plans.map((plan) => {
+                          const selected = field.value === plan.id;
+                          return (
+                            <button
+                              key={plan.id}
+                              type="button"
+                              role="radio"
+                              aria-checked={selected}
+                              onClick={() => field.onChange(plan.id)}
+                              className={cn(
+                                "flex w-full items-baseline justify-between gap-3 rounded-lg border px-3 py-2 text-left transition-colors",
+                                "focus-visible:ring-3 focus-visible:ring-ring/50 outline-none",
+                                selected
+                                  ? "border-primary bg-primary/5"
+                                  : "border-border hover:bg-muted/40",
+                              )}
+                            >
+                              <span className="min-w-0">
+                                <span className="block text-sm font-medium text-foreground">{plan.name}</span>
+                                {plan.description && (
+                                  <span className="block truncate text-xs text-muted-foreground">
+                                    {plan.description}
+                                  </span>
+                                )}
+                              </span>
+                              <span className="shrink-0 text-sm tabular-nums text-foreground">
+                                {formatCents(plan.amountCents, plan.currency)}
+                                <span className="text-muted-foreground"> /mois</span>
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}

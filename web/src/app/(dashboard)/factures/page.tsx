@@ -142,7 +142,7 @@ export default function InvoicesPage() {
                           <Pencil />
                           Modifier
                         </DropdownMenuItem>
-                        <DropdownMenuItem variant="destructive" onSelect={() => setDeleteTarget(invoiceItem)}>
+                        <DropdownMenuItem variant="destructive" onClick={() => setDeleteTarget(invoiceItem)}>
                           <Trash2 />
                           Supprimer
                         </DropdownMenuItem>

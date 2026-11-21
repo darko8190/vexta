@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { apiBaseUrl, getToken } from "@/lib/session";
+import { getToken } from "@/lib/session";
+import { apiFetch, isUnreachable } from "@/lib/api-server";
 
 async function forward(request: NextRequest, segments: string[]) {
   const token = await getToken();
@@ -9,20 +10,20 @@ async function forward(request: NextRequest, segments: string[]) {
 
   const targetPath = segments.join("/");
   const search = request.nextUrl.search;
-  const url = `${apiBaseUrl()}/api/${targetPath}${search}`;
 
   const hasBody = !["GET", "HEAD", "DELETE"].includes(request.method);
   const body = hasBody ? await request.text() : undefined;
 
-  const response = await fetch(url, {
+  const response = await apiFetch(`/api/${targetPath}${search}`, {
     method: request.method,
     headers: {
       Authorization: `Bearer ${token}`,
       ...(hasBody ? { "Content-Type": "application/json" } : {}),
     },
     body,
-    cache: "no-store",
   });
+
+  if (isUnreachable(response)) return response;
 
   const responseText = await response.text();
   const contentType = response.headers.get("content-type") ?? "application/json";

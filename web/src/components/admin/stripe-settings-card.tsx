@@ -19,7 +19,6 @@ const formSchema = z.object({
   stripePublishableKey: z.string().optional(),
   stripeSecretKey: z.string().optional(),
   stripeWebhookSecret: z.string().optional(),
-  stripeMonthlyPriceId: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -32,7 +31,6 @@ export function StripeSettingsCard({ settings }: { settings: PlatformSettings })
       stripePublishableKey: settings.stripePublishableKey ?? "",
       stripeSecretKey: "",
       stripeWebhookSecret: "",
-      stripeMonthlyPriceId: settings.stripeMonthlyPriceId ?? "",
     },
   });
 
@@ -41,7 +39,6 @@ export function StripeSettingsCard({ settings }: { settings: PlatformSettings })
       stripePublishableKey: settings.stripePublishableKey ?? "",
       stripeSecretKey: "",
       stripeWebhookSecret: "",
-      stripeMonthlyPriceId: settings.stripeMonthlyPriceId ?? "",
     });
   }, [settings, form]);
 
@@ -117,17 +114,6 @@ export function StripeSettingsCard({ settings }: { settings: PlatformSettings })
                   <FieldDescription>
                     À configurer sur l&apos;endpoint <code>/api/billing/webhook</code> dans Stripe.
                   </FieldDescription>
-                </Field>
-              )}
-            />
-            <Controller
-              name="stripeMonthlyPriceId"
-              control={form.control}
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel htmlFor="stripe-price">ID du prix mensuel</FieldLabel>
-                  <Input {...field} id="stripe-price" placeholder="price_…" />
-                  <FieldDescription>Le prix Stripe récurrent utilisé pour l&apos;abonnement Vexta.</FieldDescription>
                 </Field>
               )}
             />

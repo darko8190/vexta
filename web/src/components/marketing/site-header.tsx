@@ -18,16 +18,20 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur">
+      {/* The two outer cells grow equally, so the nav sits at the true centre of
+          the bar instead of drifting with the width of the logo or the buttons. */}
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center gap-4 px-4 sm:px-6 md:gap-8">
-        <Link
-          href="/"
-          aria-label="Vexta — accueil"
-          className="flex items-center transition-opacity hover:opacity-70"
-        >
-          <VextaLockup iconClassName="size-7" priority />
-        </Link>
+        <div className="flex flex-1 items-center">
+          <Link
+            href="/"
+            aria-label="Vexta — accueil"
+            className="flex items-center transition-opacity hover:opacity-70"
+          >
+            <VextaLockup iconClassName="size-7" priority />
+          </Link>
+        </div>
 
-        <nav className="hidden items-center gap-6 md:flex">
+        <nav className="hidden shrink-0 items-center gap-6 md:flex">
           {sections.map((section) => (
             <Link
               key={section.href}
@@ -39,7 +43,7 @@ export function SiteHeader() {
           ))}
         </nav>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex flex-1 items-center justify-end gap-2">
           <ThemeToggle />
           {loading ? null : user ? (
             <Link href="/tableau-de-bord" className={cn(buttonVariants(), "h-9 px-4")}>

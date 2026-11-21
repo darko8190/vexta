@@ -11,6 +11,12 @@ public interface IPlatformSettingsService
     Task<Dictionary<string, string?>> GetManyAsync(IEnumerable<string> keys, CancellationToken ct = default);
     Task SetAsync(string key, string? value, CancellationToken ct = default);
     Task SetManyAsync(Dictionary<string, string?> values, CancellationToken ct = default);
+
+    /// <summary>
+    /// Removes a setting. <see cref="SetManyAsync"/> deliberately ignores blanks so an untouched
+    /// password field cannot wipe a secret, which leaves no way to empty an optional value.
+    /// </summary>
+    Task ClearAsync(string key, CancellationToken ct = default);
 }
 
 public class PlatformSettingsService(VextaDbContext db, ISecretProtector protector) : IPlatformSettingsService
@@ -50,6 +56,18 @@ public class PlatformSettingsService(VextaDbContext db, ISecretProtector protect
     public async Task SetAsync(string key, string? value, CancellationToken ct = default)
     {
         await SetManyAsync(new Dictionary<string, string?> { [key] = value }, ct);
+    }
+
+    public async Task ClearAsync(string key, CancellationToken ct = default)
+    {
+        var setting = await db.PlatformSettings.FindAsync([key], ct);
+        if (setting is null)
+        {
+            return;
+        }
+
+        db.PlatformSettings.Remove(setting);
+        await db.SaveChangesAsync(ct);
     }
 
     public async Task SetManyAsync(Dictionary<string, string?> values, CancellationToken ct = default)

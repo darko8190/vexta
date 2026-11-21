@@ -12,6 +12,8 @@ interface RegisterTenantInput {
   email: string;
   password: string;
   kind: "Business" | "Personal";
+  /** Null for a personal space: it is free and has no plan. */
+  planId: string | null;
 }
 
 /** A business sign-up goes to Stripe; a free personal one comes back already signed in. */

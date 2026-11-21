@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { apiBaseUrl, getToken } from "@/lib/session";
+import { getToken } from "@/lib/session";
+import { apiFetch, isUnreachable } from "@/lib/api-server";
 
 export async function GET() {
   const token = await getToken();
@@ -7,10 +8,13 @@ export async function GET() {
     return NextResponse.json({ message: "Non authentifié." }, { status: 401 });
   }
 
-  const response = await fetch(`${apiBaseUrl()}/api/auth/me`, {
+  const response = await apiFetch("/api/auth/me", {
     headers: { Authorization: `Bearer ${token}` },
-    cache: "no-store",
   });
+
+  // An unreachable API is not an invalid session: saying so would sign the person out
+  // of a perfectly good session every time the back end hiccups.
+  if (isUnreachable(response)) return response;
 
   if (!response.ok) {
     return NextResponse.json({ message: "Session invalide." }, { status: response.status });

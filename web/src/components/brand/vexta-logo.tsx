@@ -1,11 +1,22 @@
-import Image from "next/image";
+/* eslint-disable @next/next/no-img-element -- see the note below: next/image caches by URL and
+   cannot know the dimensions of artwork chosen at runtime. */
 import { cn } from "@/lib/utils";
 
 /**
- * The stacked logo exists in a dark and a light artwork. Both are rendered and one is
- * hidden by CSS rather than picked in JS: the theme class lands on <html> before React
- * hydrates, so there is never a frame with the wrong artwork.
+ * The brand artwork, served by /branding/<slot> rather than imported from /public.
+ *
+ * That route resolves what the super admin uploaded, then the environment's URL, then the
+ * bundled file — so changing the logo is a setting, not a deployment.
+ *
+ * These are plain <img> tags on purpose. next/image would route them through the optimiser,
+ * which caches by URL and would keep serving the old artwork after an upload; and it cannot know
+ * the dimensions of a file that is chosen at runtime. The width/height attributes below are the
+ * bundled artwork's, used only as an aspect-ratio hint so the page does not jump while loading.
  */
+
+const LOGO_RATIO = { width: 1536, height: 1024 };
+const ICON_RATIO = { width: 500, height: 500 };
+
 export function VextaLogo({
   className,
   priority = false,
@@ -13,23 +24,25 @@ export function VextaLogo({
   className?: string;
   priority?: boolean;
 }) {
+  // Both artworks are rendered and one is hidden by CSS rather than picked in JS: the theme
+  // class lands on <html> before React hydrates, so there is never a frame with the wrong one.
   const common = "h-auto w-full";
+  const loading = priority ? { loading: "eager" as const, fetchPriority: "high" as const } : {};
+
   return (
     <span className={cn("block", className)}>
-      <Image
-        src="/vexta-logo-light.png"
+      <img
+        src="/branding/logo-light"
         alt="Vexta"
-        width={1536}
-        height={1024}
-        priority={priority}
+        {...LOGO_RATIO}
+        {...loading}
         className={cn(common, "dark:hidden")}
       />
-      <Image
-        src="/vexta-logo-dark.png"
+      <img
+        src="/branding/logo-dark"
         alt="Vexta"
-        width={1536}
-        height={1024}
-        priority={priority}
+        {...LOGO_RATIO}
+        {...loading}
         className={cn(common, "hidden dark:block")}
       />
     </span>
@@ -45,13 +58,12 @@ export function VextaIcon({
   priority?: boolean;
 }) {
   return (
-    <Image
-      src="/vexta-icon.png"
+    <img
+      src="/branding/icon"
       alt="Vexta"
-      width={500}
-      height={500}
-      priority={priority}
-      className={cn("size-8 rounded-lg", className)}
+      {...ICON_RATIO}
+      {...(priority ? { loading: "eager" as const, fetchPriority: "high" as const } : {})}
+      className={cn("size-8 rounded-lg object-contain", className)}
     />
   );
 }

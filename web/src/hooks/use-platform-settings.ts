@@ -11,7 +11,12 @@ export interface UpdatePlatformSettingsValues {
   stripeSecretKey?: string;
   stripePublishableKey?: string;
   stripeWebhookSecret?: string;
-  stripeMonthlyPriceId?: string;
+  r2AccountId?: string;
+  r2AccessKeyId?: string;
+  r2SecretAccessKey?: string;
+  r2Bucket?: string;
+  /** An empty string clears it; omitting it leaves the stored value alone. */
+  r2PublicBaseUrl?: string;
 }
 
 export function usePlatformSettingsQuery() {
@@ -28,3 +33,11 @@ export function useUpdatePlatformSettings() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "settings"] }),
   });
 }
+
+/** Checks the stored R2 credentials against the bucket before anyone depends on them. */
+export function useTestR2() {
+  return useMutation({
+    mutationFn: () => api.post<{ message: string }>("admin/settings/r2/test"),
+  });
+}
+

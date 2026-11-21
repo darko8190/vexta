@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { apiBaseUrl, setToken } from "@/lib/session";
+import { setToken } from "@/lib/session";
+import { apiFetch, isUnreachable } from "@/lib/api-server";
 
 const ACCESS_TOKEN_SECONDS = 60 * 60 * 12;
 
@@ -7,11 +8,13 @@ const ACCESS_TOKEN_SECONDS = 60 * 60 * 12;
 export async function POST(request: NextRequest) {
   const body = await request.json();
 
-  const response = await fetch(`${apiBaseUrl()}/api/auth/external/exchange`, {
+  const response = await apiFetch("/api/auth/external/exchange", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+
+  if (isUnreachable(response)) return response;
 
   const data = await response.json().catch(() => null);
 

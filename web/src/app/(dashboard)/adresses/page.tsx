@@ -145,11 +145,11 @@ export default function AddressesPage() {
                         <MoreHorizontal />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onSelect={() => openEdit(addressItem)}>
+                        <DropdownMenuItem onClick={() => openEdit(addressItem)}>
                           <Pencil />
                           Modifier
                         </DropdownMenuItem>
-                        <DropdownMenuItem variant="destructive" onSelect={() => setDeleteTarget(addressItem)}>
+                        <DropdownMenuItem variant="destructive" onClick={() => setDeleteTarget(addressItem)}>
                           <Trash2 />
                           Supprimer
                         </DropdownMenuItem>

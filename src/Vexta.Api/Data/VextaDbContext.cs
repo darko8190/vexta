@@ -25,6 +25,10 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<InvoiceLine> InvoiceLines => Set<InvoiceLine>();
     public DbSet<PlatformSetting> PlatformSettings => Set<PlatformSetting>();
+    public DbSet<MediaAsset> MediaAssets => Set<MediaAsset>();
+    public DbSet<Plan> Plans => Set<Plan>();
+    public DbSet<Module> Modules => Set<Module>();
+    public DbSet<BrandingAsset> BrandingAssets => Set<BrandingAsset>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -33,11 +37,34 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
         builder.Entity<Tenant>(e =>
         {
             e.HasIndex(t => t.Slug).IsUnique();
+            // Restrict, not cascade: deleting a plan must never take paying tenants with it.
+            e.HasOne(t => t.Plan).WithMany(p => p.Tenants)
+                .HasForeignKey(t => t.PlanId).OnDelete(DeleteBehavior.Restrict);
         });
 
         builder.Entity<ApplicationUser>(e =>
         {
             e.HasOne(u => u.Tenant).WithMany(t => t.Users).HasForeignKey(u => u.TenantId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Plans and modules are platform-wide content, not tenant data: no query filter.
+        builder.Entity<Plan>(e =>
+        {
+            e.HasIndex(p => p.SortOrder);
+            e.HasMany(p => p.Modules).WithMany(m => m.Plans);
+        });
+
+        builder.Entity<Module>(e =>
+        {
+            e.HasIndex(m => m.SortOrder);
+        });
+
+        builder.Entity<MediaAsset>(e =>
+        {
+            e.HasOne(m => m.Tenant).WithMany().HasForeignKey(m => m.TenantId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(m => m.ObjectKey).IsUnique();
+            e.HasIndex(m => new { m.TenantId, m.CreatedAt });
+            e.HasQueryFilter(m => m.TenantId == CurrentTenantId);
         });
 
         builder.Entity<Client>(e =>
@@ -79,6 +106,16 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
         builder.Entity<PlatformSetting>(e =>
         {
             e.HasKey(s => s.Key);
+        });
+
+        // Platform-wide branding, like Plan and Module: no tenant query filter, because every
+        // tenant and every anonymous visitor sees the same logo.
+        builder.Entity<BrandingAsset>(e =>
+        {
+            e.HasKey(a => a.Slot);
+            e.Property(a => a.Slot).HasMaxLength(32);
+            e.Property(a => a.ContentType).HasMaxLength(100);
+            e.Property(a => a.ETag).HasMaxLength(64);
         });
     }
 }

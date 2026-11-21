@@ -1,0 +1,152 @@
+# Vexta — QA, deployed by Dokploy.
+#
+# Same shape as compose.prod.yaml so that what is tested here is what ships. The differences are
+# deliberate and limited to three: the environment name, distinct image tags and router names so
+# both stacks can live on one host, and a noindex header so QA never turns up in a search engine.
+#
+# Dokploy writes the variables entered in its UI to a .env file beside this one, and compose
+# substitutes them below. They are referenced one by one on purpose rather than loaded wholesale
+# with env_file, so each container receives only what it actually needs and this file doubles as
+# the list of what has to be configured.
+#
+# Run it from the repository root: docker compose -f compose.qa.yaml up -d
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-vextadb}
+      POSTGRES_USER: ${POSTGRES_USER:-vexta}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD est obligatoire}
+    volumes:
+      # Mounted at /var/lib/postgresql, NOT at .../data. Since Postgres 18 the image keeps its
+      # data in a version-specific subdirectory (/var/lib/postgresql/18/docker) so that
+      # pg_upgrade --link can work, and it refuses to start when it finds a volume on the old
+      # path instead.
+      - postgres-data:/var/lib/postgresql
+    # Deliberately NOT on dokploy-network: the database has no business being reachable from
+    # the proxy's network, where every other application on this host also sits.
+    networks:
+      - vexta-internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vexta} -d ${POSTGRES_DB:-vextadb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  api:
+    build:
+      context: .
+      dockerfile: src/Vexta.Api/Dockerfile
+    image: vexta/api:qa
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Staging
+
+      # The Aspire Npgsql component reads this key; "vextadb" is the name the code asks for.
+      ConnectionStrings__vextadb: Host=postgres;Port=5432;Database=${POSTGRES_DB:-vextadb};Username=${POSTGRES_USER:-vexta};Password=${POSTGRES_PASSWORD};Include Error Detail=false
+
+      # Signs every session token. Changing it signs everyone out; losing it is harmless.
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:?JWT_SIGNING_KEY est obligatoire}
+
+      # Created once, on the first start against an empty database. Never read again afterwards:
+      # the seeder skips the whole step as soon as a super admin exists, so changing the password
+      # here does not change the account's password.
+      SuperAdmin__Email: ${SUPERADMIN_EMAIL:?SUPERADMIN_EMAIL est obligatoire}
+      SuperAdmin__Password: ${SUPERADMIN_PASSWORD:?SUPERADMIN_PASSWORD est obligatoire}
+
+      Cors__AllowedOrigins__0: https://${WEB_DOMAIN}
+      Frontend__BaseUrl: https://${WEB_DOMAIN}
+
+      # Where the data protection key ring is written. Backed by a volume — see below.
+      DataProtection__KeyPath: /data/keys
+
+      # Social sign-in. Left empty, the provider is simply not registered and its button stays
+      # hidden, so a deployment without them still works.
+      Authentication__Google__ClientId: ${GOOGLE_CLIENT_ID:-}
+      Authentication__Google__ClientSecret: ${GOOGLE_CLIENT_SECRET:-}
+      Authentication__Microsoft__ClientId: ${MICROSOFT_CLIENT_ID:-}
+      Authentication__Microsoft__ClientSecret: ${MICROSOFT_CLIENT_SECRET:-}
+    volumes:
+      # The one volume that must never be lost. These keys decrypt the Stripe, Mailgun and R2
+      # credentials the super admin saved: without them those rows are unreadable and every
+      # integration has to be configured again.
+      - api-keys:/data/keys
+    networks:
+      - vexta-internal
+      # On the proxy's network too: an OAuth provider redirects the browser to the API's
+      # callback, and Stripe posts webhooks to it, so it needs a public hostname of its own.
+      - dokploy-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - 8080
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/alive"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      # Migrations run before the first request is served, so the first check must wait them out.
+      start_period: 90s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=dokploy-network
+      - traefik.http.routers.vexta-qa-api.rule=Host(`${API_DOMAIN}`)
+      - traefik.http.routers.vexta-qa-api.entrypoints=websecure
+      - traefik.http.routers.vexta-qa-api.tls.certResolver=letsencrypt
+      - traefik.http.services.vexta-qa-api.loadbalancer.server.port=8080
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    image: vexta/web:qa
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+
+      # Server-to-server, inside vexta-internal. Plain HTTP is correct here: the traffic never
+      # leaves the Docker network, and the API holds no certificate of its own.
+      API_INTERNAL_URL: http://api:8080
+      # Where the browser itself is sent, for the one flow that cannot be proxied: an OAuth
+      # provider redirects the browser, not our server.
+      API_PUBLIC_URL: https://${API_DOMAIN}
+
+      # Optional. The logo and icon used until the super admin uploads their own, from
+      # Apparence. Any URL the browser can reach; leave empty to use the bundled artwork.
+      BRANDING_LOGO_LIGHT_URL: ${BRANDING_LOGO_LIGHT_URL:-}
+      BRANDING_LOGO_DARK_URL: ${BRANDING_LOGO_DARK_URL:-}
+      BRANDING_ICON_URL: ${BRANDING_ICON_URL:-}
+    networks:
+      - vexta-internal
+      - dokploy-network
+    depends_on:
+      api:
+        condition: service_healthy
+    expose:
+      - 3000
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=dokploy-network
+      - traefik.http.routers.vexta-qa-web.rule=Host(`${WEB_DOMAIN}`)
+      - traefik.http.routers.vexta-qa-web.middlewares=vexta-qa-noindex
+      - traefik.http.middlewares.vexta-qa-noindex.headers.customresponseheaders.X-Robots-Tag=noindex, nofollow
+      - traefik.http.routers.vexta-qa-web.entrypoints=websecure
+      - traefik.http.routers.vexta-qa-web.tls.certResolver=letsencrypt
+      - traefik.http.services.vexta-qa-web.loadbalancer.server.port=3000
+
+volumes:
+  postgres-data:
+  api-keys:
+
+networks:
+  # Injected by Dokploy. It already exists on the host, which is why it is declared external:
+  # compose must attach to it, not create it.
+  dokploy-network:
+    external: true
+  # Private to this stack. Keeps Postgres off the shared proxy network.
+  vexta-internal:
+    driver: bridge

@@ -12,7 +12,9 @@ public record RegisterTenantRequest(
     string LastName,
     string Email,
     string Password,
-    TenantKind Kind = TenantKind.Business);
+    TenantKind Kind = TenantKind.Business,
+    /// <summary>Required for a business space: which published plan they picked.</summary>
+    Guid? PlanId = null);
 
 public record AuthResponse(string AccessToken, UserDto User);
 
@@ -72,7 +74,7 @@ public record RegisterTenantResponse(string? CheckoutUrl = null, AuthResponse? S
 public record ExternalExchangeRequest(string Code);
 
 /// <summary>A blank CompanyName means a personal sign-up: the space takes the person's name.</summary>
-public record ExternalRegisterTenantRequest(string Ticket, string? CompanyName);
+public record ExternalRegisterTenantRequest(string Ticket, string? CompanyName, Guid? PlanId);
 
 /// <summary>What the callback parks in the ticket while it asks for a company name.</summary>
 public record PendingExternalSignup(

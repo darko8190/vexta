@@ -8,6 +8,10 @@ public class Tenant
 
     public TenantKind Kind { get; set; } = TenantKind.Business;
 
+    /// <summary>The plan this space signed up for. Null for a free personal space.</summary>
+    public Guid? PlanId { get; set; }
+    public Plan? Plan { get; set; }
+
     public TenantSubscriptionStatus SubscriptionStatus { get; set; } = TenantSubscriptionStatus.Incomplete;
     public string? StripeCustomerId { get; set; }
     public string? StripeSubscriptionId { get; set; }

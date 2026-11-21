@@ -130,3 +130,89 @@
     @apply font-sans;
   }
 }
+/*
+ * Tinted marketing surface: a corner glow in the brand blue, a fine dot grid, and a soft halo —
+ * the treatment used on facturation.vexta.ca.
+ *
+ * One base class with per-section variables rather than three copies: the glow sits in a
+ * different corner on each section, so the page does not read as the same panel three times.
+ * The light theme keeps the geometry on a pale surface instead of forcing a dark band into it —
+ * the app has both themes, and a section that ignores the chosen one looks like a bug.
+ */
+.vx-glow {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background-color: var(--vx-surface-base);
+  background-image: radial-gradient(
+    at var(--vx-glow-corner, 100% 0%),
+    var(--vx-surface-corner) 0px,
+    transparent 60%
+  );
+}
+
+/* Decorative only, hence a pseudo-element: nothing for a screen reader to announce. */
+.vx-glow::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background-image: radial-gradient(circle, var(--vx-surface-dot) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* The halo, deliberately off-centre: it spills past a corner rather than sitting in the middle. */
+.vx-glow::after {
+  content: "";
+  position: absolute;
+  top: var(--vx-halo-top, -160px);
+  right: var(--vx-halo-right, -40px);
+  z-index: -1;
+  width: 680px;
+  height: 680px;
+  border-radius: 50%;
+  background-image: radial-gradient(circle, var(--vx-surface-halo), transparent 70%);
+}
+
+/* The pricing section mirrors the hero: glow drawn from the opposite corner. */
+.vx-glow-mirrored {
+  --vx-glow-corner: 0% 0%;
+  --vx-halo-right: auto;
+  --vx-halo-left: -40px;
+}
+
+.vx-glow-mirrored::after {
+  right: auto;
+  left: var(--vx-halo-left);
+}
+
+/* The closing band, as on the reference: the glow rises from just left of centre. */
+.vx-glow-band {
+  --vx-glow-corner: 30% 0%;
+  --vx-halo-top: -260px;
+  --vx-halo-right: 20%;
+}
+
+:root {
+  --vx-surface-base: oklch(0.975 0.006 240);
+  --vx-surface-corner: oklch(0.82 0.1 245);
+  --vx-surface-dot: oklch(0.45 0.03 258 / 14%);
+  --vx-surface-halo: oklch(0.72 0.15 225 / 22%);
+  /* The logo's bright cyan reaches only 1.8:1 on a pale surface, well under the 3:1 WCAG asks
+     for large text, so the light theme uses the deeper brand blue instead. */
+  --vx-hero-accent: oklch(0.52 0.17 243);
+}
+
+.dark {
+  /* The reference values: #070B14 base, #17408C corner glow, #37D2FF halo. */
+  --vx-surface-base: oklch(0.16 0.018 258);
+  --vx-surface-corner: oklch(0.38 0.13 265);
+  --vx-surface-dot: oklch(1 0 0 / 12%);
+  --vx-surface-halo: oklch(0.82 0.14 225 / 16%);
+  --vx-hero-accent: oklch(0.78 0.15 225);
+}
+
+/* The accent on the last sentence of the heading, in the blue of the logo. */
+.vx-hero-accent {
+  color: var(--vx-hero-accent);
+}

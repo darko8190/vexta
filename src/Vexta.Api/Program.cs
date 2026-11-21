@@ -2,6 +2,8 @@ using System.Text;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
 using Vexta.Api.Auth;
@@ -22,6 +24,21 @@ builder.Services.AddOpenApi();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddHttpClient();
 
+// Behind Traefik the API only ever sees a plain HTTP request from the proxy. Without this it
+// builds its own absolute URLs as http://, which breaks the one flow that depends on them:
+// an OAuth provider will refuse a redirect_uri that does not match the https one registered.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders =
+        ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost;
+
+    // The proxy's address is assigned by Docker and changes on every deploy, so it cannot be
+    // pinned. Nothing else can reach this container: it publishes no port to the host and is
+    // only on the proxy's own network.
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
 builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo(builder.Configuration["DataProtection:KeyPath"] ?? "/data/keys"));
 
@@ -33,6 +50,8 @@ builder.Services.AddScoped<IPlatformSettingsService, PlatformSettingsService>();
 builder.Services.AddScoped<IMailgunService, MailgunService>();
 builder.Services.AddScoped<IStripeService, StripeService>();
 builder.Services.AddScoped<ITenantSignupService, TenantSignupService>();
+builder.Services.AddScoped<IR2StorageService, R2StorageService>();
+builder.Services.AddScoped<IBrandingService, BrandingService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 
 builder.Services
@@ -121,7 +140,23 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// First in the pipeline: everything downstream that reads the scheme, host or client IP has to
+// see the real ones, not the proxy's.
+app.UseForwardedHeaders();
+
 app.MapDefaultEndpoints();
+
+// MapDefaultEndpoints only maps the health endpoints in development. Docker needs one in every
+// environment, otherwise a container counts as healthy the moment the process starts and the
+// web container is let through before migrations have finished. /alive answers only "is this
+// process responding" and says nothing about dependencies, so exposing it leaks nothing.
+if (!app.Environment.IsDevelopment())
+{
+    app.MapHealthChecks("/alive", new HealthCheckOptions
+    {
+        Predicate = registration => registration.Tags.Contains("live")
+    });
+}
 
 if (app.Environment.IsDevelopment())
 {

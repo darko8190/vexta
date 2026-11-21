@@ -1,0 +1,184 @@
+using Amazon.Runtime;
+using Amazon.S3;
+using Amazon.S3.Model;
+using Vexta.Api.Domain;
+
+namespace Vexta.Api.Services;
+
+public interface IR2StorageService
+{
+    Task<bool> IsConfiguredAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// A short-lived URL the browser PUTs the file to, straight to R2.
+    /// <paramref name="contentEncoding"/> is signed into the URL when the browser compressed the
+    /// bytes, so R2 stores the encoding alongside the object and every later read inflates on its
+    /// own. The browser must then send exactly that header, or the signature will not match.
+    /// </summary>
+    Task<string> CreateUploadUrlAsync(
+        string objectKey, string contentType, string? contentEncoding = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Where to read the file. A public base URL is used when one is configured, otherwise a
+    /// short-lived signed URL, so a private bucket works without one.
+    /// </summary>
+    Task<string> CreateDownloadUrlAsync(string objectKey, string fileName, CancellationToken ct = default);
+
+    Task DeleteAsync(string objectKey, CancellationToken ct = default);
+
+    /// <summary>Throws with a readable reason when the credentials or bucket are wrong.</summary>
+    Task CheckConnectionAsync(CancellationToken ct = default);
+}
+
+public record R2Configuration(
+    string AccountId,
+    string AccessKeyId,
+    string SecretAccessKey,
+    string Bucket,
+    string? PublicBaseUrl);
+
+public class R2StorageService(IPlatformSettingsService settings) : IR2StorageService
+{
+    private static readonly TimeSpan UploadUrlLifetime = TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan DownloadUrlLifetime = TimeSpan.FromMinutes(15);
+
+    private static readonly string[] ConfigKeys =
+    [
+        PlatformSettingKeys.R2AccountId,
+        PlatformSettingKeys.R2AccessKeyId,
+        PlatformSettingKeys.R2SecretAccessKey,
+        PlatformSettingKeys.R2Bucket,
+        PlatformSettingKeys.R2PublicBaseUrl
+    ];
+
+    public async Task<bool> IsConfiguredAsync(CancellationToken ct = default) =>
+        await ReadConfigurationAsync(ct) is not null;
+
+    private async Task<R2Configuration?> ReadConfigurationAsync(CancellationToken ct)
+    {
+        var values = await settings.GetManyAsync(ConfigKeys, ct);
+
+        var accountId = values[PlatformSettingKeys.R2AccountId];
+        var accessKeyId = values[PlatformSettingKeys.R2AccessKeyId];
+        var secret = values[PlatformSettingKeys.R2SecretAccessKey];
+        var bucket = values[PlatformSettingKeys.R2Bucket];
+
+        if (string.IsNullOrWhiteSpace(accountId)
+            || string.IsNullOrWhiteSpace(accessKeyId)
+            || string.IsNullOrWhiteSpace(secret)
+            || string.IsNullOrWhiteSpace(bucket))
+        {
+            return null;
+        }
+
+        return new R2Configuration(
+            accountId.Trim(),
+            accessKeyId.Trim(),
+            secret.Trim(),
+            bucket.Trim(),
+            string.IsNullOrWhiteSpace(values[PlatformSettingKeys.R2PublicBaseUrl])
+                ? null
+                : values[PlatformSettingKeys.R2PublicBaseUrl]!.Trim().TrimEnd('/'));
+    }
+
+    private async Task<R2Configuration> RequireConfigurationAsync(CancellationToken ct) =>
+        await ReadConfigurationAsync(ct)
+        ?? throw new InvalidOperationException(
+            "Le stockage R2 n'est pas configuré. Un administrateur doit l'ajouter dans Intégrations.");
+
+    private static IAmazonS3 CreateClient(R2Configuration config) =>
+        new AmazonS3Client(
+            new BasicAWSCredentials(config.AccessKeyId, config.SecretAccessKey),
+            new AmazonS3Config
+            {
+                ServiceURL = $"https://{config.AccountId}.r2.cloudflarestorage.com",
+                // R2 ignores the region but the SDK refuses to sign without one.
+                AuthenticationRegion = "auto",
+                ForcePathStyle = true,
+                // R2 rejects the integrity checksums the SDK adds by default, and a browser PUTting
+                // to a presigned URL cannot send them anyway.
+                RequestChecksumCalculation = RequestChecksumCalculation.WHEN_REQUIRED,
+                ResponseChecksumValidation = ResponseChecksumValidation.WHEN_REQUIRED
+            });
+
+    public async Task<string> CreateUploadUrlAsync(
+        string objectKey, string contentType, string? contentEncoding = null, CancellationToken ct = default)
+    {
+        var config = await RequireConfigurationAsync(ct);
+        using var client = CreateClient(config);
+
+        var request = new GetPreSignedUrlRequest
+        {
+            BucketName = config.Bucket,
+            Key = objectKey,
+            Verb = HttpVerb.PUT,
+            // Signed in, so the upload cannot claim a different type than the one we recorded.
+            ContentType = contentType,
+            Expires = DateTime.UtcNow.Add(UploadUrlLifetime)
+        };
+
+        if (!string.IsNullOrWhiteSpace(contentEncoding))
+        {
+            // Stored on the object itself rather than applied per read. That is what makes the
+            // decompression work through a public bucket URL too, where there is no signed
+            // request to attach response overrides to.
+            request.Headers.ContentEncoding = contentEncoding;
+        }
+
+        return await client.GetPreSignedURLAsync(request);
+    }
+
+    public async Task<string> CreateDownloadUrlAsync(
+        string objectKey, string fileName, CancellationToken ct = default)
+    {
+        var config = await RequireConfigurationAsync(ct);
+
+        if (config.PublicBaseUrl is { } publicBase)
+        {
+            return $"{publicBase}/{Uri.EscapeDataString(objectKey)}";
+        }
+
+        using var client = CreateClient(config);
+
+        return await client.GetPreSignedURLAsync(new GetPreSignedUrlRequest
+        {
+            BucketName = config.Bucket,
+            Key = objectKey,
+            Verb = HttpVerb.GET,
+            Expires = DateTime.UtcNow.Add(DownloadUrlLifetime),
+            // Keeps the original name when the browser saves it.
+            ResponseHeaderOverrides = new ResponseHeaderOverrides
+            {
+                ContentDisposition = $"inline; filename=\"{Uri.EscapeDataString(fileName)}\""
+            }
+        });
+    }
+
+    public async Task DeleteAsync(string objectKey, CancellationToken ct = default)
+    {
+        var config = await RequireConfigurationAsync(ct);
+        using var client = CreateClient(config);
+
+        await client.DeleteObjectAsync(
+            new DeleteObjectRequest { BucketName = config.Bucket, Key = objectKey }, ct);
+    }
+
+    public async Task CheckConnectionAsync(CancellationToken ct = default)
+    {
+        var config = await RequireConfigurationAsync(ct);
+        using var client = CreateClient(config);
+
+        try
+        {
+            // Listing one key proves the credentials sign correctly and the bucket exists, without
+            // writing anything.
+            await client.ListObjectsV2Async(
+                new ListObjectsV2Request { BucketName = config.Bucket, MaxKeys = 1 }, ct);
+        }
+        catch (AmazonS3Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"R2 a refusé la connexion : {ex.Message}", ex);
+        }
+    }
+}

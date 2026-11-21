@@ -13,8 +13,11 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { PageHeader } from "@/components/layout/page-header";
+import { usePublicPlansQuery } from "@/hooks/use-catalog";
 import { api } from "@/lib/api";
 import { tenantStatusBadgeVariant, tenantStatusLabels } from "@/lib/labels";
+import { formatCents } from "@/lib/money";
+import { cn } from "@/lib/utils";
 import type { TenantSubscriptionStatus } from "@/lib/types";
 
 interface BillingState {
@@ -23,6 +26,9 @@ interface BillingState {
   subscriptionStatus: TenantSubscriptionStatus;
   currentPeriodEnd: string | null;
   canManage: boolean;
+  planName: string | null;
+  planAmountCents: number | null;
+  planCurrency: string | null;
 }
 
 function PaymentReturnNotice() {
@@ -58,7 +64,11 @@ function BusinessSubscription({ state }: { state: BillingState }) {
             {tenantStatusLabels[state.subscriptionStatus]}
           </Badge>
         </div>
-        <CardDescription>{state.tenantName}</CardDescription>
+        <CardDescription>
+          {state.planName && state.planAmountCents !== null
+            ? `${state.tenantName} · ${state.planName} — ${formatCents(state.planAmountCents, state.planCurrency ?? "CAD")} / mois`
+            : state.tenantName}
+        </CardDescription>
       </CardHeader>
       <CardContent className="text-sm text-muted-foreground">
         {isActive
@@ -81,15 +91,17 @@ function BusinessSubscription({ state }: { state: BillingState }) {
 
 function PersonalSpace({ state }: { state: BillingState }) {
   const [companyName, setCompanyName] = useState("");
+  const [planId, setPlanId] = useState("");
+  const { data: plans, isLoading: plansLoading } = usePublicPlansQuery();
 
   const upgrade = useMutation({
-    mutationFn: () => api.post<{ checkoutUrl: string }>("billing/upgrade", { companyName }),
+    mutationFn: () => api.post<{ checkoutUrl: string }>("billing/upgrade", { companyName, planId }),
     onSuccess: (data) => window.location.assign(data.checkoutUrl),
     onError: (error) =>
       toast.error(error instanceof Error ? error.message : "Impossible de démarrer le paiement."),
   });
 
-  const canSubmit = companyName.trim().length >= 2 && !upgrade.isPending;
+  const canSubmit = companyName.trim().length >= 2 && planId.length > 0 && !upgrade.isPending;
 
   return (
     <div className="grid max-w-lg gap-4">
@@ -130,6 +142,43 @@ function PersonalSpace({ state }: { state: BillingState }) {
                 onChange={(event) => setCompanyName(event.target.value)}
                 placeholder="Acme inc."
               />
+            </Field>
+
+            <Field className="mt-4">
+              <FieldLabel>Forfait</FieldLabel>
+              {plansLoading ? (
+                <FieldDescription>Chargement des forfaits…</FieldDescription>
+              ) : !plans || plans.length === 0 ? (
+                <FieldDescription>
+                  Aucun forfait n&apos;est offert pour le moment.
+                </FieldDescription>
+              ) : (
+                <div role="radiogroup" aria-label="Forfait" className="space-y-2">
+                  {plans.map((plan) => {
+                    const selected = planId === plan.id;
+                    return (
+                      <button
+                        key={plan.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        onClick={() => setPlanId(plan.id)}
+                        className={cn(
+                          "flex w-full items-baseline justify-between gap-3 rounded-lg border px-3 py-2 text-left transition-colors",
+                          "focus-visible:ring-3 focus-visible:ring-ring/50 outline-none",
+                          selected ? "border-primary bg-primary/5" : "border-border hover:bg-muted/40",
+                        )}
+                      >
+                        <span className="text-sm font-medium text-foreground">{plan.name}</span>
+                        <span className="shrink-0 text-sm tabular-nums text-foreground">
+                          {formatCents(plan.amountCents, plan.currency)}
+                          <span className="text-muted-foreground"> /mois</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
               <FieldDescription>
                 Le changement ne prend effet qu&apos;une fois le paiement confirmé.
               </FieldDescription>

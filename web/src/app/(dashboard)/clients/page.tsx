@@ -144,11 +144,11 @@ export default function ClientsPage() {
                         <MoreHorizontal />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onSelect={() => openEdit(clientItem)}>
+                        <DropdownMenuItem onClick={() => openEdit(clientItem)}>
                           <Pencil />
                           Modifier
                         </DropdownMenuItem>
-                        <DropdownMenuItem variant="destructive" onSelect={() => setDeleteTarget(clientItem)}>
+                        <DropdownMenuItem variant="destructive" onClick={() => setDeleteTarget(clientItem)}>
                           <Trash2 />
                           Supprimer
                         </DropdownMenuItem>

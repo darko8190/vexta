@@ -19,5 +19,13 @@ public static class PlatformSettingKeys
     public const string StripeSecretKey = "Stripe:SecretKey";
     public const string StripePublishableKey = "Stripe:PublishableKey";
     public const string StripeWebhookSecret = "Stripe:WebhookSecret";
-    public const string StripeMonthlyPriceId = "Stripe:MonthlyPriceId";
+    // The Stripe product every plan's price hangs off. Created once, then reused.
+    public const string StripeProductId = "Stripe:ProductId";
+
+    // Cloudflare R2: one bucket for the whole platform, each tenant under its own key prefix.
+    public const string R2AccountId = "R2:AccountId";
+    public const string R2AccessKeyId = "R2:AccessKeyId";
+    public const string R2SecretAccessKey = "R2:SecretAccessKey";
+    public const string R2Bucket = "R2:Bucket";
+    public const string R2PublicBaseUrl = "R2:PublicBaseUrl";
 }

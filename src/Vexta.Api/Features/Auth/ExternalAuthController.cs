@@ -177,6 +177,7 @@ public class ExternalAuthController(
         var result = await tenantSignup.CreateAsync(
             spaceName,
             isPersonal ? TenantKind.Personal : TenantKind.Business,
+            request.PlanId,
             firstName,
             pending.LastName,
             pending.Email,

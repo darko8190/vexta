@@ -14,13 +14,21 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VextaLogo } from "@/components/brand/vexta-logo";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { useAuth } from "@/lib/auth-context";
+import { usePublicPlansQuery } from "@/hooks/use-catalog";
+import { formatCents } from "@/lib/money";
+import { cn } from "@/lib/utils";
 
 const formSchema = z
   .object({
     accountType: z.enum(["business", "personal"]),
     companyName: z.string(),
+    planId: z.string(),
   })
   // A travailleur autonome has no company name to give; their space is named after them.
+  .refine((values) => values.accountType === "personal" || values.planId.length > 0, {
+    message: "Choisissez un forfait.",
+    path: ["planId"],
+  })
   .refine((values) => values.accountType === "personal" || values.companyName.trim().length >= 2, {
     message: "Le nom de l'entreprise est requis.",
     path: ["companyName"],
@@ -50,11 +58,12 @@ function CompanyStep() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: { accountType: "business", companyName: "" },
+    defaultValues: { accountType: "business", companyName: "", planId: "" },
   });
 
   const accountType = useWatch({ control: form.control, name: "accountType" });
   const isPersonal = accountType === "personal";
+  const { data: plans, isLoading: plansLoading } = usePublicPlansQuery();
 
   useEffect(() => {
     if (!ticket) return;
@@ -91,6 +100,7 @@ function CompanyStep() {
         body: JSON.stringify({
           ticket,
           companyName: values.accountType === "personal" ? null : values.companyName,
+          planId: values.accountType === "personal" ? null : values.planId,
         }),
       });
       const data = await response.json().catch(() => null);
@@ -173,6 +183,52 @@ function CompanyStep() {
                     placeholder="Acme inc."
                     aria-invalid={fieldState.invalid}
                   />
+                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              )}
+            />
+          )}
+
+          {!isPersonal && (
+            <Controller
+              name="planId"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel>Forfait</FieldLabel>
+                  {plansLoading ? (
+                    <FieldDescription>Chargement des forfaits…</FieldDescription>
+                  ) : !plans || plans.length === 0 ? (
+                    <FieldDescription>
+                      Aucun forfait n&apos;est offert pour le moment. Créez un espace personnel gratuit.
+                    </FieldDescription>
+                  ) : (
+                    <div role="radiogroup" aria-label="Forfait" className="space-y-2">
+                      {plans.map((plan) => {
+                        const selected = field.value === plan.id;
+                        return (
+                          <button
+                            key={plan.id}
+                            type="button"
+                            role="radio"
+                            aria-checked={selected}
+                            onClick={() => field.onChange(plan.id)}
+                            className={cn(
+                              "flex w-full items-baseline justify-between gap-3 rounded-lg border px-3 py-2 text-left transition-colors",
+                              "focus-visible:ring-3 focus-visible:ring-ring/50 outline-none",
+                              selected ? "border-primary bg-primary/5" : "border-border hover:bg-muted/40",
+                            )}
+                          >
+                            <span className="text-sm font-medium text-foreground">{plan.name}</span>
+                            <span className="shrink-0 text-sm tabular-nums text-foreground">
+                              {formatCents(plan.amountCents, plan.currency)}
+                              <span className="text-muted-foreground"> /mois</span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                 </Field>
               )}

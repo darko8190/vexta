@@ -263,9 +263,38 @@ ne la défait pas : prévoyez une migration inverse.
 | Symptôme | Cause la plus probable |
 | -------- | ---------------------- |
 | 404 Traefik | DNS pas encore propagé, ou `WEB_DOMAIN` contient `https://`. |
+| « Non sécurisé » dans le navigateur | Voir ci-dessous. |
 | Certificat absent | Attendez 30 s après le premier déploiement ; vérifiez que le `A` pointe bien sur le serveur. |
 | `web` ne démarre pas | `api` n'est pas en bonne santé. Regardez ses journaux : presque toujours la chaîne de connexion. |
 | Intégrations vidées après un déploiement | Le volume `api-keys` a été perdu. Restaurez-le, ou ressaisissez les clés. |
 | Connexion Google en échec | L'URI de redirection n'est pas `https://api.vexta.ca/signin-google`. |
 | Téléversement R2 en échec (403) | Politique CORS du seau : il faut `PUT` et les en-têtes `Content-Type` **et** `Content-Encoding`. |
 | Un forfait publié n'apparaît pas | Le cache du site public tient 5 minutes au maximum, et chaque modification le purge. Au-delà, vérifiez que le forfait est publié et possède un prix Stripe. |
+
+### « Votre connexion n'est pas privée » / « Non sécurisé »
+
+Deux causes distinctes, à démêler avant de corriger quoi que ce soit.
+
+**1. Vous êtes arrivé en HTTP.** Taper `qa.vexta.ca` dans la barre d'adresse envoie le navigateur
+sur `http://`, et le navigateur affiche « Non sécurisé » pour toute page HTTP — même une erreur
+404. Les fichiers compose déclarent maintenant un routeur sur l'entrée `web` dont le seul rôle
+est de rediriger vers HTTPS. C'est à la pile de le faire : contrairement aux applications créées
+depuis l'interface Dokploy, une pile Docker Compose ne reçoit pas cette redirection
+automatiquement.
+
+**2. Le certificat n'a pas été émis.** Testez directement en HTTPS :
+
+```bash
+curl -sS -o /dev/null -w "%{http_code}
+" https://qa.vexta.ca
+curl -vI https://qa.vexta.ca 2>&1 | grep -E "subject:|issuer:"
+```
+
+- `issuer: ... Let's Encrypt` → le certificat est bon.
+- `issuer: ... TRAEFIK DEFAULT CERT` → Let's Encrypt a refusé. Regardez les journaux du
+  conteneur Traefik de Dokploy. Les causes habituelles : l'enregistrement `A` ne pointait pas
+  encore sur le serveur au moment de la demande, ou le port 80 n'est pas joignable depuis
+  l'extérieur — Let's Encrypt en a besoin pour valider le domaine, même si le site final ne sert
+  qu'en HTTPS.
+
+Après correction du DNS, redéployez pour que Traefik retente la demande.

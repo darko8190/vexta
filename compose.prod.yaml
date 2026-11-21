@@ -90,8 +90,19 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=dokploy-network
+
+      # Plain HTTP: matched only to send the browser straight to HTTPS. Without this router
+      # nothing answers on port 80, so typing the bare domain lands on a Traefik 404 over an
+      # unencrypted connection — which the browser labels "non sécurisé".
+      - traefik.http.routers.vexta-prod-api-insecure.rule=Host(`${API_DOMAIN}`)
+      - traefik.http.routers.vexta-prod-api-insecure.entrypoints=web
+      - traefik.http.routers.vexta-prod-api-insecure.middlewares=vexta-prod-https
+      - traefik.http.middlewares.vexta-prod-https.redirectscheme.scheme=https
+      - traefik.http.middlewares.vexta-prod-https.redirectscheme.permanent=true
+
       - traefik.http.routers.vexta-prod-api.rule=Host(`${API_DOMAIN}`)
       - traefik.http.routers.vexta-prod-api.entrypoints=websecure
+      - traefik.http.routers.vexta-prod-api.tls=true
       - traefik.http.routers.vexta-prod-api.tls.certResolver=letsencrypt
       - traefik.http.services.vexta-prod-api.loadbalancer.server.port=8080
 
@@ -127,8 +138,19 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=dokploy-network
+
+      # Plain HTTP: matched only to send the browser straight to HTTPS. Without this router
+      # nothing answers on port 80, so typing the bare domain lands on a Traefik 404 over an
+      # unencrypted connection — which the browser labels "non sécurisé".
+      - traefik.http.routers.vexta-prod-web-insecure.rule=Host(`${WEB_DOMAIN}`)
+      - traefik.http.routers.vexta-prod-web-insecure.entrypoints=web
+      - traefik.http.routers.vexta-prod-web-insecure.middlewares=vexta-prod-https
+      - traefik.http.middlewares.vexta-prod-https.redirectscheme.scheme=https
+      - traefik.http.middlewares.vexta-prod-https.redirectscheme.permanent=true
+
       - traefik.http.routers.vexta-prod-web.rule=Host(`${WEB_DOMAIN}`)
       - traefik.http.routers.vexta-prod-web.entrypoints=websecure
+      - traefik.http.routers.vexta-prod-web.tls=true
       - traefik.http.routers.vexta-prod-web.tls.certResolver=letsencrypt
       - traefik.http.services.vexta-prod-web.loadbalancer.server.port=3000
 

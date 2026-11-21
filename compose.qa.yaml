@@ -94,8 +94,19 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=dokploy-network
+
+      # Plain HTTP: matched only to send the browser straight to HTTPS. Without this router
+      # nothing answers on port 80, so typing the bare domain lands on a Traefik 404 over an
+      # unencrypted connection — which the browser labels "non sécurisé".
+      - traefik.http.routers.vexta-qa-api-insecure.rule=Host(`${API_DOMAIN}`)
+      - traefik.http.routers.vexta-qa-api-insecure.entrypoints=web
+      - traefik.http.routers.vexta-qa-api-insecure.middlewares=vexta-qa-https
+      - traefik.http.middlewares.vexta-qa-https.redirectscheme.scheme=https
+      - traefik.http.middlewares.vexta-qa-https.redirectscheme.permanent=true
+
       - traefik.http.routers.vexta-qa-api.rule=Host(`${API_DOMAIN}`)
       - traefik.http.routers.vexta-qa-api.entrypoints=websecure
+      - traefik.http.routers.vexta-qa-api.tls=true
       - traefik.http.routers.vexta-qa-api.tls.certResolver=letsencrypt
       - traefik.http.services.vexta-qa-api.loadbalancer.server.port=8080
 
@@ -131,12 +142,23 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=dokploy-network
+
+      # Plain HTTP: matched only to send the browser straight to HTTPS. Without this router
+      # nothing answers on port 80, so typing the bare domain lands on a Traefik 404 over an
+      # unencrypted connection — which the browser labels "non sécurisé".
+      - traefik.http.routers.vexta-qa-web-insecure.rule=Host(`${WEB_DOMAIN}`)
+      - traefik.http.routers.vexta-qa-web-insecure.entrypoints=web
+      - traefik.http.routers.vexta-qa-web-insecure.middlewares=vexta-qa-https
+      - traefik.http.middlewares.vexta-qa-https.redirectscheme.scheme=https
+      - traefik.http.middlewares.vexta-qa-https.redirectscheme.permanent=true
+
       - traefik.http.routers.vexta-qa-web.rule=Host(`${WEB_DOMAIN}`)
-      - traefik.http.routers.vexta-qa-web.middlewares=vexta-qa-noindex
-      - traefik.http.middlewares.vexta-qa-noindex.headers.customresponseheaders.X-Robots-Tag=noindex, nofollow
       - traefik.http.routers.vexta-qa-web.entrypoints=websecure
+      - traefik.http.routers.vexta-qa-web.tls=true
       - traefik.http.routers.vexta-qa-web.tls.certResolver=letsencrypt
+      - traefik.http.routers.vexta-qa-web.middlewares=vexta-qa-noindex
       - traefik.http.services.vexta-qa-web.loadbalancer.server.port=3000
+      - traefik.http.middlewares.vexta-qa-noindex.headers.customresponseheaders.X-Robots-Tag=noindex, nofollow
 
 volumes:
   postgres-data:

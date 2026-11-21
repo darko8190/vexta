@@ -1,9 +1,18 @@
 # Vexta — production, deployed by Dokploy.
 #
+# Domains are NOT declared in this file. They are configured in Dokploy's Domains tab, which
+# creates the Traefik router, requests the Let's Encrypt certificate and adds the HTTP→HTTPS
+# redirect on its own — so every domain is served over HTTPS without anything to remember here.
+# Declaring them here as well would put two routers on the same host, and Dokploy refuses to
+# deploy when a domain names a service this file does not define.
+#
+# WEB_DOMAIN and API_DOMAIN are still required: CORS, the addresses Stripe returns people to,
+# and the URL the browser uses to reach the API during social sign-in are all built from them.
+#
 # Dokploy writes the variables entered in its UI to a .env file beside this one, and compose
-# substitutes them below. They are referenced one by one on purpose rather than loaded wholesale
-# with env_file, so each container receives only what it actually needs and this file doubles as
-# the list of what has to be configured.
+# substitutes them below. They are referenced one by one rather than loaded wholesale with
+# env_file, so each container receives only what it actually needs and this file doubles as the
+# list of what has to be configured.
 #
 # Run it from the repository root: docker compose -f compose.prod.yaml up -d
 
@@ -53,7 +62,7 @@ services:
       SuperAdmin__Email: ${SUPERADMIN_EMAIL:?SUPERADMIN_EMAIL est obligatoire}
       SuperAdmin__Password: ${SUPERADMIN_PASSWORD:?SUPERADMIN_PASSWORD est obligatoire}
 
-      Cors__AllowedOrigins__0: https://${WEB_DOMAIN}
+      Cors__AllowedOrigins__0: https://${WEB_DOMAIN:?WEB_DOMAIN est obligatoire}
       Frontend__BaseUrl: https://${WEB_DOMAIN}
 
       # Where the data protection key ring is written. Backed by a volume — see below.
@@ -87,24 +96,6 @@ services:
       retries: 5
       # Migrations run before the first request is served, so the first check must wait them out.
       start_period: 90s
-    labels:
-      - traefik.enable=true
-      - traefik.docker.network=dokploy-network
-
-      # Plain HTTP: matched only to send the browser straight to HTTPS. Without this router
-      # nothing answers on port 80, so typing the bare domain lands on a Traefik 404 over an
-      # unencrypted connection — which the browser labels "non sécurisé".
-      - traefik.http.routers.vexta-prod-api-insecure.rule=Host(`${API_DOMAIN}`)
-      - traefik.http.routers.vexta-prod-api-insecure.entrypoints=web
-      - traefik.http.routers.vexta-prod-api-insecure.middlewares=vexta-prod-https
-      - traefik.http.middlewares.vexta-prod-https.redirectscheme.scheme=https
-      - traefik.http.middlewares.vexta-prod-https.redirectscheme.permanent=true
-
-      - traefik.http.routers.vexta-prod-api.rule=Host(`${API_DOMAIN}`)
-      - traefik.http.routers.vexta-prod-api.entrypoints=websecure
-      - traefik.http.routers.vexta-prod-api.tls=true
-      - traefik.http.routers.vexta-prod-api.tls.certResolver=letsencrypt
-      - traefik.http.services.vexta-prod-api.loadbalancer.server.port=8080
 
   app:
     build:
@@ -135,24 +126,6 @@ services:
         condition: service_healthy
     expose:
       - 3000
-    labels:
-      - traefik.enable=true
-      - traefik.docker.network=dokploy-network
-
-      # Plain HTTP: matched only to send the browser straight to HTTPS. Without this router
-      # nothing answers on port 80, so typing the bare domain lands on a Traefik 404 over an
-      # unencrypted connection — which the browser labels "non sécurisé".
-      - traefik.http.routers.vexta-prod-app-insecure.rule=Host(`${WEB_DOMAIN}`)
-      - traefik.http.routers.vexta-prod-app-insecure.entrypoints=web
-      - traefik.http.routers.vexta-prod-app-insecure.middlewares=vexta-prod-https
-      - traefik.http.middlewares.vexta-prod-https.redirectscheme.scheme=https
-      - traefik.http.middlewares.vexta-prod-https.redirectscheme.permanent=true
-
-      - traefik.http.routers.vexta-prod-app.rule=Host(`${WEB_DOMAIN}`)
-      - traefik.http.routers.vexta-prod-app.entrypoints=websecure
-      - traefik.http.routers.vexta-prod-app.tls=true
-      - traefik.http.routers.vexta-prod-app.tls.certResolver=letsencrypt
-      - traefik.http.services.vexta-prod-app.loadbalancer.server.port=3000
 
 volumes:
   postgres-data:

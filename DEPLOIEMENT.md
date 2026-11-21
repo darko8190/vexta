@@ -35,8 +35,21 @@ Avant de déployer, faites pointer quatre enregistrements `A` vers l'IP de votre
 | `qa.vexta.ca`   | QA         |
 | `api-qa.vexta.ca` | QA       |
 
+Les quatre sont nécessaires, y compris ceux de l'API : sans `api-qa.vexta.ca`, la connexion
+sociale et les webhooks Stripe n'ont nulle part où arriver.
+
 Traefik ne peut pas obtenir de certificat Let's Encrypt avant que le DNS ne résolve. Attendez
 que `nslookup api.vexta.ca` réponde avant de lancer le déploiement.
+
+Let's Encrypt valide le domaine en contactant le **port 80 depuis l'extérieur**, même si le site
+ne sert ensuite qu'en HTTPS. Deux pièges :
+
+- un pare-feu qui ferme le 80 empêche toute émission de certificat ;
+- tester depuis votre propre réseau ne prouve rien. Si le serveur est chez vous, votre routeur
+  répond en boucle locale et le port paraît ouvert alors qu'il est bloqué de l'extérieur.
+  Plusieurs fournisseurs résidentiels, dont Vidéotron, bloquent le port 80 entrant. Vérifiez
+  depuis une connexion extérieure, par exemple le partage de connexion d'un téléphone en données
+  mobiles.
 
 ---
 
@@ -48,16 +61,23 @@ que `nslookup api.vexta.ca` réponde avant de lancer le déploiement.
 2. **Provider :** GitHub, dépôt `darko8190/vexta`.
 3. **Branch :** `prod` (ou `qa`).
 4. **Compose Path :** `./compose.prod.yaml` (ou `./compose.qa.yaml`).
-5. **Compose Type :** `Docker Compose`, pas `Stack` — les étiquettes Traefik sont placées sous
-   `labels`, et Docker Swarm les attend sous `deploy.labels`.
-6. **Laissez l'onglet Domains vide.** Les domaines sont déclarés par les étiquettes Traefik du
-   fichier compose, à partir de `WEB_DOMAIN` et `API_DOMAIN`. Les saisir aussi dans l'interface
-   crée un **second** routeur Traefik sur le même hôte : les deux se disputent la requête, et
-   celui qui gagne n'est pas prévisible. Si un domaine y figure déjà, supprimez-le.
+5. **Compose Type :** `Docker Compose`, pas `Stack`.
+6. Remplissez l'onglet **Environment** (section 3), puis **Deploy**.
+7. Une fois la pile démarrée, ajoutez les deux domaines dans l'onglet **Domains** :
 
-   Les services que l'interface propose, si vous l'ouvrez quand même, sont `app` (le site et
-   l'application, port 3000), `api` (port 8080) et `postgres` (à ne jamais exposer).
-7. Remplissez l'onglet **Environment** (section 3), puis **Deploy**.
+   | Host | Service | Port |
+   | ---- | ------- | ---- |
+   | `vexta.ca` (ou `qa.vexta.ca`) | `app` | 3000 |
+   | `api.vexta.ca` (ou `api-qa.vexta.ca`) | `api` | 8080 |
+
+   Activez **HTTPS** et choisissez **Let's Encrypt** comme fournisseur de certificat sur chacun.
+   Dokploy crée alors le routeur, demande le certificat et ajoute la redirection HTTP→HTTPS tout
+   seul. N'exposez jamais `postgres`.
+
+Le fichier compose ne déclare **aucune** étiquette Traefik : les domaines se gèrent uniquement
+ici. Les deux à la fois créeraient deux routeurs pour le même hôte, et Dokploy refuse de
+déployer dès qu'un domaine nomme un service absent du fichier — ce qui bloque le déploiement au
+moindre renommage.
 
 Le premier déploiement est long : il compile l'API .NET et le front Next.js. Les suivants
 réutilisent le cache de couches.
@@ -266,7 +286,8 @@ ne la défait pas : prévoyez une migration inverse.
 
 | Symptôme | Cause la plus probable |
 | -------- | ---------------------- |
-| 404 Traefik | DNS pas encore propagé, ou `WEB_DOMAIN` contient `https://`. |
+| `404 page not found` sur **toutes** les pages | C'est la réponse de Traefik quand aucun routeur ne correspond à l'hôte : le domaine n'est pas déclaré dans l'onglet Domains, ou il pointe sur un service arrêté. |
+| 404 Traefik sur une page seulement | DNS pas encore propagé, ou `WEB_DOMAIN` contient `https://`. |
 | « Non sécurisé » dans le navigateur | Voir ci-dessous. |
 | Il faut se reconnecter à chaque rafraîchissement | Le site est servi en HTTP. Le cookie de session porte l'attribut `Secure`, qu'un navigateur refuse d'enregistrer sur une origine non chiffrée — la connexion réussit, mais rien n'est conservé. Réglez le HTTPS et le problème disparaît. |
 | Certificat absent | Attendez 30 s après le premier déploiement ; vérifiez que le `A` pointe bien sur le serveur. |
@@ -282,10 +303,8 @@ Deux causes distinctes, à démêler avant de corriger quoi que ce soit.
 
 **1. Vous êtes arrivé en HTTP.** Taper `qa.vexta.ca` dans la barre d'adresse envoie le navigateur
 sur `http://`, et le navigateur affiche « Non sécurisé » pour toute page HTTP — même une erreur
-404. Les fichiers compose déclarent maintenant un routeur sur l'entrée `web` dont le seul rôle
-est de rediriger vers HTTPS. C'est à la pile de le faire : contrairement aux applications créées
-depuis l'interface Dokploy, une pile Docker Compose ne reçoit pas cette redirection
-automatiquement.
+404. Vérifiez que **HTTPS est activé** sur le domaine, dans l'onglet Domains : c'est ce réglage
+qui ajoute la redirection.
 
 **2. Le certificat n'a pas été émis.** Testez directement en HTTPS :
 

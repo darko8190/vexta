@@ -44,7 +44,9 @@ COPY --from=build --chown=app:app /app ./
 
 USER app
 EXPOSE 8080
-ENV ASPNETCORE_HTTP_PORTS=8080 \
-    DOTNET_gcServer=1
+# Server GC is already on: the web SDK writes System.GC.Server=true into runtimeconfig.json,
+# and the runtime sizes its heaps from the container's own CPU and memory limits. Setting it
+# again here would only look like a tuning decision that was never made.
+ENV ASPNETCORE_HTTP_PORTS=8080
 
 ENTRYPOINT ["dotnet", "Vexta.Api.dll"]

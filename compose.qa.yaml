@@ -110,11 +110,11 @@ services:
       - traefik.http.routers.vexta-qa-api.tls.certResolver=letsencrypt
       - traefik.http.services.vexta-qa-api.loadbalancer.server.port=8080
 
-  web:
+  app:
     build:
       context: ./web
       dockerfile: Dockerfile
-    image: vexta/web:qa
+    image: vexta/app:qa
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -146,18 +146,18 @@ services:
       # Plain HTTP: matched only to send the browser straight to HTTPS. Without this router
       # nothing answers on port 80, so typing the bare domain lands on a Traefik 404 over an
       # unencrypted connection — which the browser labels "non sécurisé".
-      - traefik.http.routers.vexta-qa-web-insecure.rule=Host(`${WEB_DOMAIN}`)
-      - traefik.http.routers.vexta-qa-web-insecure.entrypoints=web
-      - traefik.http.routers.vexta-qa-web-insecure.middlewares=vexta-qa-https
+      - traefik.http.routers.vexta-qa-app-insecure.rule=Host(`${WEB_DOMAIN}`)
+      - traefik.http.routers.vexta-qa-app-insecure.entrypoints=web
+      - traefik.http.routers.vexta-qa-app-insecure.middlewares=vexta-qa-https
       - traefik.http.middlewares.vexta-qa-https.redirectscheme.scheme=https
       - traefik.http.middlewares.vexta-qa-https.redirectscheme.permanent=true
 
-      - traefik.http.routers.vexta-qa-web.rule=Host(`${WEB_DOMAIN}`)
-      - traefik.http.routers.vexta-qa-web.entrypoints=websecure
-      - traefik.http.routers.vexta-qa-web.tls=true
-      - traefik.http.routers.vexta-qa-web.tls.certResolver=letsencrypt
-      - traefik.http.routers.vexta-qa-web.middlewares=vexta-qa-noindex
-      - traefik.http.services.vexta-qa-web.loadbalancer.server.port=3000
+      - traefik.http.routers.vexta-qa-app.rule=Host(`${WEB_DOMAIN}`)
+      - traefik.http.routers.vexta-qa-app.entrypoints=websecure
+      - traefik.http.routers.vexta-qa-app.tls=true
+      - traefik.http.routers.vexta-qa-app.tls.certResolver=letsencrypt
+      - traefik.http.routers.vexta-qa-app.middlewares=vexta-qa-noindex
+      - traefik.http.services.vexta-qa-app.loadbalancer.server.port=3000
       - traefik.http.middlewares.vexta-qa-noindex.headers.customresponseheaders.X-Robots-Tag=noindex, nofollow
 
 volumes:

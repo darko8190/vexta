@@ -10,7 +10,7 @@ Deux environnements, deux branches, deux fichiers compose :
 Chaque pile démarre trois conteneurs :
 
 ```
-Internet → Traefik (Dokploy) ──→ web   (Next.js, port 3000)  ──┐
+Internet → Traefik (Dokploy) ──→ app   (Next.js, port 3000)  ──┐
                              └──→ api   (.NET, port 8080)  ────┤ réseau vexta-internal
                                         postgres (port 5432) ──┘
 ```
@@ -50,9 +50,13 @@ que `nslookup api.vexta.ca` réponde avant de lancer le déploiement.
 4. **Compose Path :** `./compose.prod.yaml` (ou `./compose.qa.yaml`).
 5. **Compose Type :** `Docker Compose`, pas `Stack` — les étiquettes Traefik sont placées sous
    `labels`, et Docker Swarm les attend sous `deploy.labels`.
-6. Ne touchez pas à l'onglet **Domains** : les domaines sont déclarés par les étiquettes Traefik
-   dans le fichier compose, à partir de `WEB_DOMAIN` et `API_DOMAIN`. Les saisir aussi dans
-   l'interface créerait un second routeur pour le même domaine.
+6. **Laissez l'onglet Domains vide.** Les domaines sont déclarés par les étiquettes Traefik du
+   fichier compose, à partir de `WEB_DOMAIN` et `API_DOMAIN`. Les saisir aussi dans l'interface
+   crée un **second** routeur Traefik sur le même hôte : les deux se disputent la requête, et
+   celui qui gagne n'est pas prévisible. Si un domaine y figure déjà, supprimez-le.
+
+   Les services que l'interface propose, si vous l'ouvrez quand même, sont `app` (le site et
+   l'application, port 3000), `api` (port 8080) et `postgres` (à ne jamais exposer).
 7. Remplissez l'onglet **Environment** (section 3), puis **Deploy**.
 
 Le premier déploiement est long : il compile l'API .NET et le front Next.js. Les suivants
@@ -146,7 +150,7 @@ Modifier `SUPERADMIN_PASSWORD` par la suite ne change **pas** le mot de passe du
 faut passer par l'application. C'est voulu : un redémarrage ne doit pas pouvoir réinitialiser un
 mot de passe en silence.
 
-Le conteneur `web` attend que `api` soit en bonne santé (`/alive`) avant de démarrer, et la
+Le conteneur `app` attend que `api` soit en bonne santé (`/alive`) avant de démarrer, et la
 fenêtre de grâce du test est de 90 secondes pour laisser les migrations se terminer.
 
 Ne montez pas `api` à plus d'un exemplaire sans précaution : deux conteneurs qui appliquent les
@@ -264,8 +268,9 @@ ne la défait pas : prévoyez une migration inverse.
 | -------- | ---------------------- |
 | 404 Traefik | DNS pas encore propagé, ou `WEB_DOMAIN` contient `https://`. |
 | « Non sécurisé » dans le navigateur | Voir ci-dessous. |
+| Il faut se reconnecter à chaque rafraîchissement | Le site est servi en HTTP. Le cookie de session porte l'attribut `Secure`, qu'un navigateur refuse d'enregistrer sur une origine non chiffrée — la connexion réussit, mais rien n'est conservé. Réglez le HTTPS et le problème disparaît. |
 | Certificat absent | Attendez 30 s après le premier déploiement ; vérifiez que le `A` pointe bien sur le serveur. |
-| `web` ne démarre pas | `api` n'est pas en bonne santé. Regardez ses journaux : presque toujours la chaîne de connexion. |
+| `app` ne démarre pas | `api` n'est pas en bonne santé. Regardez ses journaux : presque toujours la chaîne de connexion. |
 | Intégrations vidées après un déploiement | Le volume `api-keys` a été perdu. Restaurez-le, ou ressaisissez les clés. |
 | Connexion Google en échec | L'URI de redirection n'est pas `https://api.vexta.ca/signin-google`. |
 | Téléversement R2 en échec (403) | Politique CORS du seau : il faut `PUT` et les en-têtes `Content-Type` **et** `Content-Encoding`. |

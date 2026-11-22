@@ -19,7 +19,11 @@ export function ClientSelect({
   return (
     <Select value={value || undefined} onValueChange={(v) => onChange(v ?? "")}>
       <SelectTrigger id={id} className="w-full" aria-invalid={invalid}>
-        <SelectValue placeholder={isLoading ? "Chargement…" : "Choisir un client"} />
+        {/* The trigger renders the stored value when it has nothing else, and the stored
+            value here is a GUID. Looking the name up is what keeps an id off the screen. */}
+        <SelectValue placeholder={isLoading ? "Chargement…" : "Choisir un client"}>
+          {(id: string) => clients?.find((clientItem) => clientItem.id === id)?.name ?? "Chargement…"}
+        </SelectValue>
       </SelectTrigger>
       <SelectContent>
         {clients?.map((clientItem) => (

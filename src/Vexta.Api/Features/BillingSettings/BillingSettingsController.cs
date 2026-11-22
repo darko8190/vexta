@@ -16,6 +16,8 @@ public record BillingSettingsDto(
     bool Configured,
     string? GstNumber,
     string? QstNumber,
+    /// <summary>The RBQ licence, printed under the company's address. Empty when it has none.</summary>
+    string? RbqNumber,
     decimal GstRate,
     decimal QstRate,
     string InvoicePrefix,
@@ -29,6 +31,7 @@ public record BillingSettingsDto(
 public record SaveBillingSettingsRequest(
     string? GstNumber,
     string? QstNumber,
+    string? RbqNumber,
     decimal GstRate,
     decimal QstRate,
     string InvoicePrefix,
@@ -72,6 +75,7 @@ public class BillingSettingsController(VextaDbContext db, ICurrentUserService cu
 
         settings.GstNumber = Clean(request.GstNumber);
         settings.QstNumber = Clean(request.QstNumber);
+        settings.RbqNumber = Clean(request.RbqNumber);
         settings.GstRate = request.GstRate;
         settings.QstRate = request.QstRate;
         settings.InvoicePrefix = request.InvoicePrefix.Trim().ToUpperInvariant();
@@ -130,6 +134,7 @@ public class BillingSettingsController(VextaDbContext db, ICurrentUserService cu
             settings is not null,
             model.GstNumber,
             model.QstNumber,
+            model.RbqNumber,
             model.GstRate,
             model.QstRate,
             model.InvoicePrefix,

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ExternalLink, MoreHorizontal, Pencil, Plus, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +29,7 @@ import { useClientsQuery, useDeleteClient } from "@/hooks/use-clients";
 import { formatClientNumber, type ClientRecord } from "@/lib/types";
 
 export default function ClientsPage() {
+  const router = useRouter();
   const canCreate = useCanCreate();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -131,8 +133,8 @@ export default function ClientsPage() {
               {data.items.map((clientItem) => (
                 <ClickableRow
                   key={clientItem.id}
-                  label={`Modifier ${clientItem.name}`}
-                  onOpen={() => openEdit(clientItem)}
+                  label={`Ouvrir la fiche de ${clientItem.name}`}
+                  onOpen={() => router.push(`/clients/${clientItem.id}`)}
                 >
                   <TableCell className="font-mono text-xs text-muted-foreground tabular-nums">
                     {formatClientNumber(clientItem.number)}

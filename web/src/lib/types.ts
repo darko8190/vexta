@@ -131,7 +131,6 @@ export interface ProjectRecord {
   number: number;
   clientId: string;
   clientName: string;
-  name: string;
   /** The client's own purchase order, printed on this project's invoices. */
   poNumber: string | null;
   description: string | null;
@@ -170,7 +169,6 @@ export interface InvoiceRecord {
   clientId: string;
   clientName: string;
   projectId: string | null;
-  projectName: string | null;
   /** The project's own number, so a reference reads P-0007 and never a GUID. */
   projectNumber: number | null;
   status: InvoiceStatus;
@@ -308,7 +306,21 @@ export interface Employee {
   invitationExpired: boolean;
   invitationSentAt: string | null;
   invitationExpiresAt: string | null;
+  /** The person who opened the company: their access cannot be removed, nor their record. */
+  isOwner: boolean;
   createdAt: string;
+}
+
+/** One employee's own page: the record, plus the teams they are on. */
+export interface EmployeeDetail {
+  employee: Employee;
+  teams: EmployeeTeam[];
+}
+
+export interface EmployeeTeam {
+  id: string;
+  name: string;
+  isLead: boolean;
 }
 
 export interface SeatUsage {

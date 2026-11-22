@@ -11,6 +11,7 @@ using Vexta.Api.Common;
 using Vexta.Api.Data;
 using Vexta.Api.Data.Seed;
 using Vexta.Api.Domain;
+using Vexta.Api.Features.Invoices;
 using Vexta.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -56,6 +57,7 @@ builder.Services.AddScoped<IEmployeeAccessService, EmployeeAccessService>();
 builder.Services.AddScoped<IClientAccessService, ClientAccessService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IWorkspaceService, WorkspaceService>();
+builder.Services.AddScoped<IInvoicePdfService, InvoicePdfService>();
 
 builder.Services
     .AddIdentityCore<ApplicationUser>(options =>
@@ -140,6 +142,9 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(origins).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
     });
 });
+
+// Fonts and licence, once per process rather than per document.
+InvoiceDocument.Configure();
 
 var app = builder.Build();
 

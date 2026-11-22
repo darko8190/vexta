@@ -15,7 +15,7 @@ namespace Vexta.Api.Features.Invoices;
 // stops them changing anything.
 [Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.TenantUser)},{nameof(UserRole.SuperAdmin)},{nameof(UserRole.Client)}")]
 [RequireActiveSubscription]
-public class InvoicesController(VextaDbContext db, ICurrentUserService currentUser) : ControllerBase
+public class InvoicesController(VextaDbContext db, ICurrentUserService currentUser, IInvoicePdfService pdf) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<PagedResult<InvoiceDto>>> List(
@@ -53,6 +53,44 @@ public class InvoicesController(VextaDbContext db, ICurrentUserService currentUs
         return invoice is null ? NotFound() : Ok(ToDto(invoice));
     }
 
+    /// <summary>
+    /// The invoice as a document: what gets printed, filed and handed to the client. Open to
+    /// the customer it belongs to, like the record itself — the query filter is what keeps
+    /// them to their own.
+    /// </summary>
+    [HttpGet("{id:guid}/pdf")]
+    public async Task<IActionResult> Pdf(Guid id, CancellationToken ct)
+    {
+        var number = await db.Invoices.AsNoTracking()
+            .Where(i => i.Id == id)
+            .Select(i => i.Number)
+            .FirstOrDefaultAsync(ct);
+
+        if (number is null) return NotFound();
+
+        var bytes = await pdf.RenderAsync(id, ct);
+        if (bytes is null) return NotFound();
+
+        // Inline, not an attachment: this is shown in a viewer beside the form, and a browser
+        // that downloads it instead would turn a preview into a folder full of files.
+        Response.Headers.ContentDisposition = $"inline; filename=\"Facture-{number}.pdf\"";
+        return File(bytes, "application/pdf");
+    }
+
+    /// <summary>
+    /// The same document, built from an invoice that has not been saved. Staff only, and it
+    /// writes nothing — the number it shows is the one the invoice would be given.
+    /// </summary>
+    [HttpPost("preview")]
+    [StaffOnly]
+    public async Task<IActionResult> Preview(
+        UpsertInvoiceRequest request, [FromQuery] Guid? invoiceId, CancellationToken ct)
+    {
+        var bytes = await pdf.RenderDraftAsync(request, invoiceId, ct);
+        Response.Headers.ContentDisposition = "inline; filename=\"Apercu-facture.pdf\"";
+        return File(bytes, "application/pdf");
+    }
+
     // Reading is open to the customer this record belongs to — the query filter already
     // narrows it to theirs. Writing is not: a client does not raise their own invoice, and
     // "they can only see their own" is not the same promise as "they can change it".
@@ -64,10 +102,7 @@ public class InvoicesController(VextaDbContext db, ICurrentUserService currentUs
         var clientExists = await db.Clients.AnyAsync(c => c.Id == request.ClientId);
         if (!clientExists) return BadRequest(new { message = "Client introuvable." });
 
-        if (request.Lines.Count == 0)
-        {
-            return BadRequest(new { message = "Ajoutez au moins une ligne à la facture." });
-        }
+        if (LineProblem(request) is { } lineError) return BadRequest(new { message = lineError });
 
         var tenantId = currentUser.TenantId!.Value;
 
@@ -115,10 +150,7 @@ public class InvoicesController(VextaDbContext db, ICurrentUserService currentUs
         var invoice = await db.Invoices.Include(i => i.Lines).FirstOrDefaultAsync(i => i.Id == id);
         if (invoice is null) return NotFound();
 
-        if (request.Lines.Count == 0)
-        {
-            return BadRequest(new { message = "Ajoutez au moins une ligne à la facture." });
-        }
+        if (LineProblem(request) is { } lineError) return BadRequest(new { message = lineError });
 
         invoice.ClientId = request.ClientId;
         invoice.ProjectId = request.ProjectId;
@@ -152,10 +184,20 @@ public class InvoicesController(VextaDbContext db, ICurrentUserService currentUs
 
 
 
+    /// <summary>What an invoice may not be saved without. The preview is allowed both.</summary>
+    private static string? LineProblem(UpsertInvoiceRequest request)
+    {
+        if (request.Lines.Count == 0) return "Ajoutez au moins une ligne à la facture.";
+        if (request.Lines.Any(l => string.IsNullOrWhiteSpace(l.Description)))
+            return "Chaque ligne a besoin d'une description.";
+
+        return null;
+    }
+
     private static List<InvoiceLine> ToLineEntities(List<InvoiceLineRequest> lines) => lines
         .Select((l, index) => new InvoiceLine
         {
-            Description = l.Description.Trim(),
+            Description = l.Description?.Trim() ?? string.Empty,
             Quantity = l.Quantity,
             UnitPrice = l.UnitPrice,
             TaxRatePercent = l.TaxRatePercent,
@@ -180,7 +222,7 @@ public class InvoicesController(VextaDbContext db, ICurrentUserService currentUs
 
         return new InvoiceDto(
             invoice.Id, invoice.Number, invoice.ClientId, invoice.Client?.Name ?? string.Empty,
-            invoice.ProjectId, invoice.Project?.Name, invoice.Project?.Number,
+            invoice.ProjectId, invoice.Project?.Number,
             invoice.Status, invoice.IssueDate, invoice.DueDate, invoice.Currency, invoice.Notes,
             subtotal, taxTotal, subtotal + taxTotal, lines, invoice.CreatedAt, invoice.UpdatedAt);
     }

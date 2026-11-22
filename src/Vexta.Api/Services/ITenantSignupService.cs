@@ -120,6 +120,21 @@ public class TenantSignupService(
             }
         }
 
+        if (kind == TenantKind.Business)
+        {
+            // The person who opened the company works there. Without this row they are absent
+            // from their own staff list and cannot be put on a team — which reads as a bug,
+            // because the one name everybody expects to find is the owner's.
+            db.Employees.Add(new Employee
+            {
+                TenantId = tenant.Id,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                Email = user.Email!.ToLowerInvariant(),
+                UserId = user.Id
+            });
+        }
+
         await db.SaveChangesAsync(ct);
 
         if (kind == TenantKind.Personal)

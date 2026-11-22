@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { FileText, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,6 +27,7 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useDeleteInvoice, useInvoicesQuery } from "@/hooks/use-invoices";
 import { invoiceStatusBadgeVariant, invoiceStatusLabels } from "@/lib/labels";
 import type { InvoiceRecord } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 function formatCurrency(amount: number, currency: string) {
   return new Intl.NumberFormat("fr-CA", { style: "currency", currency }).format(amount);
@@ -62,10 +63,10 @@ export default function InvoicesPage() {
         description={isClient ? "Les factures qui vous sont adressées." : "Créez et suivez vos factures clients."}
         action={
           canCreate ? (
-            <Button render={<Link href="/factures/nouvelle" />}>
+            <Link href="/factures/nouvelle" className={cn(buttonVariants())}>
               <Plus />
               Nouvelle facture
-            </Button>
+            </Link>
           ) : isClient ? null : (
             <UpgradeCta />
           )
@@ -98,10 +99,10 @@ export default function InvoicesPage() {
           action={
             !debouncedSearch && !isClient &&
             (canCreate ? (
-              <Button render={<Link href="/factures/nouvelle" />}>
+              <Link href="/factures/nouvelle" className={cn(buttonVariants())}>
                 <Plus />
                 Nouvelle facture
-              </Button>
+              </Link>
             ) : (
               <UpgradeCta />
             ))
@@ -151,6 +152,10 @@ export default function InvoicesPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem render={<Link href={`/factures/${invoiceItem.id}`} />}>
+                          <FileText />
+                          Ouvrir la facture
+                        </DropdownMenuItem>
+                        <DropdownMenuItem render={<Link href={`/factures/${invoiceItem.id}/modifier`} />}>
                           <Pencil />
                           Modifier
                         </DropdownMenuItem>

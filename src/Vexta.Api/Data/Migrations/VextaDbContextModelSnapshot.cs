@@ -355,6 +355,9 @@ namespace Vexta.Api.Data.Migrations
                         .HasPrecision(6, 3)
                         .HasColumnType("numeric(6,3)");
 
+                    b.Property<string>("RbqNumber")
+                        .HasColumnType("text");
+
                     b.Property<string>("Terms")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
@@ -966,10 +969,6 @@ namespace Vexta.Api.Data.Migrations
 
                     b.Property<DateOnly?>("EndDate")
                         .HasColumnType("date");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text");
 
                     b.Property<int>("Number")
                         .HasColumnType("integer");

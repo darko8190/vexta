@@ -41,7 +41,10 @@ export function ClientPicker({
 }) {
   const { data: clients, isLoading } = useClientSummaryQuery();
   const [createOpen, setCreateOpen] = useState(false);
-  const [query, setQuery] = useState("");
+  // Null while nothing has been typed, which is how the field can show the record it already
+  // points at. A plain empty string would win over the selection and the form would open on a
+  // placeholder where a chosen value belongs.
+  const [typed, setTyped] = useState<string | null>(null);
 
   const selected = useMemo(
     () => clients?.find((clientItem) => clientItem.id === value) ?? null,
@@ -51,26 +54,26 @@ export function ClientPicker({
   // Filtered here rather than by the combobox's own matcher so the number is searchable too:
   // people quote "C-0012" off an invoice far more often than they spell the company name.
   const matches = useMemo(() => {
-    const needle = query.trim().toLowerCase();
+    const needle = (typed ?? "").trim().toLowerCase();
     if (!needle) return clients ?? [];
     return (clients ?? []).filter((clientItem) =>
       `${formatClientNumber(clientItem.number)} ${clientItem.name} ${clientItem.email ?? ""}`
         .toLowerCase()
         .includes(needle),
     );
-  }, [clients, query]);
+  }, [clients, typed]);
 
   return (
     <>
       <Combobox
         items={matches}
         value={selected}
-        inputValue={query}
-        onInputValueChange={setQuery}
+        inputValue={typed ?? selected?.name ?? ""}
+        onInputValueChange={setTyped}
         onValueChange={(next) => {
           const picked = next as ClientSummary | null;
           onChange(picked?.id ?? "");
-          setQuery(picked?.name ?? "");
+          setTyped(picked?.name ?? "");
         }}
         itemToStringLabel={(item: ClientSummary) => item.name}
         disabled={disabled}
@@ -104,7 +107,7 @@ export function ClientPicker({
             className="mt-1 flex w-full items-center gap-1.5 rounded-md border-t border-border px-1.5 py-2 text-sm text-foreground outline-none hover:bg-accent focus-visible:bg-accent"
           >
             <Plus className="size-4 shrink-0" />
-            {query.trim() ? `Créer « ${query.trim()} »` : "Créer un client"}
+            {typed?.trim() ? `Créer « ${typed.trim()} »` : "Créer un client"}
           </button>
         </ComboboxContent>
       </Combobox>
@@ -114,7 +117,7 @@ export function ClientPicker({
         onOpenChange={setCreateOpen}
         onCreated={(created) => {
           onChange(created.id);
-          setQuery(created.name);
+          setTyped(created.name);
         }}
       />
     </>

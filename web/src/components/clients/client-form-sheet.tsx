@@ -175,7 +175,14 @@ export function ClientFormSheet({
         <form
           id="client-form"
           className="flex-1 overflow-y-auto px-4"
-          onSubmit={form.handleSubmit(onSubmit)}
+          // Stops here rather than bubbling. This sheet is opened from inside another form —
+          // the project form, through the picker — and although the portal puts it elsewhere in
+          // the page, React still routes the submit up its own tree to that outer form. The
+          // outer form then saved and closed on a press meant for this one.
+          onSubmit={(event) => {
+            event.stopPropagation();
+            return form.handleSubmit(onSubmit)(event);
+          }}
           noValidate
         >
           <FieldGroup>

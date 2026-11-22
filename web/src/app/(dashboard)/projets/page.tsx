@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { FolderKanban, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ExternalLink, FolderKanban, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,6 +35,7 @@ function formatCurrency(amount: number | null) {
 }
 
 export default function ProjectsPage() {
+  const router = useRouter();
   const canCreate = useCanCreate();
   const isClient = useIsClientUser();
   const [page, setPage] = useState(1);
@@ -124,9 +127,9 @@ export default function ProjectsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Numéro</TableHead>
-                <TableHead>Projet</TableHead>
+                <TableHead className="w-24">Numéro</TableHead>
                 <TableHead>Client</TableHead>
+                <TableHead className="hidden md:table-cell">Description</TableHead>
                 <TableHead>Statut</TableHead>
                 <TableHead>Échéancier</TableHead>
                 <TableHead>Budget</TableHead>
@@ -138,19 +141,24 @@ export default function ProjectsPage() {
               {data.items.map((projectItem) => (
                 <ClickableRow
                   key={projectItem.id}
-                  label={`Modifier ${projectItem.name}`}
-                  onOpen={() => openEdit(projectItem)}
+                  label={`Ouvrir le projet ${formatProjectNumber(projectItem.number)}`}
+                  onOpen={() => router.push(`/projets/${projectItem.id}`)}
                 >
-                  <TableCell className="font-mono text-xs text-muted-foreground tabular-nums">
-                    {formatProjectNumber(projectItem.number)}
-                  </TableCell>
-                  <TableCell className="font-medium">
-                    {projectItem.name}
+                  <TableCell className="font-mono text-xs tabular-nums">
+                    <Link
+                      href={`/projets/${projectItem.id}`}
+                      className="font-medium text-foreground underline-offset-4 hover:underline"
+                    >
+                      {formatProjectNumber(projectItem.number)}
+                    </Link>
                     {projectItem.poNumber && (
-                      <div className="text-xs font-normal text-muted-foreground">PO {projectItem.poNumber}</div>
+                      <div className="font-sans text-xs text-muted-foreground">PO {projectItem.poNumber}</div>
                     )}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{projectItem.clientName}</TableCell>
+                  <TableCell className="font-medium">{projectItem.clientName}</TableCell>
+                  <TableCell className="hidden max-w-xs truncate text-muted-foreground md:table-cell">
+                    {projectItem.description || "—"}
+                  </TableCell>
                   <TableCell>
                     <Badge variant={projectStatusBadgeVariant[projectItem.status]}>
                       {projectStatusLabels[projectItem.status]}
@@ -167,6 +175,10 @@ export default function ProjectsPage() {
                         <MoreHorizontal />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        <DropdownMenuItem render={<Link href={`/projets/${projectItem.id}`} />}>
+                          <ExternalLink />
+                          Ouvrir la fiche
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => openEdit(projectItem)}>
                           <Pencil />
                           Modifier
@@ -194,7 +206,7 @@ export default function ProjectsPage() {
         open={Boolean(deleteTarget)}
         onOpenChange={(open) => !open && setDeleteTarget(undefined)}
         title="Supprimer ce projet ?"
-        description={`« ${deleteTarget?.name} » et ses factures liées seront détachés. Cette action est définitive.`}
+        description={`Le projet ${deleteTarget ? formatProjectNumber(deleteTarget.number) : ""} sera supprimé et ses factures liées seront détachées. Cette action est définitive.`}
         onConfirm={confirmDelete}
         pending={deleteProject.isPending}
       />

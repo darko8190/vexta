@@ -4,7 +4,6 @@ import type { PagedResult, ProjectRecord, ProjectStatus } from "@/lib/types";
 
 export interface ProjectFormValues {
   clientId: string;
-  name: string;
   poNumber?: string | null;
   description?: string;
   status: ProjectStatus;
@@ -53,5 +52,13 @@ export function useDeleteProject() {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       queryClient.invalidateQueries({ queryKey: ["clients"] });
     },
+  });
+}
+
+export function useProjectQuery(id: string | undefined) {
+  return useQuery({
+    queryKey: ["projects", id],
+    queryFn: () => api.get<ProjectRecord>(`projects/${id}`),
+    enabled: Boolean(id),
   });
 }

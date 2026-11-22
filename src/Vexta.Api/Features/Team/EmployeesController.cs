@@ -34,18 +34,35 @@ public class EmployeesController(
             .ToListAsync(ct);
 
         // One query for every employee that has an account, rather than one per row.
-        var userIds = employees.Where(e => e.UserId is not null).Select(e => e.UserId!.Value).ToList();
-        var withPassword = userIds.Count == 0
-            ? new HashSet<Guid>()
-            : await userManager.Users.IgnoreQueryFilters()
-                .Where(u => userIds.Contains(u.Id) && u.PasswordHash != null)
-                .Select(u => u.Id)
-                .ToHashSetAsync(ct);
+        var withPassword = await PasswordHoldersAsync(employees, ct);
+        var owners = await OwnersAsync(employees, ct);
 
         var now = DateTimeOffset.UtcNow;
-        var dtos = employees.Select(e => ToDto(e, withPassword, now)).ToList();
+        var dtos = employees.Select(e => ToDto(e, withPassword, owners, now)).ToList();
 
         return Ok(new TeamListDto(dtos, ToDto(await access.GetSeatUsageAsync(tenantId, ct))));
+    }
+
+    /// <summary>One employee's own page: the record, the state of their access, their teams.</summary>
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<EmployeeDetailDto>> Get(Guid id, CancellationToken ct)
+    {
+        var employee = await db.Employees.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id, ct);
+        if (employee is null) return NotFound();
+
+        var teams = await db.Teams.AsNoTracking()
+            .Where(t => t.Members.Any(m => m.Id == id) || t.LeadEmployeeId == id)
+            .OrderBy(t => t.Name)
+            .Select(t => new EmployeeTeamDto(t.Id, t.Name, t.LeadEmployeeId == id))
+            .ToListAsync(ct);
+
+        var dto = ToDto(
+            employee,
+            await PasswordHoldersAsync([employee], ct),
+            await OwnersAsync([employee], ct),
+            DateTimeOffset.UtcNow);
+
+        return Ok(new EmployeeDetailDto(dto, teams));
     }
 
     [HttpPost]
@@ -74,7 +91,7 @@ public class EmployeesController(
         db.Employees.Add(employee);
         await db.SaveChangesAsync(ct);
 
-        return Ok(ToDto(employee, EmptySet, DateTimeOffset.UtcNow));
+        return Ok(ToDto(employee, EmptySet, EmptySet, DateTimeOffset.UtcNow));
     }
 
     [HttpPut("{id:guid}")]
@@ -110,7 +127,7 @@ public class EmployeesController(
         await db.SaveChangesAsync(ct);
 
         var withPassword = await PasswordHoldersAsync([employee], ct);
-        return Ok(ToDto(employee, withPassword, DateTimeOffset.UtcNow));
+        return Ok(ToDto(employee, withPassword, await OwnersAsync([employee], ct), DateTimeOffset.UtcNow));
     }
 
     [HttpDelete("{id:guid}")]
@@ -118,6 +135,14 @@ public class EmployeesController(
     {
         var employee = await db.Employees.FirstOrDefaultAsync(e => e.Id == id, ct);
         if (employee is null) return NotFound();
+
+        if (await IsOwnerAsync(employee, ct))
+        {
+            return BadRequest(new
+            {
+                message = "Cette fiche est celle du propriétaire de l'entreprise et ne peut pas être supprimée."
+            });
+        }
 
         // Removing the record must also remove the way in, otherwise a deleted employee keeps
         // a working login that no page lists any more.
@@ -145,7 +170,7 @@ public class EmployeesController(
             grant.InvitationUrl,
             grant.ExpiresAt,
             grant.EmailSent,
-            ToDto(employee, EmptySet, DateTimeOffset.UtcNow)));
+            ToDto(employee, EmptySet, await OwnersAsync([employee], ct), DateTimeOffset.UtcNow)));
     }
 
     /// <summary>Unticking the box. The employee stays on file; the seat comes back.</summary>
@@ -158,6 +183,14 @@ public class EmployeesController(
         if (employee.UserId == currentUser.UserId)
         {
             return BadRequest(new { message = "Vous ne pouvez pas retirer votre propre accès." });
+        }
+
+        if (await IsOwnerAsync(employee, ct))
+        {
+            return BadRequest(new
+            {
+                message = "Le propriétaire de l'entreprise garde son accès : c'est le compte auquel l'espace appartient."
+            });
         }
 
         await access.RevokeAsync(employee, ct);
@@ -181,7 +214,7 @@ public class EmployeesController(
             grant.InvitationUrl,
             grant.ExpiresAt,
             grant.EmailSent,
-            ToDto(employee, EmptySet, DateTimeOffset.UtcNow)));
+            ToDto(employee, EmptySet, await OwnersAsync([employee], ct), DateTimeOffset.UtcNow)));
     }
 
     /// <summary>A freshly granted or created employee cannot have a password yet.</summary>
@@ -198,7 +231,26 @@ public class EmployeesController(
             .ToHashSetAsync(ct);
     }
 
-    private static EmployeeDto ToDto(Employee e, IReadOnlySet<Guid> withPassword, DateTimeOffset now)
+    /// <summary>
+    /// Which of these employees are the owner of the company. Read from the account's role
+    /// rather than from a flag on the employee: the owner is a property of the account that
+    /// holds the space, and a second copy of that truth would be a second thing to keep right.
+    /// </summary>
+    private async Task<HashSet<Guid>> OwnersAsync(IEnumerable<Employee> employees, CancellationToken ct)
+    {
+        var ids = employees.Where(e => e.UserId is not null).Select(e => e.UserId!.Value).ToList();
+        if (ids.Count == 0) return [];
+
+        return await userManager.Users.IgnoreQueryFilters()
+            .Where(u => ids.Contains(u.Id) && u.Role == UserRole.TenantAdmin)
+            .Select(u => u.Id)
+            .ToHashSetAsync(ct);
+    }
+
+    private async Task<bool> IsOwnerAsync(Employee employee, CancellationToken ct) =>
+        employee.UserId is { } userId && (await OwnersAsync([employee], ct)).Contains(userId);
+
+    private static EmployeeDto ToDto(Employee e, IReadOnlySet<Guid> withPassword, IReadOnlySet<Guid> owners, DateTimeOffset now)
     {
         var hasAccess = e.UserId is not null;
         var passwordSet = e.UserId is { } id && withPassword.Contains(id);
@@ -216,6 +268,7 @@ public class EmployeesController(
             pending && e.InvitationExpiresAt <= now,
             e.InvitationSentAt,
             e.InvitationExpiresAt,
+            e.UserId is { } ownerId && owners.Contains(ownerId),
             e.CreatedAt);
     }
 

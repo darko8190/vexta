@@ -49,7 +49,10 @@ export function AddressPicker({
   // paging for, and the search below narrows what is shown anyway.
   const { data, isLoading } = useAddressesQuery(1, "", clientId || undefined);
   const [createOpen, setCreateOpen] = useState(false);
-  const [query, setQuery] = useState("");
+  // Null while nothing has been typed, which is how the field can show the record it already
+  // points at. A plain empty string would win over the selection and the form would open on a
+  // placeholder where a chosen value belongs.
+  const [typed, setTyped] = useState<string | null>(null);
 
   const addresses = useMemo(() => (clientId ? (data?.items ?? []) : []), [clientId, data]);
   const selected = useMemo(
@@ -58,24 +61,24 @@ export function AddressPicker({
   );
 
   const matches = useMemo(() => {
-    const needle = query.trim().toLowerCase();
+    const needle = (typed ?? "").trim().toLowerCase();
     if (!needle) return addresses;
     return addresses.filter((address) =>
       `${oneLine(address)} ${place(address)}`.toLowerCase().includes(needle),
     );
-  }, [addresses, query]);
+  }, [addresses, typed]);
 
   return (
     <>
       <Combobox
         items={matches}
         value={selected}
-        inputValue={query}
-        onInputValueChange={setQuery}
+        inputValue={typed ?? (selected ? oneLine(selected) : "")}
+        onInputValueChange={setTyped}
         onValueChange={(next) => {
           const picked = next as AddressRecord | null;
           onChange(picked?.id ?? "");
-          setQuery(picked ? oneLine(picked) : "");
+          setTyped(picked ? oneLine(picked) : "");
         }}
         itemToStringLabel={(address: AddressRecord) => oneLine(address)}
         disabled={!clientId}
@@ -119,7 +122,7 @@ export function AddressPicker({
         defaultClientId={clientId}
         onCreated={(created) => {
           onChange(created.id);
-          setQuery(oneLine(created));
+          setTyped(oneLine(created));
         }}
       />
     </>

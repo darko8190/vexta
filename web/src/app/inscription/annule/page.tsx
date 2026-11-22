@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { XCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export default function RegisterCancelledPage() {
   return (
@@ -10,7 +11,7 @@ export default function RegisterCancelledPage() {
       <p className="max-w-sm text-sm text-muted-foreground">
         Votre abonnement n&apos;a pas été activé. Vous pouvez réessayer à tout moment.
       </p>
-      <Button render={<Link href="/inscription" />}>Réessayer</Button>
+      <Link href="/inscription" className={cn(buttonVariants())}>Réessayer</Link>
     </div>
   );
 }

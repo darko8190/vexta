@@ -11,7 +11,6 @@ public record ProjectDto(
     int Number,
     Guid ClientId,
     string ClientName,
-    string Name,
     string? PoNumber,
     string? Description,
     ProjectStatus Status,
@@ -28,7 +27,6 @@ public record ProjectDto(
 
 public record UpsertProjectRequest(
     Guid ClientId,
-    string Name,
     string? PoNumber,
     string? Description,
     ProjectStatus Status,

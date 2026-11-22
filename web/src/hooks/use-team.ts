@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { AccessGranted, Employee, TeamList } from "@/lib/types";
+import type { AccessGranted, Employee, EmployeeDetail, TeamList } from "@/lib/types";
 
 const TEAM_KEY = ["team", "employees"];
 
@@ -16,6 +16,14 @@ export function useTeamQuery() {
   return useQuery({
     queryKey: TEAM_KEY,
     queryFn: () => api.get<TeamList>("employees"),
+  });
+}
+
+export function useEmployeeQuery(id: string | undefined) {
+  return useQuery({
+    queryKey: [...TEAM_KEY, id],
+    queryFn: () => api.get<EmployeeDetail>(`employees/${id}`),
+    enabled: Boolean(id),
   });
 }
 

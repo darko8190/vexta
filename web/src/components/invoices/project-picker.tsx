@@ -15,8 +15,8 @@ import { formatProjectNumber, type ProjectRecord } from "@/lib/types";
 
 /**
  * Picks one of the client's projects by typing, and shows P-0007 rather than the GUID the old
- * select leaked whenever its items had not loaded. The number is searchable because that is
- * what people have in front of them — a work order, not a name they would have to spell.
+ * select leaked whenever its items had not loaded. The number is what identifies a project —
+ * it is what the work order says — and the PO and the description are there to recognise it by.
  */
 export function ProjectPicker({
   clientId,
@@ -32,7 +32,10 @@ export function ProjectPicker({
   // One page: a client with more than a hundred projects is not a case worth paging for here,
   // and the search below narrows what is shown anyway.
   const { data, isLoading } = useProjectsQuery(1, "", clientId || undefined);
-  const [query, setQuery] = useState("");
+  // Null while nothing has been typed, which is how the field can show the record it already
+  // points at. A plain empty string would win over the selection and the form would open on a
+  // placeholder where a chosen value belongs.
+  const [typed, setTyped] = useState<string | null>(null);
 
   const projects = useMemo(() => (clientId ? (data?.items ?? []) : []), [clientId, data]);
   const selected = useMemo(
@@ -41,27 +44,27 @@ export function ProjectPicker({
   );
 
   const matches = useMemo(() => {
-    const needle = query.trim().toLowerCase();
+    const needle = (typed ?? "").trim().toLowerCase();
     if (!needle) return projects;
     return projects.filter((project) =>
-      `${formatProjectNumber(project.number)} ${project.name} ${project.poNumber ?? ""}`
+      `${formatProjectNumber(project.number)} ${project.description ?? ""} ${project.poNumber ?? ""}`
         .toLowerCase()
         .includes(needle),
     );
-  }, [projects, query]);
+  }, [projects, typed]);
 
   return (
     <Combobox
       items={matches}
       value={selected}
-      inputValue={query}
-      onInputValueChange={setQuery}
+      inputValue={typed ?? (selected ? formatProjectNumber(selected.number) : "")}
+      onInputValueChange={setTyped}
       onValueChange={(next) => {
         const picked = next as ProjectRecord | null;
         onChange(picked?.id ?? "");
-        setQuery(picked?.name ?? "");
+        setTyped(picked ? formatProjectNumber(picked.number) : "");
       }}
-      itemToStringLabel={(project: ProjectRecord) => project.name}
+      itemToStringLabel={(project: ProjectRecord) => formatProjectNumber(project.number)}
       disabled={!clientId}
     >
       <div className="relative">
@@ -79,10 +82,11 @@ export function ProjectPicker({
         <ComboboxList>
           {(project: ProjectRecord) => (
             <ComboboxItem key={project.id} value={project}>
-              <span className="truncate font-medium">{project.name}</span>
+              <span className="truncate font-medium">{formatProjectNumber(project.number)}</span>
               <span className="truncate text-xs text-muted-foreground">
-                {formatProjectNumber(project.number)}
-                {project.poNumber ? ` · PO ${project.poNumber}` : ""}
+                {[project.poNumber ? `PO ${project.poNumber}` : null, project.description]
+                  .filter(Boolean)
+                  .join(" · ") || "Sans description"}
               </span>
             </ComboboxItem>
           )}

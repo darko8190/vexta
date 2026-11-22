@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { MoreHorizontal, Pencil, Plus, Send, Trash2, UsersRound } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ExternalLink, MoreHorizontal, Pencil, Plus, Send, Trash2, UsersRound } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +17,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ClickableRow } from "@/components/layout/clickable-row";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
 import { EmployeeFormSheet } from "@/components/team/employee-form-sheet";
@@ -49,7 +52,12 @@ function AccessCell({
   onRevoke: () => void;
   pending: boolean;
 }) {
-  const disabled = pending || (!employee.hasAccess && !canGrant);
+  // The owner's access is the account the space belongs to. Unticking it is refused by the
+  // API, so the box says so rather than offering a thing that cannot happen.
+  const disabled = pending || employee.isOwner || (!employee.hasAccess && !canGrant);
+  const reason = employee.isOwner
+    ? "Le propriétaire de l'entreprise garde son accès."
+    : blockedReason;
 
   const box = (
     <Checkbox
@@ -60,7 +68,7 @@ function AccessCell({
     />
   );
 
-  if (!disabled || employee.hasAccess || !blockedReason) {
+  if (!disabled || !reason) {
     return box;
   }
 
@@ -68,12 +76,13 @@ function AccessCell({
     <Tooltip>
       {/* A disabled checkbox fires no pointer events, so the span is what the tooltip hangs on. */}
       <TooltipTrigger render={<span className="inline-flex" />}>{box}</TooltipTrigger>
-      <TooltipContent>{blockedReason}</TooltipContent>
+      <TooltipContent>{reason}</TooltipContent>
     </Tooltip>
   );
 }
 
 export function EmployeesSection() {
+  const router = useRouter();
   const { data, isLoading } = useTeamQuery();
   const grantAccess = useGrantAccess();
   const revokeAccess = useRevokeAccess();
@@ -210,9 +219,21 @@ export function EmployeesSection() {
             </TableHeader>
             <TableBody>
               {employees.map((employee) => (
-                <TableRow key={employee.id}>
+                <ClickableRow
+                  key={employee.id}
+                  label={`Ouvrir la fiche de ${employee.firstName} ${employee.lastName}`}
+                  onOpen={() => router.push(`/ressources-humaines/employes/${employee.id}`)}
+                >
                   <TableCell className="font-medium">
-                    {employee.firstName} {employee.lastName}
+                    <Link
+                      href={`/ressources-humaines/employes/${employee.id}`}
+                      className="underline-offset-4 hover:underline"
+                    >
+                      {employee.firstName} {employee.lastName}
+                    </Link>
+                    {employee.isOwner && (
+                      <div className="text-xs font-normal text-muted-foreground">Propriétaire</div>
+                    )}
                   </TableCell>
                   <TableCell className="text-muted-foreground">{employee.email}</TableCell>
                   <TableCell className="text-muted-foreground">{employee.jobTitle ?? "—"}</TableCell>
@@ -243,6 +264,10 @@ export function EmployeesSection() {
                         <MoreHorizontal />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        <DropdownMenuItem render={<Link href={`/ressources-humaines/employes/${employee.id}`} />}>
+                          <ExternalLink />
+                          Ouvrir la fiche
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => {
                             setEditing(employee);
@@ -258,14 +283,16 @@ export function EmployeesSection() {
                             Renvoyer l&apos;invitation
                           </DropdownMenuItem>
                         )}
-                        <DropdownMenuItem variant="destructive" onClick={() => setDeleteTarget(employee)}>
-                          <Trash2 />
-                          Supprimer
-                        </DropdownMenuItem>
+                        {!employee.isOwner && (
+                          <DropdownMenuItem variant="destructive" onClick={() => setDeleteTarget(employee)}>
+                            <Trash2 />
+                            Supprimer
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
-                </TableRow>
+                </ClickableRow>
               ))}
             </TableBody>
           </Table>

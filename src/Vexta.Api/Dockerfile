@@ -25,8 +25,12 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 # curl is for the container healthcheck. The runtime image ships without it, and without a
 # healthcheck Docker reports the container "up" the instant the process starts, so the web
 # container would be let through before migrations have finished running.
+#
+# libfontconfig1 is for the invoice PDF: the Skia build QuestPDF draws with asks the system
+# font configuration for a typeface before it renders anything, and the runtime image carries
+# none. The invoice's own font is embedded in the binary, but the lookup still has to work.
 RUN apt-get update \
- && apt-get install --yes --no-install-recommends curl \
+ && apt-get install --yes --no-install-recommends curl libfontconfig1 \
  && rm -rf /var/lib/apt/lists/*
 
 # The data protection key ring lives here. It MUST be a persisted volume: these keys decrypt

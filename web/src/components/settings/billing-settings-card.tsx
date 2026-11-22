@@ -24,6 +24,7 @@ import { ApiError } from "@/lib/api";
 const formSchema = z.object({
   gstNumber: z.string().trim().max(40, "40 caractères maximum."),
   qstNumber: z.string().trim().max(40, "40 caractères maximum."),
+  rbqNumber: z.string().trim().max(40, "40 caractères maximum."),
   gstRate: z.string().min(1, "Taux requis."),
   qstRate: z.string().min(1, "Taux requis."),
   invoicePrefix: z.string().trim().min(1, "Le préfixe est requis.").max(10, "10 caractères maximum."),
@@ -39,6 +40,7 @@ function toFormValues(settings?: BillingSettings): FormValues {
   return {
     gstNumber: settings?.gstNumber ?? "",
     qstNumber: settings?.qstNumber ?? "",
+    rbqNumber: settings?.rbqNumber ?? "",
     gstRate: String(settings?.gstRate ?? 5),
     qstRate: String(settings?.qstRate ?? 9.975),
     invoicePrefix: settings?.invoicePrefix ?? "F",
@@ -73,6 +75,7 @@ export function BillingSettingsCard() {
       await save.mutateAsync({
         gstNumber: values.gstNumber || null,
         qstNumber: values.qstNumber || null,
+        rbqNumber: values.rbqNumber || null,
         gstRate: Number(values.gstRate),
         qstRate: Number(values.qstRate),
         invoicePrefix: values.invoicePrefix,
@@ -139,6 +142,22 @@ export function BillingSettingsCard() {
                 )}
               />
             </div>
+
+            <Controller
+              name="rbqNumber"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor="billing-rbq">Numéro de licence RBQ</FieldLabel>
+                  <Input {...field} id="billing-rbq" placeholder="1234-5678-01" aria-invalid={fieldState.invalid} />
+                  {fieldState.invalid ? (
+                    <FieldError errors={[fieldState.error]} />
+                  ) : (
+                    <FieldDescription>Imprimé sous votre adresse sur chaque facture.</FieldDescription>
+                  )}
+                </Field>
+              )}
+            />
 
             <div className="grid gap-4 sm:grid-cols-2">
               <Controller

@@ -17,7 +17,10 @@ public class Project
     /// <summary>The client's own purchase order, printed on the invoices for this project.</summary>
     public string? PoNumber { get; set; }
 
-    public required string Name { get; set; }
+    /// <summary>
+    /// What the work is, in a line or two. A project is identified by its number and its
+    /// client — it carries no name of its own, because on paper nobody quotes one.
+    /// </summary>
     public string? Description { get; set; }
     public ProjectStatus Status { get; set; } = ProjectStatus.Planifie;
 

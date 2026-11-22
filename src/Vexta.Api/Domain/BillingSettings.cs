@@ -19,6 +19,12 @@ public class BillingSettings
     public string? GstNumber { get; set; }
     public string? QstNumber { get; set; }
 
+    /// <summary>
+    /// The RBQ licence, printed under the company's address. Required on a construction
+    /// invoice in Québec and meaningless everywhere else, which is why it is optional.
+    /// </summary>
+    public string? RbqNumber { get; set; }
+
     /// <summary>Rates in percent, applied to a new line by default. Québec: 5 and 9.975.</summary>
     public decimal GstRate { get; set; } = 5m;
     public decimal QstRate { get; set; } = 9.975m;

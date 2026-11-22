@@ -6,6 +6,8 @@ export interface BillingSettings {
   configured: boolean;
   gstNumber: string | null;
   qstNumber: string | null;
+  /** The RBQ licence, printed under the company's address on every invoice. */
+  rbqNumber: string | null;
   gstRate: number;
   qstRate: number;
   invoicePrefix: string;

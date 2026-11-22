@@ -147,7 +147,9 @@ export function MailgunSettingsCard({ settings }: { settings: PlatformSettings }
                   <FieldLabel htmlFor="mailgun-region">Région</FieldLabel>
                   <Select value={field.value} onValueChange={field.onChange}>
                     <SelectTrigger id="mailgun-region" className="w-full">
-                      <SelectValue />
+                      <SelectValue>
+                        {(region: string) => (region === "eu" ? "Europe (eu)" : "États-Unis (us)")}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="us">États-Unis (us)</SelectItem>

@@ -33,7 +33,6 @@ const statuses = Object.keys(projectStatusLabels) as ProjectStatus[];
 
 const formSchema = z.object({
   clientId: z.string().min(1, "Le client est requis."),
-  name: z.string().min(1, "Le nom est requis."),
   poNumber: z.string().trim().max(60, "60 caractères maximum.").optional().or(z.literal("")),
   clientAddressId: z.string().optional().or(z.literal("")),
   sameAddressAsClient: z.boolean(),
@@ -50,7 +49,6 @@ type FormValues = z.infer<typeof formSchema>;
 function toFormValues(project?: ProjectRecord, defaultClientId?: string): FormValues {
   return {
     clientId: project?.clientId ?? defaultClientId ?? "",
-    name: project?.name ?? "",
     poNumber: project?.poNumber ?? "",
     clientAddressId: project?.clientAddress?.id ?? "",
     // A new project bills and works at the same place until someone says otherwise, which is
@@ -92,7 +90,6 @@ export function ProjectFormSheet({
   async function onSubmit(values: FormValues) {
     const payload: ProjectFormValues = {
       clientId: values.clientId,
-      name: values.name.trim(),
       poNumber: values.poNumber?.trim() || null,
       clientAddressId: values.clientAddressId || null,
       sameAddressAsClient: values.sameAddressAsClient,
@@ -169,18 +166,6 @@ export function ProjectFormSheet({
             />
 
             <Controller
-              name="name"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="project-name">Nom du projet</FieldLabel>
-                  <Input {...field} id="project-name" aria-invalid={fieldState.invalid} />
-                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                </Field>
-              )}
-            />
-
-            <Controller
               name="description"
               control={form.control}
               render={({ field }) => (
@@ -199,7 +184,10 @@ export function ProjectFormSheet({
                   <FieldLabel htmlFor="project-status">Statut</FieldLabel>
                   <Select value={field.value} onValueChange={field.onChange}>
                     <SelectTrigger id="project-status" className="w-full">
-                      <SelectValue />
+                      {/* The trigger shows whatever is in the field until the list has been
+                          opened once, and what is in the field is the stored name: "EnCours".
+                          Formatting it here is what makes the closed select readable. */}
+                      <SelectValue>{(status: ProjectStatus) => projectStatusLabels[status]}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {statuses.map((status) => (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
@@ -17,17 +17,17 @@ import { Spinner } from "@/components/ui/spinner";
 import Link from "next/link";
 import { ClientPicker } from "@/components/clients/client-picker";
 import { ProjectPicker } from "@/components/invoices/project-picker";
-import { InvoicePreview } from "@/components/invoices/invoice-preview";
+import { InvoicePdfViewer } from "@/components/invoices/invoice-pdf-viewer";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { buttonVariants } from "@/components/ui/button";
 import { useBillingSettingsQuery } from "@/hooks/use-billing-settings";
-import { useClientSummaryQuery } from "@/hooks/use-clients";
-import { useProjectsQuery } from "@/hooks/use-projects";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { usePdfDocument } from "@/hooks/use-pdf-document";
 import { cn } from "@/lib/utils";
 import { ApiError } from "@/lib/api";
 import { useCreateInvoice, useUpdateInvoice, type InvoiceFormValues } from "@/hooks/use-invoices";
 import { invoiceStatusLabels } from "@/lib/labels";
-import { formatProjectNumber, type InvoiceRecord, type InvoiceStatus } from "@/lib/types";
+import type { InvoiceRecord, InvoiceStatus } from "@/lib/types";
 
 const statuses = Object.keys(invoiceStatusLabels) as InvoiceStatus[];
 
@@ -126,12 +126,43 @@ export function InvoiceForm({ invoice, defaultClientId }: { invoice?: InvoiceRec
   const issueDate = useWatch({ control: form.control, name: "issueDate" });
   const dueDate = useWatch({ control: form.control, name: "dueDate" });
   const notes = useWatch({ control: form.control, name: "notes" });
+  const status = useWatch({ control: form.control, name: "status" });
 
-  const { data: clients } = useClientSummaryQuery();
-  const { data: projects } = useProjectsQuery(1, "", clientId || undefined);
+  // The document is built by the API from what is on screen, so the preview is the invoice
+  // rather than a second drawing of it. Debounced: it is a round trip, and one per keystroke
+  // would be a request the person has already made obsolete by the time it answers.
+  const draft = useMemo(
+    () =>
+      JSON.stringify({
+        clientId,
+        projectId: projectId || null,
+        status,
+        issueDate,
+        dueDate,
+        currency,
+        notes: notes || null,
+        lines: (lines ?? []).map((line) => ({
+          description: line.description ?? "",
+          quantity: Number(line.quantity) || 0,
+          unitPrice: Number(line.unitPrice) || 0,
+          taxRatePercent: Number(line.taxRatePercent) || 0,
+        })),
+      }),
+    [clientId, projectId, status, issueDate, dueDate, currency, notes, lines],
+  );
 
-  const client = clients?.find((c) => c.id === clientId);
-  const project = projects?.items.find((p) => p.id === projectId);
+  const debouncedDraft = useDebouncedValue(draft, 500);
+
+  // Nothing to draw without a client and dates: the request would be refused rather than
+  // return a document with holes in it.
+  const preview = usePdfDocument(
+    clientId && issueDate && dueDate
+      // An invoice being edited is previewed under its own number, not under the one the next
+      // invoice will get.
+      ? `invoices/preview${invoice ? `?invoiceId=${invoice.id}` : ""}`
+      : null,
+    debouncedDraft,
+  );
 
   // A new line carries the company's own rates. Zero is not a neutral default on an invoice —
   // it is a claim that nothing is taxable, and it would be wrong on nearly every line.
@@ -192,7 +223,7 @@ export function InvoiceForm({ invoice, defaultClientId }: { invoice?: InvoiceRec
   }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_26rem]">
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_30rem]">
     <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="space-y-6">
       <Card>
         <CardHeader>
@@ -243,7 +274,7 @@ export function InvoiceForm({ invoice, defaultClientId }: { invoice?: InvoiceRec
                     <FieldLabel htmlFor="invoice-status">Statut</FieldLabel>
                     <Select value={field.value} onValueChange={field.onChange}>
                       <SelectTrigger id="invoice-status" className="w-full">
-                        <SelectValue />
+                        <SelectValue>{(s: InvoiceStatus) => invoiceStatusLabels[s]}</SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {statuses.map((status) => (
@@ -441,18 +472,12 @@ export function InvoiceForm({ invoice, defaultClientId }: { invoice?: InvoiceRec
       {/* Beside the form on a wide screen, under it otherwise — stacking beats a preview too
           narrow to read. Sticky so it stays in view while the lines are being filled in. */}
       <aside className="xl:sticky xl:top-6 xl:self-start">
-        <p className="mb-2 text-sm font-medium text-foreground">Aperçu</p>
-        <InvoicePreview
-          number={invoice?.number ?? settings?.nextInvoiceLabel ?? "—"}
-          clientName={client?.name ?? ""}
-          projectLabel={project ? `${formatProjectNumber(project.number)} — ${project.name}` : null}
-          poNumber={project?.poNumber ?? null}
-          issueDate={issueDate}
-          dueDate={dueDate}
-          currency={currency}
-          notes={notes}
-          lines={lines ?? []}
-          settings={settings}
+        <InvoicePdfViewer
+          url={preview.url}
+          loading={preview.loading}
+          error={clientId ? preview.error : "Choisissez un client pour voir la facture."}
+          title={`Facture ${invoice?.number ?? settings?.nextInvoiceLabel ?? ""}`.trim()}
+          fileName={`Facture-${invoice?.number ?? settings?.nextInvoiceLabel ?? "brouillon"}.pdf`}
         />
       </aside>
     </div>

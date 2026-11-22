@@ -15,7 +15,18 @@ public record EmployeeDto(
     bool InvitationExpired,
     DateTimeOffset? InvitationSentAt,
     DateTimeOffset? InvitationExpiresAt,
+    /// <summary>
+    /// The person who opened the company. Their access is theirs by definition: it cannot be
+    /// unticked and their record cannot be deleted, because both would take the account that
+    /// owns the space down with them.
+    /// </summary>
+    bool IsOwner,
     DateTimeOffset CreatedAt);
+
+/// <summary>One employee's own page: the record, plus the teams they are on.</summary>
+public record EmployeeDetailDto(EmployeeDto Employee, IReadOnlyList<EmployeeTeamDto> Teams);
+
+public record EmployeeTeamDto(Guid Id, string Name, bool IsLead);
 
 /// <summary>
 /// Sent with every employee list so the page can show "3 / 5" and disable the access boxes it

@@ -9,6 +9,7 @@ import { useAddressesQuery } from "@/hooks/use-addresses";
 import { useInvoicesQuery } from "@/hooks/use-invoices";
 import { useProjectsQuery } from "@/hooks/use-projects";
 import { formatCents } from "@/lib/money";
+import { formatProjectNumber } from "@/lib/types";
 import { invoiceStatusLabels, projectStatusLabels } from "@/lib/labels";
 
 function Loading({ rows = 3 }: { rows?: number }) {
@@ -90,7 +91,15 @@ export function ClientProjectsSection({ clientId }: { clientId: string }) {
           {items.map((project) => (
             <li key={project.id} className="flex items-start justify-between gap-3 rounded-lg border border-border bg-card p-3">
               <div className="min-w-0">
-                <p className="font-medium text-foreground">{project.name}</p>
+                <Link
+                  href={`/projets/${project.id}`}
+                  className="font-mono text-sm font-medium text-foreground underline-offset-4 hover:underline"
+                >
+                  {formatProjectNumber(project.number)}
+                </Link>
+                {project.poNumber && (
+                  <span className="ml-2 text-xs text-muted-foreground">PO {project.poNumber}</span>
+                )}
                 {project.description && (
                   <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">{project.description}</p>
                 )}

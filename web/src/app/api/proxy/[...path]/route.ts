@@ -25,8 +25,20 @@ async function forward(request: NextRequest, segments: string[]) {
 
   if (isUnreachable(response)) return response;
 
-  const responseText = await response.text();
   const contentType = response.headers.get("content-type") ?? "application/json";
+
+  // A PDF read as text comes back mangled: the bytes are decoded as UTF-8 and every invalid
+  // sequence is replaced, which is most of a PDF. Anything that is not text is passed through
+  // as bytes, with the disposition the API chose so the browser still knows what it is.
+  if (!contentType.includes("json") && !contentType.startsWith("text/")) {
+    const headers = new Headers({ "content-type": contentType });
+    const disposition = response.headers.get("content-disposition");
+    if (disposition) headers.set("content-disposition", disposition);
+
+    return new NextResponse(await response.arrayBuffer(), { status: response.status, headers });
+  }
+
+  const responseText = await response.text();
 
   return new NextResponse(responseText || null, {
     status: response.status,

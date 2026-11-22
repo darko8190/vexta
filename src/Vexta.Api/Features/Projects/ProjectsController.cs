@@ -27,10 +27,17 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
+            // A project has no name to search, so what is left is who it is for, the client's
+            // own PO, and its number — typed either as 12 or as P-0012, which is how it is read
+            // off a document.
+            var search = query.Search.Trim();
+            var digits = new string(search.Where(char.IsDigit).ToArray());
+            var number = int.TryParse(digits, out var parsed) ? parsed : (int?)null;
+
             projects = projects.Where(p =>
-                p.Name.Contains(query.Search)
-                || p.Client!.Name.Contains(query.Search)
-                || p.PoNumber!.Contains(query.Search));
+                p.Client!.Name.Contains(search)
+                || p.PoNumber!.Contains(search)
+                || (number != null && p.Number == number));
         }
 
         var totalCount = await projects.CountAsync();
@@ -70,7 +77,6 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
             TenantId = tenantId,
             Number = await NextNumberAsync(tenantId),
             ClientId = request.ClientId,
-            Name = request.Name.Trim(),
             PoNumber = Clean(request.PoNumber),
             Description = request.Description,
             Status = request.Status,
@@ -97,7 +103,6 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
         if (await InvalidAddressesAsync(request) is { } addressError) return BadRequest(new { message = addressError });
 
         project.ClientId = request.ClientId;
-        project.Name = request.Name.Trim();
         project.PoNumber = Clean(request.PoNumber);
         project.Description = request.Description;
         project.Status = request.Status;
@@ -178,7 +183,6 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
         p.Number,
         p.ClientId,
         p.Client!.Name,
-        p.Name,
         p.PoNumber,
         p.Description,
         p.Status,

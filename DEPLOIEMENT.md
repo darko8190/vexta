@@ -263,6 +263,50 @@ configuré, le téléversement échoue. Le reste de la section fonctionne sans l
 l'entreprise** est rangé en base plutôt qu'en R2, pour la même raison que la marque de la
 plateforme — il doit survivre à une panne de stockage.
 
+### Espaces : personnel et travail
+
+Un compte n'appartient plus à un seul espace. Une personne a **son espace personnel**, gratuit,
+et les entreprises qui lui ont donné un accès ; elle bascule de l'un à l'autre depuis la
+pastille de son profil, section **Espaces**.
+
+Ce qui change à chaque bascule : le locataire **et** le rôle. La même personne est propriétaire
+de son espace personnel et employée de l'entreprise qui l'emploie, donc le rôle ne peut pas
+vivre sur le compte. Il vit sur l'appartenance, et le jeton en porte une à la fois.
+
+- L'espace personnel est créé au premier passage dans le sélecteur, y compris pour les comptes
+  qui existaient avant. Rien à migrer.
+- Un super admin n'a ni appartenance ni espace personnel : il entre dans un locataire, ce qui
+  reste un mécanisme distinct.
+- Demander un espace où l'on n'a pas d'appartenance est refusé, même si le locataire existe.
+
+### Accès client
+
+Un **particulier**, ou un **contact nommé** dans la fiche d'une entreprise cliente, peut recevoir
+un accès depuis sa fiche. L'invitation est la même que pour un employé : compte sans mot de
+passe, jeton à usage unique valable 7 jours, courriel par Mailgun s'il est configuré et lien
+affiché dans tous les cas.
+
+Ce qu'un client voit une fois connecté :
+
+| | Client | Employé |
+|---|---|---|
+| Ses projets, ses factures | Lecture | Lecture et écriture |
+| Les projets et factures des autres clients | **Jamais** | Oui |
+| Répertoire des clients, RH, fiche entreprise, bibliothèque | **Refusé** | Oui |
+| Siège consommé dans le forfait | **Aucun** | Un |
+
+Le cloisonnement est posé dans les filtres de requête, pas dans chaque point d'entrée : demander
+explicitement les projets d'un autre client renvoie une liste vide, parce que la requête ne les
+a jamais vus.
+
+Deux modifications sont refusées tant qu'un accès existe, parce qu'elles laisseraient un compte
+orphelin : **changer le courriel** (c'est l'identifiant) et **passer un particulier en
+entreprise** (il ne reste personne pour être le titulaire). Retirer l'accès débloque les deux et
+conserve la fiche.
+
+> Un client peut lister ses factures mais pas encore en ouvrir une : le seul écran de détail est
+> le formulaire de modification, et le lui montrer serait pire que le manque.
+
 ### Cloudflare R2
 
 1. Créez un seau et un jeton d'API R2 (lecture + écriture).

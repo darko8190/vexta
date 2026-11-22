@@ -46,7 +46,12 @@ public class TenantsController(
             .Take(query.PageSize)
             .Select(t => new TenantDto(
                 t.Id, t.Name, t.Slug, t.Kind.ToString(), t.SubscriptionStatus.ToString(), t.CurrentPeriodEnd, t.CreatedAt,
-                db.Users.IgnoreQueryFilters().Count(u => u.TenantId == t.Id),
+                // Counted exactly as the company's own Employés page counts it, and as
+                // EmployeeAccessService.GetSeatUsageAsync decides whether a seat is free: by
+                // membership, not by whose home space this is. Counting homes read 2 / 3 on this
+                // screen while the company read 3 / 3 on its own, and the company was right —
+                // someone who lives in their personal space still holds a seat here.
+                db.TenantMemberships.Count(m => m.TenantId == t.Id && m.Role != UserRole.Client),
                 db.Clients.IgnoreQueryFilters().Count(c => c.TenantId == t.Id),
                 t.PlanId,
                 t.Plan!.Name,

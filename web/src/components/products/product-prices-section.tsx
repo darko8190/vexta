@@ -4,12 +4,13 @@ import { TrendingUp } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/layout/empty-state";
+import { LoadErrorState } from "@/components/layout/load-error-state";
 import { money, percent, timestamp } from "@/components/products/product-format";
 import { useProductPricesQuery } from "@/hooks/use-products";
 
 /** What the product cost and sold for, each time one of the three figures moved. */
 export function ProductPricesSection({ productId }: { productId: string }) {
-  const { data, isLoading } = useProductPricesQuery(productId);
+  const { data, isLoading, isError, isPlaceholderData, error: loadError, refetch } = useProductPricesQuery(productId);
   const entries = data ?? [];
 
   return (
@@ -27,6 +28,18 @@ export function ProductPricesSection({ productId }: { productId: string }) {
             <Skeleton key={index} className="h-12 w-full" />
           ))}
         </div>
+      ) : isError && (!data || isPlaceholderData) ? (
+        /* "Aucun changement de prix" is a claim about the past; a failed read is a claim about
+           now. Saying the first when the second happened makes a history look rewritten.
+           And `isError` alone is too wide: a failed background refetch keeps it true over rows
+           that are still right, so the panel only wins with nothing read at all (`!data`) or rows
+           left over from another query key (`isPlaceholderData`). */
+        <LoadErrorState
+          error={loadError}
+          title="Historique de prix indisponible"
+          fallback="L'historique de prix n'a pas pu être chargé."
+          onRetry={() => refetch()}
+        />
       ) : entries.length === 0 ? (
         <EmptyState
           icon={TrendingUp}

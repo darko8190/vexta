@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/layout/empty-state";
+import { LoadErrorState } from "@/components/layout/load-error-state";
 import { MAX_UPLOAD_BYTES, useUploadMedia } from "@/hooks/use-media";
 import { useProductImagesQuery, useSaveProductImages } from "@/hooks/use-products";
 import { ApiError } from "@/lib/api";
@@ -19,7 +20,14 @@ import { ApiError } from "@/lib/api";
  * section rather than kept anywhere.
  */
 export function ProductImagesSection({ productId }: { productId: string }) {
-  const { data: images, isLoading } = useProductImagesQuery(productId);
+  const {
+    data: images,
+    isLoading,
+    isError,
+    isPlaceholderData,
+    error: loadError,
+    refetch,
+  } = useProductImagesQuery(productId);
   const save = useSaveProductImages(productId);
   const upload = useUploadMedia();
   const fileInput = useRef<HTMLInputElement>(null);
@@ -70,8 +78,14 @@ export function ProductImagesSection({ productId }: { productId: string }) {
 
   const busy = upload.isPending || save.isPending;
 
+  // Adding is refused while the read has failed: the set is saved whole, so appending to a list
+  // we could not read would send the new image alone and erase the ones already there.
   const addButton = (
-    <Button variant="outline" disabled={busy || isLoading} onClick={() => fileInput.current?.click()}>
+    <Button
+      variant="outline"
+      disabled={busy || isLoading || isError}
+      onClick={() => fileInput.current?.click()}
+    >
       {busy ? <Spinner /> : <ImagePlus />}
       Ajouter des images
     </Button>
@@ -109,6 +123,18 @@ export function ProductImagesSection({ productId }: { productId: string }) {
             <Skeleton key={index} className="aspect-square w-full" />
           ))}
         </div>
+      ) : isError && (!images || isPlaceholderData) ? (
+        /* A failed read is not a product without photographs: "Aucune image" would claim the
+           pictures were never taken, when they simply could not be fetched.
+           And `isError` alone is too wide: a failed background refetch keeps it true over rows
+           that are still right, so the panel only wins with nothing read at all (`!images`) or rows
+           left over from another query key (`isPlaceholderData`). */
+        <LoadErrorState
+          error={loadError}
+          title="Images indisponibles"
+          fallback="Les images de ce produit n'ont pas pu être chargées."
+          onRetry={() => refetch()}
+        />
       ) : current.length === 0 ? (
         <EmptyState
           icon={Images}

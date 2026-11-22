@@ -15,6 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
+import { LoadErrorState } from "@/components/layout/load-error-state";
 import { DocumentFormSheet } from "@/components/projects/detail/document-form-sheet";
 import { formatFileSize } from "@/components/projects/detail/document-file-size";
 import { NoteThread } from "@/components/projects/detail/note-thread";
@@ -38,7 +39,20 @@ export function ProjectDocumentsSection({ projectId }: { projectId: string }) {
   // same thing twice over — [StaffOnly] on the writes, and on the notes entirely — and this
   // keeps the interface from offering a button and a half-page that would both be refused.
   const isClient = useIsClientUser();
-  const { data, isLoading } = useProjectDocumentsQuery(projectId);
+  // A failed read is not a job with no paperwork, and the empty copy here promises the files
+  // will "appear as soon as the company uploads them" — said to a customer whose plans and
+  // permits are already filed, that is a lie the request invented. The failure says so instead.
+  // And `isError` alone is too wide: a failed background refetch keeps it true over rows
+  // that are still right, so the panel only wins with nothing read at all (`!data`) or rows
+  // left over from another query key (`isPlaceholderData`).
+  const {
+    data,
+    isLoading,
+    isError,
+    isPlaceholderData,
+    error: loadError,
+    refetch,
+  } = useProjectDocumentsQuery(projectId);
   const remove = useDeleteProjectDocument(projectId);
 
   const [formOpen, setFormOpen] = useState(false);
@@ -89,6 +103,13 @@ export function ProjectDocumentsSection({ projectId }: { projectId: string }) {
             <Skeleton key={index} className="h-16 w-full" />
           ))}
         </div>
+      ) : isError && (!data || isPlaceholderData) ? (
+        <LoadErrorState
+          error={loadError}
+          title="Documents indisponibles"
+          fallback="Les documents de ce projet n'ont pas pu être chargés."
+          onRetry={() => refetch()}
+        />
       ) : documents.length === 0 ? (
         <EmptyState
           icon={FileText}

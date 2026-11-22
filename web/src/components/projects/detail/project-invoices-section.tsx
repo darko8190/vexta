@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/layout/empty-state";
+import { LoadErrorState } from "@/components/layout/load-error-state";
 import { useInvoicesQuery } from "@/hooks/use-invoices";
 import { formatDateOnly } from "@/lib/dates";
 import { invoiceStatusLabels } from "@/lib/labels";
@@ -21,7 +22,20 @@ export function ProjectInvoicesSection({
   /** Needed on the link: the project picker on the form is scoped to a client. */
   clientId: string;
 }) {
-  const { data, isLoading } = useInvoicesQuery(1, "", undefined, undefined, projectId);
+  // A failed read is not a project nobody billed, and here the two look identical: `data` is
+  // undefined on failure, so `items.length === 0` would announce "aucune facture" on a project
+  // that has been invoiced — the one sentence nobody should read about money they are owed.
+  // And `isError` alone is too wide: a failed background refetch keeps it true over rows
+  // that are still right, so the panel only wins with nothing read at all (`!data`) or rows
+  // left over from another query key (`isPlaceholderData`).
+  const {
+    data,
+    isLoading,
+    isError,
+    isPlaceholderData,
+    error: loadError,
+    refetch,
+  } = useInvoicesQuery(1, "", undefined, undefined, projectId);
   const invoices = data?.items ?? [];
 
   // A styled link rather than a Button rendering one: Base UI drops native button semantics
@@ -52,6 +66,13 @@ export function ProjectInvoicesSection({
             <Skeleton key={index} className="h-14 w-full" />
           ))}
         </div>
+      ) : isError && (!data || isPlaceholderData) ? (
+        <LoadErrorState
+          error={loadError}
+          title="Factures indisponibles"
+          fallback="Les factures de ce projet n'ont pas pu être chargées."
+          onRetry={() => refetch()}
+        />
       ) : invoices.length === 0 ? (
         <EmptyState
           icon={FileText}

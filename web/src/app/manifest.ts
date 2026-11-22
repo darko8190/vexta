@@ -13,6 +13,10 @@ export default function manifest(): MetadataRoute.Manifest {
     // they already said yes to. The dashboard group redirects to /connexion when no session is
     // open, so a signed-out launch still lands somewhere useful.
     start_url: "/tableau-de-bord",
+    // The installed app's identity, pinned now rather than later: without it a browser
+    // identifies the app by its start_url, so moving that page one day would be read as a
+    // different application and leave people with two Vexta icons, one of them dead.
+    id: "/",
     // Everything the app does lives under the same origin, so the whole site is in scope and a
     // link out of it leaves the installed window.
     scope: "/",

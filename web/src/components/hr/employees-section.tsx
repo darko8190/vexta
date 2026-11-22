@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CloudOff, ExternalLink, MoreHorizontal, Pencil, Plus, Send, Trash2, UsersRound } from "lucide-react";
+import { ExternalLink, MoreHorizontal, Pencil, Plus, Send, Trash2, UsersRound } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ClickableRow } from "@/components/layout/clickable-row";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
+import { LoadErrorState } from "@/components/layout/load-error-state";
 import { EmptyState } from "@/components/layout/empty-state";
 import { EmployeeFormSheet } from "@/components/team/employee-form-sheet";
 import { InvitationLinkDialog } from "@/components/team/invitation-link-dialog";
@@ -83,7 +84,7 @@ function AccessCell({
 
 export function EmployeesSection() {
   const router = useRouter();
-  const { data, isLoading, isError, error: loadError, refetch } = useTeamQuery();
+  const { data, isLoading, isError, isPlaceholderData, error: loadError, refetch } = useTeamQuery();
   const grantAccess = useGrantAccess();
   const revokeAccess = useRevokeAccess();
   const resendInvitation = useResendInvitation();
@@ -197,15 +198,18 @@ export function EmployeesSection() {
             <Skeleton key={i} className="h-12 w-full" />
           ))}
         </div>
-      ) : isError ? (
+      ) : isError && (!data || isPlaceholderData) ? (
         /* An error is not an empty list. Saying "aucun employé" when the request failed tells
            someone their payroll is empty, which is both false and alarming — and it was being
-           said while the badge beside it still counted two. */
-        <EmptyState
-          icon={CloudOff}
-          title="Liste indisponible"
-          description={message(loadError, "Vos employés n'ont pas pu être chargés.")}
-          action={<Button onClick={() => refetch()}>Réessayer</Button>}
+           said while the badge beside it still counted two.
+           And `isError` alone is too wide: a failed background refetch keeps it true over rows
+           that are still right, so the panel only wins with nothing read at all (`!data`) or rows
+           left over from another query key (`isPlaceholderData`). */
+        <LoadErrorState
+          error={loadError}
+          title="Employés indisponibles"
+          fallback="Vos employés n'ont pas pu être chargés."
+          onRetry={() => refetch()}
         />
       ) : employees.length === 0 ? (
         <EmptyState

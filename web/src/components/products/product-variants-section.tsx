@@ -17,6 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ClickableRow } from "@/components/layout/clickable-row";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
+import { LoadErrorState } from "@/components/layout/load-error-state";
 import { ProductFormSheet } from "@/components/products/product-form-sheet";
 import { formatProductNumber, money } from "@/components/products/product-format";
 import { AvailableQuantity } from "@/components/products/products-section";
@@ -30,7 +31,14 @@ import type { ProductRecord } from "@/lib/types";
  */
 export function ProductVariantsSection({ product }: { product: ProductRecord }) {
   const router = useRouter();
-  const { data, isLoading } = useProductVariantsQuery(product.id);
+  const {
+    data,
+    isLoading,
+    isError,
+    isPlaceholderData,
+    error: loadError,
+    refetch,
+  } = useProductVariantsQuery(product.id);
   const remove = useDeleteProduct();
 
   const [formOpen, setFormOpen] = useState(false);
@@ -80,6 +88,19 @@ export function ProductVariantsSection({ product }: { product: ProductRecord }) 
             <Skeleton key={index} className="h-12 w-full" />
           ))}
         </div>
+      ) : isError && (!data || isPlaceholderData) ? (
+        /* "Aucune variante" invites someone to create a declination that may already exist. A
+           failed read is not an absence, and offering the create button on one would make
+           duplicates out of an outage.
+           And `isError` alone is too wide: a failed background refetch keeps it true over rows
+           that are still right, so the panel only wins with nothing read at all (`!data`) or rows
+           left over from another query key (`isPlaceholderData`). */
+        <LoadErrorState
+          error={loadError}
+          title="Variantes indisponibles"
+          fallback="Les variantes de ce produit n'ont pas pu être chargées."
+          onRetry={() => refetch()}
+        />
       ) : variants.length === 0 ? (
         <EmptyState
           icon={GitBranch}

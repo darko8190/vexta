@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
+import { LoadErrorState } from "@/components/layout/load-error-state";
 import { EmptyState } from "@/components/layout/empty-state";
 import { ClientContactFormSheet } from "@/components/clients/detail/client-contact-form-sheet";
 import { useClientContactsQuery, useDeleteClientContact } from "@/hooks/use-clients";
@@ -19,7 +20,7 @@ import { ApiError } from "@/lib/api";
 import type { ClientContact } from "@/lib/types";
 
 export function ClientContactsSection({ clientId }: { clientId: string }) {
-  const { data, isLoading } = useClientContactsQuery(clientId);
+  const { data, isLoading, isError, isPlaceholderData, error: loadError, refetch } = useClientContactsQuery(clientId);
   const remove = useDeleteClientContact(clientId);
 
   const [formOpen, setFormOpen] = useState(false);
@@ -67,6 +68,18 @@ export function ClientContactsSection({ clientId }: { clientId: string }) {
             <Skeleton key={i} className="h-16 w-full" />
           ))}
         </div>
+      ) : isError && (!data || isPlaceholderData) ? (
+        /* An error is not an empty list. "Aucun contact" after a failed request tells someone
+           this client has nobody to call, when the list was simply not read.
+           And `isError` alone is too wide: a failed background refetch keeps it true over rows
+           that are still right, so the panel only wins with nothing read at all (`!data`) or rows
+           left over from another query key (`isPlaceholderData`). */
+        <LoadErrorState
+          error={loadError}
+          title="Contacts indisponibles"
+          fallback="Les contacts de ce client n'ont pas pu être chargés."
+          onRetry={() => refetch()}
+        />
       ) : !data || data.length === 0 ? (
         <EmptyState
           icon={UserRound}

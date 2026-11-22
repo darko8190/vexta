@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
+import { LoadErrorState } from "@/components/layout/load-error-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { ModuleFormSheet } from "@/components/catalog/module-form-sheet";
 import { useDeleteModule, useModulesQuery } from "@/hooks/use-catalog";
@@ -24,7 +25,13 @@ import { moduleIcon } from "@/lib/module-icons";
 import type { ModuleRecord } from "@/lib/types";
 
 export default function ModulesPage() {
-  const { data, isLoading } = useModulesQuery();
+  // A failed read is not a platform without modules — and `!data` was swallowing the failure
+  // into the empty branch, so an outage invited an admin to re-create the modules that already
+  // compose every forfait. There is no search on this page, so empty really means empty.
+  // And `isError` alone is too wide: a failed background refetch keeps it true over rows
+  // that are still right, so the panel only wins with nothing read at all (`!data`) or rows
+  // left over from another query key (`isPlaceholderData`).
+  const { data, isLoading, isError, isPlaceholderData, error: loadError, refetch } = useModulesQuery();
   const deleteModule = useDeleteModule();
 
   const [formOpen, setFormOpen] = useState(false);
@@ -68,6 +75,13 @@ export default function ModulesPage() {
             <Skeleton key={i} className="h-12 w-full" />
           ))}
         </div>
+      ) : isError && (!data || isPlaceholderData) ? (
+        <LoadErrorState
+          error={loadError}
+          title="Modules indisponibles"
+          fallback="Les modules n'ont pas pu être chargés."
+          onRetry={() => refetch()}
+        />
       ) : !data || data.length === 0 ? (
         <EmptyState
           icon={Blocks}

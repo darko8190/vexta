@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CreateTenantDialog } from "@/components/admin/create-tenant-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
+import { LoadErrorState } from "@/components/layout/load-error-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { PaginationBar } from "@/components/layout/pagination-bar";
 import { SearchInput } from "@/components/layout/search-input";
@@ -59,7 +60,14 @@ function TableSkeleton() {
 
 function BusinessTenants({ search, onCreate }: { search: string; onCreate: () => void }) {
   const [page, setPage] = useState(1);
-  const { data, isLoading } = useTenantsQuery(page, search, "Business");
+  // Three different things were all drawing the same panel: the request failed, the platform has
+  // no companies, and this search matched none. On an admin screen the first one read as the
+  // second — "aucune entreprise", on the page that lists every paying customer — so the failure
+  // is now said first, and the search tells its own story after it.
+  // And `isError` alone is too wide: a failed background refetch keeps it true over rows
+  // that are still right, so the panel only wins with nothing read at all (`!data`) or rows
+  // left over from another query key (`isPlaceholderData`).
+  const { data, isLoading, isError, isPlaceholderData, error: loadError, refetch } = useTenantsQuery(page, search, "Business");
   const { data: plans } = usePlansQuery();
   const updateStatus = useUpdateTenantSubscriptionStatus();
   const updatePlan = useUpdateTenantPlan();
@@ -93,18 +101,33 @@ function BusinessTenants({ search, onCreate }: { search: string; onCreate: () =>
 
       {isLoading ? (
         <TableSkeleton />
-      ) : !data || data.items.length === 0 ? (
-        <EmptyState
-          icon={Building2}
-          title="Aucune entreprise"
-          description="Les entreprises qui s'inscrivent ou que vous créez manuellement apparaîtront ici."
-          action={
-            <Button onClick={onCreate}>
-              <Plus />
-              Nouveau locataire
-            </Button>
-          }
+      ) : isError && (!data || isPlaceholderData) ? (
+        <LoadErrorState
+          error={loadError}
+          title="Locataires indisponibles"
+          fallback="La liste des entreprises n'a pas pu être chargée."
+          onRetry={() => refetch()}
         />
+      ) : !data || data.items.length === 0 ? (
+        search ? (
+          <EmptyState
+            icon={Building2}
+            title="Aucune entreprise trouvée"
+            description="Essayez une autre recherche."
+          />
+        ) : (
+          <EmptyState
+            icon={Building2}
+            title="Aucune entreprise"
+            description="Les entreprises qui s'inscrivent ou que vous créez manuellement apparaîtront ici."
+            action={
+              <Button onClick={onCreate}>
+                <Plus />
+                Nouveau locataire
+              </Button>
+            }
+          />
+        )
       ) : (
         <div className="overflow-hidden rounded-lg border border-border">
           <Table>
@@ -196,7 +219,7 @@ function BusinessTenants({ search, onCreate }: { search: string; onCreate: () =>
  */
 function PersonalTenants({ search }: { search: string }) {
   const [page, setPage] = useState(1);
-  const { data, isLoading } = useTenantsQuery(page, search, "Personal");
+  const { data, isLoading, isError, isPlaceholderData, error: loadError, refetch } = useTenantsQuery(page, search, "Personal");
 
   return (
     <section>
@@ -209,12 +232,27 @@ function PersonalTenants({ search }: { search: string }) {
 
       {isLoading ? (
         <TableSkeleton />
-      ) : !data || data.items.length === 0 ? (
-        <EmptyState
-          icon={UserRound}
-          title="Aucun espace personnel"
-          description="Il s'en crée un la première fois qu'une personne ouvre son sélecteur d'espaces."
+      ) : isError && (!data || isPlaceholderData) ? (
+        <LoadErrorState
+          error={loadError}
+          title="Locataires indisponibles"
+          fallback="La liste des espaces personnels n'a pas pu être chargée."
+          onRetry={() => refetch()}
         />
+      ) : !data || data.items.length === 0 ? (
+        search ? (
+          <EmptyState
+            icon={UserRound}
+            title="Aucun espace personnel trouvé"
+            description="Essayez une autre recherche."
+          />
+        ) : (
+          <EmptyState
+            icon={UserRound}
+            title="Aucun espace personnel"
+            description="Il s'en crée un la première fois qu'une personne ouvre son sélecteur d'espaces."
+          />
+        )
       ) : (
         <div className="overflow-hidden rounded-lg border border-border">
           <Table>

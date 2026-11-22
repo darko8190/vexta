@@ -33,6 +33,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
+import { LoadErrorState } from "@/components/layout/load-error-state";
 import { EmptyState } from "@/components/layout/empty-state";
 import { useDeleteJobPosting, useJobPostingsQuery, useSaveJobPosting } from "@/hooks/use-public-page";
 import { ApiError } from "@/lib/api";
@@ -290,7 +291,7 @@ function JobFormSheet({
 
 /** The company's positions: the table is the file, the ticked ones are the page. */
 export function JobPostingsCard() {
-  const { data, isLoading } = useJobPostingsQuery();
+  const { data, isLoading, isError, isPlaceholderData, error: loadError, refetch } = useJobPostingsQuery();
   const remove = useDeleteJobPosting();
 
   const [formOpen, setFormOpen] = useState(false);
@@ -340,6 +341,18 @@ export function JobPostingsCard() {
               <Skeleton key={i} className="h-10 w-full" />
             ))}
           </div>
+        ) : isError && (!data || isPlaceholderData) ? (
+          /* An error is not an empty list. "Aucune offre" after a failed request tells someone
+             their postings are gone, when they were simply not read.
+             And `isError` alone is too wide: a failed background refetch keeps it true over rows
+             that are still right, so the panel only wins with nothing read at all (`!data`) or rows
+             left over from another query key (`isPlaceholderData`). */
+          <LoadErrorState
+            error={loadError}
+            title="Offres indisponibles"
+            fallback="Vos offres d'emploi n'ont pas pu être chargées."
+            onRetry={() => refetch()}
+          />
         ) : !data || data.length === 0 ? (
           <EmptyState
             icon={BriefcaseBusiness}

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/layout/empty-state";
+import { LoadErrorState } from "@/components/layout/load-error-state";
 import { quantity, timestamp } from "@/components/products/product-format";
 import { StockMovementDialog } from "@/components/products/stock-movement-dialog";
 import { useProductStockQuery } from "@/hooks/use-products";
@@ -13,7 +14,7 @@ import type { ProductRecord } from "@/lib/types";
 
 /** What came in, what left, and what was on the shelf after each movement. */
 export function ProductStockSection({ product }: { product: ProductRecord }) {
-  const { data, isLoading } = useProductStockQuery(product.id);
+  const { data, isLoading, isError, isPlaceholderData, error: loadError, refetch } = useProductStockQuery(product.id);
   const [adjustOpen, setAdjustOpen] = useState(false);
 
   const entries = data ?? [];
@@ -41,6 +42,18 @@ export function ProductStockSection({ product }: { product: ProductRecord }) {
             <Skeleton key={index} className="h-12 w-full" />
           ))}
         </div>
+      ) : isError && (!data || isPlaceholderData) ? (
+        /* "Aucun mouvement" says nothing ever entered or left this shelf. A failed read says
+           only that we could not look, and the two must not be told as the same story.
+           And `isError` alone is too wide: a failed background refetch keeps it true over rows
+           that are still right, so the panel only wins with nothing read at all (`!data`) or rows
+           left over from another query key (`isPlaceholderData`). */
+        <LoadErrorState
+          error={loadError}
+          title="Historique d'inventaire indisponible"
+          fallback="L'historique d'inventaire n'a pas pu être chargé."
+          onRetry={() => refetch()}
+        />
       ) : entries.length === 0 ? (
         <EmptyState
           icon={History}

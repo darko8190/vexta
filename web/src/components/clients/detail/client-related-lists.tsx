@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FileText, FolderKanban, MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { LoadErrorState } from "@/components/layout/load-error-state";
 import { EmptyState } from "@/components/layout/empty-state";
 import { useAddressesQuery } from "@/hooks/use-addresses";
 import { useInvoicesQuery } from "@/hooks/use-invoices";
@@ -33,7 +34,7 @@ function SectionHeading({ title, description }: { title: string; description: st
 }
 
 export function ClientAddressesSection({ clientId }: { clientId: string }) {
-  const { data, isLoading } = useAddressesQuery(1, "", clientId);
+  const { data, isLoading, isError, isPlaceholderData, error: loadError, refetch } = useAddressesQuery(1, "", clientId);
   const items = data?.items ?? [];
 
   return (
@@ -44,6 +45,18 @@ export function ClientAddressesSection({ clientId }: { clientId: string }) {
       />
       {isLoading ? (
         <Loading />
+      ) : isError && (!data || isPlaceholderData) ? (
+        /* An error is not an empty list — in every section here. Falling through to "aucun"
+           tells someone this client's history is gone when a request merely failed.
+           And `isError` alone is too wide: a failed background refetch keeps it true over rows
+           that are still right, so the panel only wins with nothing read at all (`!data`) or rows
+           left over from another query key (`isPlaceholderData`). */
+        <LoadErrorState
+          error={loadError}
+          title="Adresses indisponibles"
+          fallback="Les adresses de ce client n'ont pas pu être chargées."
+          onRetry={() => refetch()}
+        />
       ) : items.length === 0 ? (
         <EmptyState
           icon={MapPin}
@@ -73,7 +86,7 @@ export function ClientAddressesSection({ clientId }: { clientId: string }) {
 }
 
 export function ClientProjectsSection({ clientId }: { clientId: string }) {
-  const { data, isLoading } = useProjectsQuery(1, "", clientId);
+  const { data, isLoading, isError, isPlaceholderData, error: loadError, refetch } = useProjectsQuery(1, "", clientId);
   const items = data?.items ?? [];
 
   return (
@@ -81,6 +94,13 @@ export function ClientProjectsSection({ clientId }: { clientId: string }) {
       <SectionHeading title="Projets" description="Les mandats en cours et passés pour ce client." />
       {isLoading ? (
         <Loading />
+      ) : isError && (!data || isPlaceholderData) ? (
+        <LoadErrorState
+          error={loadError}
+          title="Projets indisponibles"
+          fallback="Les projets de ce client n'ont pas pu être chargés."
+          onRetry={() => refetch()}
+        />
       ) : items.length === 0 ? (
         <EmptyState
           icon={FolderKanban}
@@ -117,7 +137,7 @@ export function ClientProjectsSection({ clientId }: { clientId: string }) {
 }
 
 export function ClientInvoicesSection({ clientId }: { clientId: string }) {
-  const { data, isLoading } = useInvoicesQuery(1, "", clientId);
+  const { data, isLoading, isError, isPlaceholderData, error: loadError, refetch } = useInvoicesQuery(1, "", clientId);
   const items = data?.items ?? [];
 
   return (
@@ -125,6 +145,13 @@ export function ClientInvoicesSection({ clientId }: { clientId: string }) {
       <SectionHeading title="Factures" description="Tout ce qui a été facturé à ce client." />
       {isLoading ? (
         <Loading />
+      ) : isError && (!data || isPlaceholderData) ? (
+        <LoadErrorState
+          error={loadError}
+          title="Factures indisponibles"
+          fallback="Les factures de ce client n'ont pas pu être chargées."
+          onRetry={() => refetch()}
+        />
       ) : items.length === 0 ? (
         <EmptyState
           icon={FileText}

@@ -16,6 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ClickableRow } from "@/components/layout/clickable-row";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
+import { LoadErrorState } from "@/components/layout/load-error-state";
 import { BilledNotice } from "@/components/projects/detail/billed-notice";
 import { ExpenseFormSheet } from "@/components/projects/detail/expense-form-sheet";
 import { useDeleteExpense, useExpensesQuery } from "@/hooks/use-expenses";
@@ -47,7 +48,14 @@ export function ProjectExpensesSection({
   projectId: string;
   locked?: boolean;
 }) {
-  const { data, isLoading } = useExpensesQuery(projectId);
+  // A failed read is not a project without expenses: `data` is undefined either way, so asking
+  // only `length === 0` would tell someone the receipts they filed are gone when the request
+  // merely did not come back. The lock has nothing to do with it — a billed project's list can
+  // fail to load too, and it still deserves the truth and a retry.
+  // And `isError` alone is too wide: a failed background refetch keeps it true over rows
+  // that are still right, so the panel only wins with nothing read at all (`!data`) or rows
+  // left over from another query key (`isPlaceholderData`).
+  const { data, isLoading, isError, isPlaceholderData, error: loadError, refetch } = useExpensesQuery(projectId);
   const remove = useDeleteExpense(projectId);
 
   const [formOpen, setFormOpen] = useState(false);
@@ -108,6 +116,13 @@ export function ProjectExpensesSection({
             <Skeleton key={index} className="h-12 w-full" />
           ))}
         </div>
+      ) : isError && (!data || isPlaceholderData) ? (
+        <LoadErrorState
+          error={loadError}
+          title="Dépenses indisponibles"
+          fallback="Les dépenses de ce projet n'ont pas pu être chargées."
+          onRetry={() => refetch()}
+        />
       ) : expenses.length === 0 ? (
         <EmptyState
           icon={Receipt}

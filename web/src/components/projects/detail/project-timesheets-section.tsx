@@ -23,6 +23,7 @@ import {
 import { ClickableRow } from "@/components/layout/clickable-row";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
+import { LoadErrorState } from "@/components/layout/load-error-state";
 import { BilledNotice } from "@/components/projects/detail/billed-notice";
 import {
   TimesheetFormSheet,
@@ -64,7 +65,14 @@ export function ProjectTimesheetsSection({
   projectId: string;
   locked?: boolean;
 }) {
-  const { data, isLoading } = useTimesheetsQuery(projectId);
+  // A failed read is not a shift nobody worked: `data` is undefined either way, so asking only
+  // `length === 0` would say "aucune heure inscrite" about hours that are on file and simply
+  // were not fetched — and the total underneath would read 0 h with them. The lock is beside
+  // the point: a billed project's sheet can fail to load as easily as any other.
+  // And `isError` alone is too wide: a failed background refetch keeps it true over rows
+  // that are still right, so the panel only wins with nothing read at all (`!data`) or rows
+  // left over from another query key (`isPlaceholderData`).
+  const { data, isLoading, isError, isPlaceholderData, error: loadError, refetch } = useTimesheetsQuery(projectId);
   const remove = useDeleteTimesheet(projectId);
 
   const [formOpen, setFormOpen] = useState(false);
@@ -126,6 +134,13 @@ export function ProjectTimesheetsSection({
             <Skeleton key={index} className="h-12 w-full" />
           ))}
         </div>
+      ) : isError && (!data || isPlaceholderData) ? (
+        <LoadErrorState
+          error={loadError}
+          title="Feuilles de temps indisponibles"
+          fallback="Les heures de ce projet n'ont pas pu être chargées."
+          onRetry={() => refetch()}
+        />
       ) : entries.length === 0 ? (
         <EmptyState
           icon={Clock}

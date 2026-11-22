@@ -31,6 +31,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
+import { LoadErrorState } from "@/components/layout/load-error-state";
 import { EmptyState } from "@/components/layout/empty-state";
 import { useDeleteTeam, useSaveTeam, useTeamsQuery } from "@/hooks/use-hr";
 import { useTeamQuery } from "@/hooks/use-team";
@@ -239,7 +240,7 @@ function TeamFormSheet({
 }
 
 export function TeamsSection() {
-  const { data, isLoading } = useTeamsQuery();
+  const { data, isLoading, isError, isPlaceholderData, error: loadError, refetch } = useTeamsQuery();
   const remove = useDeleteTeam();
 
   const [formOpen, setFormOpen] = useState(false);
@@ -287,6 +288,18 @@ export function TeamsSection() {
             <Skeleton key={i} className="h-20 w-full" />
           ))}
         </div>
+      ) : isError && (!data || isPlaceholderData) ? (
+        /* An error is not an empty list. "Aucune équipe" after a failed request tells someone
+           their teams are gone, when they were simply not read.
+           And `isError` alone is too wide: a failed background refetch keeps it true over rows
+           that are still right, so the panel only wins with nothing read at all (`!data`) or rows
+           left over from another query key (`isPlaceholderData`). */
+        <LoadErrorState
+          error={loadError}
+          title="Équipes indisponibles"
+          fallback="Vos équipes n'ont pas pu être chargées."
+          onRetry={() => refetch()}
+        />
       ) : !data || data.length === 0 ? (
         <EmptyState
           icon={UsersRound}

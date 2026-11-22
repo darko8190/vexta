@@ -29,6 +29,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
+import { LoadErrorState } from "@/components/layout/load-error-state";
 import { EmptyState } from "@/components/layout/empty-state";
 import { useDeleteLocation, useLocationsQuery, useSaveLocation } from "@/hooks/use-hr";
 import { ApiError } from "@/lib/api";
@@ -262,7 +263,7 @@ function LocationFormSheet({
 }
 
 export function LocationsSection() {
-  const { data, isLoading } = useLocationsQuery();
+  const { data, isLoading, isError, isPlaceholderData, error: loadError, refetch } = useLocationsQuery();
   const remove = useDeleteLocation();
 
   const [formOpen, setFormOpen] = useState(false);
@@ -310,6 +311,18 @@ export function LocationsSection() {
             <Skeleton key={i} className="h-16 w-full" />
           ))}
         </div>
+      ) : isError && (!data || isPlaceholderData) ? (
+        /* An error is not an empty list. "Aucun lieu" after a failed request tells someone
+           their addresses are gone, when they were simply not read.
+           And `isError` alone is too wide: a failed background refetch keeps it true over rows
+           that are still right, so the panel only wins with nothing read at all (`!data`) or rows
+           left over from another query key (`isPlaceholderData`). */
+        <LoadErrorState
+          error={loadError}
+          title="Adresses indisponibles"
+          fallback="Vos adresses n'ont pas pu être chargées."
+          onRetry={() => refetch()}
+        />
       ) : !data || data.length === 0 ? (
         <EmptyState
           icon={MapPin}

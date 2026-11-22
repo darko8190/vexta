@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
+import { LoadErrorState } from "@/components/layout/load-error-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { PlanFormSheet } from "@/components/catalog/plan-form-sheet";
 import { useDeletePlan, usePlansQuery } from "@/hooks/use-catalog";
@@ -23,7 +24,13 @@ import { formatCents } from "@/lib/money";
 import type { PlanRecord } from "@/lib/types";
 
 export default function PlansPage() {
-  const { data, isLoading } = usePlansQuery();
+  // A failed read is not a platform without plans — and `!data` was swallowing the failure into
+  // the empty branch, so an outage invited an admin to create the forfaits that already exist
+  // and that the public site is selling. There is no search on this page, so empty means empty.
+  // And `isError` alone is too wide: a failed background refetch keeps it true over rows
+  // that are still right, so the panel only wins with nothing read at all (`!data`) or rows
+  // left over from another query key (`isPlaceholderData`).
+  const { data, isLoading, isError, isPlaceholderData, error: loadError, refetch } = usePlansQuery();
   const deletePlan = useDeletePlan();
 
   const [formOpen, setFormOpen] = useState(false);
@@ -67,6 +74,13 @@ export default function PlansPage() {
             <Skeleton key={i} className="h-12 w-full" />
           ))}
         </div>
+      ) : isError && (!data || isPlaceholderData) ? (
+        <LoadErrorState
+          error={loadError}
+          title="Forfaits indisponibles"
+          fallback="Les forfaits n'ont pas pu être chargés."
+          onRetry={() => refetch()}
+        />
       ) : !data || data.length === 0 ? (
         <EmptyState
           icon={Tag}

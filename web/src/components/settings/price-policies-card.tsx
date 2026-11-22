@@ -34,6 +34,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { ClickableRow } from "@/components/layout/clickable-row";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
+import { LoadErrorState } from "@/components/layout/load-error-state";
 import { EmptyState } from "@/components/layout/empty-state";
 import { RequiredMark } from "@/components/ui/required-mark";
 import {
@@ -245,7 +246,7 @@ function PolicyFormSheet({
  * the prices without anyone retyping them.
  */
 export function PricePoliciesCard() {
-  const { data, isLoading } = usePricePoliciesQuery();
+  const { data, isLoading, isError, isPlaceholderData, error: loadError, refetch } = usePricePoliciesQuery();
   const save = useSavePricePolicy();
   const remove = useDeletePricePolicy();
 
@@ -326,6 +327,18 @@ export function PricePoliciesCard() {
               <Skeleton key={index} className="h-12 w-full" />
             ))}
           </div>
+        ) : isError && (!data || isPlaceholderData) ? (
+          /* An error is not an empty list. "Aucune politique" after a failed request tells
+             someone their pricing is gone, when it was simply not read.
+             And `isError` alone is too wide: a failed background refetch keeps it true over rows
+             that are still right, so the panel only wins with nothing read at all (`!data`) or rows
+             left over from another query key (`isPlaceholderData`). */
+          <LoadErrorState
+            error={loadError}
+            title="Politiques indisponibles"
+            fallback="Vos politiques de prix n'ont pas pu être chargées."
+            onRetry={() => refetch()}
+          />
         ) : policies.length === 0 ? (
           <EmptyState
             icon={Tags}

@@ -18,6 +18,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ClickableRow } from "@/components/layout/clickable-row";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
+import { LoadErrorState } from "@/components/layout/load-error-state";
 import { PaginationBar } from "@/components/layout/pagination-bar";
 import { SearchInput } from "@/components/layout/search-input";
 import { ProductFormSheet } from "@/components/products/product-form-sheet";
@@ -60,7 +61,14 @@ export function ProductsSection() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search);
 
-  const { data, isLoading } = useProductsQuery({ page, search: debouncedSearch });
+  const {
+    data,
+    isLoading,
+    isError,
+    isPlaceholderData,
+    error: loadError,
+    refetch,
+  } = useProductsQuery({ page, search: debouncedSearch });
   const remove = useDeleteProduct();
 
   const [formOpen, setFormOpen] = useState(false);
@@ -122,6 +130,20 @@ export function ProductsSection() {
             <Skeleton key={index} className="h-12 w-full" />
           ))}
         </div>
+      ) : isError && (!data || isPlaceholderData) ? (
+        /* Three states, not two: a failed read is not an empty catalogue, and neither of those
+           is a search that matched nothing. Telling someone their products are gone because a
+           request failed is the one message that cannot be taken back, so the failure is
+           answered first and the two "nothing here" wordings below keep their own cases.
+           And `isError` alone is too wide: a failed background refetch keeps it true over rows
+           that are still right, so the panel only wins with nothing read at all (`!data`) or rows
+           left over from another query key (`isPlaceholderData`). */
+        <LoadErrorState
+          error={loadError}
+          title="Produits indisponibles"
+          fallback="Vos produits n'ont pas pu être chargés."
+          onRetry={() => refetch()}
+        />
       ) : !data || data.items.length === 0 ? (
         <EmptyState
           icon={Package}

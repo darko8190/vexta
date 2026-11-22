@@ -15,6 +15,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
+import { LoadErrorState } from "@/components/layout/load-error-state";
 import {
   useDeleteProjectNote,
   useProjectNotesQuery,
@@ -35,7 +36,13 @@ const MAX_BODY_LENGTH = 4000;
  */
 export function NoteThread({ projectId }: { projectId: string }) {
   const { user } = useAuth();
-  const { data, isLoading } = useProjectNotesQuery(projectId);
+  // A failed read is not a thread nobody wrote in. Showing an unread thread as empty is worse
+  // here than in a table: the box above invites a note, so somebody writes down what they were
+  // told on site a second time, next to the entry they could not see.
+  // And `isError` alone is too wide: a failed background refetch keeps it true over rows
+  // that are still right, so the panel only wins with nothing read at all (`!data`) or rows
+  // left over from another query key (`isPlaceholderData`).
+  const { data, isLoading, isError, isPlaceholderData, error: loadError, refetch } = useProjectNotesQuery(projectId);
   const save = useSaveProjectNote(projectId);
   const remove = useDeleteProjectNote(projectId);
 
@@ -130,6 +137,13 @@ export function NoteThread({ projectId }: { projectId: string }) {
             <Skeleton key={index} className="h-20 w-full" />
           ))}
         </div>
+      ) : isError && (!data || isPlaceholderData) ? (
+        <LoadErrorState
+          error={loadError}
+          title="Notes indisponibles"
+          fallback="Les notes de ce projet n'ont pas pu être chargées."
+          onRetry={() => refetch()}
+        />
       ) : notes.length === 0 ? (
         <EmptyState
           icon={MessageSquare}

@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using Vexta.Api.Auth;
 using Vexta.Api.Common;
@@ -75,6 +76,31 @@ builder.Services
     // SignInManager is what reads the provider's response back out of the external cookie
     // (GetExternalLoginInfoAsync). IdentityCore alone does not register it.
     .AddSignInManager();
+
+// A rejected body answered with ValidationProblemDetails, which has no "message" field — so
+// the browser fell back to its generic sentence and the person was told nothing about which
+// field was wrong. The errors are joined into the one field every client here already reads.
+builder.Services.Configure<ApiBehaviorOptions>(options =>
+{
+    options.InvalidModelStateResponseFactory = context =>
+    {
+        var problems = context.ModelState
+            .SelectMany(entry => entry.Value?.Errors ?? [])
+            .Select(error => FrenchValidationMessage.For(error.ErrorMessage))
+            .Where(message => !string.IsNullOrWhiteSpace(message))
+            .Distinct()
+            .ToArray();
+
+        return new BadRequestObjectResult(new
+        {
+            message = problems.Length > 0
+                ? string.Join(" ", problems)
+                : "La demande est incomplète ou mal formée."
+        });
+    };
+});
+
+builder.Services.AddExceptionHandler<UnhandledExceptionHandler>();
 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
@@ -149,6 +175,10 @@ builder.Services.AddCors(options =>
 InvoiceDocument.Configure();
 
 var app = builder.Build();
+
+// Before anything that can throw. Without it a crash answers 500 with an empty body, which the
+// browser can only report as a generic failure with nothing tying it to the log.
+app.UseExceptionHandler(_ => { });
 
 // First in the pipeline: everything downstream that reads the scheme, host or client IP has to
 // see the real ones, not the proxy's.

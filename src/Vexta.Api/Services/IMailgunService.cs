@@ -55,7 +55,6 @@ public class MailgunService(IHttpClientFactory httpClientFactory, IPlatformSetti
             : "https://api.mailgun.net/v3";
 
         using var client = httpClientFactory.CreateClient();
-        client.BaseAddress = new Uri(baseUrl);
         client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
             "Basic", Convert.ToBase64String(System.Text.Encoding.ASCII.GetBytes($"api:{apiKey}")));
 
@@ -67,7 +66,12 @@ public class MailgunService(IHttpClientFactory httpClientFactory, IPlatformSetti
             { new StringContent(htmlBody), "html" }
         };
 
-        var response = await client.PostAsync($"{domain}/messages", form, ct);
+        // The full URL, not BaseAddress plus a relative path. Relative resolution replaces the
+        // last segment of the base path, so a base of ".../v3" and a relative "domain/messages"
+        // resolve to ".../domain/messages" — the version segment is dropped and Mailgun answers
+        // 404, which reads exactly like an unknown sending domain. Nothing caught it before
+        // because this method used to log its failures and return.
+        var response = await client.PostAsync($"{baseUrl}/{domain}/messages", form, ct);
         if (!response.IsSuccessStatusCode)
         {
             var body = await response.Content.ReadAsStringAsync(ct);
@@ -100,8 +104,12 @@ public class MailgunService(IHttpClientFactory httpClientFactory, IPlatformSetti
         {
             System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden =>
                 "Mailgun a refusé la clé d'API. Vérifiez la clé et la région (US ou EU).",
+            // The body matters here. Mailgun's own "domain not found" comes back as JSON naming
+            // the domain; a bare "404 page not found" is its router saying the path was wrong,
+            // which is a bug on our side and not something the super admin can fix in a field.
             System.Net.HttpStatusCode.NotFound =>
-                "Mailgun ne connaît pas ce domaine d'envoi. Vérifiez le domaine et la région.",
+                "Mailgun ne trouve pas ce domaine d'envoi. Soit il est mal écrit, soit il est dans "
+                + $"l'autre région (us / eu), soit il appartient à un autre compte que celui de la clé d'API.{detail}",
             System.Net.HttpStatusCode.BadRequest =>
                 $"Mailgun a refusé le message. Vérifiez l'adresse d'expédition et celle du destinataire.{detail}",
             _ => $"Mailgun a répondu {(int)status}.{detail}"

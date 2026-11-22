@@ -207,6 +207,19 @@ Mailgun accepte parfois une clé tout en refusant le domaine, c'est pourquoi rie
 envoi réel ne prouve que la configuration fonctionne. Les refus sont relayés tels quels :
 une clé rejetée, un domaine inconnu, une région qui ne correspond pas.
 
+Le corps de la réponse est inclus dans le message, et il départage deux cas qui se ressemblent :
+
+| Corps renvoyé | Ce que ça veut dire |
+|---|---|
+| `404 page not found` | L'URL appelée est mauvaise — c'est un défaut de code, pas un champ à corriger. |
+| JSON nommant le domaine | Mailgun ne connaît vraiment pas ce domaine sur ce compte et dans cette région. |
+| `Forbidden` | La clé d'API est refusée. |
+
+Un domaine d'envoi doit être un **sous-domaine** (`mg.vexta.ca`), jamais le domaine racine : les MX
+de Mailgun ne doivent pas déloger ceux de la messagerie de l'entreprise. GoDaddy remplace le SPF
+de Mailgun par sa propre indirection (`include:dc-xxxx._spfm.mg.vexta.ca`) qui aboutit au même
+endroit — c'est normal, il ne faut pas la remplacer par la valeur brute.
+
 Sans Mailgun, la plateforme fonctionne : les invitations d'employés ne partent simplement pas
 par courriel, et l'administrateur transmet le lien lui-même.
 

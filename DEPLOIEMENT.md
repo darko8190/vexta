@@ -53,6 +53,33 @@ ne sert ensuite qu'en HTTPS. Deux pièges :
 
 ---
 
+## 1b. Deux piles sur une seule machine
+
+QA et production tournent côte à côte, et les deux fichiers compose décrivent des services
+portant les mêmes noms : `postgres`, `api`, `app`. Compose enregistre un alias DNS **égal au nom
+du service sur chaque réseau rejoint**, et `api` comme `app` rejoignent `dokploy-network`, qui
+est partagé. Sur ce réseau, le nom `api` a donc répondu pour deux conteneurs à la fois.
+
+Docker alterne entre eux. La moitié des appels de la production vers `http://api:8080` étaient
+servis par l'API de QA — qui signe les jetons avec une autre clé, d'où des déconnexions au
+hasard, et qui lit la base de QA, d'où deux environnements qui semblaient partager leurs données
+et leurs intégrations. Les refus n'apparaissaient dans aucun journal : ils se produisaient dans
+l'autre pile.
+
+Chaque pile donne donc à ses conteneurs un **alias privé** sur `vexta-internal`, un réseau qui
+n'appartient qu'à elle, et les appelle par cet alias :
+
+| | QA | Production |
+| --- | --- | --- |
+| Base | `vexta-qa-db` | `vexta-prod-db` |
+| API | `vexta-qa-api` | `vexta-prod-api` |
+
+Les noms de services restent `api` et `app`, donc les domaines configurés dans Dokploy
+continuent de nommer des services qui existent. Ne revenez jamais à `Host=postgres` ou à
+`http://api:8080` dans ces fichiers.
+
+---
+
 ## 2. Créer l'application dans Dokploy
 
 À faire deux fois, une par environnement.
@@ -110,7 +137,8 @@ production.
 
 | Variable | Défaut | Rôle |
 | -------- | ------ | ---- |
-| `POSTGRES_DB` | `vextadb` | Nom de la base. |
+| `POSTGRES_DB` | `vextaprod` / `vextaqa` | Nom de la base. Il diffère par environnement :
+deux piles sur une machine ne doivent pas être à une faute de frappe près d'écrire l'une chez l'autre. |
 | `POSTGRES_USER` | `vexta` | Utilisateur PostgreSQL. |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | vide | Connexion Google. Vides, le bouton n'apparaît pas. |
 | `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` | vide | Connexion Microsoft. |

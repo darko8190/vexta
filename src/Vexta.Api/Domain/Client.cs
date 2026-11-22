@@ -1,6 +1,6 @@
 namespace Vexta.Api.Domain;
 
-public class Client
+public class Client : IInvitable
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid TenantId { get; set; }
@@ -36,6 +36,18 @@ public class Client
     public string? Phone { get; set; }
     public string? TaxId { get; set; }
     public string? Notes { get; set; }
+
+    /// <summary>
+    /// The sign-in account of a particulier who was given access to their own files, or null.
+    /// An entreprise is a company and has no one to be: its people are its Contacts, and access
+    /// is granted to them individually.
+    /// </summary>
+    public Guid? UserId { get; set; }
+    public ApplicationUser? User { get; set; }
+
+    public string? InvitationTokenHash { get; set; }
+    public DateTimeOffset? InvitationExpiresAt { get; set; }
+    public DateTimeOffset? InvitationSentAt { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;

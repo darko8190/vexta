@@ -5,7 +5,7 @@ namespace Vexta.Api.Domain;
 /// journalier on the payroll is on file here without ever consuming a seat. Access is granted
 /// separately, by linking <see cref="UserId"/>, and that link is what the plan's seat limit counts.
 /// </summary>
-public class Employee
+public class Employee : IInvitable
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 

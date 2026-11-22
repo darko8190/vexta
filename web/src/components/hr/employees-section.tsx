@@ -262,7 +262,12 @@ export function EmployeesSection() {
 
       <EmployeeFormSheet open={formOpen} onOpenChange={setFormOpen} employee={editing} />
 
-      <InvitationLinkDialog grant={grant} onOpenChange={(open) => !open && setGrant(null)} />
+      <InvitationLinkDialog
+        grant={grant}
+        recipientName={grant?.employee.firstName}
+        recipientEmail={grant?.employee.email}
+        onOpenChange={(open) => !open && setGrant(null)}
+      />
 
       <ConfirmDeleteDialog
         open={Boolean(deleteTarget)}

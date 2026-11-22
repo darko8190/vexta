@@ -19,6 +19,13 @@ public interface IWorkspaceService
     Task<TenantMembership?> FindAsync(Guid userId, Guid tenantId, CancellationToken ct = default);
 
     /// <summary>
+    /// The membership of the space they land in when they sign in. Every token is minted from a
+    /// membership rather than from the account, because the role and the client scope both live
+    /// there — a customer signing in with no scope on their token would read the whole company.
+    /// </summary>
+    Task<TenantMembership?> HomeMembershipAsync(ApplicationUser user, CancellationToken ct = default);
+
+    /// <summary>
     /// Makes sure the person has a membership for the space they belong to and a personal space
     /// of their own, creating either if it is missing.
     ///
@@ -104,6 +111,14 @@ public class WorkspaceService(VextaDbContext db) : IWorkspaceService
                 m.Role.ToString(),
                 m.TenantId == currentTenantId))
             .ToList();
+    }
+
+    public async Task<TenantMembership?> HomeMembershipAsync(ApplicationUser user, CancellationToken ct = default)
+    {
+        if (user.TenantId is not { } tenantId) return null;
+
+        await EnsureAsync(user, ct);
+        return await FindAsync(user.Id, tenantId, ct);
     }
 
     public Task<TenantMembership?> FindAsync(Guid userId, Guid tenantId, CancellationToken ct = default) =>

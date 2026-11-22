@@ -13,22 +13,28 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import type { AccessGranted } from "@/lib/types";
+import type { InvitationGrant } from "@/lib/types";
 
 function formatExpiry(iso: string): string {
   return new Date(iso).toLocaleDateString("fr-CA", { day: "numeric", month: "long", year: "numeric" });
 }
 
 /**
- * Shown right after access is granted or resent. The link is always here, even when the email
+ * Shown right after access is granted or resent, for an employee or for a client: it needs the
+ * grant and nothing about who it was for. The link is always here, even when the email
  * went out: "I never got it" is the most common next sentence, and the answer should be one
  * click away rather than a resend and another wait.
  */
 export function InvitationLinkDialog({
   grant,
+  recipientName,
+  recipientEmail,
   onOpenChange,
 }: {
-  grant: AccessGranted | null;
+  grant: InvitationGrant | null;
+  /** Who it is for, so the dialog can say it. Falls back to "Cette personne" when unknown. */
+  recipientName?: string;
+  recipientEmail?: string | null;
   onOpenChange: (open: boolean) => void;
 }) {
   const [copied, setCopied] = useState(false);
@@ -57,8 +63,9 @@ export function InvitationLinkDialog({
         <DialogHeader>
           <DialogTitle>Accès créé</DialogTitle>
           <DialogDescription>
-            {grant?.employee.firstName} doit ouvrir ce lien pour choisir son mot de passe. Il
-            expire le {grant ? formatExpiry(grant.expiresAt) : ""} et ne sert qu&apos;une fois.
+            {recipientName ?? "Cette personne"} doit ouvrir ce lien pour choisir son mot de
+            passe. Il expire le {grant ? formatExpiry(grant.expiresAt) : ""} et ne sert
+            qu&apos;une fois.
           </DialogDescription>
         </DialogHeader>
 
@@ -78,7 +85,7 @@ export function InvitationLinkDialog({
               )}
               <p className="text-muted-foreground">
                 {grant.emailSent
-                  ? `Un courriel vient de partir à ${grant.employee.email}.`
+                  ? `Un courriel vient de partir${recipientEmail ? ` à ${recipientEmail}` : ""}.`
                   : "Aucun courriel n'a été envoyé : Mailgun n'est pas configuré ou a refusé le message. Transmettez le lien vous-même."}
               </p>
             </div>

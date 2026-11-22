@@ -136,7 +136,10 @@ public class AuthController(
     private async Task<AuthResponse> BuildAuthResponseAsync(ApplicationUser user)
     {
         await db.Entry(user).Reference(u => u.Tenant).LoadAsync();
-        var token = tokenService.CreateAccessToken(user);
+        var membership = await workspaces.HomeMembershipAsync(user);
+        var token = membership is null
+            ? tokenService.CreateAccessToken(user)
+            : tokenService.CreateAccessToken(user, membership);
         return new AuthResponse(token, UserDto.ForUser(user));
     }
 }

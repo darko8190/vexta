@@ -9,6 +9,7 @@ namespace Vexta.Api.Features.Addresses;
 
 [ApiController]
 [Route("api/addresses")]
+[StaffOnly]
 [Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.TenantUser)},{nameof(UserRole.SuperAdmin)}")]
 [RequireActiveSubscription]
 public class AddressesController(VextaDbContext db, ICurrentUserService currentUser) : ControllerBase

@@ -15,6 +15,7 @@ namespace Vexta.Api.Features.Team;
 /// </summary>
 [ApiController]
 [Route("api/employees")]
+[StaffOnly]
 [Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.SuperAdmin)}")]
 [RequireActiveSubscription]
 public class EmployeesController(

@@ -37,6 +37,17 @@ const tenantAdminNav: NavItem[] = [
   { href: "/entreprise", label: "Entreprise", icon: Building2 },
 ];
 
+/**
+ * A customer sees their own files and nothing else. The labels say "mes" on purpose: the same
+ * two routes show the whole company to staff, and the possessive is what tells a client what
+ * they are looking at without them having to work it out from an unexpectedly short list.
+ */
+const clientNav: NavItem[] = [
+  { href: "/tableau-de-bord", label: "Tableau de bord", icon: LayoutDashboard },
+  { href: "/projets", label: "Mes projets", icon: FolderKanban },
+  { href: "/factures", label: "Mes factures", icon: FileText },
+];
+
 const superAdminNav: NavItem[] = [
   { href: "/tableau-de-bord", label: "Tableau de bord", icon: LayoutDashboard },
   { href: "/admin/tenants", label: "Locataires", icon: Building2 },
@@ -52,6 +63,7 @@ export function getNavItems(
   tenantKind: "Business" | "Personal" | null = null,
 ): NavItem[] {
   if (role === "SuperAdmin" && !isImpersonating) return superAdminNav;
+  if (role === "Client") return clientNav;
 
   // A super admin who has entered a tenant acts as its owner, so they get the owner's items too.
   const isOwner = role === "TenantAdmin" || (role === "SuperAdmin" && isImpersonating);

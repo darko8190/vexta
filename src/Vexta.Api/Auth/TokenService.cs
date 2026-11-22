@@ -28,15 +28,15 @@ public class TokenService(IOptions<JwtOptions> options) : ITokenService
     private readonly JwtOptions _options = options.Value;
 
     public string CreateAccessToken(ApplicationUser user, TenantMembership membership) =>
-        Write(user, membership.Role, membership.TenantId, impersonating: false);
+        Write(user, membership.Role, membership.TenantId, impersonating: false, clientId: membership.ClientId);
 
     public string CreateAccessToken(ApplicationUser user, Guid? impersonatedTenantId = null)
     {
         var tenantId = impersonatedTenantId ?? user.TenantId;
-        return Write(user, user.Role, tenantId, impersonating: impersonatedTenantId is not null);
+        return Write(user, user.Role, tenantId, impersonating: impersonatedTenantId is not null, clientId: null);
     }
 
-    private string Write(ApplicationUser user, UserRole role, Guid? tenantId, bool impersonating)
+    private string Write(ApplicationUser user, UserRole role, Guid? tenantId, bool impersonating, Guid? clientId)
     {
         var claims = new List<Claim>
         {
@@ -55,6 +55,14 @@ public class TokenService(IOptions<JwtOptions> options) : ITokenService
         if (impersonating)
         {
             claims.Add(new Claim(VextaClaimTypes.Impersonating, "true"));
+        }
+
+        // What confines a signed-in customer to their own records. It is read by the EF query
+        // filters, so it has to be in the token: a filter runs synchronously and cannot go and
+        // look the membership up.
+        if (clientId is { } scopedClient)
+        {
+            claims.Add(new Claim(VextaClaimTypes.ClientId, scopedClient.ToString()));
         }
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SigningKey));

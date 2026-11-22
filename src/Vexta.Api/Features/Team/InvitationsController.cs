@@ -11,8 +11,9 @@ using Vexta.Api.Services;
 namespace Vexta.Api.Features.Team;
 
 /// <summary>
-/// Where an invited employee lands. Anonymous by necessity — they have no account to sign in
-/// with yet — so every lookup goes through the token hash and nothing else.
+/// Where anyone holding an invitation lands — an employee, a client, a contact at a client.
+/// Anonymous by necessity, since they have no account to sign in with yet, so every lookup goes
+/// through the token hash and nothing else.
 /// </summary>
 [ApiController]
 [Route("api/invitations")]
@@ -20,18 +21,19 @@ namespace Vexta.Api.Features.Team;
 public class InvitationsController(
     VextaDbContext db,
     UserManager<ApplicationUser> userManager,
+    IWorkspaceService workspaces,
     ITokenService tokenService) : ControllerBase
 {
     [HttpGet("{token}")]
     public async Task<ActionResult<InvitationDto>> Get(string token, CancellationToken ct)
     {
-        var employee = await FindAsync(token, ct);
-        if (employee is null)
+        var invited = await FindAsync(token, ct);
+        if (invited is null)
         {
             return NotFound(new { message = "Cette invitation n'existe pas ou a déjà été utilisée." });
         }
 
-        if (employee.InvitationExpiresAt <= DateTimeOffset.UtcNow)
+        if (invited.InvitationExpiresAt <= DateTimeOffset.UtcNow)
         {
             return StatusCode(StatusCodes.Status410Gone, new
             {
@@ -40,23 +42,23 @@ public class InvitationsController(
         }
 
         var tenantName = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
-            .Where(t => t.Id == employee.TenantId)
+            .Where(t => t.Id == invited.TenantId)
             .Select(t => t.Name)
             .FirstOrDefaultAsync(ct);
 
-        return Ok(new InvitationDto(employee.FirstName, employee.LastName, employee.Email, tenantName ?? ""));
+        return Ok(new InvitationDto(invited.FirstName ?? "", invited.LastName ?? "", invited.Email ?? "", tenantName ?? ""));
     }
 
     [HttpPost("{token}/accept")]
     public async Task<ActionResult<AuthResponse>> Accept(string token, AcceptInvitationRequest request, CancellationToken ct)
     {
-        var employee = await FindAsync(token, ct);
-        if (employee is null)
+        var invited = await FindAsync(token, ct);
+        if (invited is null)
         {
             return NotFound(new { message = "Cette invitation n'existe pas ou a déjà été utilisée." });
         }
 
-        if (employee.InvitationExpiresAt <= DateTimeOffset.UtcNow)
+        if (invited.InvitationExpiresAt <= DateTimeOffset.UtcNow)
         {
             return StatusCode(StatusCodes.Status410Gone, new
             {
@@ -64,7 +66,7 @@ public class InvitationsController(
             });
         }
 
-        if (employee.UserId is not { } userId)
+        if (invited.UserId is not { } userId)
         {
             return BadRequest(new { message = "Cet accès a été retiré." });
         }
@@ -89,25 +91,41 @@ public class InvitationsController(
         }
 
         // The token is single use: clearing the hash is what spends it.
-        employee.InvitationTokenHash = null;
-        employee.InvitationExpiresAt = null;
-        employee.UpdatedAt = DateTimeOffset.UtcNow;
+        invited.InvitationTokenHash = null;
+        invited.InvitationExpiresAt = null;
+        invited.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
 
         await db.Entry(user).Reference(u => u.Tenant).LoadAsync(ct);
-        return Ok(new AuthResponse(tokenService.CreateAccessToken(user), UserDto.ForUser(user)));
+
+        // From the membership, like every other sign-in: a client accepting an invitation needs
+        // the scope on their very first token, not on the one after they sign in again.
+        var membership = await workspaces.HomeMembershipAsync(user, ct);
+        var accessToken = membership is null
+            ? tokenService.CreateAccessToken(user)
+            : tokenService.CreateAccessToken(user, membership);
+
+        return Ok(new AuthResponse(accessToken, UserDto.ForUser(user)));
     }
 
     /// <summary>
+    /// Three places an invitation can live, one token space: the hash is 32 random bytes, so a
+    /// token can only ever match the record it was issued for.
+    ///
     /// IgnoreQueryFilters is required, not incidental: the caller has no session, so the tenant
     /// filter would match nothing and every invitation would look used.
     /// </summary>
-    private async Task<Employee?> FindAsync(string token, CancellationToken ct)
+    private async Task<IInvitable?> FindAsync(string token, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(token)) return null;
 
-        var hash = EmployeeAccessService.HashToken(token);
+        var hash = InvitationToken.Hash(token);
+
         return await db.Employees.IgnoreQueryFilters()
-            .FirstOrDefaultAsync(e => e.InvitationTokenHash == hash, ct);
+                   .FirstOrDefaultAsync(e => e.InvitationTokenHash == hash, ct)
+               ?? await db.ClientContacts.IgnoreQueryFilters()
+                   .FirstOrDefaultAsync(c => c.InvitationTokenHash == hash, ct)
+               ?? (IInvitable?)await db.Clients.IgnoreQueryFilters()
+                   .FirstOrDefaultAsync(c => c.InvitationTokenHash == hash, ct);
     }
 }

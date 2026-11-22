@@ -51,6 +51,22 @@ function TenantDashboard() {
   );
 }
 
+/**
+ * A customer's own two numbers. The client directory is closed to them, so asking for its count
+ * would be a refused request behind a tile that could only ever show a dash.
+ */
+function ClientDashboard() {
+  const { data: projects } = useProjectsQuery(1, "");
+  const { data: invoices } = useInvoicesQuery(1, "");
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <StatCard href="/projets" label="Mes projets" value={projects?.totalCount ?? "—"} icon={FolderKanban} />
+      <StatCard href="/factures" label="Mes factures" value={invoices?.totalCount ?? "—"} icon={FileText} />
+    </div>
+  );
+}
+
 function SuperAdminDashboard() {
   const { data: tenants } = useTenantsQuery(1, "");
 
@@ -72,7 +88,9 @@ export default function DashboardPage() {
         description={
           isSuperAdmin
             ? "Vue d'ensemble de la plateforme Vexta."
-            : // A personal space has no subscription, so showing its status would read as a
+            : user?.role === "Client"
+              ? `Vos dossiers chez ${user.tenantName}`
+              : // A personal space has no subscription, so showing its status would read as a
               // problem where there is none.
               user?.tenantKind === "Personal"
               ? `${user.tenantName} — espace personnel gratuit`
@@ -81,7 +99,13 @@ export default function DashboardPage() {
                 : undefined
         }
       />
-      {isSuperAdmin ? <SuperAdminDashboard /> : <TenantDashboard />}
+      {isSuperAdmin ? (
+        <SuperAdminDashboard />
+      ) : user?.role === "Client" ? (
+        <ClientDashboard />
+      ) : (
+        <TenantDashboard />
+      )}
     </div>
   );
 }

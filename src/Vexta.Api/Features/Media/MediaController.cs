@@ -11,6 +11,7 @@ namespace Vexta.Api.Features.Media;
 
 [ApiController]
 [Route("api/media")]
+[StaffOnly]
 [Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.TenantUser)},{nameof(UserRole.SuperAdmin)}")]
 [RequireActiveSubscription]
 public partial class MediaController(

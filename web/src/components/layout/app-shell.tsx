@@ -169,7 +169,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {/* A super admin who has entered a tenant acts as its owner, so they get the owner's
               entries — the same rule the sidebar follows. Outside a tenant there is no company
               to show and no settings that apply. */}
-          {(user!.role !== "SuperAdmin" || user!.isImpersonating) && (
+          {/* A customer has no company card and no space settings of their own here. */}
+          {user!.role !== "Client" && (user!.role !== "SuperAdmin" || user!.isImpersonating) && (
             <DropdownMenuGroup>
               {/* Also in the sidebar. It is here because this is where you look for "who am I
                   and what is my company", which is exactly what the card answers. A personal

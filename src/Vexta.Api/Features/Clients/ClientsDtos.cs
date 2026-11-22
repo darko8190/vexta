@@ -22,8 +22,21 @@ public record ClientDto(
     int ContactCount,
     int ProjectCount,
     int InvoiceCount,
+    /// <summary>Whether this particulier can sign in to see their own files, and where they are.</summary>
+    ClientAccessDto Access,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
+
+/// <summary>
+/// The state of one person's access, in the three forms it can take: none, invited but never
+/// accepted, and active. The UI needs all three because each offers a different action — invite,
+/// resend, revoke.
+/// </summary>
+public record ClientAccessDto(
+    bool HasAccess,
+    bool InvitationPending,
+    DateTimeOffset? InvitationExpiresAt,
+    DateTimeOffset? InvitationSentAt);
 
 /// <summary>
 /// The address fields as the client form asks for them. They are stored in the Addresses table
@@ -40,6 +53,12 @@ public record ClientAddressDto(
     string Country);
 
 public record ClientSummaryDto(Guid Id, string Name, string? Email);
+
+/// <summary>
+/// The invitation link is returned whether or not the email went out: Mailgun is optional, and
+/// an invitation nobody can deliver is an invitation nobody can accept.
+/// </summary>
+public record ClientAccessGrantedDto(string InvitationUrl, DateTimeOffset ExpiresAt, bool EmailSent);
 
 public record UpsertClientRequest(
     ClientType Type,
@@ -64,6 +83,7 @@ public record ClientContactDto(
     string? Email,
     string? Phone,
     string? Notes,
+    ClientAccessDto Access,
     DateTimeOffset CreatedAt);
 
 public record UpsertClientContactRequest(

@@ -28,6 +28,7 @@ public class ExternalAuthController(
     SignInManager<ApplicationUser> signInManager,
     UserManager<ApplicationUser> userManager,
     ITokenService tokenService,
+    IWorkspaceService workspaces,
     ITenantSignupService tenantSignup,
     IDataProtectionProvider dataProtection,
     IAuthenticationSchemeProvider schemeProvider,
@@ -139,7 +140,12 @@ public class ExternalAuthController(
 
         if (user is null) return Unauthorized(new { message = "Compte introuvable." });
 
-        return Ok(new AuthResponse(tokenService.CreateAccessToken(user), UserDto.ForUser(user)));
+        // Minted from the membership like every other sign-in: see IWorkspaceService.HomeMembershipAsync.
+        var membership = await workspaces.HomeMembershipAsync(user);
+        var token = membership is null
+            ? tokenService.CreateAccessToken(user)
+            : tokenService.CreateAccessToken(user, membership);
+        return Ok(new AuthResponse(token, UserDto.ForUser(user)));
     }
 
     /// <summary>What the "name your company" page shows, so it can greet the right person.</summary>

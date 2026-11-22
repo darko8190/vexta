@@ -9,7 +9,10 @@ namespace Vexta.Api.Features.Projects;
 
 [ApiController]
 [Route("api/projects")]
-[Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.TenantUser)},{nameof(UserRole.SuperAdmin)}")]
+// Client is in the list because a customer reads their own projects and invoices here; the
+// query filter is what confines them to their own, and [StaffOnly] on every write is what
+// stops them changing anything.
+[Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.TenantUser)},{nameof(UserRole.SuperAdmin)},{nameof(UserRole.Client)}")]
 [RequireActiveSubscription]
 public class ProjectsController(VextaDbContext db, ICurrentUserService currentUser) : ControllerBase
 {
@@ -46,7 +49,11 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
         return project is null ? NotFound() : Ok(project);
     }
 
+    // Reading is open to the customer this record belongs to — the query filter already
+    // narrows it to theirs. Writing is not: a client does not raise their own invoice, and
+    // "they can only see their own" is not the same promise as "they can change it".
     [HttpPost]
+    [StaffOnly]
     [RequireBusinessTenant]
     public async Task<ActionResult<ProjectDto>> Create(UpsertProjectRequest request)
     {
@@ -73,6 +80,7 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
     }
 
     [HttpPut("{id:guid}")]
+    [StaffOnly]
     public async Task<ActionResult<ProjectDto>> Update(Guid id, UpsertProjectRequest request)
     {
         var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == id);
@@ -92,6 +100,7 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
     }
 
     [HttpDelete("{id:guid}")]
+    [StaffOnly]
     public async Task<IActionResult> Delete(Guid id)
     {
         var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == id);

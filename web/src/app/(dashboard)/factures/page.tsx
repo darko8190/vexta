@@ -18,7 +18,7 @@ import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { UpgradeCta } from "@/components/layout/upgrade-cta";
-import { useCanCreate } from "@/hooks/use-can-create";
+import { useCanCreate, useIsClientUser } from "@/hooks/use-can-create";
 import { PaginationBar } from "@/components/layout/pagination-bar";
 import { SearchInput } from "@/components/layout/search-input";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
@@ -32,6 +32,7 @@ function formatCurrency(amount: number, currency: string) {
 
 export default function InvoicesPage() {
   const canCreate = useCanCreate();
+  const isClient = useIsClientUser();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search);
@@ -55,14 +56,14 @@ export default function InvoicesPage() {
     <div>
       <PageHeader
         title="Factures"
-        description="Créez et suivez vos factures clients."
+        description={isClient ? "Les factures qui vous sont adressées." : "Créez et suivez vos factures clients."}
         action={
           canCreate ? (
             <Button render={<Link href="/factures/nouvelle" />}>
               <Plus />
               Nouvelle facture
             </Button>
-          ) : (
+          ) : isClient ? null : (
             <UpgradeCta />
           )
         }
@@ -87,10 +88,12 @@ export default function InvoicesPage() {
               ? "Essayez une autre recherche."
               : canCreate
                 ? "Créez votre première facture pour un client."
-                : "La création de fiches est réservée aux comptes entreprise."
+                : isClient
+                  ? "Aucune facture ne vous est adressée pour l'instant."
+                  : "La création de fiches est réservée aux comptes entreprise."
           }
           action={
-            !debouncedSearch &&
+            !debouncedSearch && !isClient &&
             (canCreate ? (
               <Button render={<Link href="/factures/nouvelle" />}>
                 <Plus />
@@ -111,7 +114,8 @@ export default function InvoicesPage() {
                 <TableHead>Statut</TableHead>
                 <TableHead>Échéance</TableHead>
                 <TableHead className="text-right">Total</TableHead>
-                <TableHead className="w-10" />
+                {/* Nothing to offer a customer here: every action behind it is refused. */}
+                {!isClient && <TableHead className="w-10" />}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -132,6 +136,7 @@ export default function InvoicesPage() {
                   <TableCell className="text-right font-medium">
                     {formatCurrency(invoiceItem.total, invoiceItem.currency)}
                   </TableCell>
+                  {!isClient && (
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label="Actions" />}>
@@ -149,6 +154,7 @@ export default function InvoicesPage() {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>

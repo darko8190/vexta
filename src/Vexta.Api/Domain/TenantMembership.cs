@@ -24,5 +24,12 @@ public class TenantMembership
     /// </summary>
     public UserRole Role { get; set; } = UserRole.TenantUser;
 
+    /// <summary>
+    /// For a <see cref="UserRole.Client"/> membership, the client record it is confined to —
+    /// what they are allowed to see of the company. Null for everyone who works there.
+    /// </summary>
+    public Guid? ClientId { get; set; }
+    public Client? Client { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

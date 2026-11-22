@@ -23,6 +23,7 @@ public class CompanyController(VextaDbContext db, ICurrentUserService currentUse
     /// </summary>
     [HttpGet("profile")]
     [Authorize]
+    [StaffOnly]
     [RequireActiveSubscription]
     public async Task<ActionResult<CompanyProfileDto>> Profile(CancellationToken ct)
     {
@@ -50,6 +51,7 @@ public class CompanyController(VextaDbContext db, ICurrentUserService currentUse
     }
 
     [HttpPut("profile")]
+    [StaffOnly]
     [Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.SuperAdmin)}")]
     [RequireActiveSubscription]
     public async Task<ActionResult<CompanyProfileDto>> SaveProfile(SaveCompanyProfileRequest request, CancellationToken ct)

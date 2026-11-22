@@ -1,4 +1,5 @@
-export type UserRole = "SuperAdmin" | "TenantAdmin" | "TenantUser";
+/** Client is a customer of the company, not a member of it: they see their own files only. */
+export type UserRole = "SuperAdmin" | "TenantAdmin" | "TenantUser" | "Client";
 
 export type TenantSubscriptionStatus = "Incomplete" | "Active" | "PastDue" | "Canceled";
 
@@ -37,6 +38,14 @@ export interface ClientAddress {
   country: string;
 }
 
+/** Whether someone can sign in to see their own files, and where the invitation stands. */
+export interface ClientAccess {
+  hasAccess: boolean;
+  invitationPending: boolean;
+  invitationExpiresAt: string | null;
+  invitationSentAt: string | null;
+}
+
 export interface ClientRecord {
   id: string;
   /** Sequential within the company. Shown as C-0001. */
@@ -56,6 +65,7 @@ export interface ClientRecord {
   contactCount: number;
   projectCount: number;
   invoiceCount: number;
+  access: ClientAccess;
   createdAt: string;
   updatedAt: string;
 }
@@ -69,6 +79,7 @@ export interface ClientContact {
   email: string | null;
   phone: string | null;
   notes: string | null;
+  access: ClientAccess;
   createdAt: string;
 }
 
@@ -283,10 +294,18 @@ export interface TeamList {
   seats: SeatUsage;
 }
 
-export interface AccessGranted {
+/**
+ * What comes back from granting or resending an invitation, whoever it is for. The link is here
+ * whether or not the email went out: Mailgun is optional, and an invitation nobody can deliver
+ * is an invitation nobody can accept.
+ */
+export interface InvitationGrant {
   invitationUrl: string;
   expiresAt: string;
   emailSent: boolean;
+}
+
+export interface AccessGranted extends InvitationGrant {
   employee: Employee;
 }
 

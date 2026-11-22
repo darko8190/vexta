@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Vexta.Api.Data;
@@ -42,11 +40,7 @@ public class EmployeeAccessService(
     IConfiguration configuration,
     ILogger<EmployeeAccessService> logger) : IEmployeeAccessService
 {
-    /// <summary>
-    /// Long enough that a person can be reached on a weekend, short enough that a link forwarded
-    /// into a mailing list stops working before anyone finds it.
-    /// </summary>
-    public static readonly TimeSpan InvitationLifetime = TimeSpan.FromDays(7);
+    public static readonly TimeSpan InvitationLifetime = InvitationToken.Lifetime;
 
     private string FrontendUrl => configuration["Frontend:BaseUrl"]?.TrimEnd('/') ?? "http://localhost:3000";
 
@@ -57,7 +51,11 @@ public class EmployeeAccessService(
             .Select(t => new { t.Kind, t.PlanId, PlanName = t.Plan!.Name, PlanMaxUsers = (int?)t.Plan!.MaxUsers })
             .FirstOrDefaultAsync(ct);
 
-        var used = await db.Users.IgnoreQueryFilters().CountAsync(u => u.TenantId == tenantId, ct);
+        // Customers are excluded: a seat is sold for someone who runs the business, and a
+        // company does not pay by the number of its clients. Counting them would make giving a
+        // client their invoices cost the same as hiring.
+        var used = await db.Users.IgnoreQueryFilters()
+            .CountAsync(u => u.TenantId == tenantId && u.Role != UserRole.Client, ct);
 
         if (tenant is null)
         {
@@ -169,10 +167,10 @@ public class EmployeeAccessService(
     /// </summary>
     private async Task<AccessGrant> IssueInvitationAsync(Employee employee, CancellationToken ct)
     {
-        var token = CreateToken();
+        var token = InvitationToken.Create();
         var expiresAt = DateTimeOffset.UtcNow.Add(InvitationLifetime);
 
-        employee.InvitationTokenHash = HashToken(token);
+        employee.InvitationTokenHash = InvitationToken.Hash(token);
         employee.InvitationExpiresAt = expiresAt;
         employee.InvitationSentAt = null;
         employee.UpdatedAt = DateTimeOffset.UtcNow;
@@ -222,12 +220,4 @@ public class EmployeeAccessService(
         }
     }
 
-    private static string CreateToken() =>
-        Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
-
-    public static string HashToken(string token) =>
-        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
-
-    private static string Base64UrlEncode(byte[] bytes) =>
-        Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 }

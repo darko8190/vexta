@@ -53,6 +53,7 @@ builder.Services.AddScoped<ITenantSignupService, TenantSignupService>();
 builder.Services.AddScoped<IR2StorageService, R2StorageService>();
 builder.Services.AddScoped<IBrandingService, BrandingService>();
 builder.Services.AddScoped<IEmployeeAccessService, EmployeeAccessService>();
+builder.Services.AddScoped<IClientAccessService, ClientAccessService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IWorkspaceService, WorkspaceService>();
 

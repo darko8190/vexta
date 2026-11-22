@@ -4,14 +4,19 @@ using Microsoft.EntityFrameworkCore;
 using Vexta.Api.Common;
 using Vexta.Api.Data;
 using Vexta.Api.Domain;
+using Vexta.Api.Services;
 
 namespace Vexta.Api.Features.Clients;
 
 [ApiController]
 [Route("api/clients")]
+[StaffOnly]
 [Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.TenantUser)},{nameof(UserRole.SuperAdmin)}")]
 [RequireActiveSubscription]
-public class ClientsController(VextaDbContext db, ICurrentUserService currentUser) : ControllerBase
+public class ClientsController(
+    VextaDbContext db,
+    ICurrentUserService currentUser,
+    IClientAccessService access) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<PagedResult<ClientDto>>> List([FromQuery] PagingQuery query)
@@ -99,6 +104,22 @@ public class ClientsController(VextaDbContext db, ICurrentUserService currentUse
         if (client is null) return NotFound();
         if (Validate(request) is { } error) return BadRequest(new { message = error });
 
+        // The address is the sign-in name once access exists, so changing it here would leave
+        // them signing in with one address and listed under another. Same for the type: a
+        // particulier who becomes an entreprise has nobody left to be the account holder.
+        if (client.UserId is not null)
+        {
+            if (!string.Equals(Clean(request.Email), client.Email, StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest(new { message = "Retirez l'accès avant de changer le courriel." });
+            }
+
+            if (request.Type != client.Type)
+            {
+                return BadRequest(new { message = "Retirez l'accès avant de changer le type de client." });
+            }
+        }
+
         client.Type = request.Type;
         client.CompanyName = Clean(request.CompanyName);
         client.FirstName = Clean(request.FirstName);
@@ -175,6 +196,12 @@ public class ClientsController(VextaDbContext db, ICurrentUserService currentUse
         if (contact is null) return NotFound();
         if (ValidateContact(request) is { } error) return BadRequest(new { message = error });
 
+        if (contact.UserId is not null
+            && !string.Equals(Clean(request.Email), contact.Email, StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new { message = "Retirez l'accès avant de changer le courriel." });
+        }
+
         contact.FirstName = request.FirstName.Trim();
         contact.LastName = request.LastName.Trim();
         contact.Role = Clean(request.Role);
@@ -195,6 +222,86 @@ public class ClientsController(VextaDbContext db, ICurrentUserService currentUse
 
         db.ClientContacts.Remove(contact);
         await db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    // ---- Access to their own file ----
+
+    /// <summary>
+    /// Opens the portal to a particulier. An entreprise is a company and has nobody to be: its
+    /// people are its contacts, and each of them is invited in their own right.
+    /// </summary>
+    [HttpPost("{id:guid}/acces")]
+    [RequireBusinessTenant]
+    public Task<ActionResult<ClientAccessGrantedDto>> GrantClientAccess(Guid id, CancellationToken ct) =>
+        GrantAsync(
+            () => db.Clients.FirstOrDefaultAsync(c => c.Id == id && c.Type == ClientType.Particulier, ct),
+            client => client.Id, ct);
+
+    [HttpPost("{id:guid}/acces/renvoyer")]
+    [RequireBusinessTenant]
+    public Task<ActionResult<ClientAccessGrantedDto>> ResendClientAccess(Guid id, CancellationToken ct) =>
+        ResendAsync(() => db.Clients.FirstOrDefaultAsync(c => c.Id == id, ct), ct);
+
+    [HttpDelete("{id:guid}/acces")]
+    public Task<IActionResult> RevokeClientAccess(Guid id, CancellationToken ct) =>
+        RevokeAsync(() => db.Clients.FirstOrDefaultAsync(c => c.Id == id, ct), ct);
+
+    [HttpPost("{id:guid}/contacts/{contactId:guid}/acces")]
+    [RequireBusinessTenant]
+    public Task<ActionResult<ClientAccessGrantedDto>> GrantContactAccess(Guid id, Guid contactId, CancellationToken ct) =>
+        GrantAsync(
+            () => db.ClientContacts.FirstOrDefaultAsync(c => c.Id == contactId && c.ClientId == id, ct),
+            contact => contact.ClientId, ct);
+
+    [HttpPost("{id:guid}/contacts/{contactId:guid}/acces/renvoyer")]
+    [RequireBusinessTenant]
+    public Task<ActionResult<ClientAccessGrantedDto>> ResendContactAccess(Guid id, Guid contactId, CancellationToken ct) =>
+        ResendAsync(() => db.ClientContacts.FirstOrDefaultAsync(c => c.Id == contactId && c.ClientId == id, ct), ct);
+
+    [HttpDelete("{id:guid}/contacts/{contactId:guid}/acces")]
+    public Task<IActionResult> RevokeContactAccess(Guid id, Guid contactId, CancellationToken ct) =>
+        RevokeAsync(() => db.ClientContacts.FirstOrDefaultAsync(c => c.Id == contactId && c.ClientId == id, ct), ct);
+
+    /// <summary>
+    /// The three access endpoints differ only in which row they load and which client the scope
+    /// is taken from, so the rest is written once. Everything a customer may see follows from
+    /// that scope, which is why it is read from the record and never from the request.
+    /// </summary>
+    private async Task<ActionResult<ClientAccessGrantedDto>> GrantAsync<T>(
+        Func<Task<T?>> load, Func<T, Guid> scopeOf, CancellationToken ct) where T : class, IInvitable
+    {
+        var target = await load();
+        if (target is null) return NotFound();
+
+        var (grant, error) = await access.GrantAsync(target, scopeOf(target), ct);
+        if (grant is null) return BadRequest(new { message = error });
+
+        await db.SaveChangesAsync(ct);
+        return Ok(new ClientAccessGrantedDto(grant.InvitationUrl, grant.ExpiresAt, grant.EmailSent));
+    }
+
+    private async Task<ActionResult<ClientAccessGrantedDto>> ResendAsync<T>(
+        Func<Task<T?>> load, CancellationToken ct) where T : class, IInvitable
+    {
+        var target = await load();
+        if (target is null) return NotFound();
+
+        var (grant, error) = await access.ResendAsync(target, ct);
+        if (grant is null) return BadRequest(new { message = error });
+
+        await db.SaveChangesAsync(ct);
+        return Ok(new ClientAccessGrantedDto(grant.InvitationUrl, grant.ExpiresAt, grant.EmailSent));
+    }
+
+    private async Task<IActionResult> RevokeAsync<T>(
+        Func<Task<T?>> load, CancellationToken ct) where T : class, IInvitable
+    {
+        var target = await load();
+        if (target is null) return NotFound();
+
+        await access.RevokeAsync(target, ct);
+        await db.SaveChangesAsync(ct);
         return NoContent();
     }
 
@@ -304,12 +411,30 @@ public class ClientsController(VextaDbContext db, ICurrentUserService currentUse
         c.Contacts.Count,
         c.Projects.Count,
         c.Invoices.Count,
+        new ClientAccessDto(
+            c.UserId != null,
+            c.InvitationTokenHash != null && c.InvitationExpiresAt > DateTimeOffset.UtcNow,
+            c.InvitationExpiresAt,
+            c.InvitationSentAt),
         c.CreatedAt,
         c.UpdatedAt);
 
     private static System.Linq.Expressions.Expression<Func<ClientContact, ClientContactDto>> ContactToDto() =>
-        c => new ClientContactDto(c.Id, c.ClientId, c.FirstName, c.LastName, c.Role, c.Email, c.Phone, c.Notes, c.CreatedAt);
+        c => new ClientContactDto(
+            c.Id, c.ClientId, c.FirstName, c.LastName, c.Role, c.Email, c.Phone, c.Notes,
+            new ClientAccessDto(
+                c.UserId != null,
+                c.InvitationTokenHash != null && c.InvitationExpiresAt > DateTimeOffset.UtcNow,
+                c.InvitationExpiresAt,
+                c.InvitationSentAt),
+            c.CreatedAt);
 
     private static ClientContactDto ToContactDto(ClientContact c) =>
-        new(c.Id, c.ClientId, c.FirstName, c.LastName, c.Role, c.Email, c.Phone, c.Notes, c.CreatedAt);
+        new(c.Id, c.ClientId, c.FirstName, c.LastName, c.Role, c.Email, c.Phone, c.Notes, AccessOf(c), c.CreatedAt);
+
+    private static ClientAccessDto AccessOf(IInvitable target) => new(
+        target.UserId is not null,
+        target.InvitationTokenHash is not null && target.InvitationExpiresAt > DateTimeOffset.UtcNow,
+        target.InvitationExpiresAt,
+        target.InvitationSentAt);
 }

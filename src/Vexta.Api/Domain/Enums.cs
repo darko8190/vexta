@@ -4,7 +4,14 @@ public enum UserRole
 {
     SuperAdmin = 0,
     TenantAdmin = 1,
-    TenantUser = 2
+    TenantUser = 2,
+
+    /// <summary>
+    /// A customer of the tenant, not a member of it: they see their own projects and their own
+    /// invoices and nothing else. Never counted against the plan's seats — seats are sold for
+    /// the people who run the business, and a company does not pay per customer.
+    /// </summary>
+    Client = 3
 }
 
 public enum TenantSubscriptionStatus

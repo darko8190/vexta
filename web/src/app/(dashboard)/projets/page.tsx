@@ -17,7 +17,7 @@ import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { UpgradeCta } from "@/components/layout/upgrade-cta";
-import { useCanCreate } from "@/hooks/use-can-create";
+import { useCanCreate, useIsClientUser } from "@/hooks/use-can-create";
 import { PaginationBar } from "@/components/layout/pagination-bar";
 import { SearchInput } from "@/components/layout/search-input";
 import { ProjectFormSheet } from "@/components/projects/project-form-sheet";
@@ -33,6 +33,7 @@ function formatCurrency(amount: number | null) {
 
 export default function ProjectsPage() {
   const canCreate = useCanCreate();
+  const isClient = useIsClientUser();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search);
@@ -69,14 +70,14 @@ export default function ProjectsPage() {
     <div>
       <PageHeader
         title="Projets"
-        description="Suivez l'avancement des mandats pour vos clients."
+        description={isClient ? "Les mandats que votre fournisseur suit pour vous." : "Suivez l'avancement des mandats pour vos clients."}
         action={
           canCreate ? (
             <Button onClick={openCreate}>
               <Plus />
               Nouveau projet
             </Button>
-          ) : (
+          ) : isClient ? null : (
             <UpgradeCta />
           )
         }
@@ -101,10 +102,12 @@ export default function ProjectsPage() {
               ? "Essayez une autre recherche."
               : canCreate
                 ? "Créez votre premier projet pour un client."
-                : "La création de fiches est réservée aux comptes entreprise."
+                : isClient
+                  ? "Aucun projet ne vous est rattaché pour l'instant."
+                  : "La création de fiches est réservée aux comptes entreprise."
           }
           action={
-            !debouncedSearch &&
+            !debouncedSearch && !isClient &&
             (canCreate ? (
               <Button onClick={openCreate}>
                 <Plus />
@@ -125,7 +128,8 @@ export default function ProjectsPage() {
                 <TableHead>Statut</TableHead>
                 <TableHead>Échéancier</TableHead>
                 <TableHead>Budget</TableHead>
-                <TableHead className="w-10" />
+                {/* Nothing to offer a customer here: every action behind it is refused. */}
+                {!isClient && <TableHead className="w-10" />}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -142,6 +146,7 @@ export default function ProjectsPage() {
                     {projectItem.startDate ?? "—"} → {projectItem.endDate ?? "—"}
                   </TableCell>
                   <TableCell className="text-muted-foreground">{formatCurrency(projectItem.budget)}</TableCell>
+                  {!isClient && (
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label="Actions" />}>
@@ -159,6 +164,7 @@ export default function ProjectsPage() {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>

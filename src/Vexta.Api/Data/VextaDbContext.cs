@@ -18,6 +18,20 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             ? id
             : null;
 
+    /// <summary>
+    /// Set only for someone signed in as a client of this tenant, and then it narrows what they
+    /// can read to their own record. Null for everyone who works there, which is why every
+    /// filter below reads "no client scope, or this client" — staff are unaffected.
+    ///
+    /// It belongs in the query filter rather than in each controller for the same reason the
+    /// tenant does: one endpoint that forgets it is a customer reading another customer's
+    /// invoices, and there is no version of that which is acceptable.
+    /// </summary>
+    private Guid? CurrentClientId =>
+        Guid.TryParse(httpContextAccessor.HttpContext?.User.FindFirst(VextaClaimTypes.ClientId)?.Value, out var id)
+            ? id
+            : null;
+
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<Client> Clients => Set<Client>();
     public DbSet<Address> Addresses => Set<Address>();
@@ -64,6 +78,12 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.HasOne(m => m.Tenant).WithMany()
                 .HasForeignKey(m => m.TenantId).OnDelete(DeleteBehavior.Cascade);
 
+            // SetNull, not Cascade: losing the client record must not silently delete the
+            // membership row and leave an account pointing at a space it can no longer be
+            // scoped to. The grant is revoked explicitly instead.
+            e.HasOne(m => m.Client).WithMany()
+                .HasForeignKey(m => m.ClientId).OnDelete(DeleteBehavior.SetNull);
+
             e.HasIndex(m => new { m.UserId, m.TenantId }).IsUnique();
 
             // No query filter on purpose: this is what answers "which spaces may I enter?",
@@ -101,7 +121,13 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             // quietly handing two clients the same number.
             e.HasIndex(c => new { c.TenantId, c.Number }).IsUnique();
 
-            e.HasQueryFilter(c => c.TenantId == CurrentTenantId);
+            // SetNull, like the employee's own link: revoking access deletes the account and the
+            // client stays on file. Without it the foreign key refuses the delete and revoking
+            // an access is impossible.
+            e.HasOne(c => c.User).WithMany().HasForeignKey(c => c.UserId).OnDelete(DeleteBehavior.SetNull);
+
+            e.HasQueryFilter(c => c.TenantId == CurrentTenantId
+                && (CurrentClientId == null || c.Id == CurrentClientId));
         });
 
         builder.Entity<ClientContact>(e =>
@@ -113,20 +139,25 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.Property(c => c.Email).HasMaxLength(256);
             e.Property(c => c.Phone).HasMaxLength(40);
             e.HasIndex(c => c.ClientId);
-            e.HasQueryFilter(c => c.TenantId == CurrentTenantId);
+            e.HasOne(c => c.User).WithMany().HasForeignKey(c => c.UserId).OnDelete(DeleteBehavior.SetNull);
+
+            e.HasQueryFilter(c => c.TenantId == CurrentTenantId
+                && (CurrentClientId == null || c.ClientId == CurrentClientId));
         });
 
         builder.Entity<Address>(e =>
         {
             e.HasOne(a => a.Client).WithMany(c => c.Addresses).HasForeignKey(a => a.ClientId).OnDelete(DeleteBehavior.Cascade);
-            e.HasQueryFilter(a => a.TenantId == CurrentTenantId);
+            e.HasQueryFilter(a => a.TenantId == CurrentTenantId
+                && (CurrentClientId == null || a.ClientId == CurrentClientId));
         });
 
         builder.Entity<Project>(e =>
         {
             e.HasOne(p => p.Client).WithMany(c => c.Projects).HasForeignKey(p => p.ClientId).OnDelete(DeleteBehavior.Cascade);
             e.Property(p => p.Budget).HasPrecision(14, 2);
-            e.HasQueryFilter(p => p.TenantId == CurrentTenantId);
+            e.HasQueryFilter(p => p.TenantId == CurrentTenantId
+                && (CurrentClientId == null || p.ClientId == CurrentClientId));
         });
 
         builder.Entity<Invoice>(e =>
@@ -134,7 +165,8 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.HasOne(i => i.Client).WithMany(c => c.Invoices).HasForeignKey(i => i.ClientId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(i => i.Project).WithMany(p => p.Invoices).HasForeignKey(i => i.ProjectId).OnDelete(DeleteBehavior.SetNull);
             e.HasIndex(i => new { i.TenantId, i.Number }).IsUnique();
-            e.HasQueryFilter(i => i.TenantId == CurrentTenantId);
+            e.HasQueryFilter(i => i.TenantId == CurrentTenantId
+                && (CurrentClientId == null || i.ClientId == CurrentClientId));
         });
 
         builder.Entity<InvoiceLine>(e =>
@@ -143,7 +175,8 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.Property(l => l.Quantity).HasPrecision(14, 3);
             e.Property(l => l.UnitPrice).HasPrecision(14, 2);
             e.Property(l => l.TaxRatePercent).HasPrecision(6, 3);
-            e.HasQueryFilter(l => l.Invoice!.TenantId == CurrentTenantId);
+            e.HasQueryFilter(l => l.Invoice!.TenantId == CurrentTenantId
+                && (CurrentClientId == null || l.Invoice!.ClientId == CurrentClientId));
         });
 
         builder.Entity<PlatformSetting>(e =>

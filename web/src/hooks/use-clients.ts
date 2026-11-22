@@ -6,6 +6,7 @@ import type {
   ClientRecord,
   ClientSummary,
   ClientType,
+  InvitationGrant,
   PagedResult,
 } from "@/lib/types";
 
@@ -107,4 +108,35 @@ export function useDeleteClientContact(clientId: string) {
     mutationFn: (id: string) => api.delete(`clients/${clientId}/contacts/${id}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["clients"] }),
   });
+}
+
+// ---- Portal access, for a particulier or for one contact at a company ----
+
+/**
+ * One hook for both, because the only difference is the path: a particulier is invited on their
+ * own record, a contact on theirs. Pass contactId for the second.
+ */
+export function useClientAccess(clientId: string) {
+  const queryClient = useQueryClient();
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["clients"] });
+
+  const base = (contactId?: string) =>
+    contactId ? `clients/${clientId}/contacts/${contactId}/acces` : `clients/${clientId}/acces`;
+
+  const grant = useMutation({
+    mutationFn: (contactId?: string) => api.post<InvitationGrant>(base(contactId)),
+    onSuccess: refresh,
+  });
+
+  const resend = useMutation({
+    mutationFn: (contactId?: string) => api.post<InvitationGrant>(`${base(contactId)}/renvoyer`),
+    onSuccess: refresh,
+  });
+
+  const revoke = useMutation({
+    mutationFn: (contactId?: string) => api.delete(base(contactId)),
+    onSuccess: refresh,
+  });
+
+  return { grant, resend, revoke };
 }

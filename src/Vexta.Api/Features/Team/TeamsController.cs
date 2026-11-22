@@ -15,6 +15,7 @@ using TeamEntity = Vexta.Api.Domain.Team;
 /// </summary>
 [ApiController]
 [Route("api/hr")]
+[StaffOnly]
 [Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.SuperAdmin)}")]
 [RequireActiveSubscription]
 public class HumanResourcesController(VextaDbContext db, ICurrentUserService currentUser) : ControllerBase

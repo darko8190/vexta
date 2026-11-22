@@ -3,7 +3,6 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { API_UNREACHABLE_HEADER } from "@/lib/api-unreachable";
 import type { User } from "@/lib/types";
 
 interface RegisterTenantInput {
@@ -62,12 +61,15 @@ async function readSession(): Promise<SessionRead> {
       return { kind: "signed-in", user: data.user };
     }
 
-    // The route handler already tells an outage apart from a dead session; this is where that
-    // distinction has to survive. Reading its 504 as "signed out" is what logged people out on
-    // refresh every time the back end restarted — on every deploy, and on any hiccup.
-    if (response.headers.get(API_UNREACHABLE_HEADER) === "1") return { kind: "unreachable" };
+    // Only the API can declare a session over, and it says so with a 401. Everything else that
+    // is not a 2xx means the question could not be answered: the 504 the route handler returns
+    // when it cannot reach the API, a 502 from the proxy while the web container restarts — on
+    // every single deploy — a 500 from a database hiccup, or a proxy error page that carries no
+    // header of ours at all. Reading any of those as "signed out" is what kept bouncing people
+    // to the sign-in page mid-session. Their cookie was never cleared; only this line gave up.
+    if (response.status === 401 || response.status === 403) return { kind: "signed-out" };
 
-    return { kind: "signed-out" };
+    return { kind: "unreachable" };
   } catch {
     // fetch itself failing is the same thing: the browser is offline, not signed out.
     return { kind: "unreachable" };

@@ -1,7 +1,9 @@
 import {
   Bell,
+  Boxes,
   Building2,
   Calendar,
+  ClipboardList,
   ChartBar,
   Cloud,
   Clock,
@@ -10,10 +12,12 @@ import {
   FolderKanban,
   HardDrive,
   Images,
+  Layers,
   LayoutDashboard,
   Lock,
   Mail,
   MapPin,
+  Package,
   Phone,
   Receipt,
   Search,
@@ -24,6 +28,7 @@ import {
   Truck,
   Users,
   UsersRound,
+  Warehouse,
   Wrench,
 } from "lucide-react";
 
@@ -58,6 +63,11 @@ export const MODULE_ICONS = {
   Wrench,
   Building2,
   UsersRound,
+  Boxes,
+  Package,
+  Warehouse,
+  Layers,
+  ClipboardList,
 } as const;
 
 export type ModuleIconName = keyof typeof MODULE_ICONS;

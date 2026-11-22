@@ -38,6 +38,14 @@ public class Client : IInvitable
     public string? Notes { get; set; }
 
     /// <summary>
+    /// True for a client no tax is charged to: a band council, a reserve delivery, a government
+    /// body holding an exemption certificate. It is the default for this client's new projects
+    /// and invoices rather than a rule enforced on them — the exemption belongs to the client,
+    /// but whether a given job qualifies is still the company's call.
+    /// </summary>
+    public bool IsTaxExempt { get; set; }
+
+    /// <summary>
     /// The sign-in account of a particulier who was given access to their own files, or null.
     /// An entreprise is a company and has no one to be: its people are its Contacts, and access
     /// is granted to them individually.

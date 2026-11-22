@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/layout/empty-state";
 import { useAddressesQuery } from "@/hooks/use-addresses";
 import { useInvoicesQuery } from "@/hooks/use-invoices";
 import { useProjectsQuery } from "@/hooks/use-projects";
+import { formatDateOnly } from "@/lib/dates";
 import { formatCents } from "@/lib/money";
 import { formatProjectNumber } from "@/lib/types";
 import { invoiceStatusLabels, projectStatusLabels } from "@/lib/labels";
@@ -142,7 +143,7 @@ export function ClientInvoicesSection({ clientId }: { clientId: string }) {
                 <div className="min-w-0">
                   <p className="font-mono text-sm font-medium text-foreground">{invoice.number}</p>
                   <p className="text-sm text-muted-foreground">
-                    {new Date(invoice.issueDate).toLocaleDateString("fr-CA")}
+                    {formatDateOnly(invoice.issueDate)}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">

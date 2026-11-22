@@ -14,6 +14,8 @@ public record CompanyProfileDto(
     string? Phone,
     /// <summary>Null when no logo is on file; otherwise the cache buster for its image URL.</summary>
     string? LogoETag,
+    /// <summary>The company's chosen colour as #RRGGBB, or null for Vexta's blue.</summary>
+    string? BrandColor,
     CompanyAddressDto? Address);
 
 public record CompanyAddressDto(
@@ -29,7 +31,9 @@ public record SaveCompanyProfileRequest(
     string Name,
     string? Description,
     string? ContactEmail,
-    string? Phone);
+    string? Phone,
+    /// <summary>#RRGGBB, or null/blank to go back to Vexta's blue.</summary>
+    string? BrandColor);
 
 /// <summary>Base64 rather than multipart, for the same reason as the platform branding upload.</summary>
 public record UploadCompanyLogoRequest(string ContentType, byte[] Content, int Width, int Height);

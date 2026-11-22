@@ -14,6 +14,8 @@ export interface User {
   tenantSubscriptionStatus: TenantSubscriptionStatus | null;
   isImpersonating: boolean;
   tenantKind: "Business" | "Personal" | null;
+  /** The company's chosen colour as #RRGGBB, or null for Vexta's blue. */
+  tenantBrandColor: string | null;
 }
 
 export interface PagedResult<T> {
@@ -60,6 +62,8 @@ export interface ClientRecord {
   phone: string | null;
   taxId: string | null;
   notes: string | null;
+  /** No tax charged to this client. The default for their projects and invoices. */
+  isTaxExempt: boolean;
   primaryAddress: ClientAddress | null;
   addressCount: number;
   contactCount: number;
@@ -138,6 +142,8 @@ export interface ProjectRecord {
   startDate: string | null;
   endDate: string | null;
   budget: number | null;
+  /** No tax on this job. Taken from the client when the project is created. */
+  isTaxExempt: boolean;
   clientAddress: ProjectAddress | null;
   sameAddressAsClient: boolean;
   /** Null when the work happens at the billing address. */
@@ -176,6 +182,8 @@ export interface InvoiceRecord {
   dueDate: string;
   currency: string;
   notes: string | null;
+  /** No tax on this invoice. Every line's rate is zero while it is set. */
+  isTaxExempt: boolean;
   subtotal: number;
   taxTotal: number;
   total: number;
@@ -435,5 +443,83 @@ export interface CompanyProfile {
   phone: string | null;
   /** Null when no logo is on file; otherwise the cache buster for its image URL. */
   logoETag: string | null;
+  /** The company's chosen colour as #RRGGBB, or null for Vexta's blue. */
+  brandColor: string | null;
   address: CompanyAddress | null;
+}
+
+// ---- What a project's own page needs around the record ----
+
+/** One badge per section of a project, so the rail can say how much is behind each. */
+export interface ProjectSectionCounts {
+  materials: number;
+  equipment: number;
+  assemblies: number;
+  timesheets: number;
+  expenses: number;
+  extraCharges: number;
+  invoices: number;
+}
+
+export interface ProjectCostLine {
+  key: string;
+  label: string;
+  cost: number;
+  revenue: number;
+  profit: number;
+}
+
+export interface ProjectCostTable {
+  lines: ProjectCostLine[];
+  totalCost: number;
+  subtotal: number;
+  profit: number;
+  tax1Label: string;
+  tax1: number;
+  tax2Label: string;
+  tax2: number;
+  total: number;
+  isTaxExempt: boolean;
+}
+
+export interface ProjectSummary {
+  counts: ProjectSectionCounts;
+  costs: ProjectCostTable;
+}
+
+/** One of the company's expense categories. */
+export interface ExpenseType {
+  id: string;
+  name: string;
+  expenseCount: number;
+}
+
+/** A receipt. The URL is signed and short-lived, which is why it is never stored anywhere. */
+export interface ExpensePhoto {
+  id: string;
+  mediaAssetId: string;
+  fileName: string;
+  contentType: string;
+  url: string | null;
+  sortOrder: number;
+}
+
+export interface ProjectExpense {
+  id: string;
+  projectId: string;
+  name: string;
+  description: string | null;
+  expenseTypeId: string;
+  expenseTypeName: string;
+  cost: number | null;
+  sellingPrice: number | null;
+  spentOn: string | null;
+  photoCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProjectExpenseDetail {
+  expense: ProjectExpense;
+  photos: ExpensePhoto[];
 }

@@ -45,6 +45,7 @@ public class InvoicePdfService(VextaDbContext db, ICurrentUserService currentUse
             invoice.Lines.OrderBy(l => l.SortOrder)
                 .Select(l => (l.Description, l.Quantity, l.UnitPrice, l.TaxRatePercent))
                 .ToList(),
+            invoice.IsTaxExempt,
             ct);
 
         return new InvoiceDocument(model).GeneratePdf();
@@ -76,9 +77,46 @@ public class InvoicePdfService(VextaDbContext db, ICurrentUserService currentUse
             request.Currency,
             request.Notes,
             request.Lines.Select(l => (l.Description ?? string.Empty, l.Quantity, l.UnitPrice, l.TaxRatePercent)).ToList(),
+            await DraftExemptionAsync(request, invoiceId, ct),
             ct);
 
         return new InvoiceDocument(model).GeneratePdf();
+    }
+
+    /// <summary>
+    /// Whether the invoice being typed is exempt: what the form says, then the invoice as it
+    /// stands, then the project, then the client. The same ladder the controller climbs when it
+    /// saves, so the preview cannot promise tax the saved invoice will not charge.
+    /// </summary>
+    private async Task<bool> DraftExemptionAsync(
+        UpsertInvoiceRequest request, Guid? invoiceId, CancellationToken ct)
+    {
+        if (request.IsTaxExempt is { } stated) return stated;
+
+        if (invoiceId is { } id)
+        {
+            var saved = await db.Invoices.AsNoTracking()
+                .Where(i => i.Id == id)
+                .Select(i => new { i.IsTaxExempt })
+                .FirstOrDefaultAsync(ct);
+
+            if (saved is not null) return saved.IsTaxExempt;
+        }
+
+        if (request.ProjectId is { } projectId)
+        {
+            var project = await db.Projects.AsNoTracking()
+                .Where(p => p.Id == projectId)
+                .Select(p => new { p.IsTaxExempt })
+                .FirstOrDefaultAsync(ct);
+
+            if (project is not null) return project.IsTaxExempt;
+        }
+
+        return await db.Clients.AsNoTracking()
+            .Where(c => c.Id == request.ClientId)
+            .Select(c => c.IsTaxExempt)
+            .FirstOrDefaultAsync(ct);
     }
 
     private async Task<InvoicePdfModel> BuildAsync(
@@ -91,6 +129,7 @@ public class InvoicePdfService(VextaDbContext db, ICurrentUserService currentUse
         string currency,
         string? notes,
         IReadOnlyList<(string Description, decimal Quantity, decimal UnitPrice, decimal TaxRatePercent)> lines,
+        bool isTaxExempt,
         CancellationToken ct)
     {
         var tenant = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
@@ -140,7 +179,7 @@ public class InvoicePdfService(VextaDbContext db, ICurrentUserService currentUse
             .ToList();
 
         var subtotal = Round(items.Sum(l => l.Amount));
-        var taxes = TaxLines(lines, settings);
+        var taxes = isTaxExempt ? ExemptLine : TaxLines(lines, settings);
 
         return new InvoicePdfModel
         {
@@ -154,6 +193,7 @@ public class InvoicePdfService(VextaDbContext db, ICurrentUserService currentUse
             CompanyName = tenant?.Name ?? "",
             CompanyLines = CompanyLines(location, tenant, settings),
             Logo = logo,
+            BrandColor = tenant?.BrandColor,
             BillTo = new InvoicePdfParty(
                 client?.Name ?? "",
                 AddressLines(billingAddress),
@@ -167,6 +207,13 @@ public class InvoicePdfService(VextaDbContext db, ICurrentUserService currentUse
             FooterNote = Clean(settings?.FooterNote)
         };
     }
+
+    /// <summary>
+    /// What an exempt invoice prints where the taxes go. Zero stated rather than nothing shown:
+    /// an invoice with no tax line and no explanation reads like one where the tax was
+    /// forgotten, and that is a question the company then has to answer by telephone.
+    /// </summary>
+    private static readonly List<InvoicePdfAmount> ExemptLine = [new InvoicePdfAmount("Non taxable", 0m)];
 
     /// <summary>
     /// TPS and TVQ separately whenever the company's own two rates account for the tax charged

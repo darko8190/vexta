@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
 import { AppShell } from "@/components/layout/app-shell";
+import { BrandTheme } from "@/components/layout/brand-theme";
 import { ClientRouteGuard } from "@/components/layout/client-route-guard";
 import { SubscriptionGate } from "@/components/layout/subscription-gate";
 import { useAuth } from "@/lib/auth-context";
@@ -27,10 +28,14 @@ export default function DashboardGroupLayout({ children }: { children: React.Rea
   }
 
   return (
-    <AppShell>
-      <SubscriptionGate>
-        <ClientRouteGuard>{children}</ClientRouteGuard>
-      </SubscriptionGate>
-    </AppShell>
+    <>
+      {/* Before the shell, so the company's colour is in place for the first frame it draws. */}
+      <BrandTheme color={user.tenantBrandColor} />
+      <AppShell>
+        <SubscriptionGate>
+          <ClientRouteGuard>{children}</ClientRouteGuard>
+        </SubscriptionGate>
+      </AppShell>
+    </>
   );
 }

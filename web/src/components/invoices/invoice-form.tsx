@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
@@ -9,6 +9,8 @@ import { toast } from "sonner";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { FieldDescription } from "@/components/ui/field";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -21,6 +23,8 @@ import { InvoicePdfViewer } from "@/components/invoices/invoice-pdf-viewer";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { buttonVariants } from "@/components/ui/button";
 import { useBillingSettingsQuery } from "@/hooks/use-billing-settings";
+import { useClientQuery } from "@/hooks/use-clients";
+import { useProjectQuery } from "@/hooks/use-projects";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { usePdfDocument } from "@/hooks/use-pdf-document";
 import { cn } from "@/lib/utils";
@@ -46,6 +50,7 @@ const formSchema = z.object({
   dueDate: z.string().min(1, "Date requise."),
   currency: z.string().min(1, "Devise requise."),
   notes: z.string().optional().or(z.literal("")),
+  isTaxExempt: z.boolean(),
   lines: z.array(lineSchema).min(1, "Ajoutez au moins une ligne."),
 });
 
@@ -67,15 +72,17 @@ function toFormValues(
   defaultClientId?: string,
   termsDays = 30,
   taxRate = 0,
+  defaultProjectId?: string,
 ): FormValues {
   return {
     clientId: invoice?.clientId ?? defaultClientId ?? "",
-    projectId: invoice?.projectId ?? "",
+    projectId: invoice?.projectId ?? defaultProjectId ?? "",
     status: invoice?.status ?? "Brouillon",
     issueDate: invoice?.issueDate ?? todayIso(),
     dueDate: invoice?.dueDate ?? dueInIso(termsDays),
     currency: invoice?.currency ?? "CAD",
     notes: invoice?.notes ?? "",
+    isTaxExempt: invoice?.isTaxExempt ?? false,
     lines: invoice?.lines?.length
       ? invoice.lines.map((l) => ({
           description: l.description,
@@ -93,7 +100,16 @@ function formatCurrency(amount: number, currency: string) {
   return new Intl.NumberFormat("fr-CA", { style: "currency", currency }).format(amount);
 }
 
-export function InvoiceForm({ invoice, defaultClientId }: { invoice?: InvoiceRecord; defaultClientId?: string }) {
+export function InvoiceForm({
+  invoice,
+  defaultClientId,
+  defaultProjectId,
+}: {
+  invoice?: InvoiceRecord;
+  defaultClientId?: string;
+  /** Pre-selected when the invoice is started from a project's own page. */
+  defaultProjectId?: string;
+}) {
   const router = useRouter();
   const isEditing = Boolean(invoice);
   const createInvoice = useCreateInvoice();
@@ -103,7 +119,7 @@ export function InvoiceForm({ invoice, defaultClientId }: { invoice?: InvoiceRec
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: toFormValues(invoice, defaultClientId),
+    defaultValues: toFormValues(invoice, defaultClientId, 30, 0, defaultProjectId),
   });
 
   useEffect(() => {
@@ -113,6 +129,7 @@ export function InvoiceForm({ invoice, defaultClientId }: { invoice?: InvoiceRec
         defaultClientId,
         settings?.paymentTermsDays,
         (settings?.gstRate ?? 0) + (settings?.qstRate ?? 0),
+        defaultProjectId,
       ),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -127,6 +144,37 @@ export function InvoiceForm({ invoice, defaultClientId }: { invoice?: InvoiceRec
   const dueDate = useWatch({ control: form.control, name: "dueDate" });
   const notes = useWatch({ control: form.control, name: "notes" });
   const status = useWatch({ control: form.control, name: "status" });
+  const isTaxExempt = useWatch({ control: form.control, name: "isTaxExempt" });
+
+  // Set as soon as the box is touched, so the inheritance below stops overriding a decision
+  // someone has just made about this invoice.
+  const [exemptTouched, setExemptTouched] = useState(false);
+
+  // Only while creating: a saved invoice owns its own answer, and re-reading the project's
+  // would change the tax on a document a client may already have paid against.
+  const { data: pickedProject } = useProjectQuery(
+    !isEditing && projectId ? projectId : undefined,
+  );
+  const { data: pickedClient } = useClientQuery(
+    !isEditing && !projectId && clientId ? clientId : undefined,
+  );
+
+  // The project's answer wins over the client's: the exemption belongs to the client, but a
+  // particular job can be the exception, and the project is where that was decided.
+  const inheritedExemption = projectId ? pickedProject?.isTaxExempt : pickedClient?.isTaxExempt;
+
+  useEffect(() => {
+    if (isEditing || exemptTouched || inheritedExemption === undefined) return;
+    if (inheritedExemption === form.getValues("isTaxExempt")) return;
+
+    form.setValue("isTaxExempt", inheritedExemption);
+    (form.getValues("lines") ?? []).forEach((_, index) => {
+      form.setValue(
+        `lines.${index}.taxRatePercent`,
+        inheritedExemption ? 0 : (settings?.gstRate ?? 0) + (settings?.qstRate ?? 0),
+      );
+    });
+  }, [isEditing, exemptTouched, inheritedExemption, settings?.gstRate, settings?.qstRate, form]);
 
   // The document is built by the API from what is on screen, so the preview is the invoice
   // rather than a second drawing of it. Debounced: it is a round trip, and one per keystroke
@@ -141,6 +189,7 @@ export function InvoiceForm({ invoice, defaultClientId }: { invoice?: InvoiceRec
         dueDate,
         currency,
         notes: notes || null,
+        isTaxExempt,
         lines: (lines ?? []).map((line) => ({
           description: line.description ?? "",
           quantity: Number(line.quantity) || 0,
@@ -148,7 +197,7 @@ export function InvoiceForm({ invoice, defaultClientId }: { invoice?: InvoiceRec
           taxRatePercent: Number(line.taxRatePercent) || 0,
         })),
       }),
-    [clientId, projectId, status, issueDate, dueDate, currency, notes, lines],
+    [clientId, projectId, status, issueDate, dueDate, currency, notes, isTaxExempt, lines],
   );
 
   const debouncedDraft = useDebouncedValue(draft, 500);
@@ -166,7 +215,21 @@ export function InvoiceForm({ invoice, defaultClientId }: { invoice?: InvoiceRec
 
   // A new line carries the company's own rates. Zero is not a neutral default on an invoice —
   // it is a claim that nothing is taxable, and it would be wrong on nearly every line.
-  const defaultTaxRate = (settings?.gstRate ?? 0) + (settings?.qstRate ?? 0);
+  const companyTaxRate = (settings?.gstRate ?? 0) + (settings?.qstRate ?? 0);
+
+  // Zero on an exempt invoice, so a line added after the box is ticked does not quietly
+  // reintroduce the tax the invoice says it is not charging.
+  const defaultTaxRate = isTaxExempt ? 0 : companyTaxRate;
+
+  /** Rewrites every line's rate, which is what makes the box a decision and not a label. */
+  function applyExemption(exempt: boolean) {
+    setExemptTouched(true);
+    form.setValue("isTaxExempt", exempt);
+
+    (form.getValues("lines") ?? []).forEach((_, index) => {
+      form.setValue(`lines.${index}.taxRatePercent`, exempt ? 0 : companyTaxRate);
+    });
+  }
 
   const subtotal = lines?.reduce((sum, l) => sum + (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0), 0) ?? 0;
   const taxTotal =
@@ -184,6 +247,7 @@ export function InvoiceForm({ invoice, defaultClientId }: { invoice?: InvoiceRec
       dueDate: values.dueDate,
       currency: values.currency,
       notes: values.notes || undefined,
+      isTaxExempt: values.isTaxExempt,
       lines: values.lines,
     };
 
@@ -264,6 +328,30 @@ export function InvoiceForm({ invoice, defaultClientId }: { invoice?: InvoiceRec
                 )}
               />
             </div>
+
+            <Controller
+              name="isTaxExempt"
+              control={form.control}
+              render={({ field }) => (
+                <Field>
+                  <div className="flex items-center gap-3">
+                    <Checkbox
+                      id="invoice-tax-exempt"
+                      checked={field.value}
+                      onCheckedChange={(checked) => applyExemption(checked === true)}
+                    />
+                    <FieldLabel htmlFor="invoice-tax-exempt" className="font-normal">
+                      Facture non taxable
+                    </FieldLabel>
+                  </div>
+                  <FieldDescription>
+                    {field.value
+                      ? "Aucune taxe n'est facturée. La facture l'indique sous le total."
+                      : "Cochez pour une vente exonérée. Les taux des lignes passent à zéro."}
+                  </FieldDescription>
+                </Field>
+              )}
+            />
 
             <div className="grid gap-4 sm:grid-cols-3">
               <Controller
@@ -419,6 +507,9 @@ export function InvoiceForm({ invoice, defaultClientId }: { invoice?: InvoiceRec
                           step="0.001"
                           min="0"
                           placeholder="Taxe %"
+                          // Disabled rather than hidden on an exempt invoice: the column stays
+                          // where it is, showing the zero that is actually being saved.
+                          disabled={isTaxExempt}
                           value={field.value}
                           onChange={(e) => field.onChange(e.target.valueAsNumber || 0)}
                         />
@@ -447,7 +538,7 @@ export function InvoiceForm({ invoice, defaultClientId }: { invoice?: InvoiceRec
               <span>{formatCurrency(subtotal, currency)}</span>
             </div>
             <div className="flex justify-between text-muted-foreground">
-              <span>Taxes</span>
+              <span>{isTaxExempt ? "Taxes (non taxable)" : "Taxes"}</span>
               <span>{formatCurrency(taxTotal, currency)}</span>
             </div>
             <div className="flex justify-between text-base font-semibold text-foreground">

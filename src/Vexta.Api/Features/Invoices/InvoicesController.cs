@@ -19,11 +19,15 @@ public class InvoicesController(VextaDbContext db, ICurrentUserService currentUs
 {
     [HttpGet]
     public async Task<ActionResult<PagedResult<InvoiceDto>>> List(
-        [FromQuery] PagingQuery query, [FromQuery] Guid? clientId, [FromQuery] InvoiceStatus? status)
+        [FromQuery] PagingQuery query,
+        [FromQuery] Guid? clientId,
+        [FromQuery] Guid? projectId,
+        [FromQuery] InvoiceStatus? status)
     {
         var invoices = db.Invoices.AsNoTracking().Include(i => i.Lines).AsQueryable();
 
         if (clientId is not null) invoices = invoices.Where(i => i.ClientId == clientId);
+        if (projectId is not null) invoices = invoices.Where(i => i.ProjectId == projectId);
         if (status is not null) invoices = invoices.Where(i => i.Status == status);
 
         if (!string.IsNullOrWhiteSpace(query.Search))
@@ -104,6 +108,8 @@ public class InvoicesController(VextaDbContext db, ICurrentUserService currentUs
 
         if (LineProblem(request) is { } lineError) return BadRequest(new { message = lineError });
 
+        var exempt = await ExemptionAsync(request);
+
         var tenantId = currentUser.TenantId!.Value;
 
         // An invoice is a legal document. Its number, its tax rates and its payment terms are
@@ -129,7 +135,8 @@ public class InvoicesController(VextaDbContext db, ICurrentUserService currentUs
             DueDate = request.DueDate,
             Currency = string.IsNullOrWhiteSpace(request.Currency) ? "CAD" : request.Currency.Trim(),
             Notes = request.Notes,
-            Lines = ToLineEntities(request.Lines)
+            IsTaxExempt = exempt,
+            Lines = ToLineEntities(request.Lines, exempt)
         };
 
         // Advanced here, not derived from a count: deleting an invoice must never hand its
@@ -159,10 +166,11 @@ public class InvoicesController(VextaDbContext db, ICurrentUserService currentUs
         invoice.DueDate = request.DueDate;
         invoice.Currency = string.IsNullOrWhiteSpace(request.Currency) ? "CAD" : request.Currency.Trim();
         invoice.Notes = request.Notes;
+        invoice.IsTaxExempt = request.IsTaxExempt ?? invoice.IsTaxExempt;
         invoice.UpdatedAt = DateTimeOffset.UtcNow;
 
         db.InvoiceLines.RemoveRange(invoice.Lines);
-        invoice.Lines = ToLineEntities(request.Lines);
+        invoice.Lines = ToLineEntities(request.Lines, invoice.IsTaxExempt);
 
         await db.SaveChangesAsync();
 
@@ -194,13 +202,43 @@ public class InvoicesController(VextaDbContext db, ICurrentUserService currentUs
         return null;
     }
 
-    private static List<InvoiceLine> ToLineEntities(List<InvoiceLineRequest> lines) => lines
+    /// <summary>
+    /// Where an exempt invoice comes from when the request does not say: the project it belongs
+    /// to, and otherwise the client. The exemption is the client's, but a job can be the
+    /// exception, so the project's answer wins whenever there is one.
+    /// </summary>
+    private async Task<bool> ExemptionAsync(UpsertInvoiceRequest request)
+    {
+        if (request.IsTaxExempt is { } stated) return stated;
+
+        if (request.ProjectId is { } projectId)
+        {
+            var project = await db.Projects.AsNoTracking()
+                .Where(p => p.Id == projectId)
+                .Select(p => new { p.IsTaxExempt })
+                .FirstOrDefaultAsync();
+
+            if (project is not null) return project.IsTaxExempt;
+        }
+
+        return await db.Clients.AsNoTracking()
+            .Where(c => c.Id == request.ClientId)
+            .Select(c => c.IsTaxExempt)
+            .FirstOrDefaultAsync();
+    }
+
+    /// <summary>
+    /// The rate is forced to zero on an exempt invoice rather than trusted from the request.
+    /// A stored line that still carries 9.975 on an invoice printed without tax is a document
+    /// whose own total contradicts it, and it is the stored lines that get re-totalled later.
+    /// </summary>
+    private static List<InvoiceLine> ToLineEntities(List<InvoiceLineRequest> lines, bool isTaxExempt) => lines
         .Select((l, index) => new InvoiceLine
         {
             Description = l.Description?.Trim() ?? string.Empty,
             Quantity = l.Quantity,
             UnitPrice = l.UnitPrice,
-            TaxRatePercent = l.TaxRatePercent,
+            TaxRatePercent = isTaxExempt ? 0m : l.TaxRatePercent,
             SortOrder = index
         })
         .ToList();
@@ -224,6 +262,6 @@ public class InvoicesController(VextaDbContext db, ICurrentUserService currentUs
             invoice.Id, invoice.Number, invoice.ClientId, invoice.Client?.Name ?? string.Empty,
             invoice.ProjectId, invoice.Project?.Number,
             invoice.Status, invoice.IssueDate, invoice.DueDate, invoice.Currency, invoice.Notes,
-            subtotal, taxTotal, subtotal + taxTotal, lines, invoice.CreatedAt, invoice.UpdatedAt);
+            invoice.IsTaxExempt, subtotal, taxTotal, subtotal + taxTotal, lines, invoice.CreatedAt, invoice.UpdatedAt);
     }
 }

@@ -17,11 +17,33 @@ namespace Vexta.Api.Features.Invoices;
 /// </summary>
 public class InvoiceDocument(InvoicePdfModel model) : IDocument
 {
-    private const string Blue = "#0982CE";
+    /// <summary>Vexta's blue, used by every company that has not chosen its own.</summary>
+    private const string DefaultBlue = "#0982CE";
+
+    /// <summary>
+    /// The company's colour, or the default. Read once here rather than at each of the fifteen
+    /// places below that paint something with it.
+    /// </summary>
+    private readonly string Blue = Normalize(model.BrandColor) ?? DefaultBlue;
     private const string Grey = "#757575";
     private const string PageNumberGrey = "#9E9E9E";
     private const string HairLine = "#E0E0E0";
     private const string Font = "Montserrat";
+
+    /// <summary>
+    /// #RRGGBB or nothing. The value comes from a database column, and QuestPDF hands colours
+    /// straight to Skia, so anything else is refused here rather than thrown deep in the
+    /// renderer while a person waits for an invoice.
+    /// </summary>
+    private static string? Normalize(string? hex)
+    {
+        if (string.IsNullOrWhiteSpace(hex)) return null;
+
+        var value = hex.Trim();
+        if (value.Length != 7 || value[0] != '#') return null;
+
+        return value[1..].All(Uri.IsHexDigit) ? value.ToUpperInvariant() : null;
+    }
 
     /// <summary>
     /// fr-CA with the thin spaces taken out. ICU groups thousands with U+202F, which Montserrat
@@ -170,7 +192,8 @@ public class InvoiceDocument(InvoicePdfModel model) : IDocument
             table.Cell().Element(BodyCell).AlignRight().Text(Money(line.Amount));
         }
 
-        static IContainer HeaderCell(IContainer cell) => cell
+        // Not static: the band's colour is the company's, which is an instance field now.
+        IContainer HeaderCell(IContainer cell) => cell
             .Background(Blue)
             .PaddingVertical(5)
             .PaddingHorizontal(4)

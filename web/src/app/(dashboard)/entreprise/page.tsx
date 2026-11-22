@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/components/layout/page-header";
+import { BrandColorCard } from "@/components/settings/brand-color-card";
 import {
   useCompanyProfileQuery,
   useDeleteCompanyLogo,
@@ -204,6 +205,8 @@ export default function CompanyPage() {
         description: values.description || null,
         contactEmail: values.contactEmail || null,
         phone: values.phone || null,
+        // Carried through unchanged: this form is the identity card, and the colour has its own.
+        brandColor: profile?.brandColor ?? null,
       });
       toast.success("Fiche mise à jour.");
     } catch (error) {
@@ -346,6 +349,7 @@ export default function CompanyPage() {
         </Card>
 
         {canEdit && <LogoCard profile={profile} />}
+        {canEdit && <BrandColorCard profile={profile} />}
         <AddressCard profile={profile} />
       </div>
     </div>

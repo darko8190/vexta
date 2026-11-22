@@ -7,6 +7,8 @@ export interface SaveCompanyValues {
   description: string | null;
   contactEmail: string | null;
   phone: string | null;
+  /** #RRGGBB, or null to go back to Vexta's blue. */
+  brandColor: string | null;
 }
 
 export function useCompanyProfileQuery() {

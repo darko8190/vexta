@@ -23,6 +23,16 @@ public class Tenant
     public string? ContactEmail { get; set; }
     public string? Phone { get; set; }
 
+    /// <summary>
+    /// The company's own colour, as #RRGGBB, or null to keep Vexta's blue.
+    ///
+    /// One colour rather than a palette: it is the only one a company can choose without being
+    /// able to produce something unreadable. Every other shade the application and the invoices
+    /// use — the hover state, the focus ring, the dark theme's lighter variant, the band at the
+    /// top of a PDF — is derived from it, so contrast stays correct by construction.
+    /// </summary>
+    public string? BrandColor { get; set; }
+
     public TenantLogo? Logo { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;

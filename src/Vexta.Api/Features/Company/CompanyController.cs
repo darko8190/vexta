@@ -33,7 +33,7 @@ public class CompanyController(VextaDbContext db, ICurrentUserService currentUse
             .Where(t => t.Id == tenantId)
             .Select(t => new
             {
-                t.Id, t.Name, t.Slug, t.Kind, t.Description, t.ContactEmail, t.Phone,
+                t.Id, t.Name, t.Slug, t.Kind, t.Description, t.ContactEmail, t.Phone, t.BrandColor,
                 LogoETag = t.Logo!.ETag
             })
             .FirstOrDefaultAsync(ct);
@@ -47,7 +47,8 @@ public class CompanyController(VextaDbContext db, ICurrentUserService currentUse
 
         return Ok(new CompanyProfileDto(
             tenant.Id, tenant.Name, tenant.Slug, tenant.Kind.ToString(),
-            tenant.Description, tenant.ContactEmail, tenant.Phone, tenant.LogoETag, address));
+            tenant.Description, tenant.ContactEmail, tenant.Phone, tenant.LogoETag,
+            tenant.BrandColor, address));
     }
 
     [HttpPut("profile")]
@@ -62,6 +63,15 @@ public class CompanyController(VextaDbContext db, ICurrentUserService currentUse
         if (request.Name.Trim().Length > 200) return BadRequest(new { message = "200 caractères maximum." });
         if (request.Description is { Length: > 2000 }) return BadRequest(new { message = "La description ne peut pas dépasser 2000 caractères." });
 
+        // Validated here, not where it is painted: this value ends up in a CSS variable in
+        // every browser and in a colour handed to the PDF renderer, and neither is a place to
+        // discover that someone sent "red" or a stylesheet fragment.
+        var brandColor = NormalizeColor(request.BrandColor);
+        if (brandColor is null && !string.IsNullOrWhiteSpace(request.BrandColor))
+        {
+            return BadRequest(new { message = "La couleur doit être au format #RRGGBB." });
+        }
+
         var tenant = await db.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.Id == tenantId, ct);
         if (tenant is null) return NotFound();
 
@@ -70,6 +80,7 @@ public class CompanyController(VextaDbContext db, ICurrentUserService currentUse
         tenant.Description = Clean(request.Description);
         tenant.ContactEmail = Clean(request.ContactEmail);
         tenant.Phone = Clean(request.Phone);
+        tenant.BrandColor = brandColor;
 
         await db.SaveChangesAsync(ct);
         return await Profile(ct);
@@ -158,4 +169,18 @@ public class CompanyController(VextaDbContext db, ICurrentUserService currentUse
 
     private static string? Clean(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    /// <summary>
+    /// #RRGGBB upper-cased, or null for both "none chosen" and "not a colour". The caller tells
+    /// the two apart by looking at what was sent.
+    /// </summary>
+    private static string? NormalizeColor(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+
+        var hex = value.Trim();
+        if (hex.Length != 7 || hex[0] != '#') return null;
+
+        return hex[1..].All(Uri.IsHexDigit) ? hex.ToUpperInvariant() : null;
+    }
 }

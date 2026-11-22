@@ -17,6 +17,8 @@ public record InvoiceDto(
     DateOnly DueDate,
     string Currency,
     string? Notes,
+    /// <summary>No tax on this invoice. Every line's rate is zero while it is set.</summary>
+    bool IsTaxExempt,
     decimal Subtotal,
     decimal TaxTotal,
     decimal Total,
@@ -40,4 +42,9 @@ public record UpsertInvoiceRequest(
     DateOnly DueDate,
     string Currency,
     string? Notes,
+    /// <summary>
+    /// Null means "take the answer from the project, or from the client when there is none",
+    /// which is what a new invoice does.
+    /// </summary>
+    bool? IsTaxExempt,
     List<InvoiceLineRequest> Lines);

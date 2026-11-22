@@ -28,7 +28,13 @@ public record UserDto(
     string? TenantName,
     string? TenantSubscriptionStatus,
     bool IsImpersonating = false,
-    string? TenantKind = null)
+    string? TenantKind = null,
+    /// <summary>
+    /// The company's chosen colour, so the application is painted in it from the first frame.
+    /// It travels with the session rather than being fetched afterwards: a request of its own
+    /// would mean every screen opens in Vexta's blue and then changes colour under the person.
+    /// </summary>
+    string? TenantBrandColor = null)
 {
     public static UserDto ForUser(ApplicationUser user) => new(
         user.Id,
@@ -39,7 +45,8 @@ public record UserDto(
         user.TenantId,
         user.Tenant?.Name,
         user.Tenant?.SubscriptionStatus.ToString(),
-        TenantKind: user.Tenant?.Kind.ToString());
+        TenantKind: user.Tenant?.Kind.ToString(),
+        TenantBrandColor: user.Tenant?.BrandColor);
 
     /// <summary>
     /// The same person seen from another of their spaces. The role comes from the membership,
@@ -55,7 +62,8 @@ public record UserDto(
         tenant.Id,
         tenant.Name,
         tenant.SubscriptionStatus.ToString(),
-        TenantKind: tenant.Kind.ToString());
+        TenantKind: tenant.Kind.ToString(),
+        TenantBrandColor: tenant.BrandColor);
 
     // The super admin keeps their own identity and role; only the tenant context is swapped.
     public static UserDto ForImpersonation(ApplicationUser user, Tenant tenant) => new(
@@ -68,7 +76,8 @@ public record UserDto(
         tenant.Name,
         tenant.SubscriptionStatus.ToString(),
         IsImpersonating: true,
-        TenantKind: tenant.Kind.ToString());
+        TenantKind: tenant.Kind.ToString(),
+        TenantBrandColor: tenant.BrandColor);
 }
 
 /// <summary>

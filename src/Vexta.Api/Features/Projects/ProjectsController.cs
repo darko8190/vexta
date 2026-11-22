@@ -59,6 +59,87 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
         return project is null ? NotFound() : Ok(project);
     }
 
+    /// <summary>
+    /// What the project's own page needs around the record: how many rows sit in each section,
+    /// and the money. One request, because both are drawn at once and a page that fills in six
+    /// badges one at a time reads as broken.
+    /// </summary>
+    // StaffOnly, unlike the record itself: what a job cost the company and what it makes on it
+    // is not the customer's to read, and this is the one endpoint that says both.
+    [HttpGet("{id:guid}/summary")]
+    [StaffOnly]
+    public async Task<ActionResult<ProjectSummaryDto>> Summary(Guid id)
+    {
+        var project = await db.Projects.AsNoTracking()
+            .Where(p => p.Id == id)
+            .Select(p => new { p.Id, p.IsTaxExempt, Invoices = p.Invoices.Count, Expenses = p.Expenses.Count })
+            .FirstOrDefaultAsync();
+
+        if (project is null) return NotFound();
+
+        var expenses = await db.ProjectExpenses.AsNoTracking()
+            .Where(x => x.ProjectId == id)
+            .Select(x => new { x.Cost, x.SellingPrice })
+            .ToListAsync();
+
+        // The five sections that have no records of their own yet count zero rather than being
+        // left out: the badge is what will show them filling up, and a section that appears only
+        // once it has content is a section nobody discovers.
+        var counts = new ProjectSectionCountsDto(
+            Materials: 0,
+            Equipment: 0,
+            Assemblies: 0,
+            Timesheets: 0,
+            Expenses: project.Expenses,
+            ExtraCharges: 0,
+            Invoices: project.Invoices);
+
+        var settings = await db.BillingSettings.AsNoTracking()
+            .FirstOrDefaultAsync(b => b.TenantId == currentUser.TenantId);
+
+        var lines = new List<ProjectCostLineDto>
+        {
+            new("materiaux", "Matériaux", 0m, 0m),
+            new("equipements", "Équipements", 0m, 0m),
+            new("assemblages", "Assemblages", 0m, 0m),
+            new("feuilles-de-temps", "Feuilles de temps", 0m, 0m),
+            new("depenses", "Dépenses",
+                expenses.Sum(x => x.Cost ?? 0m),
+                expenses.Sum(x => x.SellingPrice ?? 0m)),
+            new("frais-supplementaires", "Frais supplémentaires", 0m, 0m)
+        };
+
+        var totalCost = Round(lines.Sum(l => l.Cost));
+        var subtotal = Round(lines.Sum(l => l.Revenue));
+
+        // Zero on an exempt project, and the rates are still named: the table has to show that
+        // no tax was charged on purpose, not that the settings are missing.
+        var gstRate = project.IsTaxExempt ? 0m : settings?.GstRate ?? 0m;
+        var qstRate = project.IsTaxExempt ? 0m : settings?.QstRate ?? 0m;
+
+        var tax1 = Round(subtotal * gstRate / 100m);
+        var tax2 = Round(subtotal * qstRate / 100m);
+
+        var costs = new ProjectCostTableDto(
+            lines,
+            totalCost,
+            subtotal,
+            Round(subtotal - totalCost),
+            TaxLabel("TPS", settings?.GstRate ?? 0m),
+            tax1,
+            TaxLabel("TVQ", settings?.QstRate ?? 0m),
+            tax2,
+            Round(subtotal + tax1 + tax2),
+            project.IsTaxExempt);
+
+        return Ok(new ProjectSummaryDto(counts, costs));
+    }
+
+    private static string TaxLabel(string name, decimal rate) =>
+        $"{name} ({rate.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)} %)";
+
+    private static decimal Round(decimal value) => Math.Round(value, 2, MidpointRounding.AwayFromZero);
+
     // Reading is open to the customer this record belongs to — the query filter already
     // narrows it to theirs. Writing is not: a client does not raise their own invoice, and
     // "they can only see their own" is not the same promise as "they can change it".
@@ -67,8 +148,11 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
     [RequireBusinessTenant]
     public async Task<ActionResult<ProjectDto>> Create(UpsertProjectRequest request)
     {
-        var clientExists = await db.Clients.AnyAsync(c => c.Id == request.ClientId);
-        if (!clientExists) return BadRequest(new { message = "Client introuvable." });
+        var client = await db.Clients.AsNoTracking()
+            .Where(c => c.Id == request.ClientId)
+            .Select(c => new { c.IsTaxExempt })
+            .FirstOrDefaultAsync();
+        if (client is null) return BadRequest(new { message = "Client introuvable." });
         if (await InvalidAddressesAsync(request) is { } addressError) return BadRequest(new { message = addressError });
 
         var tenantId = currentUser.TenantId!.Value;
@@ -82,7 +166,10 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
             Status = request.Status,
             StartDate = request.StartDate,
             EndDate = request.EndDate,
-            Budget = request.Budget
+            Budget = request.Budget,
+            // The client's answer is the starting point, not the rule: a tax-exempt client can
+            // still have a job that does not qualify, so the project owns the flag from here on.
+            IsTaxExempt = request.IsTaxExempt ?? client.IsTaxExempt
         };
 
         ApplyAddresses(project, request);
@@ -109,6 +196,7 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
         project.StartDate = request.StartDate;
         project.EndDate = request.EndDate;
         project.Budget = request.Budget;
+        project.IsTaxExempt = request.IsTaxExempt ?? project.IsTaxExempt;
         project.UpdatedAt = DateTimeOffset.UtcNow;
 
         ApplyAddresses(project, request);
@@ -189,6 +277,7 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
         p.StartDate,
         p.EndDate,
         p.Budget,
+        p.IsTaxExempt,
         p.ClientAddress == null
             ? null
             : new ProjectAddressDto(p.ClientAddress.Id, p.ClientAddress.Line1, p.ClientAddress.Line2,

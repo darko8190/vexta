@@ -16,6 +16,8 @@ public record ClientDto(
     string? Phone,
     string? TaxId,
     string? Notes,
+    /// <summary>No tax charged to this client. The default for their projects and invoices.</summary>
+    bool IsTaxExempt,
     /// <summary>The primary address, flattened for the form. Null when none is on file.</summary>
     ClientAddressDto? PrimaryAddress,
     int AddressCount,
@@ -69,6 +71,7 @@ public record UpsertClientRequest(
     string? Phone,
     string? TaxId,
     string? Notes,
+    bool IsTaxExempt,
     /// <summary>Omitted or blank leaves the primary address untouched.</summary>
     ClientAddressDto? PrimaryAddress);
 

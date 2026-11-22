@@ -10,13 +10,24 @@ export interface InvoiceFormValues {
   dueDate: string;
   currency: string;
   notes?: string;
+  /** Omitted on a new invoice means "take the project's answer, or the client's". */
+  isTaxExempt?: boolean | null;
   lines: InvoiceLine[];
 }
 
-export function useInvoicesQuery(page: number, search: string, clientId?: string, status?: InvoiceStatus) {
+export function useInvoicesQuery(
+  page: number,
+  search: string,
+  clientId?: string,
+  status?: InvoiceStatus,
+  projectId?: string,
+) {
   return useQuery({
-    queryKey: ["invoices", page, search, clientId, status],
-    queryFn: () => api.get<PagedResult<InvoiceRecord>>(`invoices${buildQuery({ page, search, clientId, status })}`),
+    queryKey: ["invoices", page, search, clientId, status, projectId],
+    queryFn: () =>
+      api.get<PagedResult<InvoiceRecord>>(
+        `invoices${buildQuery({ page, search, clientId, status, projectId })}`,
+      ),
     placeholderData: (previous) => previous,
   });
 }

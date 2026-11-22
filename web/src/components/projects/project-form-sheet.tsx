@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import * as z from "zod";
@@ -25,6 +25,7 @@ import { AddressPicker } from "@/components/addresses/address-picker";
 import { ClientPicker } from "@/components/clients/client-picker";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FieldDescription } from "@/components/ui/field";
+import { useClientQuery } from "@/hooks/use-clients";
 import { useCreateProject, useUpdateProject, type ProjectFormValues } from "@/hooks/use-projects";
 import { projectStatusLabels } from "@/lib/labels";
 import { formatProjectNumber, type ProjectRecord, type ProjectStatus } from "@/lib/types";
@@ -42,6 +43,7 @@ const formSchema = z.object({
   startDate: z.string().optional().or(z.literal("")),
   endDate: z.string().optional().or(z.literal("")),
   budget: z.string().optional().or(z.literal("")),
+  isTaxExempt: z.boolean(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -60,6 +62,7 @@ function toFormValues(project?: ProjectRecord, defaultClientId?: string): FormVa
     startDate: project?.startDate ?? "",
     endDate: project?.endDate ?? "",
     budget: project?.budget != null ? String(project.budget) : "",
+    isTaxExempt: project?.isTaxExempt ?? false,
   };
 }
 
@@ -77,6 +80,10 @@ export function ProjectFormSheet({
   const isEditing = Boolean(project);
   const createProject = useCreateProject();
   const updateProject = useUpdateProject();
+
+  // Set as soon as the box is touched, which is what stops the client's answer below from
+  // overwriting a decision someone has just made about this job.
+  const [exemptTouched, setExemptTouched] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -99,6 +106,7 @@ export function ProjectFormSheet({
       startDate: values.startDate || null,
       endDate: values.endDate || null,
       budget: values.budget ? Number(values.budget) : null,
+      isTaxExempt: values.isTaxExempt,
     };
 
     try {
@@ -122,8 +130,25 @@ export function ProjectFormSheet({
   const clientId = useWatch({ control: form.control, name: "clientId" });
   const sameAddress = useWatch({ control: form.control, name: "sameAddressAsClient" });
 
+  // Only while creating: an existing project owns its own answer, and re-reading the client's
+  // would quietly change the tax on a job that has already been invoiced.
+  const { data: pickedClient } = useClientQuery(isEditing ? undefined : clientId || undefined);
+
+  useEffect(() => {
+    if (isEditing || exemptTouched || !pickedClient) return;
+    form.setValue("isTaxExempt", pickedClient.isTaxExempt);
+  }, [isEditing, exemptTouched, pickedClient, form]);
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet
+      open={open}
+      // Cleared as the panel closes rather than as it opens: the same reset, but in an event
+      // handler, where the React Compiler lint can see it is not a render-time cascade.
+      onOpenChange={(next) => {
+        if (!next) setExemptTouched(false);
+        onOpenChange(next);
+      }}
+    >
       <SheetContent className="sm:max-w-md">
         <SheetHeader>
           <SheetTitle>{isEditing ? "Modifier le projet" : "Nouveau projet"}</SheetTitle>
@@ -247,6 +272,33 @@ export function ProjectFormSheet({
                   ) : (
                     <FieldDescription>Le bon de commande du client, repris sur ses factures.</FieldDescription>
                   )}
+                </Field>
+              )}
+            />
+
+            <Controller
+              name="isTaxExempt"
+              control={form.control}
+              render={({ field }) => (
+                <Field>
+                  <div className="flex items-center gap-3">
+                    <Checkbox
+                      id="project-tax-exempt"
+                      checked={field.value}
+                      onCheckedChange={(checked) => {
+                        setExemptTouched(true);
+                        field.onChange(checked === true);
+                      }}
+                    />
+                    <FieldLabel htmlFor="project-tax-exempt" className="font-normal">
+                      Projet non taxable
+                    </FieldLabel>
+                  </div>
+                  <FieldDescription>
+                    {!isEditing && pickedClient?.isTaxExempt && !exemptTouched
+                      ? `Coché parce que ${pickedClient.name} est non taxable.`
+                      : "Aucune taxe sur les factures de ce projet."}
+                  </FieldDescription>
                 </Field>
               )}
             />

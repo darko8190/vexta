@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/layout/empty-state";
 import { ClientFormSheet } from "@/components/clients/client-form-sheet";
 import { ClientContactsSection } from "@/components/clients/detail/client-contacts-section";
-import { ClientDetailNav, type DetailSection } from "@/components/clients/detail/client-detail-nav";
+import { SectionNav, type NavSection } from "@/components/layout/section-nav";
 import {
   ClientAddressesSection,
   ClientInvoicesSection,
@@ -50,7 +50,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
     );
   }
 
-  const sections: DetailSection[] = [
+  const sections: NavSection[] = [
     { key: "contacts", label: "Contacts", count: client.contactCount, icon: UserRound },
     { key: "adresses", label: "Adresses", count: client.addressCount, icon: MapPin },
     { key: "projets", label: "Projets", count: client.projectCount, icon: FolderKanban },
@@ -81,6 +81,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
               <Badge variant={client.type === "Entreprise" ? "default" : "secondary"}>
                 {client.type === "Entreprise" ? "Entreprise" : "Particulier"}
               </Badge>
+              {client.isTaxExempt && <Badge variant="outline">Non taxable</Badge>}
             </div>
             <h1 className="mt-1 text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
               {client.name}
@@ -139,7 +140,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
 
       {/* The rail sits beside the content from md up and becomes a scrollable row below it. */}
       <div className="flex flex-col gap-4 md:flex-row md:gap-6">
-        <ClientDetailNav sections={sections} active={section} onSelect={setSection} />
+        <SectionNav sections={sections} active={section} onSelect={setSection} label="Sections du client" />
 
         <div className="min-w-0 flex-1">
           {section === "contacts" && <ClientContactsSection clientId={client.id} />}

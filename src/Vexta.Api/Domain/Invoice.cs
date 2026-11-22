@@ -19,6 +19,13 @@ public class Invoice
     public string Currency { get; set; } = "CAD";
     public string? Notes { get; set; }
 
+    /// <summary>
+    /// No tax on this invoice. Defaulted from the project, or from the client when there is no
+    /// project, and then owned by the invoice. Every line's rate is forced to zero while it is
+    /// set, so the stored lines and the printed total can never disagree.
+    /// </summary>
+    public bool IsTaxExempt { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 

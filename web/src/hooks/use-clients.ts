@@ -19,6 +19,8 @@ export interface ClientFormValues {
   phone: string | null;
   taxId?: string | null;
   notes?: string | null;
+  /** No tax charged to this client. Their projects and invoices start from this. */
+  isTaxExempt: boolean;
   primaryAddress: Omit<ClientAddress, "id"> | null;
 }
 
@@ -39,7 +41,8 @@ export function useClientsQuery(page: number, search: string) {
   });
 }
 
-export function useClientQuery(id: string) {
+/** Undefined is "nothing to fetch", which is what the forms pass before a client is chosen. */
+export function useClientQuery(id: string | undefined) {
   return useQuery({
     queryKey: ["clients", "detail", id],
     queryFn: () => api.get<ClientRecord>(`clients/${id}`),

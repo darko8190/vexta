@@ -1,6 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, buildQuery } from "@/lib/api";
-import type { PagedResult, ProjectRecord, ProjectStatus } from "@/lib/types";
+import type {
+  PagedResult,
+  ProjectRecord,
+  ProjectStatus,
+  ProjectSummary,
+} from "@/lib/types";
 
 export interface ProjectFormValues {
   clientId: string;
@@ -10,6 +15,8 @@ export interface ProjectFormValues {
   startDate?: string | null;
   endDate?: string | null;
   budget?: number | null;
+  /** Omitted on a new project means "take the client's answer". */
+  isTaxExempt?: boolean | null;
   clientAddressId?: string | null;
   sameAddressAsClient: boolean;
   /** Ignored by the server when sameAddressAsClient is true. */
@@ -60,5 +67,18 @@ export function useProjectQuery(id: string | undefined) {
     queryKey: ["projects", id],
     queryFn: () => api.get<ProjectRecord>(`projects/${id}`),
     enabled: Boolean(id),
+  });
+}
+
+/**
+ * The badges and the money for one project, in one request. Invalidated by anything that
+ * changes a count or an amount — an expense saved, an invoice raised — so the rail and the cost
+ * table never disagree with the section someone is looking at.
+ */
+export function useProjectSummaryQuery(id: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: ["projects", id, "summary"],
+    queryFn: () => api.get<ProjectSummary>(`projects/${id}/summary`),
+    enabled: Boolean(id) && enabled,
   });
 }

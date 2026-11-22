@@ -1,0 +1,91 @@
+"use client";
+
+import Link from "next/link";
+import { FileText, Plus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/layout/empty-state";
+import { useInvoicesQuery } from "@/hooks/use-invoices";
+import { formatDateOnly } from "@/lib/dates";
+import { invoiceStatusLabels } from "@/lib/labels";
+import { formatCents } from "@/lib/money";
+import { cn } from "@/lib/utils";
+
+/** What has been billed on this project. Last in the rail, because it is the outcome. */
+export function ProjectInvoicesSection({
+  projectId,
+  clientId,
+}: {
+  projectId: string;
+  /** Needed on the link: the project picker on the form is scoped to a client. */
+  clientId: string;
+}) {
+  const { data, isLoading } = useInvoicesQuery(1, "", undefined, undefined, projectId);
+  const invoices = data?.items ?? [];
+
+  // A styled link rather than a Button rendering one: Base UI drops native button semantics
+  // when its render target is not a <button>, and this is a navigation.
+  const createLink = (
+    <Link
+      href={`/factures/nouvelle?clientId=${clientId}&projectId=${projectId}`}
+      className={cn(buttonVariants())}
+    >
+      <Plus />
+      Nouvelle facture
+    </Link>
+  );
+
+  return (
+    <div>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold text-foreground">Factures</h2>
+          <p className="text-sm text-muted-foreground">Ce qui a été facturé sur ce projet.</p>
+        </div>
+        {createLink}
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 2 }).map((_, index) => (
+            <Skeleton key={index} className="h-14 w-full" />
+          ))}
+        </div>
+      ) : invoices.length === 0 ? (
+        <EmptyState
+          icon={FileText}
+          title="Aucune facture"
+          description="Les factures émises pour ce projet apparaîtront ici."
+          action={createLink}
+        />
+      ) : (
+        <ul className="space-y-2">
+          {invoices.map((invoice) => (
+            <li key={invoice.id}>
+              {/* The whole row is the link: on a phone the number alone is a poor target. */}
+              <Link
+                href={`/factures/${invoice.id}`}
+                className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-3 transition-colors hover:bg-muted/40"
+              >
+                <div className="min-w-0">
+                  <p className="font-mono text-sm font-medium text-foreground">{invoice.number}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {formatDateOnly(invoice.issueDate)}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-3">
+                  {invoice.isTaxExempt && <Badge variant="outline">Non taxable</Badge>}
+                  <span className="tabular-nums text-foreground">
+                    {formatCents(Math.round(invoice.total * 100), invoice.currency)}
+                  </span>
+                  <Badge variant="secondary">{invoiceStatusLabels[invoice.status]}</Badge>
+                </div>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}

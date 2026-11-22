@@ -51,6 +51,9 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
     public DbSet<TenantLogo> TenantLogos => Set<TenantLogo>();
     public DbSet<TenantMembership> TenantMemberships => Set<TenantMembership>();
     public DbSet<BillingSettings> BillingSettings => Set<BillingSettings>();
+    public DbSet<ProjectExpense> ProjectExpenses => Set<ProjectExpense>();
+    public DbSet<ExpenseType> ExpenseTypes => Set<ExpenseType>();
+    public DbSet<ProjectExpensePhoto> ProjectExpensePhotos => Set<ProjectExpensePhoto>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -199,6 +202,54 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
                 && (CurrentClientId == null || l.Invoice!.ClientId == CurrentClientId));
         });
 
+        builder.Entity<ExpenseType>(e =>
+        {
+            e.Property(t => t.Name).HasMaxLength(100);
+
+            // One list per company, no duplicates in it: two categories with the same name are
+            // two people filing the same thing in two places.
+            e.HasIndex(t => new { t.TenantId, t.Name }).IsUnique();
+            e.HasQueryFilter(t => t.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<ProjectExpense>(e =>
+        {
+            e.HasOne(x => x.Project).WithMany(p => p.Expenses)
+                .HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
+
+            // Restrict: a category still in use cannot be deleted out from under its expenses,
+            // which would leave rows claiming a type that no longer exists.
+            e.HasOne(x => x.ExpenseType).WithMany(t => t.Expenses)
+                .HasForeignKey(x => x.ExpenseTypeId).OnDelete(DeleteBehavior.Restrict);
+
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.Description).HasMaxLength(2000);
+            e.Property(x => x.Cost).HasPrecision(14, 2);
+            e.Property(x => x.SellingPrice).HasPrecision(14, 2);
+
+            e.HasIndex(x => new { x.ProjectId, x.CreatedAt });
+
+            // A customer reads their own project's record, so the expense filter follows the
+            // project's: tenant, and the client's own rows when a client is signed in.
+            e.HasQueryFilter(x => x.TenantId == CurrentTenantId
+                && (CurrentClientId == null || x.Project!.ClientId == CurrentClientId));
+        });
+
+        builder.Entity<ProjectExpensePhoto>(e =>
+        {
+            e.HasOne(p => p.Expense).WithMany(x => x.Photos)
+                .HasForeignKey(p => p.ExpenseId).OnDelete(DeleteBehavior.Cascade);
+
+            // Cascade, like an HR document: a photo row whose file is gone shows a broken frame
+            // and proves nothing.
+            e.HasOne(p => p.MediaAsset).WithMany()
+                .HasForeignKey(p => p.MediaAssetId).OnDelete(DeleteBehavior.Cascade);
+
+            e.HasIndex(p => new { p.ExpenseId, p.SortOrder });
+            e.HasQueryFilter(p => p.TenantId == CurrentTenantId
+                && (CurrentClientId == null || p.Expense!.Project!.ClientId == CurrentClientId));
+        });
+
         builder.Entity<PlatformSetting>(e =>
         {
             e.HasKey(s => s.Key);
@@ -304,6 +355,8 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
         {
             e.Property(t => t.ContactEmail).HasMaxLength(256);
             e.Property(t => t.Phone).HasMaxLength(40);
+            // #RRGGBB, validated on the way in.
+            e.Property(t => t.BrandColor).HasMaxLength(7);
         });
 
         // Platform-wide branding, like Plan and Module: no tenant query filter, because every

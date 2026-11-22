@@ -58,7 +58,7 @@ public static class ModuleIcons
         "Images", "HardDrive", "CreditCard", "Receipt", "Calendar", "Clock",
         "Mail", "Phone", "Bell", "Search", "ChartBar", "TrendingUp",
         "Settings", "Lock", "Cloud", "Smartphone", "Truck", "Wrench",
-        "Building2", "UsersRound"
+        "Building2", "UsersRound", "Boxes", "Package", "Warehouse", "Layers", "ClipboardList"
     };
 
     public static bool IsAllowed(string? icon) => icon is not null && Allowed.Contains(icon);

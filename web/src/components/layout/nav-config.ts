@@ -1,5 +1,6 @@
 import {
   Blocks,
+  Boxes,
   Building2,
   FileText,
   FolderKanban,
@@ -35,6 +36,7 @@ const tenantNav: NavItem[] = [
   { href: "/clients", label: "Clients", icon: Users },
   { href: "/projets", label: "Projets", icon: FolderKanban },
   { href: "/factures", label: "Factures", icon: FileText },
+  { href: "/inventaire", label: "Inventaire", icon: Boxes },
 ];
 
 /**

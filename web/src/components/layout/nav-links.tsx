@@ -11,7 +11,11 @@ export function NavLinks({
   expandOnHover = false,
 }: {
   items: NavItem[];
-  onNavigate?: () => void;
+  /**
+   * Called when a destination is chosen. It receives the event so the caller can tell a mouse
+   * click from Enter on a focused link — the sidebar closes for one and not the other.
+   */
+  onNavigate?: (event: React.MouseEvent<HTMLAnchorElement>) => void;
   /** Rows start icon-width and grow with the sidebar panel around them. */
   expandOnHover?: boolean;
 }) {

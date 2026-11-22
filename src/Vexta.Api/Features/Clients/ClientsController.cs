@@ -86,7 +86,8 @@ public class ClientsController(
             Email = Clean(request.Email),
             Phone = Clean(request.Phone),
             TaxId = Clean(request.TaxId),
-            Notes = Clean(request.Notes)
+            Notes = Clean(request.Notes),
+            IsTaxExempt = request.IsTaxExempt
         };
 
         db.Clients.Add(client);
@@ -129,6 +130,7 @@ public class ClientsController(
         client.Phone = Clean(request.Phone);
         client.TaxId = Clean(request.TaxId);
         client.Notes = Clean(request.Notes);
+        client.IsTaxExempt = request.IsTaxExempt;
         client.UpdatedAt = DateTimeOffset.UtcNow;
 
         ApplyPrimaryAddress(client, request.PrimaryAddress, client.TenantId);
@@ -412,6 +414,7 @@ public class ClientsController(
         c.Phone,
         c.TaxId,
         c.Notes,
+        c.IsTaxExempt,
         c.Addresses
             .Where(a => a.IsPrimary)
             .Select(a => new ClientAddressDto(a.Id, a.Line1, a.Line2, a.City, a.Province, a.PostalCode, a.Country))

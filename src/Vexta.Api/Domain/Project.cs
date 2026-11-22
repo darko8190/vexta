@@ -28,6 +28,12 @@ public class Project
     public DateOnly? EndDate { get; set; }
     public decimal? Budget { get; set; }
 
+    /// <summary>
+    /// No tax on this job. Taken from the client when the project is created and then owned by
+    /// the project: the same client can have one job that qualifies and one that does not.
+    /// </summary>
+    public bool IsTaxExempt { get; set; }
+
     /// <summary>Which of the client's addresses to bill. Null when none is on file yet.</summary>
     public Guid? ClientAddressId { get; set; }
     public Address? ClientAddress { get; set; }
@@ -47,4 +53,5 @@ public class Project
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public List<Invoice> Invoices { get; set; } = [];
+    public List<ProjectExpense> Expenses { get; set; } = [];
 }

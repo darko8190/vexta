@@ -23,6 +23,13 @@ public record InvoicePdfModel
     /// <summary>The logo bytes, or null when none is on file — the name stands in for it.</summary>
     public byte[]? Logo { get; init; }
 
+    /// <summary>
+    /// The company's own colour as #RRGGBB, or null for Vexta's blue. The same colour the
+    /// application paints its buttons with, so a client who signs in and a client who gets the
+    /// PDF see one company rather than two.
+    /// </summary>
+    public string? BrandColor { get; init; }
+
     public required InvoicePdfParty BillTo { get; init; }
 
     /// <summary>Where the work happens. Empty when it is the billing address.</summary>

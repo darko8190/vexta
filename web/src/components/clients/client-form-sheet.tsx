@@ -6,6 +6,7 @@ import { Controller, useForm, useWatch } from "react-hook-form";
 import * as z from "zod";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -54,6 +55,7 @@ const formSchema = z
     postalCode: z.string().trim().max(20, "20 caractères maximum."),
     province: z.string().trim(),
     country: z.string().trim().max(80, "80 caractères maximum."),
+    isTaxExempt: z.boolean(),
   })
   // A company has to be named; a person does not.
   .refine((v) => v.type !== "Entreprise" || v.companyName.length > 0, {
@@ -96,6 +98,7 @@ function toFormValues(client?: ClientRecord): FormValues {
     postalCode: client?.primaryAddress?.postalCode ?? "",
     province: client?.primaryAddress?.province ?? "Québec",
     country: client?.primaryAddress?.country ?? "Canada",
+    isTaxExempt: client?.isTaxExempt ?? false,
   };
 }
 
@@ -135,6 +138,7 @@ export function ClientFormSheet({
       lastName: values.lastName,
       email: values.email || null,
       phone: values.phone || null,
+      isTaxExempt: values.isTaxExempt,
       primaryAddress: values.line1
         ? {
             line1: values.line1,
@@ -361,6 +365,31 @@ export function ClientFormSheet({
                   <FieldLabel htmlFor="client-country">Pays</FieldLabel>
                   <Input {...field} id="client-country" placeholder="Canada" aria-invalid={fieldState.invalid} />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              )}
+            />
+
+            <Separator />
+
+            <Controller
+              name="isTaxExempt"
+              control={form.control}
+              render={({ field }) => (
+                <Field>
+                  <div className="flex items-center gap-3">
+                    <Checkbox
+                      id="client-tax-exempt"
+                      checked={field.value}
+                      onCheckedChange={(checked) => field.onChange(checked === true)}
+                    />
+                    <FieldLabel htmlFor="client-tax-exempt" className="font-normal">
+                      Non taxable
+                    </FieldLabel>
+                  </div>
+                  <FieldDescription>
+                    Les projets et les factures de ce client seront créés avec la case « non
+                    taxable » déjà cochée. Chacun reste modifiable.
+                  </FieldDescription>
                 </Field>
               )}
             />

@@ -68,6 +68,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, logout, exitTenant } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  // Set the moment a destination is pressed, which drops the hover and focus rules below and
+  // lets the panel fall shut over the page being opened. Cleared when the pointer leaves, so
+  // the menu is ready to open again the next time it is approached.
+  const [dismissed, setDismissed] = useState(false);
+
   // Before the early return: a hook cannot be called conditionally, and the shell renders
   // nothing until the session is known.
   const navItems = useTenantNavItems();
@@ -101,9 +106,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             // The short delay stops the menu flapping open every time the pointer crosses the
             // left edge on its way somewhere else. Closing is immediate, and keyboard focus
             // opens it at once because waiting for a Tab makes no sense.
-            "hover:w-64 hover:shadow-xl hover:delay-100",
-            "focus-within:w-64 focus-within:shadow-xl focus-within:delay-0",
+            dismissed
+              ? undefined
+              : [
+                  "hover:w-64 hover:shadow-xl hover:delay-100",
+                  "focus-within:w-64 focus-within:shadow-xl focus-within:delay-0",
+                ],
           )}
+          onPointerLeave={() => setDismissed(false)}
         >
           <div className="flex h-16 shrink-0 items-center px-4">
             <Link
@@ -122,7 +132,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Link>
           </div>
           <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 pb-2">
-            <NavLinks items={navItems} expandOnHover />
+            <NavLinks
+              items={navItems}
+              expandOnHover
+              onNavigate={(event) => {
+                // detail is 0 when the click came from Enter on a focused link. A keyboard user
+                // keeps both the open menu and their place in it; a pointer user, who pressed
+                // the thing they wanted, gets the page back.
+                if (event.detail === 0) return;
+
+                // Without this the link keeps focus and focus-within reopens the panel the
+                // instant the pointer leaves it.
+                event.currentTarget.blur();
+                setDismissed(true);
+              }}
+            />
           </div>
         </div>
       </aside>

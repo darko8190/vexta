@@ -21,6 +21,7 @@ import { VextaIcon, VextaLockup } from "@/components/brand/vexta-logo";
 import { getNavItems } from "@/components/layout/nav-config";
 import { NavLinks } from "@/components/layout/nav-links";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
 import { useAuth } from "@/lib/auth-context";
 
 function initials(firstName: string, lastName: string) {
@@ -33,7 +34,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   if (!user) return null;
 
-  const navItems = getNavItems(user.role, user.isImpersonating);
+  const navItems = getNavItems(user.role, user.isImpersonating, user.tenantKind);
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -161,6 +162,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </DropdownMenuLabel>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
+          <WorkspaceSwitcher />
+          <DropdownMenuSeparator />
           {/* Settings live here rather than in the sidebar: they are about the account, not a
               module you work in. */}
           {/* A super admin who has entered a tenant acts as its owner, so they get the owner's
@@ -169,11 +172,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {(user!.role !== "SuperAdmin" || user!.isImpersonating) && (
             <DropdownMenuGroup>
               {/* Also in the sidebar. It is here because this is where you look for "who am I
-                  and what is my company", which is exactly what the card answers. */}
-              <DropdownMenuItem render={<Link href="/entreprise" />}>
-                <Building2 />
-                Fiche entreprise
-              </DropdownMenuItem>
+                  and what is my company", which is exactly what the card answers. A personal
+                  space is not a company and has no such card. */}
+              {user!.tenantKind !== "Personal" && (
+                <DropdownMenuItem render={<Link href="/entreprise" />}>
+                  <Building2 />
+                  Fiche entreprise
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem render={<Link href="/parametres" />}>
                 <Settings />
                 Paramètres

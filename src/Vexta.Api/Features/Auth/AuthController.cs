@@ -17,6 +17,7 @@ public class AuthController(
     VextaDbContext db,
     ITokenService tokenService,
     ITenantSignupService tenantSignup,
+    IWorkspaceService workspaces,
     ICurrentUserService currentUser) : ControllerBase
 {
     [HttpPost("login")]
@@ -63,22 +64,73 @@ public class AuthController(
     [Authorize]
     public async Task<ActionResult<UserDto>> Me()
     {
-        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        var user = await userManager.Users.Include(u => u.Tenant).FirstOrDefaultAsync(u => u.Id.ToString() == userId);
+        var user = await CurrentUserAsync();
         if (user is null) return Unauthorized();
 
         // Keeps an impersonation session alive across page reloads: the tenant lives in the token,
         // not in the super admin's own row.
-        if (currentUser.IsImpersonating && currentUser.TenantId is { } tenantId)
+        if (currentUser.IsImpersonating && currentUser.TenantId is { } impersonated)
         {
-            var tenant = await db.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.Id == tenantId);
+            var tenant = await db.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.Id == impersonated);
             if (tenant is not null)
             {
                 return Ok(UserDto.ForImpersonation(user, tenant));
             }
         }
 
+        // The token decides which space this is, not the account's own row: after a switch the
+        // two differ, and reading the row would send the person back to the space they left on
+        // the next reload.
+        if (currentUser.TenantId is { } current && current != user.TenantId)
+        {
+            var membership = await workspaces.FindAsync(user.Id, current, HttpContext.RequestAborted);
+            if (membership?.Tenant is not null)
+            {
+                return Ok(UserDto.ForWorkspace(user, membership.Tenant, membership.Role));
+            }
+        }
+
         return Ok(UserDto.ForUser(user));
+    }
+
+    /// <summary>Every space this person can work in, to fill the switcher.</summary>
+    [HttpGet("espaces")]
+    [Authorize]
+    public async Task<ActionResult<IReadOnlyList<WorkspaceDto>>> Workspaces()
+    {
+        var user = await CurrentUserAsync();
+        if (user is null) return Unauthorized();
+
+        return Ok(await workspaces.ListAsync(user, currentUser.TenantId, HttpContext.RequestAborted));
+    }
+
+    /// <summary>
+    /// Switches to another of this person's spaces, which means a new token: the tenant and the
+    /// role both live in it, and both change. The membership is checked server-side every time —
+    /// asking for a space you have no place in must not be a way into it.
+    /// </summary>
+    [HttpPost("espaces/{tenantId:guid}")]
+    [Authorize]
+    public async Task<ActionResult<AuthResponse>> EnterWorkspace(Guid tenantId)
+    {
+        var user = await CurrentUserAsync();
+        if (user is null) return Unauthorized();
+
+        var membership = await workspaces.FindAsync(user.Id, tenantId, HttpContext.RequestAborted);
+        if (membership?.Tenant is null)
+        {
+            return NotFound(new { message = "Vous n'avez pas accès à cet espace." });
+        }
+
+        return Ok(new AuthResponse(
+            tokenService.CreateAccessToken(user, membership),
+            UserDto.ForWorkspace(user, membership.Tenant, membership.Role)));
+    }
+
+    private Task<ApplicationUser?> CurrentUserAsync()
+    {
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        return userManager.Users.Include(u => u.Tenant).FirstOrDefaultAsync(u => u.Id.ToString() == userId);
     }
 
     private async Task<AuthResponse> BuildAuthResponseAsync(ApplicationUser user)

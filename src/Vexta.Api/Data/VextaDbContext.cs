@@ -35,6 +35,7 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
     public DbSet<CompanyLocation> CompanyLocations => Set<CompanyLocation>();
     public DbSet<HrDocument> HrDocuments => Set<HrDocument>();
     public DbSet<TenantLogo> TenantLogos => Set<TenantLogo>();
+    public DbSet<TenantMembership> TenantMemberships => Set<TenantMembership>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -51,6 +52,22 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
         builder.Entity<ApplicationUser>(e =>
         {
             e.HasOne(u => u.Tenant).WithMany(t => t.Users).HasForeignKey(u => u.TenantId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<TenantMembership>(e =>
+        {
+            e.HasOne(m => m.User).WithMany(u => u.Memberships)
+                .HasForeignKey(m => m.UserId).OnDelete(DeleteBehavior.Cascade);
+
+            // Losing the company takes the membership, never the person: someone who worked
+            // there still has their own personal space and whatever else they belong to.
+            e.HasOne(m => m.Tenant).WithMany()
+                .HasForeignKey(m => m.TenantId).OnDelete(DeleteBehavior.Cascade);
+
+            e.HasIndex(m => new { m.UserId, m.TenantId }).IsUnique();
+
+            // No query filter on purpose: this is what answers "which spaces may I enter?",
+            // asked before any space is current. See TenantMembership.
         });
 
         // Plans and modules are platform-wide content, not tenant data: no query filter.

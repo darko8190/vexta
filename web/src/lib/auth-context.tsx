@@ -28,6 +28,8 @@ interface AuthContextValue {
   refresh: () => Promise<void>;
   enterTenant: (tenantId: string) => Promise<void>;
   exitTenant: () => Promise<void>;
+  /** Switches to another space this person belongs to — personal or a company. */
+  enterWorkspace: (tenantId: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -119,9 +121,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push("/admin/tenants");
   }, [queryClient, router]);
 
+  // Same reason as entering a tenant: the token changes, so everything cached was read in the
+  // space being left. Sending the person to the dashboard also avoids landing them on a page
+  // the new space does not have.
+  const enterWorkspace = useCallback(async (tenantId: string) => {
+    const response = await fetch("/api/auth/espaces", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tenantId }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data?.message ?? "Impossible d'ouvrir cet espace.");
+    }
+    queryClient.clear();
+    setUser(data.user);
+    router.push("/tableau-de-bord");
+  }, [queryClient, router]);
+
   return (
     <AuthContext.Provider
-      value={{ user, loading, login, registerTenant, logout, refresh, enterTenant, exitTenant }}
+      value={{ user, loading, login, registerTenant, logout, refresh, enterTenant, exitTenant, enterWorkspace }}
     >
       {children}
     </AuthContext.Provider>

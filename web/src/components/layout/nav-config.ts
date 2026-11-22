@@ -46,10 +46,17 @@ const superAdminNav: NavItem[] = [
   { href: "/admin/parametres", label: "Intégrations", icon: Settings },
 ];
 
-export function getNavItems(role: UserRole | undefined, isImpersonating = false): NavItem[] {
+export function getNavItems(
+  role: UserRole | undefined,
+  isImpersonating = false,
+  tenantKind: "Business" | "Personal" | null = null,
+): NavItem[] {
   if (role === "SuperAdmin" && !isImpersonating) return superAdminNav;
 
   // A super admin who has entered a tenant acts as its owner, so they get the owner's items too.
   const isOwner = role === "TenantAdmin" || (role === "SuperAdmin" && isImpersonating);
-  return isOwner ? [...tenantNav, ...tenantAdminNav] : tenantNav;
+
+  // A personal space has no employees to manage and no company card to fill, so the owner's
+  // items would open on two screens with nothing in them.
+  return isOwner && tenantKind !== "Personal" ? [...tenantNav, ...tenantAdminNav] : tenantNav;
 }

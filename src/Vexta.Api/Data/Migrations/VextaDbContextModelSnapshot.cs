@@ -1024,6 +1024,34 @@ namespace Vexta.Api.Data.Migrations
                     b.ToTable("TenantLogos");
                 });
 
+            modelBuilder.Entity("Vexta.Api.Domain.TenantMembership", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Role")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("UserId", "TenantId")
+                        .IsUnique();
+
+                    b.ToTable("TenantMemberships");
+                });
+
             modelBuilder.Entity("EmployeeTeam", b =>
                 {
                     b.HasOne("Vexta.Api.Domain.Employee", null)
@@ -1264,6 +1292,30 @@ namespace Vexta.Api.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.TenantMembership", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Vexta.Api.Domain.ApplicationUser", "User")
+                        .WithMany("Memberships")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Tenant");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.ApplicationUser", b =>
+                {
+                    b.Navigation("Memberships");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.Client", b =>

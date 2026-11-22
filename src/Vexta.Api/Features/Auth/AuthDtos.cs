@@ -41,6 +41,22 @@ public record UserDto(
         user.Tenant?.SubscriptionStatus.ToString(),
         TenantKind: user.Tenant?.Kind.ToString());
 
+    /// <summary>
+    /// The same person seen from another of their spaces. The role comes from the membership,
+    /// because it is not a property of the account: owner of their own space, employee of the
+    /// company they work for.
+    /// </summary>
+    public static UserDto ForWorkspace(ApplicationUser user, Tenant tenant, UserRole role) => new(
+        user.Id,
+        user.Email ?? string.Empty,
+        user.FirstName,
+        user.LastName,
+        role.ToString(),
+        tenant.Id,
+        tenant.Name,
+        tenant.SubscriptionStatus.ToString(),
+        TenantKind: tenant.Kind.ToString());
+
     // The super admin keeps their own identity and role; only the tenant context is swapped.
     public static UserDto ForImpersonation(ApplicationUser user, Tenant tenant) => new(
         user.Id,

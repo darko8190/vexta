@@ -206,6 +206,10 @@ app.UseStatusCodePages(async context =>
 // see the real ones, not the proxy's.
 app.UseForwardedHeaders();
 
+// After the forwarded headers so the path is the real one, and before everything that can
+// refuse a request, so a refusal is logged too.
+app.UseMiddleware<RequestLog>();
+
 app.MapDefaultEndpoints();
 
 // MapDefaultEndpoints only maps the health endpoints in development. Docker needs one in every

@@ -36,7 +36,11 @@ services:
     # Deliberately NOT on dokploy-network: the database has no business being reachable from
     # the proxy's network, where every other application on this host also sits.
     networks:
-      - vexta-internal
+      vexta-internal:
+        # A name of its own. Both stacks run a service called "postgres", so the bare name is
+        # ambiguous the moment anything resolving it can see more than one of them.
+        aliases:
+          - vexta-qa-db
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vexta} -d ${POSTGRES_DB:-vextadb}"]
       interval: 10s
@@ -54,7 +58,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Staging
 
       # The Aspire Npgsql component reads this key; "vextadb" is the name the code asks for.
-      ConnectionStrings__vextadb: Host=postgres;Port=5432;Database=${POSTGRES_DB:-vextadb};Username=${POSTGRES_USER:-vexta};Password=${POSTGRES_PASSWORD};Include Error Detail=false
+      ConnectionStrings__vextadb: Host=vexta-qa-db;Port=5432;Database=${POSTGRES_DB:-vextadb};Username=${POSTGRES_USER:-vexta};Password=${POSTGRES_PASSWORD};Include Error Detail=false
 
       # Signs every session token. Changing it signs everyone out; losing it is harmless.
       Jwt__SigningKey: ${JWT_SIGNING_KEY:?JWT_SIGNING_KEY est obligatoire}
@@ -83,10 +87,26 @@ services:
       # integration has to be configured again.
       - api-keys:/data/keys
     networks:
-      - vexta-internal
+      vexta-internal:
+        # THE name this stack's own web container calls, and the reason this block is written
+        # out rather than a plain list.
+        #
+        # Compose registers a DNS alias equal to the service name on EVERY network a service
+        # joins. Both stacks define a service called "api" and both join dokploy-network, so on
+        # that shared network the name "api" answered for two different containers. Docker
+        # round-robins between them, so roughly half of production's calls to http://api:8080
+        # were answered by QA's API — which signs tokens with a different key, so the session
+        # was rejected with a 401 and the person was signed out at random, and which reads QA's
+        # database, which is why the two environments appeared to share their data and why none
+        # of it showed up in the right container's log.
+        #
+        # This alias exists only on vexta-internal, which is private to this stack, so it can
+        # never be ambiguous.
+        aliases:
+          - vexta-qa-api
       # On the proxy's network too: an OAuth provider redirects the browser to the API's
       # callback, and Stripe posts webhooks to it, so it needs a public hostname of its own.
-      - dokploy-network
+      dokploy-network:
     depends_on:
       postgres:
         condition: service_healthy
@@ -111,7 +131,7 @@ services:
 
       # Server-to-server, inside vexta-internal. Plain HTTP is correct here: the traffic never
       # leaves the Docker network, and the API holds no certificate of its own.
-      API_INTERNAL_URL: http://api:8080
+      API_INTERNAL_URL: http://vexta-qa-api:8080
       # Where the browser itself is sent, for the one flow that cannot be proxied: an OAuth
       # provider redirects the browser, not our server.
       API_PUBLIC_URL: https://${API_DOMAIN:?API_DOMAIN est obligatoire}
@@ -122,8 +142,8 @@ services:
       BRANDING_LOGO_DARK_URL: ${BRANDING_LOGO_DARK_URL:-}
       BRANDING_ICON_URL: ${BRANDING_ICON_URL:-}
     networks:
-      - vexta-internal
-      - dokploy-network
+      vexta-internal:
+      dokploy-network:
     depends_on:
       api:
         condition: service_healthy

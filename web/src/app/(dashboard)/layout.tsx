@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
 import { AppShell } from "@/components/layout/app-shell";
+import { SubscriptionGate } from "@/components/layout/subscription-gate";
 import { useAuth } from "@/lib/auth-context";
 
 export default function DashboardGroupLayout({ children }: { children: React.ReactNode }) {
@@ -24,5 +25,9 @@ export default function DashboardGroupLayout({ children }: { children: React.Rea
     );
   }
 
-  return <AppShell>{children}</AppShell>;
+  return (
+    <AppShell>
+      <SubscriptionGate>{children}</SubscriptionGate>
+    </AppShell>
+  );
 }

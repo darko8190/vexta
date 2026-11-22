@@ -7,6 +7,7 @@ import { Controller, useForm } from "react-hook-form";
 import * as z from "zod";
 import { Building2, MapPin, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -182,7 +183,7 @@ function AddressCard({ profile }: { profile: CompanyProfile }) {
 
 export default function CompanyPage() {
   const { user } = useAuth();
-  const { data: profile, isLoading } = useCompanyProfileQuery();
+  const { data: profile, isLoading, error } = useCompanyProfileQuery();
   const save = useSaveCompanyProfile();
 
   const canEdit = user?.role === "TenantAdmin" || user?.role === "SuperAdmin";
@@ -210,11 +211,28 @@ export default function CompanyPage() {
     }
   }
 
-  if (isLoading || !profile) {
+  if (isLoading) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-8 w-56" />
         <Skeleton className="h-64 w-full max-w-2xl" />
+      </div>
+    );
+  }
+
+  // A failed query leaves isLoading false and the data undefined, so testing both together
+  // showed the skeleton for ever — the page looked like it was still loading when in fact it had
+  // already given up. Whatever went wrong, say so and offer the way out.
+  if (!profile) {
+    return (
+      <div>
+        <PageHeader title="Fiche entreprise" description="Ce que vos clients voient de vous." />
+        <Alert variant="destructive" className="max-w-lg">
+          <AlertTitle>Fiche indisponible</AlertTitle>
+          <AlertDescription>
+            {error instanceof ApiError ? error.message : "Impossible de charger la fiche de l'entreprise."}
+          </AlertDescription>
+        </Alert>
       </div>
     );
   }

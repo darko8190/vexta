@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Building2, CreditCard } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -13,23 +13,12 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { PageHeader } from "@/components/layout/page-header";
+import { useBillingStateQuery, type BillingState } from "@/hooks/use-billing";
 import { usePublicPlansQuery } from "@/hooks/use-catalog";
-import { api } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
 import { tenantStatusBadgeVariant, tenantStatusLabels } from "@/lib/labels";
 import { formatCents } from "@/lib/money";
 import { cn } from "@/lib/utils";
-import type { TenantSubscriptionStatus } from "@/lib/types";
-
-interface BillingState {
-  tenantName: string;
-  kind: "Business" | "Personal";
-  subscriptionStatus: TenantSubscriptionStatus;
-  currentPeriodEnd: string | null;
-  canManage: boolean;
-  planName: string | null;
-  planAmountCents: number | null;
-  planCurrency: string | null;
-}
 
 /**
  * Confirms the payment rather than telling the person to reload until something happens. The
@@ -96,7 +85,13 @@ function BusinessSubscription({ state }: { state: BillingState }) {
   const checkout = useMutation({
     mutationFn: () => api.post<{ checkoutUrl: string }>("billing/checkout-session"),
     onSuccess: (data) => window.location.assign(data.checkoutUrl),
-    onError: () => toast.error("Impossible de démarrer le paiement. Réessayez plus tard."),
+    // The server already says what is wrong — no plan on the space, a key from the wrong Stripe
+    // account, no permission. Replacing that with "réessayez plus tard" sends someone to retry a
+    // click that will never work, and hides the one line that tells them what to fix.
+    onError: (error) =>
+      toast.error(
+        error instanceof ApiError ? error.message : "Impossible de démarrer le paiement. Réessayez plus tard.",
+      ),
   });
 
   return (
@@ -244,10 +239,7 @@ function PersonalSpace({ state }: { state: BillingState }) {
 }
 
 export default function SettingsPage() {
-  const { data, isLoading } = useQuery({
-    queryKey: ["billing-state"],
-    queryFn: () => api.get<BillingState>("billing/state"),
-  });
+  const { data, isLoading } = useBillingStateQuery();
 
   return (
     <div>

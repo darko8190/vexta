@@ -51,16 +51,18 @@ public class BillingController(
             tenant.Kind.ToString(),
             tenant.SubscriptionStatus.ToString(),
             tenant.CurrentPeriodEnd,
-            currentUser.Role == UserRole.TenantAdmin || currentUser.IsImpersonating,
+            CanManageBilling,
             plan?.Name,
             plan?.AmountCents,
             plan?.Currency));
     }
 
     [HttpPost("checkout-session")]
-    [Authorize(Roles = nameof(UserRole.TenantAdmin))]
+    [Authorize]
     public async Task<ActionResult<object>> CreateCheckoutSession()
     {
+        if (!CanManageBilling) return BillingForbidden();
+
         var tenant = await CurrentTenantAsync();
         if (tenant is null) return NotFound();
 
@@ -69,13 +71,24 @@ public class BillingController(
             return BadRequest(new { message = "Un espace personnel est gratuit. Passez à un compte entreprise pour vous abonner." });
         }
 
-        var plan = await db.Plans.FirstOrDefaultAsync(p => p.Id == tenant.PlanId && p.StripePriceId != null);
+        // Two different failures, two different fixes: assign a forfait to the space, or give the
+        // forfait a Stripe price. One message for both sends whoever reads it to check the wrong
+        // thing — the space looks correctly subscribed while the price is what is missing.
+        var plan = tenant.PlanId is null
+            ? null
+            : await db.Plans.FirstOrDefaultAsync(p => p.Id == tenant.PlanId);
+
         if (plan is null)
         {
-            return BadRequest(new { message = "Aucun forfait n'est rattaché à cet espace. Contactez l'administrateur." });
+            return BadRequest(new { message = "Aucun forfait n'est rattaché à cet espace. Demandez à l'administrateur de la plateforme de lui en attribuer un." });
         }
 
-        return await StartCheckoutAsync(tenant, plan.StripePriceId!, null);
+        if (string.IsNullOrWhiteSpace(plan.StripePriceId))
+        {
+            return BadRequest(new { message = $"Le forfait « {plan.Name} » n'a pas de tarif Stripe. L'administrateur de la plateforme doit l'enregistrer avant qu'il puisse être payé." });
+        }
+
+        return await StartCheckoutAsync(tenant, plan.StripePriceId, null);
     }
 
     /// <summary>
@@ -83,9 +96,11 @@ public class BillingController(
     /// switch to a business space happen in the webhook, once Stripe confirms the payment.
     /// </summary>
     [HttpPost("upgrade")]
-    [Authorize(Roles = nameof(UserRole.TenantAdmin))]
+    [Authorize]
     public async Task<ActionResult<object>> UpgradeToBusiness(UpgradeToBusinessRequest request)
     {
+        if (!CanManageBilling) return BillingForbidden();
+
         if (string.IsNullOrWhiteSpace(request.CompanyName) || request.CompanyName.Trim().Length < 2)
         {
             return BadRequest(new { message = "Le nom de l'entreprise est requis." });
@@ -141,6 +156,18 @@ public class BillingController(
             return StatusCode(StatusCodes.Status503ServiceUnavailable, new
             {
                 message = "Le paiement est momentanément indisponible. Réessayez plus tard."
+            });
+        }
+        catch (StripeException ex)
+        {
+            // Stripe's own refusal, passed through rather than flattened into "réessayez plus
+            // tard". A rejected price, a key from the wrong account and a malformed return URL
+            // all land here, and each one needs a different fix — which the caller cannot guess
+            // from a generic message. This used to escape as a 500 with no readable body.
+            logger.LogError(ex, "Stripe a refusé la session de paiement de {Tenant}.", tenant.Slug);
+            return StatusCode(StatusCodes.Status502BadGateway, new
+            {
+                message = $"Stripe a refusé la demande : {ex.Message}"
             });
         }
     }
@@ -215,6 +242,21 @@ public class BillingController(
             return BadRequest(new { message = ex.Message });
         }
     }
+
+    /// <summary>
+    /// Who may pay, in one place. A super admin inside a tenant counts as its owner here, as it
+    /// does in the sidebar and in the subscription gate — and the state endpoint reports exactly
+    /// this, so the button and the endpoint can no longer disagree. They did: the button appeared
+    /// for a super admin inside a tenant and the request came back 403 with nothing to read.
+    /// </summary>
+    private bool CanManageBilling =>
+        currentUser.Role == UserRole.TenantAdmin || currentUser.IsImpersonating;
+
+    private ObjectResult BillingForbidden() =>
+        StatusCode(StatusCodes.Status403Forbidden, new
+        {
+            message = "Seul un administrateur de l'entreprise peut gérer l'abonnement."
+        });
 
     private Task<Tenant?> CurrentTenantAsync() =>
         db.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.Id == currentUser.TenantId);

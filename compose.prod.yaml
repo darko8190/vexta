@@ -111,7 +111,7 @@ services:
       API_INTERNAL_URL: http://api:8080
       # Where the browser itself is sent, for the one flow that cannot be proxied: an OAuth
       # provider redirects the browser, not our server.
-      API_PUBLIC_URL: https://${API_DOMAIN}
+      API_PUBLIC_URL: https://${API_DOMAIN:?API_DOMAIN est obligatoire}
 
       # Optional. The logo and icon used until the super admin uploads their own, from
       # Apparence. Any URL the browser can reach; leave empty to use the bundled artwork.

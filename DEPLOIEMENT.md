@@ -274,8 +274,30 @@ git checkout qa && git merge main && git push     # déploie en QA
 git checkout prod && git merge qa && git push     # puis en production
 ```
 
-Dokploy déclenche le déploiement sur réception du push si le webhook GitHub est activé
-(**Deployments → Webhook URL**). Sinon, **Deploy** dans l'interface.
+### Déploiement automatique à chaque push
+
+À configurer **une seule fois pour tout le compte**, pas par projet.
+
+1. Dokploy → **Settings → Git → GitHub → Create GitHub App.** Donnez-lui un nom unique.
+2. Cliquez **Install**, puis choisissez **All repositories**. C'est ce choix qui fait qu'un
+   dépôt créé plus tard n'aura rien à reconfigurer — en sélectionnant des dépôts précis, il
+   faudra revenir autoriser chaque nouveau.
+3. **Install & Authorize.**
+
+Dans chaque application, passez ensuite le **Provider** de « Git URL » à **GitHub**, puis
+choisissez le dépôt et la branche. Avec cette méthode le déploiement automatique est actif par
+défaut : Dokploy pose et entretient le webhook lui-même, il n'y a rien à ajouter côté GitHub.
+
+La branche de l'application doit correspondre à celle que vous poussez, sinon Dokploy répond
+« Branch Not Match » et ne déploie pas. L'application QA suit `qa`, la production suit `prod`.
+
+> Une fois ceci en place, **`git push origin main:prod` déploie la production immédiatement**,
+> sans confirmation. C'est le but, mais cela change ce qu'un push engage.
+
+L'ancienne méthode — un webhook collé à la main depuis **Deployments → Webhook URL** — reste
+valable, mais elle se refait pour chaque dépôt.
+
+### Migrations
 
 Un déploiement qui ajoute une migration l'applique au démarrage. Un déploiement qui en retire une
 ne la défait pas : prévoyez une migration inverse.

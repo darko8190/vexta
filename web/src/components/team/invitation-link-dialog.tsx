@@ -39,8 +39,13 @@ export function InvitationLinkDialog({
 }) {
   const [copied, setCopied] = useState(false);
 
+  // No link means the person already had a Vexta account with a password. There is nothing to
+  // send and nothing to copy: the space simply appears in their switcher. The caller reports
+  // that with a toast, so this dialog has no reason to open.
+  if (grant && !grant.invitationUrl) return null;
+
   async function copy() {
-    if (!grant) return;
+    if (!grant?.invitationUrl) return;
     try {
       await navigator.clipboard.writeText(grant.invitationUrl);
       setCopied(true);
@@ -64,7 +69,7 @@ export function InvitationLinkDialog({
           <DialogTitle>Accès créé</DialogTitle>
           <DialogDescription>
             {recipientName ?? "Cette personne"} doit ouvrir ce lien pour choisir son mot de
-            passe. Il expire le {grant ? formatExpiry(grant.expiresAt) : ""} et ne sert
+            passe. Il expire le {grant?.expiresAt ? formatExpiry(grant.expiresAt) : ""} et ne sert
             qu&apos;une fois.
           </DialogDescription>
         </DialogHeader>
@@ -93,7 +98,7 @@ export function InvitationLinkDialog({
             <div className="flex gap-2">
               <Input
                 readOnly
-                value={grant.invitationUrl}
+                value={grant.invitationUrl ?? ""}
                 aria-label="Lien d'invitation"
                 onFocus={(event) => event.currentTarget.select()}
                 className="font-mono text-xs"

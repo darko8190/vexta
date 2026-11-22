@@ -127,7 +127,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <UserAvatarMenu />
         </header>
         <main className="flex-1 overflow-x-hidden px-4 py-6 md:px-8 md:py-8">
-          <div className="mx-auto w-full max-w-6xl">{children}</div>
+          {/* No width cap: the tables are the point of most of these screens, and a column
+              that has to truncate on a wide monitor is a column nobody can read. Forms keep
+              their own max-width, so text lines stay short where it matters. */}
+          <div className="w-full">{children}</div>
         </main>
       </div>
       </div>

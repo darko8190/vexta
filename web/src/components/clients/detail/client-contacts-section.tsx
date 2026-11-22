@@ -13,7 +13,6 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
-import { ClientAccessControls } from "@/components/clients/client-access-controls";
 import { ClientContactFormSheet } from "@/components/clients/detail/client-contact-form-sheet";
 import { useClientContactsQuery, useDeleteClientContact } from "@/hooks/use-clients";
 import { ApiError } from "@/lib/api";
@@ -111,16 +110,6 @@ export function ClientContactsSection({ clientId }: { clientId: string }) {
                 {contact.notes && (
                   <p className="mt-2 text-sm text-muted-foreground">{contact.notes}</p>
                 )}
-
-                <div className="mt-3">
-                  <ClientAccessControls
-                    clientId={clientId}
-                    contactId={contact.id}
-                    email={contact.email}
-                    name={`${contact.firstName} ${contact.lastName}`.trim()}
-                    access={contact.access}
-                  />
-                </div>
               </div>
 
               <DropdownMenu>

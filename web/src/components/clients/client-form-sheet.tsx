@@ -44,8 +44,8 @@ const formSchema = z
   .object({
     type: z.enum(["Particulier", "Entreprise"]),
     companyName: z.string().trim().max(200, "200 caractères maximum."),
-    firstName: z.string().trim().min(1, "Le prénom est requis.").max(100, "100 caractères maximum."),
-    lastName: z.string().trim().min(1, "Le nom est requis.").max(100, "100 caractères maximum."),
+    firstName: z.string().trim().max(100, "100 caractères maximum."),
+    lastName: z.string().trim().max(100, "100 caractères maximum."),
     phone: z.string().trim().max(40, "40 caractères maximum."),
     email: z.string().trim().max(256).refine((v) => v === "" || z.string().email().safeParse(v).success, "Courriel invalide."),
     line1: z.string().trim().max(200, "200 caractères maximum."),
@@ -59,6 +59,16 @@ const formSchema = z
   .refine((v) => v.type !== "Entreprise" || v.companyName.length > 0, {
     message: "Le nom d'entreprise est requis.",
     path: ["companyName"],
+  })
+  // For a particulier these fields are the name, so they are required. For an entreprise they
+  // are whoever you call there, which you may not know yet.
+  .refine((v) => v.type !== "Particulier" || v.firstName.length > 0, {
+    message: "Le prénom est requis.",
+    path: ["firstName"],
+  })
+  .refine((v) => v.type !== "Particulier" || v.lastName.length > 0, {
+    message: "Le nom est requis.",
+    path: ["lastName"],
   })
   // An address is optional, but a half-filled one would print wrong on an invoice.
   .refine((v) => v.line1 === "" || v.city.length > 0, {
@@ -224,7 +234,10 @@ export function ClientFormSheet({
               />
             </div>
             {type === "Entreprise" && (
-              <FieldDescription>La personne à joindre chez ce client.</FieldDescription>
+              <FieldDescription>
+                La personne à joindre chez ce client. Facultative — d&apos;autres contacts
+                s&apos;ajoutent depuis sa fiche.
+              </FieldDescription>
             )}
 
             <div className="grid gap-4 sm:grid-cols-2">

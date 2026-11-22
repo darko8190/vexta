@@ -300,8 +300,9 @@ export interface TeamList {
  * is an invitation nobody can accept.
  */
 export interface InvitationGrant {
-  invitationUrl: string;
-  expiresAt: string;
+  /** Null when the person already had a Vexta account with a password: nothing was sent. */
+  invitationUrl: string | null;
+  expiresAt: string | null;
   emailSent: boolean;
 }
 

@@ -36,7 +36,11 @@ public record SaveEmployeeRequest(
 /// The link is returned even when the email went out, so the admin can hand it over directly
 /// when a colleague says nothing arrived.
 /// </summary>
-public record AccessGrantedDto(string InvitationUrl, DateTimeOffset ExpiresAt, bool EmailSent, EmployeeDto Employee);
+/// <summary>
+/// InvitationUrl is null when the person already had a Vexta account with a password: there is
+/// nothing to send them, the company simply appears in their space switcher.
+/// </summary>
+public record AccessGrantedDto(string? InvitationUrl, DateTimeOffset? ExpiresAt, bool EmailSent, EmployeeDto Employee);
 
 // ---- Accepting an invitation: anonymous, token in the URL ----
 

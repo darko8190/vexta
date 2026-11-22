@@ -20,9 +20,18 @@ public class TenantsController(
     ICurrentUserService currentUser) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<PagedResult<TenantDto>>> List([FromQuery] PagingQuery query)
+    public async Task<ActionResult<PagedResult<TenantDto>>> List(
+        [FromQuery] PagingQuery query, [FromQuery] TenantKind? kind)
     {
         var tenants = db.Tenants.IgnoreQueryFilters().AsNoTracking();
+
+        // The two kinds are listed separately: a company that pays and a person's free space
+        // share a table and nothing else — status, plan and seats are meaningless for one of
+        // them. Filtering here rather than splitting the page keeps each list paged on its own.
+        if (kind is { } wanted)
+        {
+            tenants = tenants.Where(t => t.Kind == wanted);
+        }
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {

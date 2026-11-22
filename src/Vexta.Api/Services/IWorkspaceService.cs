@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Vexta.Api.Data;
 using Vexta.Api.Domain;
@@ -26,6 +27,21 @@ public interface IWorkspaceService
     Task<TenantMembership?> HomeMembershipAsync(ApplicationUser user, CancellationToken ct = default);
 
     /// <summary>
+    /// Takes someone out of one space when their access there is revoked.
+    ///
+    /// Not the same as deleting them. An account now also owns its own personal space, so
+    /// deleting it to revoke a company access would take that space and everything in it —
+    /// losing a person's own data because they stopped working somewhere. They are moved to
+    /// their personal space instead, which also frees the seat.
+    ///
+    /// The exception is an invitation that was never accepted: that account has no password, has
+    /// never been anywhere, and exists only because of the grant being revoked. It is deleted,
+    /// which matters because the address stays taken otherwise and the same person could not be
+    /// invited a second time.
+    /// </summary>
+    Task ReleaseAsync(ApplicationUser user, Guid tenantId, CancellationToken ct = default);
+
+    /// <summary>
     /// Makes sure the person has a membership for the space they belong to and a personal space
     /// of their own, creating either if it is missing.
     ///
@@ -37,8 +53,46 @@ public interface IWorkspaceService
     Task EnsureAsync(ApplicationUser user, CancellationToken ct = default);
 }
 
-public class WorkspaceService(VextaDbContext db) : IWorkspaceService
+public class WorkspaceService(VextaDbContext db, UserManager<ApplicationUser> userManager) : IWorkspaceService
 {
+    public async Task ReleaseAsync(ApplicationUser user, Guid tenantId, CancellationToken ct = default)
+    {
+        var memberships = await db.TenantMemberships
+            .Where(m => m.UserId == user.Id)
+            .Include(m => m.Tenant)
+            .ToListAsync(ct);
+
+        if (!await userManager.HasPasswordAsync(user))
+        {
+            // Never activated. Nothing of theirs exists to keep, and leaving the account
+            // behind would hold the email address hostage against a second invitation.
+            db.TenantMemberships.RemoveRange(memberships);
+            db.Tenants.RemoveRange(memberships
+                .Where(m => m.Tenant?.Kind == TenantKind.Personal)
+                .Select(m => m.Tenant!));
+
+            // Flushed before the delete so nothing still points at the row being removed.
+            await db.SaveChangesAsync(ct);
+            await userManager.DeleteAsync(user);
+            return;
+        }
+
+        await EnsureAsync(user, ct);
+
+        if (memberships.FirstOrDefault(m => m.TenantId == tenantId) is { } here)
+        {
+            db.TenantMemberships.Remove(here);
+        }
+
+        // Moving their home out of the company is what frees the seat: it is counted by
+        // the accounts whose TenantId is the company.
+        var personal = await db.TenantMemberships.Include(m => m.Tenant)
+            .FirstOrDefaultAsync(m => m.UserId == user.Id && m.Tenant!.Kind == TenantKind.Personal, ct);
+
+        user.TenantId = personal?.TenantId;
+        await db.SaveChangesAsync(ct);
+    }
+
     public async Task EnsureAsync(ApplicationUser user, CancellationToken ct = default)
     {
         // A super admin belongs to the platform, not to a space: they reach tenants by entering

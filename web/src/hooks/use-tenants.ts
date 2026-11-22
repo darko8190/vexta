@@ -10,10 +10,15 @@ export interface CreateTenantValues {
   adminPassword: string;
 }
 
-export function useTenantsQuery(page: number, search: string) {
+/**
+ * Omitting kind lists both, which is what the dashboard tile counts. The admin page asks for one
+ * at a time so each table pages on its own — a shared page number would make "next" on one list
+ * skip rows in the other.
+ */
+export function useTenantsQuery(page: number, search: string, kind?: "Business" | "Personal") {
   return useQuery({
-    queryKey: ["tenants", page, search],
-    queryFn: () => api.get<PagedResult<TenantRecord>>(`admin/tenants${buildQuery({ page, search })}`),
+    queryKey: ["tenants", page, search, kind ?? "all"],
+    queryFn: () => api.get<PagedResult<TenantRecord>>(`admin/tenants${buildQuery({ page, search, kind })}`),
     placeholderData: (previous) => previous,
   });
 }

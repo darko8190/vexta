@@ -58,7 +58,7 @@ public record ClientSummaryDto(Guid Id, string Name, string? Email);
 /// The invitation link is returned whether or not the email went out: Mailgun is optional, and
 /// an invitation nobody can deliver is an invitation nobody can accept.
 /// </summary>
-public record ClientAccessGrantedDto(string InvitationUrl, DateTimeOffset ExpiresAt, bool EmailSent);
+public record ClientAccessGrantedDto(string? InvitationUrl, DateTimeOffset? ExpiresAt, bool EmailSent);
 
 public record UpsertClientRequest(
     ClientType Type,

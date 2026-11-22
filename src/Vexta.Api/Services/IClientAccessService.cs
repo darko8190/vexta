@@ -28,6 +28,7 @@ public class ClientAccessService(
     VextaDbContext db,
     UserManager<ApplicationUser> userManager,
     IMailgunService mailgun,
+    IWorkspaceService workspaces,
     IConfiguration configuration,
     ILogger<ClientAccessService> logger) : IClientAccessService
 {
@@ -46,11 +47,35 @@ public class ClientAccessService(
             return (null, "Ajoutez un courriel avant de donner un accès.");
         }
 
-        // RequireUniqueEmail is on, so an address already used anywhere — including in another
-        // company — cannot become a second account. Saying so is better than a raw Identity error.
-        if (await userManager.FindByEmailAsync(email) is not null)
+        // An address can already belong to a Vexta account — a customer who is also somebody's
+        // employee, or who has their own personal space. That account is the person, so it is
+        // joined to this company as a customer rather than refused.
+        var existing = await userManager.FindByEmailAsync(email);
+        if (existing is not null)
         {
-            return (null, "Un compte existe déjà avec ce courriel.");
+            if (await db.TenantMemberships.AnyAsync(
+                    m => m.UserId == existing.Id && m.TenantId == target.TenantId, ct))
+            {
+                return (null, "Ce compte a déjà un accès à cet espace.");
+            }
+
+            db.TenantMemberships.Add(new TenantMembership
+            {
+                UserId = existing.Id,
+                TenantId = target.TenantId,
+                Role = UserRole.Client,
+                ClientId = clientId
+            });
+
+            target.UserId = existing.Id;
+            target.UpdatedAt = DateTimeOffset.UtcNow;
+
+            if (await userManager.HasPasswordAsync(existing))
+            {
+                return (AccessGrant.Linked(), null);
+            }
+
+            return (await IssueInvitationAsync(target, ct), null);
         }
 
         var user = new ApplicationUser
@@ -112,13 +137,10 @@ public class ClientAccessService(
     {
         if (target.UserId is { } userId)
         {
-            var memberships = await db.TenantMemberships.Where(m => m.UserId == userId).ToListAsync(ct);
-            db.TenantMemberships.RemoveRange(memberships);
-
             var user = await userManager.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Id == userId, ct);
             if (user is not null)
             {
-                await userManager.DeleteAsync(user);
+                await workspaces.ReleaseAsync(user, target.TenantId, ct);
             }
         }
 

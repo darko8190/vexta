@@ -365,12 +365,21 @@ public class ClientsController(
 
     private static string? Validate(UpsertClientRequest r)
     {
-        if (string.IsNullOrWhiteSpace(r.FirstName)) return "Le prénom est obligatoire.";
-        if (string.IsNullOrWhiteSpace(r.LastName)) return "Le nom est obligatoire.";
-        if (r.Type == ClientType.Entreprise && string.IsNullOrWhiteSpace(r.CompanyName))
+        if (r.Type == ClientType.Particulier)
+        {
+            // For a particulier these are the name. For an entreprise they are whoever you call
+            // there, which you may simply not know yet — and requiring them made every company
+            // on file without a contact impossible to save at all.
+            if (string.IsNullOrWhiteSpace(r.FirstName)) return "Le prénom est obligatoire.";
+            if (string.IsNullOrWhiteSpace(r.LastName)) return "Le nom est obligatoire.";
+        }
+        else if (string.IsNullOrWhiteSpace(r.CompanyName))
+        {
             return "Le nom d'entreprise est obligatoire pour un client entreprise.";
+        }
+
         if (r.CompanyName is { Length: > 200 }) return "Le nom d'entreprise ne peut pas dépasser 200 caractères.";
-        if (r.FirstName.Trim().Length > 100 || r.LastName.Trim().Length > 100) return "100 caractères maximum.";
+        if (r.FirstName?.Trim().Length > 100 || r.LastName?.Trim().Length > 100) return "100 caractères maximum.";
 
         // An address is optional, but a half-filled one is a mistake worth catching now rather
         // than discovering on an invoice.

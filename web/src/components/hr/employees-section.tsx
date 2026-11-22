@@ -101,7 +101,19 @@ export function EmployeesSection() {
 
   async function onGrant(employee: Employee) {
     try {
-      setGrant(await grantAccess.mutateAsync(employee.id));
+      const result = await grantAccess.mutateAsync(employee.id);
+
+      // No link means this address already had a Vexta account with a password — someone
+      // rehired, or someone who already uses Vexta for their own space. There is nothing to
+      // send, so the dialog would be an empty ceremony.
+      if (!result.invitationUrl) {
+        toast.success(
+          `${employee.firstName} avait déjà un compte Vexta. L'entreprise apparaîtra dans ses espaces.`,
+        );
+        return;
+      }
+
+      setGrant(result);
     } catch (error) {
       toast.error(message(error, "Impossible de créer cet accès."));
     }

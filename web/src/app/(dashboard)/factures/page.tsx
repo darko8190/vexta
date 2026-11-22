@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FileText, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
+import { ClickableRow } from "@/components/layout/clickable-row";
 import { PageHeader } from "@/components/layout/page-header";
 import { UpgradeCta } from "@/components/layout/upgrade-cta";
 import { useCanCreate, useIsClientUser } from "@/hooks/use-can-create";
@@ -31,6 +33,7 @@ function formatCurrency(amount: number, currency: string) {
 }
 
 export default function InvoicesPage() {
+  const router = useRouter();
   const canCreate = useCanCreate();
   const isClient = useIsClientUser();
   const [page, setPage] = useState(1);
@@ -120,7 +123,11 @@ export default function InvoicesPage() {
             </TableHeader>
             <TableBody>
               {data.items.map((invoiceItem) => (
-                <TableRow key={invoiceItem.id}>
+                <ClickableRow
+                  key={invoiceItem.id}
+                  label={`Ouvrir la facture ${invoiceItem.number}`}
+                  onOpen={() => router.push(`/factures/${invoiceItem.id}`)}
+                >
                   <TableCell className="font-medium">
                     <Link href={`/factures/${invoiceItem.id}`} className="hover:underline">
                       {invoiceItem.number}
@@ -155,7 +162,7 @@ export default function InvoicesPage() {
                     </DropdownMenu>
                   </TableCell>
                   )}
-                </TableRow>
+                </ClickableRow>
               ))}
             </TableBody>
           </Table>

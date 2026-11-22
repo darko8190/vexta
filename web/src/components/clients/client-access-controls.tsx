@@ -13,6 +13,10 @@ import { ApiError } from "@/lib/api";
 import type { ClientAccess, InvitationGrant } from "@/lib/types";
 
 /**
+ * NOT CURRENTLY MOUNTED. The client record no longer offers access, by request; the API
+ * endpoints behind this are still there and still work. Kept whole rather than deleted so
+ * putting it back is a matter of deciding where, not of writing it again.
+ *
  * Giving a customer a way into their own file. The same three actions serve a particulier
  * invited on their own record and a contact invited on theirs — pass contactId for the second.
  *
@@ -44,7 +48,16 @@ export function ClientAccessControls({
     fallback: string,
   ) {
     try {
-      onDone(await action.mutateAsync(contactId));
+      const result = await action.mutateAsync(contactId);
+
+      // No link means they already had a Vexta account with a password: nothing was sent and
+      // there is nothing to copy, so say so rather than opening an empty dialog.
+      if (!result.invitationUrl) {
+        toast.success(`${name} avait déjà un compte Vexta. Vos dossiers apparaîtront dans ses espaces.`);
+        return;
+      }
+
+      onDone(result);
     } catch (error) {
       toast.error(error instanceof ApiError ? error.message : fallback);
     }

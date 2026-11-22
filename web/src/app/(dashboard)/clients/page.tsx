@@ -17,6 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ClientFormSheet } from "@/components/clients/client-form-sheet";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
+import { ClickableRow } from "@/components/layout/clickable-row";
 import { PageHeader } from "@/components/layout/page-header";
 import { UpgradeCta } from "@/components/layout/upgrade-cta";
 import { useCanCreate } from "@/hooks/use-can-create";
@@ -128,7 +129,11 @@ export default function ClientsPage() {
             </TableHeader>
             <TableBody>
               {data.items.map((clientItem) => (
-                <TableRow key={clientItem.id}>
+                <ClickableRow
+                  key={clientItem.id}
+                  label={`Modifier ${clientItem.name}`}
+                  onOpen={() => openEdit(clientItem)}
+                >
                   <TableCell className="font-mono text-xs text-muted-foreground tabular-nums">
                     {formatClientNumber(clientItem.number)}
                   </TableCell>
@@ -173,7 +178,7 @@ export default function ClientsPage() {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
-                </TableRow>
+                </ClickableRow>
               ))}
             </TableBody>
           </Table>

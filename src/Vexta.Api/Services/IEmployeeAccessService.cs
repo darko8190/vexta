@@ -17,7 +17,14 @@ public record SeatUsage(int Used, int Limit, string? LimitReason)
 /// not the email went out: an invitation nobody can deliver is an invitation nobody can accept,
 /// and Mailgun is optional on purpose.
 /// </summary>
-public record AccessGrant(string InvitationUrl, DateTimeOffset ExpiresAt, bool EmailSent);
+public record AccessGrant(string? InvitationUrl, DateTimeOffset? ExpiresAt, bool EmailSent)
+{
+    /// <summary>
+    /// An account that already existed and already has a password. Nothing was sent and there is
+    /// no link to show: the space just appears in their switcher.
+    /// </summary>
+    public static AccessGrant Linked() => new(null, null, false);
+}
 
 public interface IEmployeeAccessService
 {
@@ -37,6 +44,7 @@ public class EmployeeAccessService(
     VextaDbContext db,
     UserManager<ApplicationUser> userManager,
     IMailgunService mailgun,
+    IWorkspaceService workspaces,
     IConfiguration configuration,
     ILogger<EmployeeAccessService> logger) : IEmployeeAccessService
 {
@@ -51,11 +59,14 @@ public class EmployeeAccessService(
             .Select(t => new { t.Kind, t.PlanId, PlanName = t.Plan!.Name, PlanMaxUsers = (int?)t.Plan!.MaxUsers })
             .FirstOrDefaultAsync(ct);
 
-        // Customers are excluded: a seat is sold for someone who runs the business, and a
-        // company does not pay by the number of its clients. Counting them would make giving a
-        // client their invoices cost the same as hiring.
-        var used = await db.Users.IgnoreQueryFilters()
-            .CountAsync(u => u.TenantId == tenantId && u.Role != UserRole.Client, ct);
+        // Counted by memberships, not by whose home space this is. A person can belong to this
+        // company and still live in their own personal space — they hold a seat here either way,
+        // and counting homes would miss them entirely.
+        //
+        // Customers are excluded: a seat is sold for someone who runs the business, and a company
+        // does not pay by the number of its clients.
+        var used = await db.TenantMemberships
+            .CountAsync(m => m.TenantId == tenantId && m.Role != UserRole.Client, ct);
 
         if (tenant is null)
         {
@@ -91,11 +102,37 @@ public class EmployeeAccessService(
 
         var email = employee.Email.Trim();
 
-        // RequireUniqueEmail is on, so an address already used anywhere — including in another
-        // tenant — cannot become a second account. Saying so is better than a raw Identity error.
-        if (await userManager.FindByEmailAsync(email) is not null)
+        // An address can already belong to a Vexta account: someone rehired, or someone who
+        // already uses Vexta for their own space. That account is the person — a second one
+        // cannot be made for them anyway, and should not be. It is joined to this company
+        // instead, which is the whole point of a person belonging to several spaces.
+        var existing = await userManager.FindByEmailAsync(email);
+        if (existing is not null)
         {
-            return (null, "Un compte existe déjà avec ce courriel.");
+            if (await db.TenantMemberships.AnyAsync(
+                    m => m.UserId == existing.Id && m.TenantId == employee.TenantId, ct))
+            {
+                return (null, "Ce compte a déjà un accès à cet espace.");
+            }
+
+            db.TenantMemberships.Add(new TenantMembership
+            {
+                UserId = existing.Id,
+                TenantId = employee.TenantId,
+                Role = UserRole.TenantUser
+            });
+
+            employee.UserId = existing.Id;
+            employee.UpdatedAt = DateTimeOffset.UtcNow;
+
+            // Already chose a password at some point, so there is nothing to invite them to: the
+            // company simply appears in their space switcher the next time they sign in.
+            if (await userManager.HasPasswordAsync(existing))
+            {
+                return (AccessGrant.Linked(), null);
+            }
+
+            return (await IssueInvitationAsync(employee, ct), null);
         }
 
         var user = new ApplicationUser
@@ -115,6 +152,16 @@ public class EmployeeAccessService(
         {
             return (null, string.Join(" ", created.Errors.Select(e => e.Description)));
         }
+
+        // Explicit rather than left to the lazy backfill: the seat count reads memberships, and
+        // a seat that only appears once the person opens their switcher is a seat nobody is
+        // charged for in the meantime.
+        db.TenantMemberships.Add(new TenantMembership
+        {
+            UserId = user.Id,
+            TenantId = employee.TenantId,
+            Role = UserRole.TenantUser
+        });
 
         employee.UserId = user.Id;
         employee.UpdatedAt = DateTimeOffset.UtcNow;
@@ -150,7 +197,9 @@ public class EmployeeAccessService(
             var user = await userManager.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Id == userId, ct);
             if (user is not null)
             {
-                await userManager.DeleteAsync(user);
+                // Not a delete: the account also owns this person's own personal space, and an
+                // employee who leaves must not lose it. See IWorkspaceService.ReleaseAsync.
+                await workspaces.ReleaseAsync(user, employee.TenantId, ct);
             }
         }
 

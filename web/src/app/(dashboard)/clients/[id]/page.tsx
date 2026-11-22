@@ -8,7 +8,6 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/layout/empty-state";
 import { ClientFormSheet } from "@/components/clients/client-form-sheet";
-import { ClientAccessControls } from "@/components/clients/client-access-controls";
 import { ClientContactsSection } from "@/components/clients/detail/client-contacts-section";
 import { ClientDetailNav, type DetailSection } from "@/components/clients/detail/client-detail-nav";
 import {
@@ -136,22 +135,6 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
             </div>
           )}
         </dl>
-
-        {/* Only a particulier is a person who can sign in. An entreprise is a company and has
-            nobody to be: its people are its contacts, each invited in their own right. */}
-        {client.type === "Particulier" && (
-          <div className="mt-4 border-t border-border pt-4">
-            <p className="mb-2 text-sm text-muted-foreground">
-              Accès au portail — ses projets et ses factures, rien d&apos;autre.
-            </p>
-            <ClientAccessControls
-              clientId={client.id}
-              email={client.email}
-              name={client.name}
-              access={client.access}
-            />
-          </div>
-        )}
       </div>
 
       {/* The rail sits beside the content from md up and becomes a scrollable row below it. */}

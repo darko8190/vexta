@@ -9,18 +9,32 @@ const currency = new Intl.NumberFormat("fr-CA", {
   minimumFractionDigits: 2,
 });
 
-export function money(amount: number | null | undefined): string {
+/**
+ * A price, and what it buys when the product carries a unit: "4,50 $ / pi".
+ *
+ * The unit is a second optional argument rather than a helper of its own, for the same reason as
+ * on `quantity` below: every screen that prints a price already comes through here, so the ones
+ * that know the unit gain it by passing it, and the price history — where a unit would repeat on
+ * every row — keeps calling this with one argument.
+ */
+export function money(amount: number | null | undefined, unit?: string | null): string {
   if (amount == null) return "—";
-  return currency.format(amount);
+  const formatted = currency.format(amount);
+  return unit ? `${formatted} / ${unit}` : formatted;
 }
 
 /**
  * A quantity with as many decimals as it actually has, up to the three the column stores. "12"
  * for twelve boxes and "2,5" for two and a half metres, never "12,000".
+ *
+ * With the product's unit it becomes "12 pi", which is the only form that answers "twelve of
+ * what". Joined with a non-breaking space so a narrow column never leaves the unit on its own
+ * line, where it would read as a separate figure.
  */
-export function quantity(value: number | null | undefined): string {
+export function quantity(value: number | null | undefined, unit?: string | null): string {
   if (value == null) return "—";
-  return new Intl.NumberFormat("fr-CA", { maximumFractionDigits: 3 }).format(value);
+  const formatted = new Intl.NumberFormat("fr-CA", { maximumFractionDigits: 3 }).format(value);
+  return unit ? `${formatted} ${unit}` : formatted;
 }
 
 /** The margin, which is a percentage and not money. */

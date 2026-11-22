@@ -41,9 +41,11 @@ export function AvailableQuantity({ product }: { product: ProductRecord }) {
   return (
     <span
       className="inline-block"
-      title={`${quantity(product.quantityOnHand)} en main, ${quantity(product.quantityReserved)} réservé`}
+      title={`${quantity(product.quantityOnHand, product.unit)} en main, ${quantity(product.quantityReserved, product.unit)} réservé`}
     >
-      <span className="font-medium tabular-nums">{quantity(product.quantityAvailable)}</span>
+      {/* The unit rides on the figure that is read first, and only on that one: repeating "pi"
+          on the two figures underneath would triple it in a column 28 units wide. */}
+      <span className="font-medium tabular-nums">{quantity(product.quantityAvailable, product.unit)}</span>
       <span className="block text-xs text-muted-foreground tabular-nums">
         {quantity(product.quantityOnHand)} en main · {quantity(product.quantityReserved)} réservé
       </span>

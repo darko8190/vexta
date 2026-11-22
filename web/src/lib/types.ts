@@ -117,7 +117,8 @@ export interface AddressRecord {
   updatedAt: string;
 }
 
-export type ProjectStatus = "Planifie" | "EnCours" | "EnPause" | "Termine" | "Annule";
+/** The pipeline a job moves through. Facturé is reached by invoicing it, not by hand. */
+export type ProjectStatus = "AFaire" | "Commence" | "AFacturer" | "Facture" | "Annule";
 
 /** An address as a project shows it: enough to recognise, not the whole record. */
 export interface ProjectAddress {
@@ -218,6 +219,60 @@ export interface InvoiceRecord {
   lines: InvoiceLine[];
   createdAt: string;
   updatedAt: string;
+}
+
+// ---- Sending an invoice by email ----
+
+/** One field a company may drop into its invoice email, as the settings screen lists them. */
+export interface InvoiceEmailField {
+  /** Written as {{numero}} in the template. */
+  field: string;
+  description: string;
+}
+
+/** A person the invoice can be addressed to: the client, or one of its contacts. */
+export interface InvoiceRecipient {
+  /** The contact's id, or null for the client's own address. */
+  id: string | null;
+  name: string;
+  email: string;
+  /** What this address is — « Fiche du client », « Comptes payables ». */
+  role: string | null;
+}
+
+/** A file already on file that can ride along with the invoice. */
+export interface InvoiceAttachmentOption {
+  id: string;
+  title: string;
+  fileName: string;
+  sizeBytes: number;
+}
+
+/**
+ * Everything the send screen needs, in one request: who it can go to, the company's own
+ * wording with the invoice's fields already filled in, and what can be attached.
+ */
+export interface InvoiceSendDefaults {
+  /** The address pre-selected: the client's, or its first contact. Null when none is on file. */
+  to: string | null;
+  subject: string;
+  /** HTML, fields already resolved — this is exactly what will be sent. */
+  body: string;
+  recipients: InvoiceRecipient[];
+  /** Employees who can be put in copy, with their sign-in addresses. */
+  employees: InvoiceRecipient[];
+  /** The documents of the project this invoice belongs to, if it belongs to one. */
+  projectDocuments: InvoiceAttachmentOption[];
+}
+
+export interface SendInvoiceValues {
+  to: string;
+  ccEmployeeIds: string[];
+  subject: string;
+  body: string;
+  /** Files uploaded in the send form itself. */
+  mediaAssetIds: string[];
+  projectDocumentIds: string[];
 }
 
 export interface TenantRecord {
@@ -486,6 +541,8 @@ export interface ProjectSectionCounts {
   timesheets: number;
   expenses: number;
   extraCharges: number;
+  /** Files and written notes together: one section, one badge. */
+  documentsAndNotes: number;
   invoices: number;
 }
 
@@ -513,6 +570,97 @@ export interface ProjectCostTable {
 export interface ProjectSummary {
   counts: ProjectSectionCounts;
   costs: ProjectCostTable;
+}
+
+/**
+ * A material posted on a job. The three prices are copied onto the row when it is taken from
+ * the catalogue, so a repriced product never rewrites a job that is already closed.
+ */
+export interface ProjectMaterial {
+  id: string;
+  /** The catalogue entry it came from, or null when it was typed by hand. */
+  productId: string | null;
+  code: string | null;
+  description: string;
+  unit: string | null;
+  quantity: number;
+  purchasePrice: number | null;
+  marginPercent: number | null;
+  /** What the client is charged per unit. */
+  unitPrice: number;
+  /** quantity × unitPrice, computed by the API so both ends show the same figure. */
+  total: number;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SaveProjectMaterialValues {
+  productId: string | null;
+  code: string | null;
+  description: string;
+  unit: string | null;
+  quantity: number;
+  purchasePrice: number | null;
+  marginPercent: number | null;
+  unitPrice: number;
+}
+
+/** One stretch of time worked on a job. The hours are rounded to the quarter by the API. */
+export interface TimesheetEntry {
+  id: string;
+  /** Null when the person has since been taken off the payroll. */
+  employeeId: string | null;
+  employeeName: string | null;
+  startDate: string;
+  endDate: string;
+  /** HH:mm, as the time inputs read and write them. */
+  startTime: string;
+  endTime: string;
+  /** Rounded to the quarter hour: 7 h 52 → 16 h 03 is 8,25. */
+  hours: number;
+  note: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SaveTimesheetValues {
+  employeeId: string;
+  startDate: string;
+  endDate: string;
+  startTime: string;
+  endTime: string;
+  note: string | null;
+}
+
+/** A file filed against a job. The URL is signed and short-lived, so it is never stored. */
+export interface ProjectDocument {
+  id: string;
+  title: string;
+  /** The company's own filing: « Plan », « Permis », « Soumission ». */
+  category: string | null;
+  mediaAssetId: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  url: string | null;
+  uploadedByName: string | null;
+  createdAt: string;
+}
+
+export interface SaveProjectDocumentValues {
+  title: string;
+  category: string | null;
+  mediaAssetId: string;
+}
+
+/** Something written down about the job, as a dated entry in a thread. */
+export interface ProjectNote {
+  id: string;
+  body: string;
+  authorName: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /** One of the company's expense categories. */
@@ -591,6 +739,8 @@ export interface ProductRecord {
   code: string | null;
   title: string;
   description: string | null;
+  /** How it is counted and sold: un, pi, m, sac. */
+  unit: string | null;
   categoryId: string | null;
   categoryName: string | null;
   subCategoryId: string | null;
@@ -720,6 +870,8 @@ export interface ProductSearchResult {
   number: number;
   code: string | null;
   title: string;
+  /** Copied onto the line that picks it, so a quantity reads as feet or as sheets. */
+  unit: string | null;
   categoryName: string | null;
   purchasePrice: number | null;
   marginPercent: number | null;

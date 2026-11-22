@@ -50,12 +50,22 @@ public enum AddressType
     Autre = 3
 }
 
+/// <summary>
+/// Where a job sits in the pipeline, in the words the office uses.
+///
+/// The numbers are the ones the previous list used, so the stored column needs no rewriting
+/// beyond the two states that changed meaning: a paused job is a started job, and a finished
+/// one is either waiting to be billed or already billed, which the migration decides by
+/// looking for an invoice.
+///
+/// Facture is reached by invoicing the project rather than by remembering to come back here.
+/// </summary>
 public enum ProjectStatus
 {
-    Planifie = 0,
-    EnCours = 1,
-    EnPause = 2,
-    Termine = 3,
+    AFaire = 0,
+    Commence = 1,
+    AFacturer = 2,
+    Facture = 3,
     Annule = 4
 }
 

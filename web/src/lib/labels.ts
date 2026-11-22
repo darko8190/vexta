@@ -16,10 +16,10 @@ export const addressTypeLabels: Record<AddressType, string> = {
 };
 
 export const projectStatusLabels: Record<ProjectStatus, string> = {
-  Planifie: "Planifié",
-  EnCours: "En cours",
-  EnPause: "En pause",
-  Termine: "Terminé",
+  AFaire: "À faire",
+  Commence: "Commencé",
+  AFacturer: "À facturer",
+  Facture: "Facturé",
   Annule: "Annulé",
 };
 
@@ -39,10 +39,11 @@ export const tenantStatusLabels: Record<TenantSubscriptionStatus, string> = {
 };
 
 export const projectStatusBadgeVariant: Record<ProjectStatus, "default" | "secondary" | "destructive" | "outline"> = {
-  Planifie: "outline",
-  EnCours: "default",
-  EnPause: "secondary",
-  Termine: "secondary",
+  AFaire: "outline",
+  Commence: "default",
+  // À facturer is the one that needs chasing, so it is the one that stands out.
+  AFacturer: "default",
+  Facture: "secondary",
   Annule: "destructive",
 };
 

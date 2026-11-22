@@ -19,6 +19,8 @@ export interface ProductFormValues {
   code: string | null;
   title: string;
   description: string | null;
+  /** How it is counted and sold: un, pi, m, sac. Null when the company has not said. */
+  unit: string | null;
   categoryId: string | null;
   subCategoryId: string | null;
   barcode: string | null;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useFieldArray, useForm, useWatch, type UseFormReturn } from "react-hook-form";
@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { RequiredMark } from "@/components/ui/required-mark";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import Link from "next/link";
 import { ClientPicker } from "@/components/clients/client-picker";
@@ -30,7 +31,13 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { usePdfDocument } from "@/hooks/use-pdf-document";
 import { cn } from "@/lib/utils";
 import { ApiError } from "@/lib/api";
-import { useCreateInvoice, useUpdateInvoice, type InvoiceFormValues } from "@/hooks/use-invoices";
+import {
+  useCreateInvoice,
+  useInvoiceDraftQuery,
+  useUpdateInvoice,
+  type InvoiceDraft,
+  type InvoiceFormValues,
+} from "@/hooks/use-invoices";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { invoiceStatusLabels } from "@/lib/labels";
@@ -60,7 +67,6 @@ const formSchema = z.object({
   status: z.custom<InvoiceStatus>((v) => typeof v === "string" && statuses.includes(v as InvoiceStatus)),
   issueDate: z.string().min(1, "Date requise."),
   dueDate: z.string().min(1, "Date requise."),
-  currency: z.string().min(1, "Devise requise."),
   notes: z.string().optional().or(z.literal("")),
   isTaxExempt: z.boolean(),
   pricePolicyId: z.string().optional().or(z.literal("")),
@@ -80,47 +86,55 @@ function dueInIso(days: number) {
   return date.toISOString().slice(0, 10);
 }
 
+/**
+ * The form's starting point: the invoice being edited, then the draft a project was read into,
+ * then an empty line. The draft is only ever consulted while creating — an invoice that exists
+ * owns its own lines, and re-reading the job would undo corrections made on the document.
+ */
 function toFormValues(
   invoice?: InvoiceRecord,
   defaultClientId?: string,
   termsDays = 30,
   defaultProjectId?: string,
+  draft?: InvoiceDraft,
 ): FormValues {
+  const exempt = invoice?.isTaxExempt ?? draft?.isTaxExempt ?? false;
+  const saved = invoice?.lines?.length ? invoice.lines : undefined;
+  const fromProject = draft?.lines?.length ? draft.lines : undefined;
+
   return {
-    clientId: invoice?.clientId ?? defaultClientId ?? "",
+    clientId: invoice?.clientId ?? draft?.clientId ?? defaultClientId ?? "",
     projectId: invoice?.projectId ?? defaultProjectId ?? "",
     status: invoice?.status ?? "Brouillon",
     issueDate: invoice?.issueDate ?? todayIso(),
     dueDate: invoice?.dueDate ?? dueInIso(termsDays),
-    currency: invoice?.currency ?? "CAD",
     notes: invoice?.notes ?? "",
-    isTaxExempt: invoice?.isTaxExempt ?? false,
-    pricePolicyId: invoice?.pricePolicyId ?? "",
-    lines: invoice?.lines?.length
-      ? invoice.lines.map((l) => ({
-          kind: l.kind,
-          productId: l.productId ?? null,
-          description: l.description,
-          quantity: l.quantity,
-          purchasePrice: l.purchasePrice ?? null,
-          marginPercent: l.marginPercent ?? null,
-          unitPrice: l.unitPrice,
-          isTaxable: l.isTaxable,
-        }))
+    isTaxExempt: exempt,
+    pricePolicyId: invoice?.pricePolicyId ?? draft?.pricePolicyId ?? "",
+    lines: (saved ?? fromProject)?.map((l) => ({
+      kind: l.kind,
+      productId: l.productId ?? null,
+      description: l.description,
+      quantity: l.quantity,
+      purchasePrice: l.purchasePrice ?? null,
+      marginPercent: l.marginPercent ?? null,
+      unitPrice: l.unitPrice,
+      isTaxable: l.isTaxable,
+    }))
       // Taxable by default. Zero is not a neutral starting point on an invoice — it is a
       // claim that nothing on it is taxable, which is wrong on nearly every line.
-      : [
-          {
-            kind: "Materiaux" as const,
-            productId: null,
-            description: "",
-            quantity: 1,
-            purchasePrice: null,
-            marginPercent: null,
-            unitPrice: 0,
-            isTaxable: !(invoice?.isTaxExempt ?? false),
-          },
-        ],
+      ?? [
+        {
+          kind: "Materiaux" as const,
+          productId: null,
+          description: "",
+          quantity: 1,
+          purchasePrice: null,
+          marginPercent: null,
+          unitPrice: 0,
+          isTaxable: !exempt,
+        },
+      ],
   };
 }
 
@@ -155,27 +169,46 @@ export function InvoiceForm({
 
   const { data: settings, isLoading: settingsLoading } = useBillingSettingsQuery();
 
+  // The company's, not the invoice's: it is settled once in the billing settings, and every
+  // amount on this screen is read in it.
+  const currency = settings?.currency ?? "CAD";
+
+  // What the project has to bill: its materials, its hours and its billable expenses. Only
+  // while creating, and only from the project the form was opened with — picking another
+  // project in the field is a change of client's job, not a request to refill the lines.
+  const { data: projectDraft, isLoading: draftLoading } = useInvoiceDraftQuery(
+    !isEditing ? defaultProjectId : undefined,
+  );
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: toFormValues(invoice, defaultClientId, 30, defaultProjectId),
   });
 
   useEffect(() => {
-    form.reset(toFormValues(invoice, defaultClientId, settings?.paymentTermsDays, defaultProjectId));
+    // Never over work already done. The settings and the project's draft both arrive after the
+    // first paint, and a form that refills itself under someone's hands is worse than one that
+    // starts empty — so once anything has been typed, what is on screen is theirs.
+    if (form.formState.isDirty) return;
+
+    form.reset(
+      toFormValues(invoice, defaultClientId, settings?.paymentTermsDays, defaultProjectId, projectDraft),
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [invoice?.id, settings?.paymentTermsDays]);
+  }, [invoice?.id, settings?.paymentTermsDays, projectDraft]);
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "lines" });
   const clientId = useWatch({ control: form.control, name: "clientId" });
   const projectId = useWatch({ control: form.control, name: "projectId" });
-  const currency = useWatch({ control: form.control, name: "currency" }) || "CAD";
   const lines = useWatch({ control: form.control, name: "lines" });
-  const issueDate = useWatch({ control: form.control, name: "issueDate" });
-  const dueDate = useWatch({ control: form.control, name: "dueDate" });
-  const notes = useWatch({ control: form.control, name: "notes" });
-  const status = useWatch({ control: form.control, name: "status" });
   const isTaxExempt = useWatch({ control: form.control, name: "isTaxExempt" });
   const pricePolicyId = useWatch({ control: form.control, name: "pricePolicyId" });
+
+  // Watched as a whole, and not field by field, for one reason: the preview has to follow every
+  // change, including the ones a line makes to itself when the repricing arithmetic runs. A
+  // hand-written list of field names is a list the next field gets left out of, and the symptom
+  // is a document on screen that no longer matches the invoice beside it.
+  const watched = useWatch({ control: form.control }) as FormValues;
 
   // Shares its cache with the settings screen that manages them; this form only reads.
   const { data: policies } = useQuery({
@@ -215,45 +248,48 @@ export function InvoiceForm({
   }, [isEditing, exemptTouched, inheritedExemption, form]);
 
   // The document is built by the API from what is on screen, so the preview is the invoice
-  // rather than a second drawing of it. Debounced: it is a round trip, and one per keystroke
-  // would be a request the person has already made obsolete by the time it answers.
-  const draft = useMemo(
-    () =>
-      JSON.stringify({
-        clientId,
-        projectId: projectId || null,
-        status,
-        issueDate,
-        dueDate,
-        currency,
-        notes: notes || null,
-        isTaxExempt,
-        pricePolicyId: pricePolicyId || null,
-        lines: (lines ?? []).map((line) => ({
-          kind: line.kind,
-          productId: line.productId ?? null,
-          description: line.description ?? "",
-          quantity: Number(line.quantity) || 0,
-          purchasePrice: line.purchasePrice ?? null,
-          marginPercent: line.marginPercent ?? null,
-          unitPrice: Number(line.unitPrice) || 0,
-          isTaxable: Boolean(line.isTaxable),
-        })),
-      }),
-    [clientId, projectId, status, issueDate, dueDate, currency, notes, isTaxExempt, pricePolicyId, lines],
-  );
+  // rather than a second drawing of it. Serialised here and compared as a string: a render that
+  // changes nothing produces the same JSON, so it costs no request, and anything that does
+  // change — a quantity, a margin, a line added — produces a different one and redraws.
+  // Nothing to draw without a client and dates: the API would refuse the request rather than
+  // return a document with holes in it. Read from the same snapshot as the draft below, which
+  // is the whole point — asking one subscription whether to draw and another what to draw sent
+  // a request with an empty client every time a client was chosen, because the two do not
+  // update on the same render.
+  const previewReady = Boolean(watched.clientId && watched.issueDate && watched.dueDate);
 
-  const debouncedDraft = useDebouncedValue(draft, 500);
+  const draft = !previewReady ? "" : JSON.stringify({
+    clientId: watched.clientId,
+    projectId: watched.projectId || null,
+    status: watched.status,
+    issueDate: watched.issueDate,
+    dueDate: watched.dueDate,
+    notes: watched.notes || null,
+    isTaxExempt: watched.isTaxExempt,
+    pricePolicyId: watched.pricePolicyId || null,
+    lines: (watched.lines ?? []).map((line) => ({
+      kind: line.kind,
+      productId: line.productId ?? null,
+      description: line.description ?? "",
+      quantity: Number(line.quantity) || 0,
+      purchasePrice: line.purchasePrice ?? null,
+      marginPercent: line.marginPercent ?? null,
+      unitPrice: Number(line.unitPrice) || 0,
+      isTaxable: Boolean(line.isTaxable),
+    })),
+  });
 
-  // Nothing to draw without a client and dates: the request would be refused rather than
-  // return a document with holes in it.
+  const debouncedDraft = useDebouncedValue(draft, 300);
+
+  // Both the address and the body come from the debounced draft, so they cannot disagree: an
+  // empty draft draws nothing at all rather than posting a half-filled invoice.
   const preview = usePdfDocument(
-    clientId && issueDate && dueDate
+    debouncedDraft
       // An invoice being edited is previewed under its own number, not under the one the next
       // invoice will get.
       ? `invoices/preview${invoice ? `?invoiceId=${invoice.id}` : ""}`
       : null,
-    debouncedDraft,
+    debouncedDraft || undefined,
   );
 
   // A new line carries the company's own rates. Zero is not a neutral default on an invoice —
@@ -293,7 +329,6 @@ export function InvoiceForm({
       status: values.status,
       issueDate: values.issueDate,
       dueDate: values.dueDate,
-      currency: values.currency,
       notes: values.notes || undefined,
       isTaxExempt: values.isTaxExempt,
       pricePolicyId: values.pricePolicyId || null,
@@ -314,7 +349,9 @@ export function InvoiceForm({
     }
   }
 
-  const pending = createInvoice.isPending || updateInvoice.isPending;
+  // Also while the project is being read: saving the empty line that is about to be replaced
+  // would create an invoice for a job whose own lines never made it onto it.
+  const pending = createInvoice.isPending || updateInvoice.isPending || draftLoading;
 
   // Only on the way in. An invoice that already exists can still be corrected — locking someone
   // out of fixing a typo because a settings page is blank would be punishing the wrong thing.
@@ -335,8 +372,11 @@ export function InvoiceForm({
     );
   }
 
+  // The preview moves beside the form only at 2xl. Below that, the nine columns of the lines
+  // table and a 30rem document cannot both fit, and the card clips what overflows — so the
+  // choice is between a document under the form and a Taxable box nobody can see.
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_30rem]">
+    <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_30rem]">
     <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="space-y-6">
       <Card>
         <CardHeader>
@@ -494,23 +534,6 @@ export function InvoiceForm({
               />
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Controller
-                name="currency"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="invoice-currency">
-                      Devise
-                      <RequiredMark />
-                    </FieldLabel>
-                    <Input {...field} id="invoice-currency" className="uppercase" aria-invalid={fieldState.invalid} />
-                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                  </Field>
-                )}
-              />
-            </div>
-
             <Controller
               name="notes"
               control={form.control}
@@ -534,19 +557,34 @@ export function InvoiceForm({
             <p className="text-sm font-medium text-destructive">{form.formState.errors.lines.message}</p>
           )}
 
-          <InvoiceLineRows
-            // The rows only touch `lines`; the cast is what keeps them from having to know
-            // about the fifteen other fields on this form.
-            form={form as unknown as UseFormReturn<LinesForm>}
-            fields={fields}
-            append={append}
-            remove={remove}
-            marginMode={settings?.marginMode ?? "Multiplication"}
-            policyMarginPercent={policyMargin}
-            hourlyRate={settings?.defaultHourlyRate ?? null}
-            isTaxExempt={isTaxExempt}
-            taxRateLabel={combinedRateLabel}
-          />
+          {draftLoading ? (
+            /* The project is being read. Skeletons rather than the usual empty line: the lines
+               are about to be replaced, and an empty row offered in the meantime is an
+               invitation to type something that would then be overwritten. */
+            <div className="space-y-3" aria-busy="true">
+              <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Spinner />
+                Lecture du projet : matériaux, heures et dépenses…
+              </p>
+              <Skeleton className="h-20 w-full" />
+              <Skeleton className="h-20 w-full" />
+              <Skeleton className="h-20 w-full" />
+            </div>
+          ) : (
+            <InvoiceLineRows
+              // The rows only touch `lines`; the cast is what keeps them from having to know
+              // about the fifteen other fields on this form.
+              form={form as unknown as UseFormReturn<LinesForm>}
+              fields={fields}
+              append={append}
+              remove={remove}
+              marginMode={settings?.marginMode ?? "Multiplication"}
+              policyMarginPercent={policyMargin}
+              hourlyRate={settings?.defaultHourlyRate ?? null}
+              isTaxExempt={isTaxExempt}
+              taxRateLabel={combinedRateLabel}
+            />
+          )}
 
           <div className="ml-auto w-full max-w-xs space-y-1 border-t border-border pt-3 text-sm">
             <div className="flex justify-between text-muted-foreground">
@@ -593,7 +631,7 @@ export function InvoiceForm({
 
       {/* Beside the form on a wide screen, under it otherwise — stacking beats a preview too
           narrow to read. Sticky so it stays in view while the lines are being filled in. */}
-      <aside className="xl:sticky xl:top-6 xl:self-start">
+      <aside className="2xl:sticky 2xl:top-6 2xl:self-start">
         <InvoicePdfViewer
           url={preview.url}
           loading={preview.loading}

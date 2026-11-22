@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { MarginMode } from "@/lib/types";
+import type { InvoiceEmailField, MarginMode } from "@/lib/types";
 
 export interface BillingSettings {
   /** False until the company has saved these once. The API refuses to invoice before then. */
@@ -11,6 +11,8 @@ export interface BillingSettings {
   rbqNumber: string | null;
   gstRate: number;
   qstRate: number;
+  /** What the company bills in. Asked once here rather than on every invoice. */
+  currency: string;
   invoicePrefix: string;
   nextInvoiceNumber: number;
   paymentTermsDays: number;
@@ -24,9 +26,34 @@ export interface BillingSettings {
   defaultPricePolicyId: string | null;
   /** What the next invoice will be called, so the preview can show it before it exists. */
   nextInvoiceLabel: string;
+  /**
+   * What the company wrote for the invoice email, or null when it wrote nothing — which means
+   * "send the built-in wording". Never filled in with a copy of the default: a company that
+   * has not written its own follows the default as it improves.
+   */
+  invoiceEmailSubject: string | null;
+  invoiceEmailBody: string | null;
+  /** The built-in wording, and what « Reprendre le modèle par défaut » writes into the fields. */
+  defaultInvoiceEmailSubject: string;
+  defaultInvoiceEmailBody: string;
+  /** The fields a template may use, as the renderer itself lists them. */
+  invoiceEmailFields: InvoiceEmailField[];
 }
 
-export type SaveBillingSettingsValues = Omit<BillingSettings, "configured" | "nextInvoiceLabel">;
+/**
+ * The email template is deliberately absent: the full PUT does not carry it, and a card that
+ * sends the whole row back must not be able to blank out a message it never showed.
+ */
+export type SaveBillingSettingsValues = Omit<
+  BillingSettings,
+  | "configured"
+  | "nextInvoiceLabel"
+  | "invoiceEmailSubject"
+  | "invoiceEmailBody"
+  | "defaultInvoiceEmailSubject"
+  | "defaultInvoiceEmailBody"
+  | "invoiceEmailFields"
+>;
 
 /**
  * The settings as the PUT wants them: it replaces the whole row, so a card that changes one
@@ -43,6 +70,7 @@ export function toSaveValues(settings?: BillingSettings): SaveBillingSettingsVal
     rbqNumber: settings?.rbqNumber ?? null,
     gstRate: settings?.gstRate ?? 5,
     qstRate: settings?.qstRate ?? 9.975,
+    currency: settings?.currency ?? "CAD",
     invoicePrefix: settings?.invoicePrefix ?? "F",
     nextInvoiceNumber: settings?.nextInvoiceNumber ?? 1,
     paymentTermsDays: settings?.paymentTermsDays ?? 30,
@@ -84,6 +112,52 @@ export function useSavePricing() {
       queryClient.invalidateQueries({ queryKey: ["billing-settings"] });
       queryClient.invalidateQueries({ queryKey: ["price-policies"] });
     },
+  });
+}
+
+export interface SaveInvoiceEmailValues {
+  /** Empty means "use the built-in wording": the API stores blank as null. */
+  subject: string;
+  body: string;
+}
+
+/**
+ * The subject and the message an invoice leaves with — and nothing else.
+ *
+ * Its own endpoint for the same reason the pricing one has one: saving the billing card is how
+ * a company declares its taxes and its numbering, and writing an email template is not that
+ * decision. Borrowing the full PUT here would unlock invoicing with rates nobody looked at.
+ */
+export function useSaveInvoiceEmail() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (values: SaveInvoiceEmailValues) =>
+      api.put<BillingSettings>("billing-settings/email", values),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["billing-settings"] }),
+  });
+}
+
+export interface InvoiceEmailPreview {
+  subject: string;
+  /** HTML, already escaped field by field by the API that rendered it. */
+  body: string;
+}
+
+/**
+ * The template as it will arrive, rendered by the same code that sends it.
+ *
+ * It posts what is being typed rather than reading the saved row, so nobody has to commit a
+ * template to find out what it looks like. Feed it a debounced value — the query key is the
+ * template itself, so every keystroke would otherwise be a request.
+ */
+export function useInvoiceEmailPreviewQuery(subject: string, body: string, enabled = true) {
+  return useQuery({
+    queryKey: ["invoice-email-preview", subject, body],
+    queryFn: () => api.post<InvoiceEmailPreview>("billing-settings/email/preview", { subject, body }),
+    enabled,
+    // The previous rendering stays on screen while the next one is fetched, so the preview
+    // never blinks empty between two keystrokes.
+    placeholderData: (previous) => previous,
   });
 }
 

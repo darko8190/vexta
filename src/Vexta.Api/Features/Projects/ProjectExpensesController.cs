@@ -59,7 +59,14 @@ public class ProjectExpensesController(
         Guid projectId, SaveProjectExpenseRequest request, CancellationToken ct)
     {
         if (currentUser.TenantId is not { } tenantId) return Forbid();
-        if (!await db.Projects.AnyAsync(p => p.Id == projectId, ct)) return NotFound();
+
+        var status = await db.Projects.Where(p => p.Id == projectId)
+            .Select(p => (ProjectStatus?)p.Status).FirstOrDefaultAsync(ct);
+        if (status is null) return NotFound();
+
+        // A billed job takes no new expenses: it would be a cost nobody charged for.
+        if (ProjectLock.Problem(status.Value) is { } locked) return BadRequest(new { message = locked });
+
         if (Problem(request) is { } problem) return BadRequest(new { message = problem });
         if (!await db.ExpenseTypes.AnyAsync(t => t.Id == request.ExpenseTypeId, ct))
         {
@@ -95,8 +102,15 @@ public class ProjectExpensesController(
     {
         if (currentUser.TenantId is not { } tenantId) return Forbid();
 
-        var expense = await db.ProjectExpenses.Include(x => x.Photos).FirstOrDefaultAsync(x => x.Id == id, ct);
+        var expense = await db.ProjectExpenses.Include(x => x.Photos).Include(x => x.Project)
+            .FirstOrDefaultAsync(x => x.Id == id, ct);
         if (expense is null) return NotFound();
+
+        if (expense.Project is { } owner && ProjectLock.Problem(owner.Status) is { } locked)
+        {
+            return BadRequest(new { message = locked });
+        }
+
         if (Problem(request) is { } problem) return BadRequest(new { message = problem });
         if (!await db.ExpenseTypes.AnyAsync(t => t.Id == request.ExpenseTypeId, ct))
         {
@@ -126,8 +140,14 @@ public class ProjectExpensesController(
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
-        var expense = await db.ProjectExpenses.FirstOrDefaultAsync(x => x.Id == id, ct);
+        var expense = await db.ProjectExpenses.Include(x => x.Project)
+            .FirstOrDefaultAsync(x => x.Id == id, ct);
         if (expense is null) return NotFound();
+
+        if (expense.Project is { } owner && ProjectLock.Problem(owner.Status) is { } locked)
+        {
+            return BadRequest(new { message = locked });
+        }
 
         // The photo rows go with it; the files stay in the library. Deleting someone's uploads
         // out from under them is the library's decision to offer, not this one's to take.

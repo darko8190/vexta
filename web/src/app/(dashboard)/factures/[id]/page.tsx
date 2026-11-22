@@ -3,20 +3,30 @@
 import { use, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, FileText, Pencil, Send, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, FileText, Pencil, Send, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
 import { InvoicePdfViewer } from "@/components/invoices/invoice-pdf-viewer";
+import { InvoiceSendDialog } from "@/components/invoices/invoice-send-dialog";
 import { useIsClientUser } from "@/hooks/use-can-create";
-import { Spinner } from "@/components/ui/spinner";
-import { useDeleteInvoice, useInvoiceQuery, useSendInvoice } from "@/hooks/use-invoices";
+import { useDeleteInvoice, useInvoiceQuery } from "@/hooks/use-invoices";
 import { usePdfDocument } from "@/hooks/use-pdf-document";
 import { ApiError } from "@/lib/api";
-import { invoiceStatusBadgeVariant, invoiceStatusLabels } from "@/lib/labels";
+import { invoiceLineKindLabels, invoiceStatusBadgeVariant, invoiceStatusLabels } from "@/lib/labels";
 import { formatDateOnly } from "@/lib/dates";
 import { formatProjectNumber } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -25,12 +35,16 @@ function money(amount: number, currency: string) {
   return new Intl.NumberFormat("fr-CA", { style: "currency", currency }).format(amount);
 }
 
+/** A line's quantity, which may be 12 or 12,5 and should not be printed as 12,00. */
+const quantityFormat = new Intl.NumberFormat("fr-CA", { maximumFractionDigits: 3 });
+
 /**
  * One invoice, as the document it is.
  *
- * The record used to open straight into its edit form, which meant a customer could list their
- * invoices and never read one. What there is to see here is the PDF; editing is a step away,
- * for the people allowed to take it.
+ * Read top to bottom the way the paper is: what this document is, then what is on it, with the
+ * document itself alongside. The record used to open straight into its edit form, which meant a
+ * customer could list their invoices and never read one; editing is a step away, for the people
+ * allowed to take it.
  */
 export default function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -38,8 +52,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const isClient = useIsClientUser();
   const { data: invoice, isLoading, isError } = useInvoiceQuery(id);
   const deleteInvoice = useDeleteInvoice();
-  const sendInvoice = useSendInvoice();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [sending, setSending] = useState(false);
 
   const pdf = usePdfDocument(invoice ? `invoices/${id}/pdf` : null);
 
@@ -47,7 +61,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     return (
       <div className="space-y-4">
         <Skeleton className="h-8 w-56" />
-        <Skeleton className="h-[40rem] w-full max-w-3xl" />
+        <Skeleton className="h-40 w-full" />
+        <Skeleton className="h-[40rem] w-full" />
       </div>
     );
   }
@@ -65,17 +80,6 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         }
       />
     );
-  }
-
-  async function onSend() {
-    try {
-      const result = await sendInvoice.mutateAsync(id);
-      toast.success(`Facture envoyée à ${result.email}.`);
-    } catch (error) {
-      // The API says what is wrong — no address on the client's file, Mailgun refusing the
-      // key. Replacing that with "réessayez" sends someone to press the same button again.
-      toast.error(error instanceof ApiError ? error.message : "Impossible d'envoyer cette facture.");
-    }
   }
 
   async function onDelete() {
@@ -98,6 +102,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         Factures
       </Link>
 
+      {/* The document's identity card, above everything: its number, who it is for, where it
+          stands and what it comes to. Everything below is detail. */}
       <div className="mb-6 rounded-lg border border-border bg-card p-4 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
@@ -106,6 +112,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
               <Badge variant={invoiceStatusBadgeVariant[invoice.status]}>
                 {invoiceStatusLabels[invoice.status]}
               </Badge>
+              {invoice.isTaxExempt && <Badge variant="secondary">Sans taxes</Badge>}
             </div>
             <h1 className="mt-1 text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
               {invoice.clientName}
@@ -126,8 +133,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
               {/* A cancelled invoice is not sent again: the status is the record someone
                   checks before chasing a payment. */}
               {invoice.status !== "Annulee" && (
-                <Button variant="outline" size="sm" disabled={sendInvoice.isPending} onClick={onSend}>
-                  {sendInvoice.isPending ? <Spinner /> : <Send />}
+                <Button variant="outline" size="sm" onClick={() => setSending(true)}>
+                  <Send />
                   {invoice.sentAt ? "Renvoyer" : "Envoyer"}
                 </Button>
               )}
@@ -155,13 +162,27 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           </div>
           <div>
             <dt className="text-muted-foreground">Projet</dt>
-            <dd className="text-foreground">
-              {invoice.projectNumber ? formatProjectNumber(invoice.projectNumber) : "—"}
+            <dd className="mt-0.5 text-foreground">
+              {invoice.projectId && invoice.projectNumber ? (
+                /* The job this document bills, one click away. Whoever opens an invoice with a
+                   question about it has the question about the chantier, not about the paper.
+                   A styled anchor rather than a Button: this is navigation. */
+                <Link
+                  href={`/projets/${invoice.projectId}`}
+                  aria-label={`Ouvrir le projet ${formatProjectNumber(invoice.projectNumber)}`}
+                  className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+                >
+                  {formatProjectNumber(invoice.projectNumber)}
+                  <ArrowUpRight />
+                </Link>
+              ) : (
+                "—"
+              )}
             </dd>
           </div>
           <div>
-            <dt className="text-muted-foreground">Total</dt>
-            <dd className="font-medium text-foreground">{money(invoice.total, invoice.currency)}</dd>
+            <dt className="text-muted-foreground">Politique de prix</dt>
+            <dd className="text-foreground">{invoice.pricePolicyName ?? "—"}</dd>
           </div>
           {invoice.sentAt && (
             <div>
@@ -169,17 +190,114 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
               <dd className="text-foreground">{formatDateOnly(invoice.sentAt)}</dd>
             </div>
           )}
+          <div>
+            <dt className="text-muted-foreground">Total</dt>
+            <dd className="font-medium text-foreground">{money(invoice.total, invoice.currency)}</dd>
+          </div>
         </dl>
+
+        {invoice.notes && (
+          <div className="mt-4 border-t border-border pt-4 text-sm">
+            <p className="text-muted-foreground">Notes</p>
+            <p className="whitespace-pre-line text-foreground">{invoice.notes}</p>
+          </div>
+        )}
       </div>
 
-      <InvoicePdfViewer
-        className="max-w-3xl"
-        url={pdf.url}
-        loading={pdf.loading}
-        error={pdf.error}
-        title={`Facture ${invoice.number}`}
-        fileName={`Facture-${invoice.number}.pdf`}
-      />
+      {/* The preview moves beside the lines only at 2xl, the same width the invoice form
+          switches at: a 30rem document next to a table of amounts clips one of the two, and a
+          total nobody can read is worse than a document further down the page. */}
+      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_30rem]">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Lignes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead className="text-right">Qté</TableHead>
+                  <TableHead className="text-right">Prix unitaire</TableHead>
+                  <TableHead className="text-right">Montant</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {invoice.lines.map((line) => (
+                  <TableRow key={line.id}>
+                    <TableCell className="font-medium text-foreground">{line.description}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {invoiceLineKindLabels[line.kind]}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {quantityFormat.format(line.quantity)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {money(line.unitPrice, invoice.currency)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {money(line.quantity * line.unitPrice, invoice.currency)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+              <TableFooter>
+                <TableRow>
+                  <TableCell colSpan={4} className="text-right text-muted-foreground">
+                    Sous-total
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {money(invoice.subtotal, invoice.currency)}
+                  </TableCell>
+                </TableRow>
+                {/* The two taxes stay named and separate, as they are on the document: one
+                    "taxes" figure is the one a company gets asked to break down. */}
+                <TableRow>
+                  <TableCell colSpan={4} className="text-right text-muted-foreground">
+                    {invoice.tax1Label}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {money(invoice.tax1, invoice.currency)}
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell colSpan={4} className="text-right text-muted-foreground">
+                    {invoice.tax2Label}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {money(invoice.tax2, invoice.currency)}
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell colSpan={4} className="text-right font-medium text-foreground">
+                    Total
+                  </TableCell>
+                  <TableCell className="text-right font-medium tabular-nums">
+                    {money(invoice.total, invoice.currency)}
+                  </TableCell>
+                </TableRow>
+              </TableFooter>
+            </Table>
+          </CardContent>
+        </Card>
+
+        {/* Beside the lines on a wide screen, under them otherwise. Sticky so the document
+            stays in view while a long list of lines is being read. */}
+        <aside className="2xl:sticky 2xl:top-6 2xl:self-start">
+          <InvoicePdfViewer
+            url={pdf.url}
+            loading={pdf.loading}
+            error={pdf.error}
+            title={`Facture ${invoice.number}`}
+            fileName={`Facture-${invoice.number}.pdf`}
+          />
+        </aside>
+      </div>
+
+      {!isClient && (
+        <InvoiceSendDialog open={sending} onOpenChange={setSending} invoice={invoice} />
+      )}
 
       <ConfirmDeleteDialog
         open={confirmDelete}

@@ -59,22 +59,27 @@ public class InvoicePdfService(VextaDbContext db, ICurrentUserService currentUse
         var settings = await db.BillingSettings.AsNoTracking()
             .FirstOrDefaultAsync(b => b.TenantId == tenantId, ct);
 
-        var existingNumber = invoiceId is { } id
-            ? await db.Invoices.AsNoTracking().Where(i => i.Id == id).Select(i => i.Number).FirstOrDefaultAsync(ct)
+        var existing = invoiceId is { } id
+            ? await db.Invoices.AsNoTracking()
+                .Where(i => i.Id == id)
+                .Select(i => new { i.Number, i.Currency })
+                .FirstOrDefaultAsync(ct)
             : null;
 
         var model = await BuildAsync(
             tenantId,
             // An invoice being edited keeps its own number. A new one shows the number it will
             // be given, rather than nothing: an invoice with no number reads like a quote.
-            existingNumber ?? InvoiceNumbering.Format(
+            existing?.Number ?? InvoiceNumbering.Format(
                 settings?.InvoicePrefix ?? "F",
                 settings?.NextInvoiceNumber ?? 1),
             request.ClientId,
             request.ProjectId,
             request.IssueDate,
             request.DueDate,
-            request.Currency,
+            // The company's currency, not the form's — the form no longer asks. An invoice being
+            // edited is previewed in the currency it was issued in, which is the one stored on it.
+            existing?.Currency ?? settings?.Currency ?? "CAD",
             request.Notes,
             request.Lines.Select(l => (l.Description ?? string.Empty, l.Quantity, l.UnitPrice, l.IsTaxable)).ToList(),
             await DraftExemptionAsync(request, invoiceId, ct),
@@ -241,7 +246,7 @@ public class InvoicePdfService(VextaDbContext db, ICurrentUserService currentUse
 
     private static string TaxLabel(string name, decimal rate, string? registration)
     {
-        var label = $"{name} ({rate.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)} %)";
+        var label = $"{name} ({rate.ToString("0.###", Formats.Quebec)} %)";
         return string.IsNullOrWhiteSpace(registration) ? label : $"{label} #{registration.Trim()}";
     }
 

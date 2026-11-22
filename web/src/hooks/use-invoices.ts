@@ -1,6 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, buildQuery } from "@/lib/api";
-import type { InvoiceLine, InvoiceRecord, InvoiceStatus, PagedResult } from "@/lib/types";
+import type {
+  InvoiceLine,
+  InvoiceRecord,
+  InvoiceSendDefaults,
+  InvoiceStatus,
+  PagedResult,
+  SendInvoiceValues,
+} from "@/lib/types";
 
 export interface InvoiceFormValues {
   clientId: string;
@@ -8,13 +15,41 @@ export interface InvoiceFormValues {
   status: InvoiceStatus;
   issueDate: string;
   dueDate: string;
-  currency: string;
   notes?: string;
   /** Omitted on a new invoice means "take the project's answer, or the client's". */
   isTaxExempt?: boolean | null;
   /** Which margin catalogue lines are priced with. Omitted takes the project's, then the default. */
   pricePolicyId?: string | null;
   lines: InvoiceLine[];
+}
+
+/**
+ * What a project would be invoiced as, before anything is saved: the client, the policy, the
+ * exemption and one line per thing the job consumed.
+ *
+ * Shaped like the lines the form already carries, so filling it in is an assignment rather than
+ * a translation. Nothing here exists in the database yet.
+ */
+export interface InvoiceDraft {
+  clientId: string;
+  /** The project's price policy, or the company's default when it names none. */
+  pricePolicyId: string | null;
+  isTaxExempt: boolean;
+  lines: InvoiceLine[];
+}
+
+/**
+ * The draft for one project. Read once when the form opens and then left alone: it is a snapshot
+ * of the job at that moment, and re-fetching it would reach into a form someone is typing in.
+ */
+export function useInvoiceDraftQuery(projectId: string | undefined) {
+  return useQuery({
+    queryKey: ["invoice-draft", projectId],
+    queryFn: () => api.get<InvoiceDraft>(`invoices/draft${buildQuery({ projectId })}`),
+    enabled: Boolean(projectId),
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+  });
 }
 
 export function useInvoicesQuery(
@@ -73,12 +108,34 @@ export function useDeleteInvoice() {
   });
 }
 
-/** Emails the invoice to the client with the PDF attached and marks it sent. */
+/**
+ * What the send form opens with: the addresses on file, the employees who can be put in copy,
+ * the company's own wording already filled in with this invoice's figures, and the documents of
+ * its project.
+ *
+ * Read when the dialog opens and then left alone — the subject and the message are being typed
+ * into, and a background refetch would reach into them. A contact created inside the form
+ * invalidates this key on purpose, which is the one case where the list has to come back.
+ */
+export function useInvoiceSendDefaultsQuery(id: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["invoice-send-defaults", id],
+    queryFn: () => api.get<InvoiceSendDefaults>(`invoices/${id}/send-defaults`),
+    enabled: enabled && Boolean(id),
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+  });
+}
+
+/**
+ * Emails the invoice with the PDF attached and marks it sent — but only if the message was
+ * accepted, which is the API's rule and not this hook's to soften.
+ */
 export function useSendInvoice() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) =>
-      api.post<{ email: string; sentAt: string; status: InvoiceStatus }>(`invoices/${id}/send`),
+    mutationFn: ({ id, values }: { id: string; values: SendInvoiceValues }) =>
+      api.post<{ email: string; sentAt: string; status: InvoiceStatus }>(`invoices/${id}/send`, values),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["invoices"] }),
   });
 }

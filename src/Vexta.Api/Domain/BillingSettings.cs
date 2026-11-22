@@ -29,6 +29,14 @@ public class BillingSettings
     public decimal GstRate { get; set; } = 5m;
     public decimal QstRate { get; set; } = 9.975m;
 
+    /// <summary>
+    /// What the company bills in. It lives here rather than on each invoice form: a company
+    /// bills in one currency, and a field asked once per invoice is a field nobody changes and
+    /// anybody can get wrong. Each invoice still stores the answer that was in force when it
+    /// was issued, so a currency change never rewrites what was already sent.
+    /// </summary>
+    public string Currency { get; set; } = "CAD";
+
     /// <summary>F-0001. The prefix is the company's, the counter is ours.</summary>
     public string InvoicePrefix { get; set; } = "F";
 
@@ -57,6 +65,15 @@ public class BillingSettings
 
     /// <summary>Days between issue and due date, used to fill the date in.</summary>
     public int PaymentTermsDays { get; set; } = 30;
+
+    /// <summary>
+    /// The subject and the message an invoice is emailed with, with fields like {{numero}}
+    /// filled in at send time. Null means "use the built-in wording", which is why neither is
+    /// defaulted to a copy of it: a company that never touched this screen should get the
+    /// improved default wording rather than a frozen snapshot of today's.
+    /// </summary>
+    public string? InvoiceEmailSubject { get; set; }
+    public string? InvoiceEmailBody { get; set; }
 
     /// <summary>Payment conditions, as printed.</summary>
     public string? Terms { get; set; }

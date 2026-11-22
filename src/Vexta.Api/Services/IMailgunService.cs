@@ -27,9 +27,32 @@ public interface IMailgunService
         byte[] content,
         CancellationToken ct = default);
 
+    /// <summary>
+    /// The full form: people in copy, and as many files as the message carries.
+    ///
+    /// Copy and attachments are separate parameters rather than something the caller folds into
+    /// the body, because Mailgun has to see them as such — an address written into the HTML is
+    /// read by nobody, and a file described in a sentence is a file that did not arrive.
+    /// </summary>
+    Task SendWithAttachmentsAsync(
+        string toEmail,
+        string toName,
+        string subject,
+        string htmlBody,
+        IReadOnlyCollection<string> ccEmails,
+        IReadOnlyCollection<EmailAttachment> attachments,
+        CancellationToken ct = default);
+
     /// <summary>Sends a real message to prove the credentials and the sending domain work.</summary>
     Task SendTestAsync(string toEmail, CancellationToken ct = default);
 }
+
+/// <summary>
+/// One attached file: the name the recipient will see it under, what it is, and its bytes
+/// already in hand. Bytes rather than a stream because Mailgun is sent one multipart body and
+/// the total size has to be known before any of it leaves.
+/// </summary>
+public record EmailAttachment(string FileName, string ContentType, byte[] Content);
 
 public class MailgunService(IHttpClientFactory httpClientFactory, IPlatformSettingsService settings, ILogger<MailgunService> logger)
     : IMailgunService
@@ -42,7 +65,7 @@ public class MailgunService(IHttpClientFactory httpClientFactory, IPlatformSetti
     }
 
     public Task SendAsync(string toEmail, string toName, string subject, string htmlBody, CancellationToken ct = default) =>
-        SendAsync(toEmail, toName, subject, htmlBody, attachment: null, ct);
+        PostAsync(toEmail, toName, subject, htmlBody, [], [], ct);
 
     public Task SendWithAttachmentAsync(
         string toEmail,
@@ -53,14 +76,27 @@ public class MailgunService(IHttpClientFactory httpClientFactory, IPlatformSetti
         string contentType,
         byte[] content,
         CancellationToken ct = default) =>
-        SendAsync(toEmail, toName, subject, htmlBody, (fileName, contentType, content), ct);
+        PostAsync(
+            toEmail, toName, subject, htmlBody,
+            [], [new EmailAttachment(fileName, contentType, content)], ct);
 
-    private async Task SendAsync(
+    public Task SendWithAttachmentsAsync(
         string toEmail,
         string toName,
         string subject,
         string htmlBody,
-        (string FileName, string ContentType, byte[] Content)? attachment,
+        IReadOnlyCollection<string> ccEmails,
+        IReadOnlyCollection<EmailAttachment> attachments,
+        CancellationToken ct = default) =>
+        PostAsync(toEmail, toName, subject, htmlBody, ccEmails, attachments, ct);
+
+    private async Task PostAsync(
+        string toEmail,
+        string toName,
+        string subject,
+        string htmlBody,
+        IReadOnlyCollection<string> ccEmails,
+        IReadOnlyCollection<EmailAttachment> attachments,
         CancellationToken ct)
     {
         var values = await settings.GetManyAsync(
@@ -100,10 +136,18 @@ public class MailgunService(IHttpClientFactory httpClientFactory, IPlatformSetti
             { new StringContent(htmlBody), "html" }
         };
 
-        if (attachment is { } file)
+        // One field per address, which is how Mailgun reads a list. A single comma-joined string
+        // works too, but an address that itself carries a comma would then split in two.
+        foreach (var cc in ccEmails.Where(c => !string.IsNullOrWhiteSpace(c)))
+        {
+            form.Add(new StringContent(cc.Trim()), "cc");
+        }
+
+        foreach (var file in attachments)
         {
             var part = new ByteArrayContent(file.Content);
             part.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(file.ContentType);
+            // Repeated under the same name, again because that is how Mailgun reads several.
             form.Add(part, "attachment", file.FileName);
         }
 

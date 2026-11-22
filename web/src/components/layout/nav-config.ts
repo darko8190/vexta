@@ -4,6 +4,7 @@ import {
   Building2,
   FileText,
   FolderKanban,
+  GraduationCap,
   LayoutDashboard,
   Palette,
   Settings,
@@ -37,6 +38,7 @@ const tenantNav: NavItem[] = [
   { href: "/projets", label: "Projets", icon: FolderKanban },
   { href: "/factures", label: "Factures", icon: FileText },
   { href: "/inventaire", label: "Inventaire", icon: Boxes },
+  { href: "/outils", label: "Outils & Formation", icon: GraduationCap },
 ];
 
 /**

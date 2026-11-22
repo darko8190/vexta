@@ -22,6 +22,7 @@ import { dashboardNavItem, getNavItems, type NavItem } from "@/components/layout
 import { NavLinks } from "@/components/layout/nav-links";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
+import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { useNavigationQuery, type NavigationItem } from "@/hooks/use-navigation";
 import { moduleIcon } from "@/lib/module-icons";
 import { useAuth } from "@/lib/auth-context";
@@ -167,6 +168,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex-1 overflow-y-auto px-3 py-2">
             <NavLinks items={navItems} onNavigate={() => setMobileOpen(false)} />
           </div>
+          {/* The invitation lives at the foot of the menu rather than in the header: the header
+              has room for two controls on a phone, and installing is something you do once.
+              It renders nothing at all when there is nothing to install. */}
+          <div className="px-3 pb-4">
+            <InstallPrompt className="w-full" />
+          </div>
         </SheetContent>
       </Sheet>
 
@@ -185,6 +192,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <UserAvatarMenu />
         </header>
         <header className="hidden h-16 items-center justify-end gap-2 border-b border-border px-6 md:flex">
+          <InstallPrompt />
           <ThemeToggle />
           <UserAvatarMenu />
         </header>

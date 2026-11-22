@@ -52,6 +52,10 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
     public DbSet<TenantMembership> TenantMemberships => Set<TenantMembership>();
     public DbSet<BillingSettings> BillingSettings => Set<BillingSettings>();
     public DbSet<ProjectExpense> ProjectExpenses => Set<ProjectExpense>();
+    public DbSet<ProjectMaterial> ProjectMaterials => Set<ProjectMaterial>();
+    public DbSet<TimesheetEntry> TimesheetEntries => Set<TimesheetEntry>();
+    public DbSet<ProjectDocument> ProjectDocuments => Set<ProjectDocument>();
+    public DbSet<ProjectNote> ProjectNotes => Set<ProjectNote>();
     public DbSet<ExpenseType> ExpenseTypes => Set<ExpenseType>();
     public DbSet<ProjectExpensePhoto> ProjectExpensePhotos => Set<ProjectExpensePhoto>();
     public DbSet<Product> Products => Set<Product>();
@@ -255,6 +259,79 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
                 && (CurrentClientId == null || x.Project!.ClientId == CurrentClientId));
         });
 
+        builder.Entity<ProjectMaterial>(e =>
+        {
+            e.HasOne(m => m.Project).WithMany(p => p.Materials)
+                .HasForeignKey(m => m.ProjectId).OnDelete(DeleteBehavior.Cascade);
+
+            // SetNull: what a job consumed outlives the catalogue entry it was taken from.
+            e.HasOne(m => m.Product).WithMany()
+                .HasForeignKey(m => m.ProductId).OnDelete(DeleteBehavior.SetNull);
+
+            e.Property(m => m.Code).HasMaxLength(60);
+            e.Property(m => m.Description).HasMaxLength(500);
+            e.Property(m => m.Unit).HasMaxLength(20);
+            e.Property(m => m.Quantity).HasPrecision(14, 3);
+            e.Property(m => m.PurchasePrice).HasPrecision(14, 2);
+            e.Property(m => m.MarginPercent).HasPrecision(6, 3);
+            e.Property(m => m.UnitPrice).HasPrecision(14, 2);
+
+            e.HasIndex(m => new { m.ProjectId, m.SortOrder });
+
+            // Follows the project's own filter, like an expense: the tenant, and the client's
+            // own rows when a customer is signed in.
+            e.HasQueryFilter(m => m.TenantId == CurrentTenantId
+                && (CurrentClientId == null || m.Project!.ClientId == CurrentClientId));
+        });
+
+        builder.Entity<TimesheetEntry>(e =>
+        {
+            e.HasOne(t => t.Project).WithMany(p => p.Timesheets)
+                .HasForeignKey(t => t.ProjectId).OnDelete(DeleteBehavior.Cascade);
+
+            // SetNull: taking someone off the payroll must not delete the hours billed for
+            // them. The entry then reads as hours with no name, which is the truth.
+            e.HasOne(t => t.Employee).WithMany()
+                .HasForeignKey(t => t.EmployeeId).OnDelete(DeleteBehavior.SetNull);
+
+            e.Property(t => t.Hours).HasPrecision(8, 2);
+            e.Property(t => t.Note).HasMaxLength(500);
+
+            e.HasIndex(t => new { t.ProjectId, t.StartDate });
+            e.HasQueryFilter(t => t.TenantId == CurrentTenantId
+                && (CurrentClientId == null || t.Project!.ClientId == CurrentClientId));
+        });
+
+        builder.Entity<ProjectDocument>(e =>
+        {
+            e.HasOne(d => d.Project).WithMany(p => p.Documents)
+                .HasForeignKey(d => d.ProjectId).OnDelete(DeleteBehavior.Cascade);
+
+            // Cascade on the asset, like an HR document: a row whose file is gone is a broken
+            // link offered as a document.
+            e.HasOne(d => d.MediaAsset).WithMany()
+                .HasForeignKey(d => d.MediaAssetId).OnDelete(DeleteBehavior.Cascade);
+
+            e.Property(d => d.Title).HasMaxLength(200);
+            e.Property(d => d.Category).HasMaxLength(100);
+
+            e.HasIndex(d => new { d.ProjectId, d.CreatedAt });
+            e.HasQueryFilter(d => d.TenantId == CurrentTenantId
+                && (CurrentClientId == null || d.Project!.ClientId == CurrentClientId));
+        });
+
+        builder.Entity<ProjectNote>(e =>
+        {
+            e.HasOne(n => n.Project).WithMany(p => p.Notes)
+                .HasForeignKey(n => n.ProjectId).OnDelete(DeleteBehavior.Cascade);
+
+            e.Property(n => n.Body).HasMaxLength(4000);
+
+            e.HasIndex(n => new { n.ProjectId, n.CreatedAt });
+            e.HasQueryFilter(n => n.TenantId == CurrentTenantId
+                && (CurrentClientId == null || n.Project!.ClientId == CurrentClientId));
+        });
+
         builder.Entity<ProjectExpensePhoto>(e =>
         {
             e.HasOne(p => p.Expense).WithMany(x => x.Photos)
@@ -305,6 +382,7 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.Property(p => p.Title).HasMaxLength(200);
             e.Property(p => p.Description).HasMaxLength(4000);
             e.Property(p => p.Barcode).HasMaxLength(64);
+            e.Property(p => p.Unit).HasMaxLength(20);
             e.Property(p => p.Note).HasMaxLength(4000);
             e.Property(p => p.PurchasePrice).HasPrecision(14, 2);
             e.Property(p => p.SellingPrice).HasPrecision(14, 2);
@@ -468,6 +546,9 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.Property(b => b.GstNumber).HasMaxLength(40);
             e.Property(b => b.QstNumber).HasMaxLength(40);
             e.Property(b => b.InvoicePrefix).HasMaxLength(10);
+            e.Property(b => b.Currency).HasMaxLength(3);
+            e.Property(b => b.InvoiceEmailSubject).HasMaxLength(300);
+            e.Property(b => b.InvoiceEmailBody).HasMaxLength(8000);
             e.Property(b => b.GstRate).HasPrecision(6, 3);
             e.Property(b => b.QstRate).HasPrecision(6, 3);
             e.Property(b => b.DefaultHourlyRate).HasPrecision(14, 2);

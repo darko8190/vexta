@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Building2, Clock, CreditCard, Percent, Receipt } from "lucide-react";
+import { Building2, Clock, CreditCard, Mail, Percent, Receipt } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +16,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { SectionNav, type NavSection } from "@/components/layout/section-nav";
 import { BillingSettingsCard } from "@/components/settings/billing-settings-card";
 import { HourlyRateCard } from "@/components/settings/hourly-rate-card";
+import { InvoiceEmailCard } from "@/components/settings/invoice-email-card";
 import { MarginModeCard } from "@/components/settings/margin-mode-card";
 import { PricePoliciesCard } from "@/components/settings/price-policies-card";
 import { useBillingStateQuery, type BillingState } from "@/hooks/use-billing";
@@ -262,6 +263,7 @@ export default function SettingsPage() {
     ...(canManage
       ? [
           { key: "facturation", label: "Facturation", icon: Receipt },
+          { key: "courriel", label: "Courriel", icon: Mail },
           { key: "taux", label: "Taux", icon: Clock },
           // The only count that means anything on this page; the others are one thing each.
           { key: "marge", label: "Marge et prix", count: policies?.length ?? 0, icon: Percent },
@@ -306,6 +308,7 @@ export default function SettingsPage() {
                 <BusinessSubscription state={data} />
               ))}
             {active === "facturation" && <BillingSettingsCard />}
+            {active === "courriel" && <InvoiceEmailCard />}
             {active === "taux" && <HourlyRateCard />}
             {active === "marge" && (
               <div className="space-y-6">

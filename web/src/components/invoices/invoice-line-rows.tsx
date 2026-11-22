@@ -18,6 +18,18 @@ const KINDS = Object.keys(invoiceLineKindLabels) as InvoiceLineKind[];
 /** The two kinds that are bought rather than typed, and so can be found in the catalogue. */
 const CATALOGUE_KINDS: InvoiceLineKind[] = ["Materiaux", "Equipement"];
 
+/**
+ * The columns, written once and shared by the headings and every row — two copies of a nine
+ * column template is two things to keep in step, and they do not stay in step.
+ */
+const COLUMNS = "lg:grid-cols-[130px_minmax(0,1fr)_72px_100px_80px_100px_96px_80px_36px]";
+
+/** The line total, without a symbol: the currency is stated once under the table. */
+const amountFormat = new Intl.NumberFormat("fr-CA", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
 export interface LineValues {
   kind: InvoiceLineKind;
   productId: string | null;
@@ -45,12 +57,33 @@ function fieldValue(value: number | null | undefined): string {
 }
 
 /**
+ * A column that has no answer on this line.
+ *
+ * A dash rather than an empty box: a box invites a number, and what an hour of labour cost the
+ * company is payroll — not a figure anybody can type onto the client's invoice. The label stays
+ * below lg, where the fields are read one under the other instead of as a table.
+ */
+function NotApplicable({ label }: { label: string }) {
+  return (
+    <Field>
+      <FieldLabel className="lg:sr-only">{label}</FieldLabel>
+      <p className="flex h-8 items-center justify-end px-2.5 text-sm tabular-nums text-muted-foreground">
+        —
+      </p>
+    </Field>
+  );
+}
+
+/**
  * The lines of an invoice, as a table with headings.
  *
  * Six numbers in a row with nothing above them is a puzzle — the columns are what make a
  * selling price readable as a selling price. The arithmetic between them runs in one direction
  * at a time: changing the cost or the margin recomputes the selling price, and typing a selling
  * price recomputes the margin, so whichever one was touched last is the one that is kept.
+ *
+ * A labour line is the same row read differently: description, hours, hourly rate, total. There
+ * is no product to look up and no purchase price to state, so those two columns show a dash.
  */
 export function InvoiceLineRows({
   form,
@@ -127,10 +160,15 @@ export function InvoiceLineRows({
     // Leaving the catalogue means the line is no longer that product, whatever it still says.
     if (!CATALOGUE_KINDS.includes(kind)) patch.productId = null;
 
-    // Labour starts at the company's rate. Only when the line is still blank: overwriting a
-    // price someone has typed because they changed the kind would be the form arguing back.
-    if (kind === "MainDOeuvre" && hourlyRate != null && !lines[index]?.unitPrice) {
-      patch.unitPrice = hourlyRate;
+    if (kind === "MainDOeuvre") {
+      // Cleared, not merely hidden. The row shows a dash in these two columns from here on,
+      // and a dash over a stored cost is a line whose margin nobody can explain later.
+      patch.purchasePrice = null;
+      patch.marginPercent = null;
+
+      // Labour starts at the company's rate. Only when the line is still blank: overwriting a
+      // price someone has typed because they changed the kind would be the form arguing back.
+      if (hourlyRate != null && !lines[index]?.unitPrice) patch.unitPrice = hourlyRate;
     }
 
     setLine(index, patch);
@@ -139,14 +177,17 @@ export function InvoiceLineRows({
   return (
     <div className="space-y-3">
       {/* The headings. Hidden below lg, where every field carries its own label instead —
-          a seven-column table on a telephone is a horizontal scrollbar nobody uses. */}
-      <div className="hidden items-end gap-2 px-3 text-xs font-medium text-muted-foreground lg:grid lg:grid-cols-[140px_minmax(0,1fr)_80px_110px_90px_110px_90px_40px]">
+          a nine-column table on a telephone is a horizontal scrollbar nobody uses. */}
+      <div
+        className={`hidden items-end gap-2 px-3 text-xs font-medium text-muted-foreground lg:grid ${COLUMNS}`}
+      >
         <span>Type</span>
         <span>Description</span>
         <span className="text-right">Qté</span>
         <span className="text-right">Prix d&apos;achat</span>
         <span className="text-right">Marge %</span>
         <span className="text-right">Prix vendant</span>
+        <span className="text-right">Total</span>
         <span className="text-center">Taxable</span>
         <span />
       </div>
@@ -155,10 +196,19 @@ export function InvoiceLineRows({
         const kind = (lines[index]?.kind ?? "Autre") as InvoiceLineKind;
         const fromCatalogue = CATALOGUE_KINDS.includes(kind);
 
+        // Labour is sold by the hour, so the quantity is hours and the unit price is the rate.
+        // Naming them so is the difference between a row that reads itself and one that has to
+        // be decoded.
+        const isLabour = kind === "MainDOeuvre";
+        const quantityLabel = isLabour ? "Heures" : "Quantité";
+        const unitPriceLabel = isLabour ? "Taux horaire" : "Prix vendant";
+
+        const total = (Number(lines[index]?.quantity) || 0) * (Number(lines[index]?.unitPrice) || 0);
+
         return (
           <div
             key={lineField.id}
-            className="grid gap-2 rounded-lg border border-border p-3 lg:grid-cols-[140px_minmax(0,1fr)_80px_110px_90px_110px_90px_40px] lg:items-start lg:gap-2"
+            className={`grid gap-2 rounded-lg border border-border p-3 lg:items-start lg:gap-2 ${COLUMNS}`}
           >
             <Controller
               name={`lines.${index}.kind`}
@@ -218,13 +268,15 @@ export function InvoiceLineRows({
               control={form.control}
               render={({ field }) => (
                 <Field>
-                  <FieldLabel className="lg:sr-only">Quantité</FieldLabel>
+                  <FieldLabel className="lg:sr-only">{quantityLabel}</FieldLabel>
                   <Input
                     type="number"
                     step="0.01"
                     min="0"
                     inputMode="decimal"
                     className="text-right"
+                    aria-label={quantityLabel}
+                    placeholder={isLabour ? "Heures" : undefined}
                     value={field.value}
                     onChange={(event) => field.onChange(event.target.valueAsNumber || 0)}
                   />
@@ -232,75 +284,101 @@ export function InvoiceLineRows({
               )}
             />
 
-            <Controller
-              name={`lines.${index}.purchasePrice`}
-              control={form.control}
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel className="lg:sr-only">Prix d&apos;achat</FieldLabel>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    inputMode="decimal"
-                    placeholder="—"
-                    className="text-right"
-                    value={fieldValue(field.value)}
-                    onChange={(event) =>
-                      repriceFromMargin(
-                        index,
-                        numberOrNull(event.target.value),
-                        lines[index]?.marginPercent ?? null,
-                      )
-                    }
-                  />
-                </Field>
-              )}
-            />
+            {/* Labour has neither: the catalogue does not price an hour, and the cost of one is
+                payroll. A dash says so; two empty boxes would ask for it. */}
+            {isLabour ? (
+              <>
+                <NotApplicable label="Prix d'achat" />
+                <NotApplicable label="Marge %" />
+              </>
+            ) : (
+              <>
+                <Controller
+                  name={`lines.${index}.purchasePrice`}
+                  control={form.control}
+                  render={({ field }) => (
+                    <Field>
+                      <FieldLabel className="lg:sr-only">Prix d&apos;achat</FieldLabel>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        inputMode="decimal"
+                        placeholder="—"
+                        className="text-right"
+                        aria-label="Prix d'achat"
+                        value={fieldValue(field.value)}
+                        onChange={(event) =>
+                          repriceFromMargin(
+                            index,
+                            numberOrNull(event.target.value),
+                            lines[index]?.marginPercent ?? null,
+                          )
+                        }
+                      />
+                    </Field>
+                  )}
+                />
 
-            <Controller
-              name={`lines.${index}.marginPercent`}
-              control={form.control}
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel className="lg:sr-only">Marge %</FieldLabel>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    inputMode="decimal"
-                    placeholder="—"
-                    className="text-right"
-                    value={fieldValue(field.value)}
-                    onChange={(event) =>
-                      repriceFromMargin(
-                        index,
-                        lines[index]?.purchasePrice ?? null,
-                        numberOrNull(event.target.value),
-                      )
-                    }
-                  />
-                </Field>
-              )}
-            />
+                <Controller
+                  name={`lines.${index}.marginPercent`}
+                  control={form.control}
+                  render={({ field }) => (
+                    <Field>
+                      <FieldLabel className="lg:sr-only">Marge %</FieldLabel>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        inputMode="decimal"
+                        placeholder="—"
+                        className="text-right"
+                        aria-label="Marge %"
+                        value={fieldValue(field.value)}
+                        onChange={(event) =>
+                          repriceFromMargin(
+                            index,
+                            lines[index]?.purchasePrice ?? null,
+                            numberOrNull(event.target.value),
+                          )
+                        }
+                      />
+                    </Field>
+                  )}
+                />
+              </>
+            )}
 
             <Controller
               name={`lines.${index}.unitPrice`}
               control={form.control}
               render={({ field }) => (
                 <Field>
-                  <FieldLabel className="lg:sr-only">Prix vendant</FieldLabel>
+                  <FieldLabel className="lg:sr-only">{unitPriceLabel}</FieldLabel>
                   <Input
                     type="number"
                     step="0.01"
                     min="0"
                     inputMode="decimal"
                     className="text-right"
+                    aria-label={unitPriceLabel}
+                    placeholder={isLabour ? "Taux horaire" : undefined}
                     value={field.value}
                     onChange={(event) => repriceFromSelling(index, event.target.valueAsNumber || 0)}
                   />
                 </Field>
               )}
             />
+
+            {/* Computed, on every line and not only on labour: it is the column people look for
+                first, and a table of unit prices that never states what the line comes to is a
+                table everyone re-multiplies in their head. Never editable — a total that can
+                disagree with its own quantity and price is a total nobody can trust. */}
+            <Field>
+              <FieldLabel className="lg:sr-only">Total</FieldLabel>
+              <p className="flex h-8 items-center justify-end px-2.5 text-sm font-medium tabular-nums">
+                {amountFormat.format(total)}
+              </p>
+            </Field>
 
             <Controller
               name={`lines.${index}.isTaxable`}

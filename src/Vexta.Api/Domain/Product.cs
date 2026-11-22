@@ -25,6 +25,13 @@ public class Product
     public required string Title { get; set; }
     public string? Description { get; set; }
 
+    /// <summary>
+    /// How it is counted and sold: un, pi, pi², m, kg, h, sac. Free text rather than a list,
+    /// because every trade measures differently and the unit is printed, not calculated with —
+    /// forcing a shared vocabulary here would only make people pick the nearest wrong one.
+    /// </summary>
+    public string? Unit { get; set; }
+
     public Guid? CategoryId { get; set; }
     public ProductCategory? Category { get; set; }
 

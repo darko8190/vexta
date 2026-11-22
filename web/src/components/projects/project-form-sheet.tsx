@@ -6,6 +6,7 @@ import { Controller, useForm, useWatch } from "react-hook-form";
 import * as z from "zod";
 import { toast } from "sonner";
 import { ApiError } from "@/lib/api";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -65,12 +66,36 @@ function toFormValues(project?: ProjectRecord, defaultClientId?: string): FormVa
     sameAddressAsClient: project?.sameAddressAsClient ?? true,
     siteAddressId: project?.siteAddress?.id ?? "",
     description: project?.description ?? "",
-    status: project?.status ?? "Planifie",
+    status: project?.status ?? "AFaire",
     startDate: project?.startDate ?? "",
     endDate: project?.endDate ?? "",
     budget: project?.budget != null ? String(project.budget) : "",
     isTaxExempt: project?.isTaxExempt ?? false,
     pricePolicyId: project?.pricePolicyId ?? "",
+  };
+}
+
+/**
+ * The project exactly as it is stored, in the shape the save endpoint wants.
+ *
+ * Used to reopen a billed job: the API refuses an edit that touches anything but the status, so
+ * reopening has to send back every other field unchanged rather than whatever happens to be in
+ * the form at that moment.
+ */
+function storedValues(project: ProjectRecord): ProjectFormValues {
+  return {
+    clientId: project.clientId,
+    poNumber: project.poNumber,
+    clientAddressId: project.clientAddress?.id ?? null,
+    sameAddressAsClient: project.sameAddressAsClient,
+    siteAddressId: project.siteAddress?.id ?? null,
+    description: project.description ?? undefined,
+    status: project.status,
+    startDate: project.startDate,
+    endDate: project.endDate,
+    budget: project.budget,
+    isTaxExempt: project.isTaxExempt,
+    pricePolicyId: project.pricePolicyId,
   };
 }
 
@@ -134,6 +159,26 @@ export function ProjectFormSheet({
 
   const pending = createProject.isPending || updateProject.isPending;
 
+  // Billed is a lock, not just a label: the materials, the hours and the expenses behind the
+  // job are the figures the client was charged from, and the invoice is the document that will
+  // be quoted back at the company. The way out is one deliberate button rather than a status
+  // dropdown somebody can nudge by accident.
+  const billed = isEditing && project?.status === "Facture";
+
+  async function reopen() {
+    if (!project) return;
+
+    try {
+      await updateProject.mutateAsync({
+        id: project.id,
+        values: { ...storedValues(project), status: "AFacturer" },
+      });
+      toast.success("Projet rouvert. Vous pouvez le modifier.");
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Impossible de rouvrir le projet.");
+    }
+  }
+
   // useWatch rather than form.watch: the React Compiler lint refuses a subscription read during
   // render, and the repo already follows this convention elsewhere.
   const clientId = useWatch({ control: form.control, name: "clientId" });
@@ -174,12 +219,31 @@ export function ProjectFormSheet({
           </SheetDescription>
         </SheetHeader>
 
+        {billed && (
+          <Alert className="mx-4">
+            <AlertTitle>Projet facturé</AlertTitle>
+            <AlertDescription className="space-y-3">
+              <p>
+                Ce projet a été facturé : ses matériaux, ses heures et ses dépenses sont les
+                chiffres portés sur la facture. Rouvrez-le pour y toucher.
+              </p>
+              <Button type="button" size="sm" variant="outline" onClick={reopen} disabled={pending}>
+                {pending && <Spinner />}
+                Rouvrir le projet
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
         <form
           id="project-form"
           className="flex-1 overflow-y-auto px-4"
           onSubmit={form.handleSubmit(onSubmit)}
           noValidate
         >
+          {/* A fieldset rather than a disabled prop on each control: one attribute turns the
+              whole card read-only, and nothing can be added later that forgets to follow. */}
+          <fieldset disabled={billed} className="min-w-0 border-0 p-0">
           <FieldGroup>
             <Controller
               name="clientId"
@@ -412,10 +476,11 @@ export function ProjectFormSheet({
               />
             )}
           </FieldGroup>
+          </fieldset>
         </form>
 
         <SheetFooter>
-          <Button type="submit" form="project-form" disabled={pending}>
+          <Button type="submit" form="project-form" disabled={pending || billed}>
             {pending && <Spinner />}
             {isEditing ? "Enregistrer" : "Créer le projet"}
           </Button>

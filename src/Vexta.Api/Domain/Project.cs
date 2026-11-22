@@ -22,7 +22,7 @@ public class Project
     /// client — it carries no name of its own, because on paper nobody quotes one.
     /// </summary>
     public string? Description { get; set; }
-    public ProjectStatus Status { get; set; } = ProjectStatus.Planifie;
+    public ProjectStatus Status { get; set; } = ProjectStatus.AFaire;
 
     public DateOnly? StartDate { get; set; }
     public DateOnly? EndDate { get; set; }
@@ -61,4 +61,8 @@ public class Project
 
     public List<Invoice> Invoices { get; set; } = [];
     public List<ProjectExpense> Expenses { get; set; } = [];
+    public List<ProjectMaterial> Materials { get; set; } = [];
+    public List<TimesheetEntry> Timesheets { get; set; } = [];
+    public List<ProjectDocument> Documents { get; set; } = [];
+    public List<ProjectNote> Notes { get; set; } = [];
 }

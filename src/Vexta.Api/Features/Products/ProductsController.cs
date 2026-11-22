@@ -95,6 +95,7 @@ public class ProductsController(
                 p.Number,
                 p.Code,
                 p.Title,
+                p.Unit,
                 CategoryName = p.Category == null ? null : p.Category.Name,
                 p.PurchasePrice,
                 p.MarginPercent,
@@ -111,6 +112,7 @@ public class ProductsController(
             i.Number,
             i.Code,
             i.Title,
+            i.Unit,
             i.CategoryName,
             i.PurchasePrice,
             i.MarginPercent,
@@ -163,6 +165,7 @@ public class ProductsController(
             Code = Clean(request.Code),
             Title = request.Title.Trim(),
             Description = Clean(request.Description),
+            Unit = Clean(request.Unit),
             CategoryId = request.CategoryId,
             SubCategoryId = request.SubCategoryId,
             Barcode = Clean(request.Barcode),
@@ -218,6 +221,7 @@ public class ProductsController(
         product.Code = Clean(request.Code);
         product.Title = request.Title.Trim();
         product.Description = Clean(request.Description);
+        product.Unit = Clean(request.Unit);
         product.CategoryId = request.CategoryId;
         product.SubCategoryId = request.SubCategoryId;
         product.Barcode = Clean(request.Barcode);
@@ -495,6 +499,10 @@ public class ProductsController(
         if (request.Code is { Length: > 60 }) return "Le code est trop long.";
         if (request.Barcode is { Length: > 64 }) return "Le code à barres est trop long.";
 
+        // 20, like the column: an abbreviation is what a unit is, and anything longer is a
+        // sentence that would be truncated by the database rather than refused here.
+        if (request.Unit is { Length: > 20 }) return "L'unité est trop longue.";
+
         if (request.PurchasePrice is < 0 || request.SellingPrice is < 0)
         {
             return "Un prix ne peut pas être négatif.";
@@ -673,6 +681,7 @@ public class ProductsController(
         p.Code,
         p.Title,
         p.Description,
+        p.Unit,
         p.CategoryId,
         p.Category == null ? null : p.Category.Name,
         p.SubCategoryId,

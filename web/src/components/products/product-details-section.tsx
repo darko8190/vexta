@@ -78,20 +78,22 @@ export function ProductDetailsSection({ product }: { product: ProductRecord }) {
 
       {product.tracksInventory ? (
         <div className="grid gap-4 sm:grid-cols-3">
+          {/* The unit is on all three: each tile is read on its own, across a counter, and a
+              figure that borrows its unit from the tile beside it is a figure read wrong. */}
           <Quantity
             label="Quantité physique"
-            value={quantity(product.quantityOnHand)}
+            value={quantity(product.quantityOnHand, product.unit)}
             note="Ce qui est sur la tablette."
           />
           <Quantity
             label="Réservé"
-            value={quantity(product.quantityReserved)}
+            value={quantity(product.quantityReserved, product.unit)}
             note="Promis à des factures non réglées."
             muted
           />
           <Quantity
             label="Disponible"
-            value={quantity(product.quantityAvailable)}
+            value={quantity(product.quantityAvailable, product.unit)}
             note="Ce qui peut encore être vendu."
           />
         </div>
@@ -122,25 +124,31 @@ export function ProductDetailsSection({ product }: { product: ProductRecord }) {
         </Row>
         <Row label="Page publique">{product.isPublic ? "Visible" : "Non publié"}</Row>
 
+        {/* Both prices carry the unit — a price is per something, and "4,50 $" on its own is the
+            kind of figure that gets quoted for a whole roof. The margin is a percentage of the
+            two, so it has none. */}
         <Row label="Prix d'achat">
-          <span className="tabular-nums">{money(product.purchasePrice)}</span>
+          <span className="tabular-nums">{money(product.purchasePrice, product.unit)}</span>
         </Row>
         <Row label="Marge">
           <span className="tabular-nums">{percent(product.marginPercent)}</span>
         </Row>
         <Row label="Prix de vente">
-          <span className="tabular-nums">{money(product.sellingPrice)}</span>
+          <span className="tabular-nums">{money(product.sellingPrice, product.unit)}</span>
         </Row>
         <Row label="Temps d'installation">{duration(product.installationMinutes)}</Row>
 
+        {/* Spelled out as a row of its own as well, so the unit can be read off the page even for
+            a product with no price and no quantity to hang it on. */}
+        <Row label="Unité">{product.unit || "—"}</Row>
         <Row label="Minimum">
           <span className="tabular-nums">
-            {product.tracksInventory ? quantity(product.minimumQuantity) : "—"}
+            {product.tracksInventory ? quantity(product.minimumQuantity, product.unit) : "—"}
           </span>
         </Row>
         <Row label="Maximum">
           <span className="tabular-nums">
-            {product.tracksInventory ? quantity(product.maximumQuantity) : "—"}
+            {product.tracksInventory ? quantity(product.maximumQuantity, product.unit) : "—"}
           </span>
         </Row>
 

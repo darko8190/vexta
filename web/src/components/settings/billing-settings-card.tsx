@@ -28,6 +28,10 @@ const formSchema = z.object({
   rbqNumber: z.string().trim().max(40, "40 caractères maximum."),
   gstRate: z.string().min(1, "Taux requis."),
   qstRate: z.string().min(1, "Taux requis."),
+  currency: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z]{3}$/, "Trois lettres, comme CAD, USD ou EUR."),
   invoicePrefix: z.string().trim().min(1, "Le préfixe est requis.").max(10, "10 caractères maximum."),
   nextInvoiceNumber: z.string().min(1, "Numéro requis."),
   paymentTermsDays: z.string().min(1, "Délai requis."),
@@ -44,6 +48,7 @@ function toFormValues(settings?: BillingSettings): FormValues {
     rbqNumber: settings?.rbqNumber ?? "",
     gstRate: String(settings?.gstRate ?? 5),
     qstRate: String(settings?.qstRate ?? 9.975),
+    currency: settings?.currency ?? "CAD",
     invoicePrefix: settings?.invoicePrefix ?? "F",
     nextInvoiceNumber: String(settings?.nextInvoiceNumber ?? 1),
     paymentTermsDays: String(settings?.paymentTermsDays ?? 30),
@@ -82,6 +87,9 @@ export function BillingSettingsCard() {
         rbqNumber: values.rbqNumber || null,
         gstRate: Number(values.gstRate),
         qstRate: Number(values.qstRate),
+        // Upper-cased here as well as on the server, so the field someone just typed reads back
+        // the way it will be printed rather than the way it was keyed.
+        currency: values.currency.toUpperCase(),
         invoicePrefix: values.invoicePrefix,
         nextInvoiceNumber: Number(values.nextInvoiceNumber),
         paymentTermsDays: Number(values.paymentTermsDays),
@@ -188,7 +196,7 @@ export function BillingSettingsCard() {
               />
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <Controller
                 name="invoicePrefix"
                 control={form.control}
@@ -222,10 +230,33 @@ export function BillingSettingsCard() {
                   </Field>
                 )}
               />
+              {/* Beside the numbering, because it is the same kind of decision: how this
+                  company's invoices are written, settled once and then never asked again. */}
+              <Controller
+                name="currency"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="billing-currency">Devise</FieldLabel>
+                    <Input
+                      {...field}
+                      id="billing-currency"
+                      className="uppercase"
+                      maxLength={3}
+                      autoComplete="off"
+                      spellCheck={false}
+                      placeholder="CAD"
+                      aria-invalid={fieldState.invalid}
+                    />
+                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  </Field>
+                )}
+              />
             </div>
             <FieldDescription>
               Le numéro ne peut pas reculer sur une facture déjà émise : il est relevé
-              automatiquement si vous essayez.
+              automatiquement si vous essayez. La devise s&apos;applique aux prochaines factures ;
+              celles déjà émises gardent la leur.
             </FieldDescription>
 
             <Controller

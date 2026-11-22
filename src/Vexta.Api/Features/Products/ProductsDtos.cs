@@ -25,6 +25,7 @@ public record ProductDto(
     string? Code,
     string Title,
     string? Description,
+    string? Unit,
     Guid? CategoryId,
     string? CategoryName,
     Guid? SubCategoryId,
@@ -97,11 +98,16 @@ public record ProductSummaryDto(ProductSectionCountsDto Counts);
 /// A catalogue hit as the invoice line picker shows it. Deliberately small: the picker runs on
 /// every keystroke and a line only needs what it is about to copy onto itself.
 /// </summary>
+/// <param name="Unit">
+/// Carried even though the picker barely shows it: the line that picks a product copies the unit
+/// onto itself, and a quantity of 12 has to be able to say twelve of what.
+/// </param>
 public record ProductSearchResultDto(
     Guid Id,
     int Number,
     string? Code,
     string Title,
+    string? Unit,
     string? CategoryName,
     decimal? PurchasePrice,
     decimal? MarginPercent,
@@ -114,10 +120,15 @@ public record ProductSearchResultDto(
 /// than applied silently, so the number on the page always has a movement behind it.
 /// </param>
 /// <param name="ParentProductId">Set to create this product as a variant of another one.</param>
+/// <param name="Unit">
+/// How the product is counted and sold: un, pi, pi², m, kg, h, sac. Free text, trimmed, and null
+/// when left blank — a variant measures itself, so it carries its own rather than its parent's.
+/// </param>
 public record SaveProductRequest(
     string? Code,
     string Title,
     string? Description,
+    string? Unit,
     Guid? CategoryId,
     Guid? SubCategoryId,
     string? Barcode,

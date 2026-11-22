@@ -61,6 +61,8 @@ public record ProjectSectionCountsDto(
     int Timesheets,
     int Expenses,
     int ExtraCharges,
+    /// <summary>Files and written notes together: they share one section, so they share a badge.</summary>
+    int DocumentsAndNotes,
     int Invoices);
 
 /// <summary>

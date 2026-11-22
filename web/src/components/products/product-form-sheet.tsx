@@ -39,6 +39,7 @@ const formSchema = z.object({
   code: z.string().trim().max(60, "60 caractères maximum."),
   title: z.string().trim().min(1, "Le titre est obligatoire.").max(200, "200 caractères maximum."),
   description: z.string().trim().max(4000, "4000 caractères maximum."),
+  unit: z.string().trim().max(20, "20 caractères maximum."),
   categoryId: z.string(),
   subCategoryId: z.string(),
   barcode: z.string().trim().max(64, "64 caractères maximum."),
@@ -61,6 +62,7 @@ function emptyValues(): FormValues {
     code: "",
     title: "",
     description: "",
+    unit: "",
     categoryId: "",
     subCategoryId: "",
     barcode: "",
@@ -125,6 +127,7 @@ export function ProductFormSheet({
             code: product.code ?? "",
             title: product.title,
             description: product.description ?? "",
+            unit: product.unit ?? "",
             categoryId: product.categoryId ?? "",
             subCategoryId: product.subCategoryId ?? "",
             barcode: product.barcode ?? "",
@@ -231,6 +234,7 @@ export function ProductFormSheet({
           code: values.code || null,
           title: values.title,
           description: values.description || null,
+          unit: values.unit || null,
           categoryId: values.categoryId || null,
           subCategoryId: values.categoryId ? values.subCategoryId || null : null,
           barcode: values.barcode || null,
@@ -548,6 +552,34 @@ export function ProductFormSheet({
                 </Field>
               )}
             />
+
+            {/* Alone in a three-column grid so it lines up above Quantité, which is the figure it
+                qualifies, and keeps the width of a short abbreviation. Outside the grid below it
+                because it stays usable for a product nobody counts: sand sold by the truckload has
+                no quantity but is still sold "au voyage". */}
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Controller
+                name="unit"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="product-unit">Unité</FieldLabel>
+                    <Input
+                      {...field}
+                      id="product-unit"
+                      placeholder="un, pi, pi², m, kg, h, sac"
+                      aria-invalid={fieldState.invalid}
+                    />
+                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  </Field>
+                )}
+              />
+            </div>
+
+            <FieldDescription>
+              Comment ce produit se compte et se vend. Elle suit la quantité et le prix partout
+              où ils s&apos;affichent, et se retrouve sur les lignes qui prennent ce produit.
+            </FieldDescription>
 
             <div className="grid gap-4 sm:grid-cols-3">
               <Controller

@@ -8,6 +8,7 @@ import {
   Clock,
   FileText,
   FolderKanban,
+  FolderOpen,
   HardHat,
   Info,
   MapPin,
@@ -23,7 +24,10 @@ import { EmptyState } from "@/components/layout/empty-state";
 import { SectionNav, type NavSection } from "@/components/layout/section-nav";
 import { ProjectFormSheet } from "@/components/projects/project-form-sheet";
 import { ProjectCostTable } from "@/components/projects/detail/project-cost-table";
+import { ProjectDocumentsSection } from "@/components/projects/detail/project-documents-section";
 import { ProjectExpensesSection } from "@/components/projects/detail/project-expenses-section";
+import { ProjectMaterialsSection } from "@/components/projects/detail/project-materials-section";
+import { ProjectTimesheetsSection } from "@/components/projects/detail/project-timesheets-section";
 import { ProjectInvoicesSection } from "@/components/projects/detail/project-invoices-section";
 import { SectionPlaceholder } from "@/components/projects/detail/section-placeholder";
 import { useIsClientUser } from "@/hooks/use-can-create";
@@ -136,6 +140,12 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         { key: "feuilles-de-temps", label: "Feuilles de temps", count: counts?.timesheets ?? 0, icon: Clock },
         { key: "depenses", label: "Dépenses", count: counts?.expenses ?? 0, icon: Receipt },
         { key: "frais", label: "Frais supplémentaires", count: counts?.extraCharges ?? 0, icon: Plus },
+        {
+          key: "documents",
+          label: "Documents et notes",
+          count: counts?.documentsAndNotes ?? 0,
+          icon: FolderOpen,
+        },
         { key: "factures", label: "Factures", count: counts?.invoices ?? project.invoiceCount, icon: FileText },
       ];
 
@@ -224,13 +234,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             </div>
           )}
 
-          {section === "materiaux" && (
-            <SectionPlaceholder
-              icon={HardHat}
-              title="Matériaux"
-              description="Ce qui est acheté et posé sur le chantier."
-            />
-          )}
+          {section === "materiaux" && <ProjectMaterialsSection projectId={project.id} />}
 
           {section === "equipements" && (
             <SectionPlaceholder
@@ -248,13 +252,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             />
           )}
 
-          {section === "feuilles-de-temps" && (
-            <SectionPlaceholder
-              icon={Clock}
-              title="Feuilles de temps"
-              description="Les heures travaillées sur ce projet, par personne."
-            />
-          )}
+          {section === "feuilles-de-temps" && <ProjectTimesheetsSection projectId={project.id} />}
 
           {section === "depenses" && <ProjectExpensesSection projectId={project.id} />}
 
@@ -265,6 +263,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               description="Ce qui s'ajoute au mandat en cours de route."
             />
           )}
+
+          {section === "documents" && <ProjectDocumentsSection projectId={project.id} />}
 
           {section === "factures" && (
             <ProjectInvoicesSection projectId={project.id} clientId={project.clientId} />

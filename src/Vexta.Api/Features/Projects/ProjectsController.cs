@@ -76,7 +76,17 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
     {
         var project = await db.Projects.AsNoTracking()
             .Where(p => p.Id == id)
-            .Select(p => new { p.Id, p.IsTaxExempt, Invoices = p.Invoices.Count, Expenses = p.Expenses.Count })
+            .Select(p => new
+            {
+                p.Id,
+                p.IsTaxExempt,
+                Invoices = p.Invoices.Count,
+                Expenses = p.Expenses.Count,
+                Materials = p.Materials.Count,
+                Timesheets = p.Timesheets.Count,
+                Documents = p.Documents.Count,
+                Notes = p.Notes.Count
+            })
             .FirstOrDefaultAsync();
 
         if (project is null) return NotFound();
@@ -86,27 +96,44 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
             .Select(x => new { x.Cost, x.SellingPrice })
             .ToListAsync();
 
-        // The five sections that have no records of their own yet count zero rather than being
-        // left out: the badge is what will show them filling up, and a section that appears only
+        var materials = await db.ProjectMaterials.AsNoTracking()
+            .Where(m => m.ProjectId == id)
+            .Select(m => new { m.Quantity, m.PurchasePrice, m.UnitPrice })
+            .ToListAsync();
+
+        var hours = await db.TimesheetEntries.AsNoTracking()
+            .Where(t => t.ProjectId == id)
+            .SumAsync(t => (decimal?)t.Hours) ?? 0m;
+
+        // The sections that have no records of their own yet count zero rather than being left
+        // out: the badge is what will show them filling up, and a section that appears only
         // once it has content is a section nobody discovers.
         var counts = new ProjectSectionCountsDto(
-            Materials: 0,
+            Materials: project.Materials,
             Equipment: 0,
             Assemblies: 0,
-            Timesheets: 0,
+            Timesheets: project.Timesheets,
             Expenses: project.Expenses,
             ExtraCharges: 0,
+            DocumentsAndNotes: project.Documents + project.Notes,
             Invoices: project.Invoices);
 
         var settings = await db.BillingSettings.AsNoTracking()
             .FirstOrDefaultAsync(b => b.TenantId == currentUser.TenantId);
 
+        // Hours are revenue and no cost: what the company charges for an hour is settled, what
+        // an hour of that person's time costs it is payroll, which this application does not
+        // know. A guessed wage here would turn the profit column into fiction.
+        var labourRevenue = hours * (settings?.DefaultHourlyRate ?? 0m);
+
         var lines = new List<ProjectCostLineDto>
         {
-            new("materiaux", "Matériaux", 0m, 0m),
+            new("materiaux", "Matériaux",
+                materials.Sum(m => m.Quantity * (m.PurchasePrice ?? 0m)),
+                materials.Sum(m => m.Quantity * m.UnitPrice)),
             new("equipements", "Équipements", 0m, 0m),
             new("assemblages", "Assemblages", 0m, 0m),
-            new("feuilles-de-temps", "Feuilles de temps", 0m, 0m),
+            new("feuilles-de-temps", "Feuilles de temps", 0m, labourRevenue),
             new("depenses", "Dépenses",
                 expenses.Sum(x => x.Cost ?? 0m),
                 expenses.Sum(x => x.SellingPrice ?? 0m)),
@@ -140,7 +167,7 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
     }
 
     private static string TaxLabel(string name, decimal rate) =>
-        $"{name} ({rate.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)} %)";
+        $"{name} ({rate.ToString("0.###", Formats.Quebec)} %)";
 
     private static decimal Round(decimal value) => Math.Round(value, 2, MidpointRounding.AwayFromZero);
 
@@ -192,6 +219,14 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
         var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == id);
         if (project is null) return NotFound();
 
+        // A billed job is frozen except for its status. Everything else on it is what the
+        // client was charged from, and editing it afterwards makes the job and the invoice
+        // disagree — it is the invoice that will be quoted back at the company.
+        if (ProjectLock.IsBilled(project.Status) && ChangesMoreThanStatus(project, request))
+        {
+            return BadRequest(new { message = ProjectLock.Problem(project.Status) });
+        }
+
         if (await InvalidAddressesAsync(request) is { } addressError) return BadRequest(new { message = addressError });
 
         project.ClientId = request.ClientId;
@@ -218,10 +253,34 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
         var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == id);
         if (project is null) return NotFound();
 
+        // Deleting a billed job would leave its invoice pointing at nothing, and that invoice
+        // is the one document the client has.
+        if (ProjectLock.Problem(project.Status) is { } locked) return BadRequest(new { message = locked });
+
         db.Projects.Remove(project);
         await db.SaveChangesAsync();
         return NoContent();
     }
+
+    /// <summary>
+    /// True when the request would change anything but the status.
+    ///
+    /// Compared field by field rather than trusted from a flag, because the browser sends the
+    /// whole record back on every save: a form that only moved the status still posts the other
+    /// fifteen fields, and refusing that save would lock the office out of reopening the job.
+    /// </summary>
+    private static bool ChangesMoreThanStatus(Project project, UpsertProjectRequest request) =>
+        project.ClientId != request.ClientId
+        || project.PoNumber != Clean(request.PoNumber)
+        || project.Description != request.Description
+        || project.StartDate != request.StartDate
+        || project.EndDate != request.EndDate
+        || project.Budget != request.Budget
+        || project.IsTaxExempt != (request.IsTaxExempt ?? project.IsTaxExempt)
+        || project.PricePolicyId != request.PricePolicyId
+        || project.ClientAddressId != request.ClientAddressId
+        || project.SameAddressAsClient != request.SameAddressAsClient
+        || project.SiteAddressId != (request.SameAddressAsClient ? null : request.SiteAddressId);
 
     /// <summary>
     /// Max + 1, not count + 1: deleting a project must not hand its number to the next one.

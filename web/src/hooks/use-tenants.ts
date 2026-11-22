@@ -34,3 +34,16 @@ export function useUpdateTenantSubscriptionStatus() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["tenants"] }),
   });
 }
+
+/**
+ * Sets what the space is allowed to do, not what it pays: Stripe is untouched, so a running
+ * subscription keeps charging whatever it charges.
+ */
+export function useUpdateTenantPlan() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, planId }: { id: string; planId: string | null }) =>
+      api.patch(`admin/tenants/${id}/plan`, { planId }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["tenants"] }),
+  });
+}

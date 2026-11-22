@@ -29,6 +29,7 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
     public DbSet<Plan> Plans => Set<Plan>();
     public DbSet<Module> Modules => Set<Module>();
     public DbSet<BrandingAsset> BrandingAssets => Set<BrandingAsset>();
+    public DbSet<Employee> Employees => Set<Employee>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -106,6 +107,30 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
         builder.Entity<PlatformSetting>(e =>
         {
             e.HasKey(s => s.Key);
+        });
+
+        builder.Entity<Employee>(e =>
+        {
+            e.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Cascade);
+
+            // SetNull, not Cascade: deleting the sign-in account is how access is revoked, and it
+            // must leave the employee on file rather than erase them from the payroll.
+            e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.SetNull);
+
+            e.Property(x => x.FirstName).HasMaxLength(100);
+            e.Property(x => x.LastName).HasMaxLength(100);
+            e.Property(x => x.Email).HasMaxLength(256);
+            e.Property(x => x.JobTitle).HasMaxLength(100);
+            e.Property(x => x.Phone).HasMaxLength(40);
+            e.Property(x => x.InvitationTokenHash).HasMaxLength(64);
+
+            e.HasIndex(x => new { x.TenantId, x.Email }).IsUnique();
+
+            // Looked up by hash on every invitation link that is opened, by someone with no
+            // session and therefore no tenant to narrow the search.
+            e.HasIndex(x => x.InvitationTokenHash);
+
+            e.HasQueryFilter(x => x.TenantId == CurrentTenantId);
         });
 
         // Platform-wide branding, like Plan and Module: no tenant query filter, because every

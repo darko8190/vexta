@@ -10,7 +10,8 @@ namespace Vexta.Api.Features.Settings;
 [Authorize(Roles = nameof(UserRole.SuperAdmin))]
 public class SettingsController(
     IPlatformSettingsService settings,
-    IR2StorageService r2) : ControllerBase
+    IR2StorageService r2,
+    IMailgunService mailgun) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<PlatformSettingsDto>> Get()
@@ -80,6 +81,44 @@ public class SettingsController(
         return NoContent();
     }
 
+
+    /// <summary>
+    /// Sends a real message. Mailgun can accept a key and still refuse the domain, so nothing
+    /// short of an actual send proves the configuration works.
+    /// </summary>
+    [HttpPost("mailgun/test")]
+    public async Task<IActionResult> TestMailgun(SendTestEmailRequest request, CancellationToken ct)
+    {
+        var to = request.ToEmail?.Trim();
+        if (string.IsNullOrWhiteSpace(to))
+        {
+            to = await settings.GetAsync(PlatformSettingKeys.MailgunFromEmail, ct);
+        }
+
+        if (string.IsNullOrWhiteSpace(to))
+        {
+            return BadRequest(new { message = "Entrez une adresse de destination, ou enregistrez d'abord l'adresse d'expédition." });
+        }
+
+        if (!to.Contains('@') || !to.Contains('.'))
+        {
+            return BadRequest(new { message = "Entrez une adresse courriel valide." });
+        }
+
+        try
+        {
+            await mailgun.SendTestAsync(to, ct);
+            return Ok(new { message = $"Message de test envoyé à {to}. Vérifiez la réception, et les indésirables." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (HttpRequestException ex)
+        {
+            return BadRequest(new { message = $"Mailgun est injoignable : {ex.Message}" });
+        }
+    }
 
     /// <summary>Proves the R2 credentials work before anyone relies on them to upload.</summary>
     [HttpPost("r2/test")]

@@ -1,0 +1,276 @@
+"use client";
+
+import { useState } from "react";
+import { MoreHorizontal, Pencil, Plus, Send, Trash2, UsersRound } from "lucide-react";
+import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
+import { EmptyState } from "@/components/layout/empty-state";
+import { PageHeader } from "@/components/layout/page-header";
+import { EmployeeFormSheet } from "@/components/team/employee-form-sheet";
+import { InvitationLinkDialog } from "@/components/team/invitation-link-dialog";
+import {
+  useDeleteEmployee,
+  useGrantAccess,
+  useResendInvitation,
+  useRevokeAccess,
+  useTeamQuery,
+} from "@/hooks/use-team";
+import { ApiError } from "@/lib/api";
+import type { AccessGranted, Employee } from "@/lib/types";
+
+function message(error: unknown, fallback: string): string {
+  return error instanceof ApiError ? error.message : fallback;
+}
+
+/** The one cell that does something. Disabled with a reason rather than hidden. */
+function AccessCell({
+  employee,
+  canGrant,
+  blockedReason,
+  onGrant,
+  onRevoke,
+  pending,
+}: {
+  employee: Employee;
+  canGrant: boolean;
+  blockedReason: string | null;
+  onGrant: () => void;
+  onRevoke: () => void;
+  pending: boolean;
+}) {
+  const disabled = pending || (!employee.hasAccess && !canGrant);
+
+  const box = (
+    <Checkbox
+      checked={employee.hasAccess}
+      disabled={disabled}
+      aria-label={`Accès à l'application pour ${employee.firstName} ${employee.lastName}`}
+      onCheckedChange={(checked) => (checked === true ? onGrant() : onRevoke())}
+    />
+  );
+
+  if (!disabled || employee.hasAccess || !blockedReason) {
+    return box;
+  }
+
+  return (
+    <Tooltip>
+      {/* A disabled checkbox fires no pointer events, so the span is what the tooltip hangs on. */}
+      <TooltipTrigger render={<span className="inline-flex" />}>{box}</TooltipTrigger>
+      <TooltipContent>{blockedReason}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+export default function TeamPage() {
+  const { data, isLoading } = useTeamQuery();
+  const grantAccess = useGrantAccess();
+  const revokeAccess = useRevokeAccess();
+  const resendInvitation = useResendInvitation();
+  const deleteEmployee = useDeleteEmployee();
+
+  const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<Employee | undefined>(undefined);
+  const [deleteTarget, setDeleteTarget] = useState<Employee | undefined>(undefined);
+  const [grant, setGrant] = useState<AccessGranted | null>(null);
+
+  const seats = data?.seats;
+  const employees = data?.employees ?? [];
+
+  const blockedReason =
+    seats?.limitReason ??
+    (seats && !seats.hasRoom
+      ? `Le forfait permet ${seats.limit} accès et ils sont tous utilisés.`
+      : null);
+
+  function openCreate() {
+    setEditing(undefined);
+    setFormOpen(true);
+  }
+
+  async function onGrant(employee: Employee) {
+    try {
+      setGrant(await grantAccess.mutateAsync(employee.id));
+    } catch (error) {
+      toast.error(message(error, "Impossible de créer cet accès."));
+    }
+  }
+
+  async function onRevoke(employee: Employee) {
+    try {
+      await revokeAccess.mutateAsync(employee.id);
+      toast.success(`L'accès de ${employee.firstName} a été retiré. La fiche reste au dossier.`);
+    } catch (error) {
+      toast.error(message(error, "Impossible de retirer cet accès."));
+    }
+  }
+
+  async function onResend(employee: Employee) {
+    try {
+      setGrant(await resendInvitation.mutateAsync(employee.id));
+    } catch (error) {
+      toast.error(message(error, "Impossible de renvoyer l'invitation."));
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    try {
+      await deleteEmployee.mutateAsync(deleteTarget.id);
+      toast.success("Employé supprimé.");
+      setDeleteTarget(undefined);
+    } catch (error) {
+      toast.error(message(error, "Impossible de supprimer cet employé."));
+    }
+  }
+
+  const createButton = (
+    <Button onClick={openCreate}>
+      <Plus />
+      Nouvel employé
+    </Button>
+  );
+
+  const busy = grantAccess.isPending || revokeAccess.isPending || resendInvitation.isPending;
+
+  return (
+    <div>
+      <PageHeader
+        title="Équipe"
+        description="Vos employés. Cochez « Accès » pour qu'une personne puisse se connecter à Vexta."
+        action={createButton}
+      />
+
+      {seats && (
+        <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+          <span className="font-medium tabular-nums text-foreground">
+            {seats.used} / {seats.limit} accès utilisés
+          </span>
+          <span className="text-muted-foreground">
+            {seats.limitReason ??
+              (seats.remaining === 0
+                ? "Retirez un accès ou changez de forfait pour en ajouter."
+                : `${seats.remaining} encore ${seats.remaining > 1 ? "disponibles" : "disponible"}, vous compris.`)}
+          </span>
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      ) : employees.length === 0 ? (
+        <EmptyState
+          icon={UsersRound}
+          title="Aucun employé pour l'instant"
+          description="Ajoutez les gens qui travaillent chez vous. Une fiche n'occupe aucun accès tant que vous ne cochez pas la case."
+          action={createButton}
+        />
+      ) : (
+        <div className="overflow-hidden rounded-lg border border-border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Employé</TableHead>
+                <TableHead>Courriel</TableHead>
+                <TableHead>Titre</TableHead>
+                <TableHead className="w-20 text-center">Accès</TableHead>
+                <TableHead className="w-40">État</TableHead>
+                <TableHead className="w-10" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {employees.map((employee) => (
+                <TableRow key={employee.id}>
+                  <TableCell className="font-medium">
+                    {employee.firstName} {employee.lastName}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{employee.email}</TableCell>
+                  <TableCell className="text-muted-foreground">{employee.jobTitle ?? "—"}</TableCell>
+                  <TableCell className="text-center">
+                    <AccessCell
+                      employee={employee}
+                      canGrant={Boolean(seats?.hasRoom)}
+                      blockedReason={blockedReason}
+                      onGrant={() => onGrant(employee)}
+                      onRevoke={() => onRevoke(employee)}
+                      pending={busy}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    {!employee.hasAccess ? (
+                      <span className="text-sm text-muted-foreground">Au dossier</span>
+                    ) : employee.invitationExpired ? (
+                      <Badge variant="destructive">Invitation expirée</Badge>
+                    ) : employee.invitationPending ? (
+                      <Badge variant="outline">Invitation envoyée</Badge>
+                    ) : (
+                      <Badge variant="default">Actif</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label="Actions" />}>
+                        <MoreHorizontal />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setEditing(employee);
+                            setFormOpen(true);
+                          }}
+                        >
+                          <Pencil />
+                          Modifier
+                        </DropdownMenuItem>
+                        {employee.invitationPending && (
+                          <DropdownMenuItem onClick={() => onResend(employee)}>
+                            <Send />
+                            Renvoyer l&apos;invitation
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem variant="destructive" onClick={() => setDeleteTarget(employee)}>
+                          <Trash2 />
+                          Supprimer
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      <EmployeeFormSheet open={formOpen} onOpenChange={setFormOpen} employee={editing} />
+
+      <InvitationLinkDialog grant={grant} onOpenChange={(open) => !open && setGrant(null)} />
+
+      <ConfirmDeleteDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => !open && setDeleteTarget(undefined)}
+        title="Supprimer cet employé ?"
+        description={`La fiche de ${deleteTarget?.firstName} ${deleteTarget?.lastName} sera supprimée.${
+          deleteTarget?.hasAccess ? " Son accès à Vexta sera retiré du même coup." : ""
+        }`}
+        onConfirm={confirmDelete}
+        pending={deleteEmployee.isPending}
+      />
+    </div>
+  );
+}

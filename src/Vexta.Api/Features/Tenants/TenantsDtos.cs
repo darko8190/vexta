@@ -11,7 +11,12 @@ public record TenantDto(
     DateTimeOffset? CurrentPeriodEnd,
     DateTimeOffset CreatedAt,
     int UserCount,
-    int ClientCount);
+    int ClientCount,
+    /// <summary>Null for a personal space, and for a tenant created by hand before a plan was chosen.</summary>
+    Guid? PlanId,
+    string? PlanName,
+    /// <summary>Seats the plan allows. 1 when there is no plan: the owner and nobody else.</summary>
+    int MaxUsers);
 
 public record CreateTenantRequest(
     string CompanyName,
@@ -21,3 +26,6 @@ public record CreateTenantRequest(
     string AdminPassword);
 
 public record UpdateTenantSubscriptionRequest(TenantSubscriptionStatus Status);
+
+/// <summary>Null detaches the plan, which drops the space back to a single seat.</summary>
+public record UpdateTenantPlanRequest(Guid? PlanId);

@@ -20,6 +20,22 @@ public class Plan
     /// </summary>
     public string? StripePriceId { get; set; }
 
+    /// <summary>
+    /// The floor of the plan's user range, shown on the pricing page so a buyer can see at a
+    /// glance which tier is meant for their size. It is not enforced: nothing can oblige a
+    /// company to create accounts it does not want, and refusing to let them under their own
+    /// floor would only lock the owner out of their own space.
+    /// </summary>
+    public int MinUsers { get; set; } = 1;
+
+    /// <summary>
+    /// The ceiling, and the one that is enforced: how many people can sign in at once, the owner
+    /// included. A tenant whose plan allows 5 gets 5 accounts in total, not 5 on top of the
+    /// admin — that is what the buyer reads on the pricing page, and selling 5 while delivering
+    /// 6 is a promise nobody made.
+    /// </summary>
+    public int MaxUsers { get; set; } = 1;
+
     public bool IsPublished { get; set; }
     public int SortOrder { get; set; }
 

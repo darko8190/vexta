@@ -183,11 +183,66 @@ migrations en même temps peuvent entrer en conflit.
 ### Stripe
 
 1. **Intégrations** → clé secrète, clé publiable.
-2. Dans Stripe, créez un webhook vers `https://api.vexta.ca/api/billing/webhook`, événement
-   `checkout.session.completed`.
+2. Dans Stripe, créez un webhook vers `https://api.vexta.ca/api/billing/webhook`
+   (`https://api-qa.vexta.ca/api/billing/webhook` en QA) et abonnez-le à ces trois
+   événements — ce sont exactement ceux que l'API traite, le reste est seulement journalisé :
+   - `checkout.session.completed` — le paiement est arrivé : on attache le client et
+     l'abonnement Stripe au locataire, et c'est là qu'un espace personnel devient une entreprise.
+   - `customer.subscription.updated` — changement d'état : `past_due`, `unpaid` et `incomplete`
+     passent le locataire en impayé, `active` et `trialing` le réactivent.
+   - `customer.subscription.deleted` — abonnement résilié : le locataire passe en annulé.
 3. Reportez le secret de signature dans **Intégrations**.
 4. Créez vos forfaits dans **Forfaits**. Vexta crée le prix dans Stripe à l'enregistrement ; un
-   forfait sans prix Stripe ne peut pas être publié.
+   forfait sans prix Stripe ne peut pas être publié. Chaque forfait porte aussi un **nombre
+   d'utilisateurs** — voir la section Équipe plus bas.
+
+### Mailgun
+
+1. **Intégrations** → domaine, clé d'API, adresse et nom d'envoi, région (us ou eu).
+2. Enregistrez, puis utilisez **Envoyer un test** dans la même carte. Le test part avec la
+   configuration *enregistrée*, pas avec ce qui est à l'écran : enregistrez d'abord.
+3. Laissé vide, le test part vers l'adresse d'envoi. Vérifiez aussi les indésirables.
+
+Mailgun accepte parfois une clé tout en refusant le domaine, c'est pourquoi rien d'autre qu'un
+envoi réel ne prouve que la configuration fonctionne. Les refus sont relayés tels quels :
+une clé rejetée, un domaine inconnu, une région qui ne correspond pas.
+
+Sans Mailgun, la plateforme fonctionne : les invitations d'employés ne partent simplement pas
+par courriel, et l'administrateur transmet le lien lui-même.
+
+### Équipe et nombre d'utilisateurs
+
+Chaque forfait porte une plage d'utilisateurs, **le propriétaire compris** : un forfait à 5
+donne 5 comptes au total, pas 5 en plus du propriétaire.
+
+- Le **maximum** est la seule valeur appliquée. Au-delà, la case « Accès » ne peut plus être
+  cochée et l'API refuse la demande.
+- Le **minimum** n'est pas appliqué : il sert à situer le forfait sur la page des tarifs
+  (« De 3 à 10 utilisateurs »). Rien ne peut obliger une entreprise à créer des comptes
+  qu'elle ne veut pas, et l'en empêcher ne ferait qu'enfermer le propriétaire hors de son
+  propre espace.
+
+Baisser le maximum ne déconnecte personne : une entreprise déjà au-dessus garde ses accès
+jusqu'à ce qu'elle en retire. La page **Locataires** affiche `utilisés / permis` et passe le
+chiffre en rouge quand un locataire dépasse sa limite.
+
+Côté entreprise, la page **Équipe** liste les employés. Une fiche n'occupe aucun siège tant que
+la case **Accès** n'est pas cochée. En la cochant :
+
+1. un compte sans mot de passe est créé — il est donc inutilisable tel quel ;
+2. une invitation à usage unique est émise, valable 7 jours ;
+3. Mailgun l'envoie s'il est configuré, et le lien est de toute façon affiché pour être copié ;
+4. l'employé choisit son mot de passe sur `/bienvenue/<jeton>` et arrive connecté.
+
+Décocher la case supprime le compte et libère le siège ; la fiche de l'employé reste au dossier.
+
+> Un espace sans forfait est plafonné à **1** accès. C'est le cas des locataires créés à la main
+> depuis **Locataires** : la colonne **Forfait** de cette page permet de leur en assigner un.
+> Changer le forfait d'un locataire ne touche pas à Stripe — ça fixe ce que l'espace a le droit
+> de faire, pas ce qu'il paie.
+>
+> Les forfaits qui existaient avant cette fonction ont été mis à 1 / 1 par les migrations, ce qui
+> correspond à ce qu'ils permettaient réellement. Relisez-les avant de vendre.
 
 ### Cloudflare R2
 

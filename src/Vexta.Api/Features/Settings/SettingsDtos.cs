@@ -31,3 +31,9 @@ public record UpdatePlatformSettingsRequest(
     // a deployment may legitimately want to empty, when moving to a private bucket.
     string? R2PublicBaseUrl);
 
+
+/// <summary>
+/// Blank means "send it to the address Mailgun is configured to send from", which is the one
+/// address the super admin is certain to be able to check.
+/// </summary>
+public record SendTestEmailRequest(string? ToEmail);

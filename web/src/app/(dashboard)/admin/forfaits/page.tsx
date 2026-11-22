@@ -82,6 +82,7 @@ export default function PlansPage() {
                 <TableHead>Forfait</TableHead>
                 <TableHead>Tarif</TableHead>
                 <TableHead>Modules</TableHead>
+                <TableHead className="text-center">Utilisateurs</TableHead>
                 <TableHead className="text-center">Locataires</TableHead>
                 <TableHead className="w-36">Statut</TableHead>
                 <TableHead className="w-10" />
@@ -102,6 +103,9 @@ export default function PlansPage() {
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {plan.modules.length === 0 ? "—" : `${plan.modules.length} inclus`}
+                  </TableCell>
+                  <TableCell className="text-center tabular-nums">
+                    {plan.minUsers === plan.maxUsers ? plan.maxUsers : `${plan.minUsers} – ${plan.maxUsers}`}
                   </TableCell>
                   <TableCell className="text-center">
                     <Badge variant="secondary">{plan.tenantCount}</Badge>

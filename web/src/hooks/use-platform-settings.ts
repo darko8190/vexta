@@ -34,6 +34,17 @@ export function useUpdatePlatformSettings() {
   });
 }
 
+/**
+ * Sends a real message. Mailgun can accept a key and still refuse the sending domain, so only
+ * an actual send tells the super admin whether invitations will go out.
+ */
+export function useSendTestEmail() {
+  return useMutation({
+    mutationFn: (toEmail: string | null) =>
+      api.post<{ message: string }>("admin/settings/mailgun/test", { toEmail }),
+  });
+}
+
 /** Checks the stored R2 credentials against the bucket before anyone depends on them. */
 export function useTestR2() {
   return useMutation({

@@ -18,6 +18,7 @@ public class AdminPlansController(VextaDbContext db, IStripeService stripe) : Co
 {
     private const long MinCents = 100;
     private const long MaxCents = 10_000_000;
+    private const int MaxSeats = 500;
 
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<PlanDto>>> List(CancellationToken ct)
@@ -49,6 +50,8 @@ public class AdminPlansController(VextaDbContext db, IStripeService stripe) : Co
             Name = request.Name.Trim(),
             Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
             AmountCents = request.AmountCents,
+            MinUsers = request.MinUsers,
+            MaxUsers = request.MaxUsers,
             SortOrder = request.SortOrder
         };
 
@@ -85,6 +88,8 @@ public class AdminPlansController(VextaDbContext db, IStripeService stripe) : Co
         plan.Name = request.Name.Trim();
         plan.Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim();
         plan.SortOrder = request.SortOrder;
+        plan.MinUsers = request.MinUsers;
+        plan.MaxUsers = request.MaxUsers;
         plan.Modules = await LoadModulesAsync(request.ModuleIds, ct);
         plan.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -178,6 +183,13 @@ public class AdminPlansController(VextaDbContext db, IStripeService stripe) : Co
         if (request.Description is { Length: > 300 }) return "La description ne peut pas dépasser 300 caractères.";
         if (request.AmountCents < MinCents || request.AmountCents > MaxCents)
             return "Le tarif mensuel doit être entre 1 $ et 100 000 $.";
+        // Zero would be a plan nobody can sign into, including the person who paid for it.
+        if (request.MinUsers < 1 || request.MinUsers > MaxSeats)
+            return $"Le minimum d'utilisateurs doit être entre 1 et {MaxSeats}.";
+        if (request.MaxUsers < 1 || request.MaxUsers > MaxSeats)
+            return $"Le maximum d'utilisateurs doit être entre 1 et {MaxSeats}.";
+        if (request.MinUsers > request.MaxUsers)
+            return "Le minimum d'utilisateurs ne peut pas dépasser le maximum.";
         return null;
     }
 
@@ -187,6 +199,8 @@ public class AdminPlansController(VextaDbContext db, IStripeService stripe) : Co
             p.Description,
             p.AmountCents,
             p.Currency,
+            p.MinUsers,
+            p.MaxUsers,
             p.IsPublished,
             p.SortOrder,
             p.StripePriceId,

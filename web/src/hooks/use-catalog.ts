@@ -26,6 +26,8 @@ export interface SavePlanValues {
   name: string;
   description: string | null;
   amountCents: number;
+  minUsers: number;
+  maxUsers: number;
   sortOrder: number;
   isPublished: boolean;
   moduleIds: string[];

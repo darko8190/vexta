@@ -5,7 +5,16 @@ namespace Vexta.Api.Services;
 public interface IMailgunService
 {
     Task<bool> IsConfiguredAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Throws <see cref="InvalidOperationException"/> when Mailgun is unconfigured or rejects the
+    /// message. Silence would be worse: a caller that records "sent" on a refused message leaves
+    /// someone waiting for an email that was never going to arrive.
+    /// </summary>
     Task SendAsync(string toEmail, string toName, string subject, string htmlBody, CancellationToken ct = default);
+
+    /// <summary>Sends a real message to prove the credentials and the sending domain work.</summary>
+    Task SendTestAsync(string toEmail, CancellationToken ct = default);
 }
 
 public class MailgunService(IHttpClientFactory httpClientFactory, IPlatformSettingsService settings, ILogger<MailgunService> logger)
@@ -37,8 +46,8 @@ public class MailgunService(IHttpClientFactory httpClientFactory, IPlatformSetti
 
         if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(domain) || string.IsNullOrWhiteSpace(fromEmail))
         {
-            logger.LogWarning("Mailgun is not configured. Skipping email to {ToEmail}.", toEmail);
-            return;
+            throw new InvalidOperationException(
+                "Mailgun n'est pas configuré. Renseignez la clé d'API, le domaine et l'adresse d'expédition.");
         }
 
         var baseUrl = region.Equals("eu", StringComparison.OrdinalIgnoreCase)
@@ -63,6 +72,39 @@ public class MailgunService(IHttpClientFactory httpClientFactory, IPlatformSetti
         {
             var body = await response.Content.ReadAsStringAsync(ct);
             logger.LogError("Mailgun send failed ({Status}): {Body}", response.StatusCode, body);
+            throw new InvalidOperationException(Explain(response.StatusCode, body));
         }
+    }
+
+    public async Task SendTestAsync(string toEmail, CancellationToken ct = default)
+    {
+        var sentAt = DateTimeOffset.Now.ToString("d MMMM yyyy à HH:mm");
+        var body = $"""
+            <p>Ceci est un envoi de test depuis Vexta.</p>
+            <p>Si vous lisez ce message, la clé d'API, le domaine d'envoi et l'adresse
+            d'expédition sont corrects : les invitations et les factures partiront.</p>
+            <p style="color:#666">Envoyé le {sentAt}.</p>
+            """;
+
+        await SendAsync(toEmail, "Test Vexta", "Test d'envoi Vexta", body, ct);
+    }
+
+    /// <summary>
+    /// Mailgun answers in English and often with just a code. These are the refusals a first
+    /// configuration actually hits, worded so the super admin knows which field to go fix.
+    /// </summary>
+    private static string Explain(System.Net.HttpStatusCode status, string body)
+    {
+        var detail = string.IsNullOrWhiteSpace(body) ? "" : $" ({body.Trim()})";
+        return status switch
+        {
+            System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden =>
+                "Mailgun a refusé la clé d'API. Vérifiez la clé et la région (US ou EU).",
+            System.Net.HttpStatusCode.NotFound =>
+                "Mailgun ne connaît pas ce domaine d'envoi. Vérifiez le domaine et la région.",
+            System.Net.HttpStatusCode.BadRequest =>
+                $"Mailgun a refusé le message. Vérifiez l'adresse d'expédition et celle du destinataire.{detail}",
+            _ => $"Mailgun a répondu {(int)status}.{detail}"
+        };
     }
 }

@@ -7,6 +7,13 @@ import { SiteHeader } from "@/components/marketing/site-header";
 import { getPublishedModules, getPublishedPlans } from "@/lib/catalog-cache";
 import { moduleIcon } from "@/lib/module-icons";
 
+/** "1 utilisateur", "Jusqu'à 5 utilisateurs", "De 3 à 10 utilisateurs". */
+function planSeats(min: number, max: number): string {
+  if (min === max) return max === 1 ? "1 utilisateur" : `${max} utilisateurs`;
+  if (min <= 1) return `Jusqu'à ${max} utilisateurs`;
+  return `De ${min} à ${max} utilisateurs`;
+}
+
 function formatPrice(amountCents: number, currency: string) {
   return new Intl.NumberFormat("fr-CA", {
     style: "currency",
@@ -143,8 +150,17 @@ export default async function HomePage() {
                       <p className="mt-3 text-sm text-muted-foreground">{plan.description}</p>
                     )}
 
+                    {/* The seat count is the line that decides for a team, so it leads the
+                        feature list rather than sitting at the bottom of it. */}
+                    <ul className="mt-8 space-y-3">
+                      <li className="flex items-start gap-3 text-sm text-foreground">
+                        <Check className="mt-0.5 size-4 shrink-0 text-primary" />
+                        {planSeats(plan.minUsers, plan.maxUsers)}
+                      </li>
+                    </ul>
+
                     {plan.modules.length > 0 && (
-                      <ul className="mt-8 space-y-3">
+                      <ul className="mt-3 space-y-3">
                         {plan.modules.map((module) => (
                           <li key={module.id} className="flex items-start gap-3 text-sm text-foreground">
                             <Check className="mt-0.5 size-4 shrink-0 text-primary" />

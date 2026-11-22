@@ -38,7 +38,10 @@ public class TenantsController(
             .Select(t => new TenantDto(
                 t.Id, t.Name, t.Slug, t.Kind.ToString(), t.SubscriptionStatus.ToString(), t.CurrentPeriodEnd, t.CreatedAt,
                 db.Users.IgnoreQueryFilters().Count(u => u.TenantId == t.Id),
-                db.Clients.IgnoreQueryFilters().Count(c => c.TenantId == t.Id)))
+                db.Clients.IgnoreQueryFilters().Count(c => c.TenantId == t.Id),
+                t.PlanId,
+                t.Plan!.Name,
+                t.PlanId == null ? 1 : t.Plan!.MaxUsers))
             .ToListAsync();
 
         return Ok(new PagedResult<TenantDto> { Items = items, Page = query.Page, PageSize = query.PageSize, TotalCount = totalCount });
@@ -86,7 +89,7 @@ public class TenantsController(
 
         await db.SaveChangesAsync();
 
-        return Ok(new TenantDto(tenant.Id, tenant.Name, tenant.Slug, tenant.Kind.ToString(), tenant.SubscriptionStatus.ToString(), null, tenant.CreatedAt, 1, 0));
+        return Ok(new TenantDto(tenant.Id, tenant.Name, tenant.Slug, tenant.Kind.ToString(), tenant.SubscriptionStatus.ToString(), null, tenant.CreatedAt, 1, 0, null, null, 1));
     }
 
     [HttpPatch("{id:guid}/subscription-status")]
@@ -97,6 +100,36 @@ public class TenantsController(
 
         tenant.SubscriptionStatus = request.Status;
         await db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Assigns the plan a hand-created tenant never got. Without this the space stays capped at
+    /// one seat forever, because the seat limit is the plan's and there is no plan.
+    /// </summary>
+    [HttpPatch("{id:guid}/plan")]
+    public async Task<IActionResult> UpdatePlan(Guid id, UpdateTenantPlanRequest request, CancellationToken ct)
+    {
+        var tenant = await db.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.Id == id, ct);
+        if (tenant is null) return NotFound();
+
+        if (request.PlanId is { } planId)
+        {
+            if (!await db.Plans.AnyAsync(p => p.Id == planId, ct))
+            {
+                return BadRequest(new { message = "Ce forfait n'existe pas." });
+            }
+
+            // Nothing here touches Stripe: the subscription, if any, keeps charging what it
+            // charges. This sets what the space is allowed to do, not what it pays.
+            tenant.PlanId = planId;
+        }
+        else
+        {
+            tenant.PlanId = null;
+        }
+
+        await db.SaveChangesAsync(ct);
         return NoContent();
     }
 

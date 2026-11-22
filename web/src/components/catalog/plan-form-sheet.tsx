@@ -28,6 +28,15 @@ import type { PlanRecord } from "@/lib/types";
 
 const MIN_CENTS = 100;
 const MAX_CENTS = 10_000_000;
+const MAX_SEATS = 500;
+
+// Shared by both ends of the range: same rule, same wording.
+const seatField = z
+  .string()
+  .trim()
+  .regex(/^\d{1,3}$/, "Entrez un nombre.")
+  .refine((v) => Number(v) >= 1, "Au moins 1 : le propriétaire compte dans le total.")
+  .refine((v) => Number(v) <= MAX_SEATS, `${MAX_SEATS} au maximum.`);
 
 const formSchema = z.object({
   name: z.string().trim().min(1, "Le nom est requis.").max(60, "60 caractères maximum."),
@@ -39,11 +48,20 @@ const formSchema = z.object({
     .refine((v) => parseAmountToCents(v) !== null, "Écrivez un montant comme 49 ou 49,99.")
     .refine((v) => (parseAmountToCents(v) ?? 0) >= MIN_CENTS, "Le tarif minimum est de 1 $.")
     .refine((v) => (parseAmountToCents(v) ?? 0) <= MAX_CENTS, "Le tarif maximum est de 100 000 $."),
+  minUsers: seatField,
+  maxUsers: seatField,
   // A string for the same reason as the amount: coercion breaks the resolver's typing.
   sortOrder: z.string().trim().regex(/^\d{1,3}$/, "Entrez un nombre entre 0 et 999."),
   isPublished: z.boolean(),
   moduleIds: z.array(z.string()),
 });
+
+// On the object rather than on either field: a range is only wrong as a pair, and the message
+// belongs on the maximum, which is the one the super admin just typed.
+const planSchema = formSchema.refine(
+  (values) => Number(values.minUsers) <= Number(values.maxUsers),
+  { message: "Le maximum doit être au moins égal au minimum.", path: ["maxUsers"] },
+);
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -52,6 +70,8 @@ function toFormValues(plan?: PlanRecord): FormValues {
     name: plan?.name ?? "",
     description: plan?.description ?? "",
     amount: plan ? centsToFieldValue(plan.amountCents) : "",
+    minUsers: String(plan?.minUsers ?? 1),
+    maxUsers: String(plan?.maxUsers ?? 1),
     sortOrder: String(plan?.sortOrder ?? 0),
     isPublished: plan?.isPublished ?? false,
     moduleIds: plan?.modules.map((m) => m.id) ?? [],
@@ -72,7 +92,7 @@ export function PlanFormSheet({
   const { data: modules } = useModulesQuery();
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(planSchema),
     defaultValues: toFormValues(plan),
   });
 
@@ -91,6 +111,8 @@ export function PlanFormSheet({
           name: values.name,
           description: values.description ? values.description : null,
           amountCents,
+          minUsers: Number(values.minUsers),
+          maxUsers: Number(values.maxUsers),
           sortOrder: Number(values.sortOrder),
           isPublished: values.isPublished,
           moduleIds: values.moduleIds,
@@ -177,6 +199,56 @@ export function PlanFormSheet({
                 </Field>
               )}
             />
+
+            <Field>
+              <FieldLabel>Nombre d&apos;utilisateurs</FieldLabel>
+              <div className="grid grid-cols-2 gap-3">
+                <Controller
+                  name="minUsers"
+                  control={form.control}
+                  render={({ field, fieldState }) => (
+                    <Field data-invalid={fieldState.invalid}>
+                      <FieldLabel htmlFor="plan-min-users" className="text-xs font-normal text-muted-foreground">
+                        Minimum
+                      </FieldLabel>
+                      <Input
+                        {...field}
+                        id="plan-min-users"
+                        inputMode="numeric"
+                        placeholder="1"
+                        aria-invalid={fieldState.invalid}
+                      />
+                      {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                    </Field>
+                  )}
+                />
+                <Controller
+                  name="maxUsers"
+                  control={form.control}
+                  render={({ field, fieldState }) => (
+                    <Field data-invalid={fieldState.invalid}>
+                      <FieldLabel htmlFor="plan-max-users" className="text-xs font-normal text-muted-foreground">
+                        Maximum
+                      </FieldLabel>
+                      <Input
+                        {...field}
+                        id="plan-max-users"
+                        inputMode="numeric"
+                        placeholder="5"
+                        aria-invalid={fieldState.invalid}
+                      />
+                      {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                    </Field>
+                  )}
+                />
+              </div>
+              <FieldDescription>
+                Le propriétaire compte dans le total. Seul le maximum est appliqué : au-delà,
+                la case « Accès » ne peut plus être cochée. Le minimum sert à situer le forfait
+                sur la page des tarifs. Baisser le maximum ne déconnecte personne — les
+                entreprises déjà au-dessus gardent leurs accès jusqu&apos;à ce qu&apos;elles en retirent.
+              </FieldDescription>
+            </Field>
 
             <Controller
               name="moduleIds"

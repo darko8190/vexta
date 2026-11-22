@@ -119,6 +119,11 @@ export interface TenantRecord {
   createdAt: string;
   userCount: number;
   clientCount: number;
+  /** Null for a personal space, and for a tenant created by hand before a plan was chosen. */
+  planId: string | null;
+  planName: string | null;
+  /** Seats the plan allows. 1 when there is no plan. */
+  maxUsers: number;
 }
 
 export interface PlatformSettings {
@@ -150,6 +155,10 @@ export interface PlanRecord {
   description: string | null;
   amountCents: number;
   currency: string;
+  /** The range's floor: shown to buyers, never enforced. */
+  minUsers: number;
+  /** Seats the plan allows, the owner included. This one is enforced. */
+  maxUsers: number;
   isPublished: boolean;
   sortOrder: number;
   /** Null when Stripe could not be reached: such a plan cannot be published. */
@@ -171,6 +180,9 @@ export interface PublicPlan {
   description: string | null;
   amountCents: number;
   currency: string;
+  minUsers: number;
+  /** Seats the plan allows, the owner included. */
+  maxUsers: number;
   modules: PublicModule[];
 }
 
@@ -198,4 +210,49 @@ export interface BrandingSlotInfo {
   eTag: string | null;
   width: number;
   height: number;
+}
+
+export interface Employee {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  jobTitle: string | null;
+  phone: string | null;
+  /** True once a sign-in account exists. This is what the seat limit counts. */
+  hasAccess: boolean;
+  /** Access granted but the password never chosen. */
+  invitationPending: boolean;
+  invitationExpired: boolean;
+  invitationSentAt: string | null;
+  invitationExpiresAt: string | null;
+  createdAt: string;
+}
+
+export interface SeatUsage {
+  used: number;
+  limit: number;
+  remaining: number;
+  hasRoom: boolean;
+  /** Why the limit is what it is, when it is not simply the plan's number. */
+  limitReason: string | null;
+}
+
+export interface TeamList {
+  employees: Employee[];
+  seats: SeatUsage;
+}
+
+export interface AccessGranted {
+  invitationUrl: string;
+  expiresAt: string;
+  emailSent: boolean;
+  employee: Employee;
+}
+
+export interface Invitation {
+  firstName: string;
+  lastName: string;
+  email: string;
+  tenantName: string;
 }

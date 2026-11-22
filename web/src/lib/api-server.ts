@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
 import { apiBaseUrl } from "@/lib/session";
+import { API_UNREACHABLE_HEADER, API_UNREACHABLE_MESSAGE } from "@/lib/api-unreachable";
 
 /** Default deadline for a call to the .NET API. */
 const DEFAULT_TIMEOUT_MS = 10_000;
 
-const UNREACHABLE_HEADER = "x-vexta-api-unreachable";
-
-export const UNREACHABLE_MESSAGE =
-  "Le service est momentanément injoignable. Réessayez dans un instant.";
+/** Re-exported for the route handlers that already import it from here. */
+export const UNREACHABLE_MESSAGE = API_UNREACHABLE_MESSAGE;
 
 /**
  * Calls the .NET API with a deadline, and turns a failure to reach it into a 504 that the
@@ -42,12 +41,12 @@ export async function apiFetch(
   } catch {
     return NextResponse.json(
       { message: UNREACHABLE_MESSAGE },
-      { status: 504, headers: { [UNREACHABLE_HEADER]: "1" } },
+      { status: 504, headers: { [API_UNREACHABLE_HEADER]: "1" } },
     );
   }
 }
 
 /** True when `apiFetch` gave up, rather than the API having answered. */
 export function isUnreachable(response: Response): boolean {
-  return response.headers.get(UNREACHABLE_HEADER) === "1";
+  return response.headers.get(API_UNREACHABLE_HEADER) === "1";
 }

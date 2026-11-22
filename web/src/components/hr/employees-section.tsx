@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ExternalLink, MoreHorizontal, Pencil, Plus, Send, Trash2, UsersRound } from "lucide-react";
+import { CloudOff, ExternalLink, MoreHorizontal, Pencil, Plus, Send, Trash2, UsersRound } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -83,7 +83,7 @@ function AccessCell({
 
 export function EmployeesSection() {
   const router = useRouter();
-  const { data, isLoading } = useTeamQuery();
+  const { data, isLoading, isError, error: loadError, refetch } = useTeamQuery();
   const grantAccess = useGrantAccess();
   const revokeAccess = useRevokeAccess();
   const resendInvitation = useResendInvitation();
@@ -197,6 +197,16 @@ export function EmployeesSection() {
             <Skeleton key={i} className="h-12 w-full" />
           ))}
         </div>
+      ) : isError ? (
+        /* An error is not an empty list. Saying "aucun employé" when the request failed tells
+           someone their payroll is empty, which is both false and alarming — and it was being
+           said while the badge beside it still counted two. */
+        <EmptyState
+          icon={CloudOff}
+          title="Liste indisponible"
+          description={message(loadError, "Vos employés n'ont pas pu être chargés.")}
+          action={<Button onClick={() => refetch()}>Réessayer</Button>}
+        />
       ) : employees.length === 0 ? (
         <EmptyState
           icon={UsersRound}

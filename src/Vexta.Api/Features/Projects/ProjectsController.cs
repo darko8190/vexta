@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Vexta.Api.Common;
 using Vexta.Api.Data;
+using Vexta.Api.Auth;
 using Vexta.Api.Domain;
 
 namespace Vexta.Api.Features.Projects;
@@ -12,7 +13,7 @@ namespace Vexta.Api.Features.Projects;
 // Client is in the list because a customer reads their own projects and invoices here; the
 // query filter is what confines them to their own, and [StaffOnly] on every write is what
 // stops them changing anything.
-[Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.TenantUser)},{nameof(UserRole.SuperAdmin)},{nameof(UserRole.Client)}")]
+[Authorize(Roles = Roles.StaffAndClients)]
 [RequireActiveSubscription]
 public class ProjectsController(VextaDbContext db, ICurrentUserService currentUser) : ControllerBase
 {
@@ -85,7 +86,10 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
                 Materials = p.Materials.Count,
                 Timesheets = p.Timesheets.Count,
                 Documents = p.Documents.Count,
-                Notes = p.Notes.Count
+                Notes = p.Notes.Count,
+                // Open only. A badge counting finished tasks would keep growing on a job that
+                // has nothing left to do, which is the opposite of what it is there to say.
+                OpenTasks = p.Tasks.Count(t => t.Status != ProjectTaskStatus.Terminee)
             })
             .FirstOrDefaultAsync();
 
@@ -109,6 +113,7 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
         // out: the badge is what will show them filling up, and a section that appears only
         // once it has content is a section nobody discovers.
         var counts = new ProjectSectionCountsDto(
+            OpenTasks: project.OpenTasks,
             Materials: project.Materials,
             Equipment: 0,
             Assemblies: 0,
@@ -174,6 +179,7 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
     // Reading is open to the customer this record belongs to — the query filter already
     // narrows it to theirs. Writing is not: a client does not raise their own invoice, and
     // "they can only see their own" is not the same promise as "they can change it".
+    [Authorize(Roles = Roles.Managers)]
     [HttpPost]
     [StaffOnly]
     [RequireBusinessTenant]
@@ -212,6 +218,7 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
         return CreatedAtAction(nameof(Get), new { id = project.Id }, dto);
     }
 
+    [Authorize(Roles = Roles.Managers)]
     [HttpPut("{id:guid}")]
     [StaffOnly]
     public async Task<ActionResult<ProjectDto>> Update(Guid id, UpsertProjectRequest request)
@@ -246,6 +253,7 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
         return Ok(await GetDtoAsync(id));
     }
 
+    [Authorize(Roles = Roles.Managers)]
     [HttpDelete("{id:guid}")]
     [StaffOnly]
     public async Task<IActionResult> Delete(Guid id)

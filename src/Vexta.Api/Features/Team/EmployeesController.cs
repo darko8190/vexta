@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Vexta.Api.Common;
 using Vexta.Api.Data;
+using Vexta.Api.Auth;
 using Vexta.Api.Domain;
 using Vexta.Api.Services;
 
@@ -16,7 +17,7 @@ namespace Vexta.Api.Features.Team;
 [ApiController]
 [Route("api/employees")]
 [StaffOnly]
-[Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.SuperAdmin)}")]
+[Authorize(Roles = Roles.Managers)]
 [RequireActiveSubscription]
 public class EmployeesController(
     VextaDbContext db,
@@ -65,6 +66,7 @@ public class EmployeesController(
         return Ok(new EmployeeDetailDto(dto, teams));
     }
 
+    [Authorize(Roles = Roles.Owner)]
     [HttpPost]
     [RequireBusinessTenant]
     public async Task<ActionResult<EmployeeDto>> Create(SaveEmployeeRequest request, CancellationToken ct)
@@ -85,7 +87,8 @@ public class EmployeesController(
             LastName = request.LastName.Trim(),
             Email = email,
             JobTitle = Clean(request.JobTitle),
-            Phone = Clean(request.Phone)
+            Phone = Clean(request.Phone),
+            Role = request.Role
         };
 
         db.Employees.Add(employee);
@@ -94,6 +97,7 @@ public class EmployeesController(
         return Ok(ToDto(employee, EmptySet, EmptySet, DateTimeOffset.UtcNow));
     }
 
+    [Authorize(Roles = Roles.Owner)]
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<EmployeeDto>> Update(Guid id, SaveEmployeeRequest request, CancellationToken ct)
     {
@@ -117,12 +121,35 @@ public class EmployeesController(
             });
         }
 
+        // The founder stays an administrator. Demoting them would leave a company whose owner
+        // cannot reach its own settings, and nobody left who can put it back.
+        if (request.Role != employee.Role
+            && request.Role != UserRole.TenantAdmin
+            && await IsOwnerAsync(employee, ct))
+        {
+            return BadRequest(new
+            {
+                message = "Le propriétaire de l'entreprise reste administrateur."
+            });
+        }
+
         employee.FirstName = request.FirstName.Trim();
         employee.LastName = request.LastName.Trim();
         employee.Email = email;
         employee.JobTitle = Clean(request.JobTitle);
         employee.Phone = Clean(request.Phone);
+        employee.Role = request.Role;
         employee.UpdatedAt = DateTimeOffset.UtcNow;
+
+        // The membership is what the token is signed from, so a role changed here has to reach
+        // it or the change is only cosmetic. It takes effect on their next sign-in or when their
+        // session slides — see AuthController.Me.
+        var membership = await db.TenantMemberships
+            .FirstOrDefaultAsync(m => m.UserId == employee.UserId && m.TenantId == employee.TenantId, ct);
+        if (membership is not null && membership.Role != UserRole.Client)
+        {
+            membership.Role = request.Role;
+        }
 
         await db.SaveChangesAsync(ct);
 
@@ -130,6 +157,7 @@ public class EmployeesController(
         return Ok(ToDto(employee, withPassword, await OwnersAsync([employee], ct), DateTimeOffset.UtcNow));
     }
 
+    [Authorize(Roles = Roles.Owner)]
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
@@ -154,6 +182,7 @@ public class EmployeesController(
     }
 
     /// <summary>Ticking the access box. Creates the account and issues the first invitation.</summary>
+    [Authorize(Roles = Roles.Owner)]
     [HttpPost("{id:guid}/access")]
     [RequireBusinessTenant]
     public async Task<ActionResult<AccessGrantedDto>> GrantAccess(Guid id, CancellationToken ct)
@@ -174,6 +203,7 @@ public class EmployeesController(
     }
 
     /// <summary>Unticking the box. The employee stays on file; the seat comes back.</summary>
+    [Authorize(Roles = Roles.Owner)]
     [HttpDelete("{id:guid}/access")]
     public async Task<IActionResult> RevokeAccess(Guid id, CancellationToken ct)
     {
@@ -198,6 +228,7 @@ public class EmployeesController(
         return NoContent();
     }
 
+    [Authorize(Roles = Roles.Owner)]
     [HttpPost("{id:guid}/access/resend")]
     [RequireBusinessTenant]
     public async Task<ActionResult<AccessGrantedDto>> ResendInvitation(Guid id, CancellationToken ct)
@@ -263,6 +294,7 @@ public class EmployeesController(
             e.Email,
             e.JobTitle,
             e.Phone,
+            e.Role,
             hasAccess,
             pending,
             pending && e.InvitationExpiresAt <= now,
@@ -288,6 +320,11 @@ public class EmployeesController(
         if (!r.Email.Contains('@') || !r.Email.Contains('.')) return "Entrez un courriel valide.";
         if (r.JobTitle is { Length: > 100 }) return "Le titre ne peut pas dépasser 100 caractères.";
         if (r.Phone is { Length: > 40 }) return "Le téléphone ne peut pas dépasser 40 caractères.";
+
+        // SuperAdmin and Client both exist in the enum and neither is a company's to hand out:
+        // one is the platform's, the other is granted by giving a customer their own files.
+        if (!Roles.Assignable.Contains(r.Role)) return "Ce rôle ne peut pas être attribué ici.";
+
         return null;
     }
 }

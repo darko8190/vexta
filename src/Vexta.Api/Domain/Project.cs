@@ -65,4 +65,5 @@ public class Project
     public List<TimesheetEntry> Timesheets { get; set; } = [];
     public List<ProjectDocument> Documents { get; set; } = [];
     public List<ProjectNote> Notes { get; set; } = [];
+    public List<ProjectTask> Tasks { get; set; } = [];
 }

@@ -31,6 +31,7 @@ import {
   useTeamQuery,
 } from "@/hooks/use-team";
 import { ApiError } from "@/lib/api";
+import { userRoleLabels } from "@/lib/labels";
 import type { AccessGranted, Employee } from "@/lib/types";
 
 function message(error: unknown, fallback: string): string {
@@ -226,6 +227,7 @@ export function EmployeesSection() {
                 <TableHead>Employé</TableHead>
                 <TableHead>Courriel</TableHead>
                 <TableHead>Titre</TableHead>
+                <TableHead className="w-36">Rôle</TableHead>
                 <TableHead className="w-20 text-center">Accès</TableHead>
                 <TableHead className="w-40">État</TableHead>
                 <TableHead className="w-10" />
@@ -251,6 +253,14 @@ export function EmployeesSection() {
                   </TableCell>
                   <TableCell className="text-muted-foreground">{employee.email}</TableCell>
                   <TableCell className="text-muted-foreground">{employee.jobTitle ?? "—"}</TableCell>
+                  <TableCell>
+                    {/* The title is what they are called; the role is what they may do. Two
+                        different things, and a staff list that shows only the first leaves the
+                        owner guessing who can reach the company's settings. */}
+                    <Badge variant={employee.role === "TenantUser" ? "outline" : "secondary"}>
+                      {userRoleLabels[employee.role]}
+                    </Badge>
+                  </TableCell>
                   <TableCell className="text-center">
                     <AccessCell
                       employee={employee}

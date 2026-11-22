@@ -131,6 +131,9 @@ public class TenantSignupService(
                 FirstName = user.FirstName,
                 LastName = user.LastName,
                 Email = user.Email!.ToLowerInvariant(),
+                // The person who opened the company runs it. Their staff record has to say so,
+                // or the staff page shows the founder as an ordinary employee.
+                Role = UserRole.TenantAdmin,
                 UserId = user.Id
             });
         }

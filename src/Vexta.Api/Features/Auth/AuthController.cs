@@ -20,6 +20,7 @@ public class AuthController(
     ITenantSignupService tenantSignup,
     IWorkspaceService workspaces,
     ICurrentUserService currentUser,
+    IPasswordResetService passwordReset,
     IOptions<JwtOptions> jwtOptions) : ControllerBase
 {
     [HttpPost("login")]
@@ -62,6 +63,57 @@ public class AuthController(
         return Ok(RegisterTenantResponse.For(result, tokenService));
     }
 
+    /// <summary>
+    /// Asks for a reset link. Answers the same thing whether or not the address has an account:
+    /// a different answer would turn this into a way of finding out who banks with us.
+    /// </summary>
+    [HttpPost("mot-de-passe-oublie")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ForgotPassword(ForgotPasswordRequest request)
+    {
+        await passwordReset.SendLinkAsync(request.Email, HttpContext.RequestAborted);
+
+        return Ok(new
+        {
+            message = "Si un compte utilise cette adresse, un lien vient d'y être envoyé. "
+                + "Vérifiez aussi votre dossier de courrier indésirable."
+        });
+    }
+
+    /// <summary>
+    /// The signed-in person asking for their own link, from their profile. Here the answer can
+    /// be honest — they already know the address has an account, it is theirs.
+    /// </summary>
+    [HttpPost("mot-de-passe/reinitialisation")]
+    [Authorize]
+    public async Task<IActionResult> RequestOwnPasswordReset()
+    {
+        var user = await CurrentUserAsync();
+        if (user is null) return Unauthorized();
+
+        if (!await passwordReset.SendLinkToUserAsync(user, HttpContext.RequestAborted))
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new
+            {
+                message = "Le courriel n'a pas pu être envoyé. Réessayez dans quelques minutes."
+            });
+        }
+
+        return Ok(new { message = $"Un lien vient d'être envoyé à {user.Email}." });
+    }
+
+    [HttpPost("reinitialiser-mot-de-passe")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ResetPassword(ResetPasswordRequest request)
+    {
+        var outcome = await passwordReset.ResetAsync(
+            request.Token, request.Password, HttpContext.RequestAborted);
+
+        if (!outcome.Succeeded) return BadRequest(new { message = outcome.Error });
+
+        return Ok(new { message = "Votre mot de passe est changé. Connectez-vous avec le nouveau." });
+    }
+
     [HttpGet("me")]
     [Authorize]
     public async Task<ActionResult<UserDto>> Me()
@@ -89,7 +141,7 @@ public class AuthController(
             var membership = await workspaces.FindAsync(user.Id, current, HttpContext.RequestAborted);
             if (membership?.Tenant is not null)
             {
-                SlideSession(() => tokenService.CreateAccessToken(user, membership));
+                SlideSession(() => tokenService.CreateAccessToken(user, membership), membership.Role);
                 return Ok(UserDto.ForWorkspace(user, membership.Tenant, membership.Role));
             }
         }
@@ -102,10 +154,12 @@ public class AuthController(
             ? await workspaces.FindAsync(user.Id, own, HttpContext.RequestAborted)
             : null;
 
-        SlideSession(() => home is not null
-            ? tokenService.CreateAccessToken(user, home)
-            : tokenService.CreateAccessToken(user));
-        return Ok(UserDto.ForUser(user));
+        SlideSession(
+            () => home is not null
+                ? tokenService.CreateAccessToken(user, home)
+                : tokenService.CreateAccessToken(user),
+            home?.Role);
+        return Ok(UserDto.ForHome(user, home));
     }
 
     /// <summary>
@@ -118,14 +172,21 @@ public class AuthController(
     ///
     /// The caller passes a factory rather than a token: building one costs a signature, and the
     /// usual answer here is that nothing needs to be built at all.
+    ///
+    /// <paramref name="currentRole"/> is the role the membership gives right now. When it no
+    /// longer matches the one the token was signed with, the token is reissued immediately
+    /// whatever its expiry: an employee promoted this morning should not have to wait out a
+    /// thirty-day window — or be told to sign out and back in — before the promotion works.
     /// </summary>
-    private void SlideSession(Func<string> issue)
+    private void SlideSession(Func<string> issue, UserRole? currentRole = null)
     {
         var expiry = currentUser.ExpiresAt;
         if (expiry is null) return;
 
+        var roleChanged = currentRole is { } role && currentUser.Role != role;
+
         var window = TimeSpan.FromMinutes(jwtOptions.Value.AccessTokenMinutes);
-        if (expiry.Value - DateTimeOffset.UtcNow > window / 2) return;
+        if (!roleChanged && expiry.Value - DateTimeOffset.UtcNow > window / 2) return;
 
         Response.Headers[AuthHeaders.RenewedToken] = issue();
     }
@@ -177,6 +238,6 @@ public class AuthController(
         var token = membership is null
             ? tokenService.CreateAccessToken(user)
             : tokenService.CreateAccessToken(user, membership);
-        return new AuthResponse(token, UserDto.ForUser(user));
+        return new AuthResponse(token, UserDto.ForHome(user, membership));
     }
 }

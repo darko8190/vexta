@@ -1,5 +1,15 @@
-/** Client is a customer of the company, not a member of it: they see their own files only. */
-export type UserRole = "SuperAdmin" | "TenantAdmin" | "TenantUser" | "Client";
+/**
+ * Client is a customer of the company, not a member of it: they see their own files only.
+ *
+ * The three roles a company hands out are TenantAdmin (Administrateur), ProjectManager
+ * (Chargé de projet) and TenantUser (Employé) — see userRoleLabels for the words used on screen.
+ */
+export type UserRole = "SuperAdmin" | "TenantAdmin" | "ProjectManager" | "TenantUser" | "Client";
+
+/** The three a company can assign, in the order they are offered. */
+export const assignableRoles = ["TenantAdmin", "ProjectManager", "TenantUser"] as const;
+
+export type AssignableRole = (typeof assignableRoles)[number];
 
 export type TenantSubscriptionStatus = "Incomplete" | "Active" | "PastDue" | "Canceled";
 
@@ -390,6 +400,11 @@ export interface Employee {
   email: string;
   jobTitle: string | null;
   phone: string | null;
+  /**
+   * Administrateur, chargé de projet or employé. Decided before an access exists, and copied
+   * onto the sign-in account the moment one is granted.
+   */
+  role: AssignableRole;
   /** True once a sign-in account exists. This is what the seat limit counts. */
   hasAccess: boolean;
   /** Access granted but the password never chosen. */
@@ -535,6 +550,8 @@ export interface CompanyProfile {
 
 /** One badge per section of a project, so the rail can say how much is behind each. */
 export interface ProjectSectionCounts {
+  /** Only the work still open: a finished task is no longer something to do. */
+  openTasks: number;
   materials: number;
   equipment: number;
   assemblies: number;
@@ -593,6 +610,64 @@ export interface ProjectMaterial {
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
+}
+
+// ---- Tasks ----
+
+export type ProjectTaskStatus = "AFaire" | "EnCours" | "Bloquee" | "Terminee";
+
+export type ProjectTaskPriority = "Basse" | "Normale" | "Haute" | "Urgente";
+
+/** One person a task can be handed to. */
+export interface TaskAssignee {
+  id: string;
+  name: string;
+  jobTitle: string | null;
+}
+
+export interface TaskTeam {
+  id: string;
+  name: string;
+  memberCount: number;
+}
+
+export interface TaskAssignables {
+  employees: TaskAssignee[];
+  teams: TaskTeam[];
+}
+
+/**
+ * One thing to do on a job. A task goes to named people, to a team, to both, or to nobody —
+ * all four are real, and the list says which rather than inventing an owner.
+ */
+export interface ProjectTask {
+  id: string;
+  title: string;
+  description: string | null;
+  status: ProjectTaskStatus;
+  priority: ProjectTaskPriority;
+  startDate: string | null;
+  dueDate: string | null;
+  estimatedHours: number | null;
+  assignedTeamId: string | null;
+  assignedTeamName: string | null;
+  assignees: TaskAssignee[];
+  completedAt: string | null;
+  /** Decided by the API, so every reader agrees on what today is. */
+  isLate: boolean;
+  sortOrder: number;
+}
+
+export interface SaveProjectTaskValues {
+  title: string;
+  description: string | null;
+  status: ProjectTaskStatus;
+  priority: ProjectTaskPriority;
+  startDate: string | null;
+  dueDate: string | null;
+  estimatedHours: number | null;
+  assignedTeamId: string | null;
+  assigneeIds: string[];
 }
 
 export interface SaveProjectMaterialValues {
@@ -878,4 +953,67 @@ export interface ProductSearchResult {
   sellingPrice: number | null;
   tracksInventory: boolean;
   quantityAvailable: number;
+}
+
+// ---- Reports ----
+
+/** One report a company is offered on the Rapports page. */
+export interface ReportSummary {
+  id: string;
+  key: string;
+  title: string;
+  description: string;
+  icon: string;
+  moduleId: string;
+  moduleTitle: string;
+  /** False while the calculation is still to be written. The page says so plainly. */
+  isImplemented: boolean;
+}
+
+export interface ReportColumn {
+  label: string;
+  /** Right-aligned and tabular. A property of the column, not a guess from the first cell. */
+  numeric: boolean;
+}
+
+/**
+ * A report's result: columns, and rows of cells already formatted by the API. Shapeless on
+ * purpose — a new report is a server-side job, not a new table component here.
+ */
+export interface ReportResult {
+  title: string;
+  subtitle: string | null;
+  columns: ReportColumn[];
+  rows: string[][];
+  totals: string[] | null;
+  generatedAt: string;
+}
+
+/** One report as the super admin manages it. */
+export interface AdminReport {
+  id: string;
+  moduleId: string;
+  moduleTitle: string;
+  key: string;
+  title: string;
+  description: string;
+  icon: string;
+  sortOrder: number;
+  isPublished: boolean;
+}
+
+export interface ReportKeyOption {
+  key: string;
+  label: string;
+  isImplemented: boolean;
+}
+
+export interface SaveReportValues {
+  moduleId: string;
+  key: string;
+  title: string;
+  description: string;
+  icon: string;
+  sortOrder: number;
+  isPublished: boolean;
 }

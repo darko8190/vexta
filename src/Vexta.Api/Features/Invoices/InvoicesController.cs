@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Vexta.Api.Common;
 using Vexta.Api.Data;
+using Vexta.Api.Auth;
 using Vexta.Api.Domain;
 using Vexta.Api.Services;
 using Vexta.Api.Features.BillingSettings;
@@ -15,7 +16,7 @@ namespace Vexta.Api.Features.Invoices;
 // Client is in the list because a customer reads their own projects and invoices here; the
 // query filter is what confines them to their own, and [StaffOnly] on every write is what
 // stops them changing anything.
-[Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.TenantUser)},{nameof(UserRole.SuperAdmin)},{nameof(UserRole.Client)}")]
+[Authorize(Roles = Roles.StaffAndClients)]
 [RequireActiveSubscription]
 public class InvoicesController(
     VextaDbContext db,
@@ -115,6 +116,7 @@ public class InvoicesController(
     /// The same document, built from an invoice that has not been saved. Staff only, and it
     /// writes nothing — the number it shows is the one the invoice would be given.
     /// </summary>
+    [Authorize(Roles = Roles.Managers)]
     [HttpPost("preview")]
     [StaffOnly]
     public async Task<IActionResult> Preview(
@@ -320,6 +322,7 @@ public class InvoicesController(
     /// "Envoyée" because a button was pressed is worse than no status at all: it is the record
     /// someone checks before chasing a payment that was never asked for.
     /// </summary>
+    [Authorize(Roles = Roles.Managers)]
     [HttpPost("{id:guid}/send")]
     [StaffOnly]
     public async Task<ActionResult<InvoiceSentDto>> Send(Guid id, SendInvoiceRequest request, CancellationToken ct)
@@ -448,7 +451,14 @@ public class InvoicesController(
                 body,
                 cc,
                 attachments,
-                ct);
+                ct,
+                // An invoice arrives from the company that issued it. Read from the tenant rather
+                // than from the token: a super admin inside a company sends on its behalf, and the
+                // client has no idea who we are.
+                await db.Tenants.IgnoreQueryFilters().AsNoTracking()
+                    .Where(t => t.Id == currentUser.TenantId)
+                    .Select(t => t.Name)
+                    .FirstOrDefaultAsync(ct));
         }
         catch (InvalidOperationException ex)
         {
@@ -482,6 +492,7 @@ public class InvoicesController(
     // Reading is open to the customer this record belongs to — the query filter already
     // narrows it to theirs. Writing is not: a client does not raise their own invoice, and
     // "they can only see their own" is not the same promise as "they can change it".
+    [Authorize(Roles = Roles.Managers)]
     [HttpPost]
     [StaffOnly]
     [RequireBusinessTenant]
@@ -544,6 +555,7 @@ public class InvoicesController(
         return CreatedAtAction(nameof(Get), new { id = invoice.Id }, ToDto(created!, gst, qst));
     }
 
+    [Authorize(Roles = Roles.Managers)]
     [HttpPut("{id:guid}")]
     [StaffOnly]
     public async Task<ActionResult<InvoiceDto>> Update(Guid id, UpsertInvoiceRequest request)
@@ -589,6 +601,7 @@ public class InvoicesController(
         return Ok(ToDto(updated!, gst, qst));
     }
 
+    [Authorize(Roles = Roles.Managers)]
     [HttpDelete("{id:guid}")]
     [StaffOnly]
     public async Task<IActionResult> Delete(Guid id)

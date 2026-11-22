@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Vexta.Api.Common;
 using Vexta.Api.Data;
+using Vexta.Api.Auth;
 using Vexta.Api.Domain;
 
 namespace Vexta.Api.Features.Addresses;
@@ -10,7 +11,7 @@ namespace Vexta.Api.Features.Addresses;
 [ApiController]
 [Route("api/addresses")]
 [StaffOnly]
-[Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.TenantUser)},{nameof(UserRole.SuperAdmin)}")]
+[Authorize(Roles = Roles.Staff)]
 [RequireActiveSubscription]
 public class AddressesController(VextaDbContext db, ICurrentUserService currentUser) : ControllerBase
 {
@@ -55,6 +56,7 @@ public class AddressesController(VextaDbContext db, ICurrentUserService currentU
         return address is null ? NotFound() : Ok(address);
     }
 
+    [Authorize(Roles = Roles.Managers)]
     [HttpPost]
     [RequireBusinessTenant]
     public async Task<ActionResult<AddressDto>> Create(UpsertAddressRequest request)
@@ -88,6 +90,7 @@ public class AddressesController(VextaDbContext db, ICurrentUserService currentU
         return CreatedAtAction(nameof(Get), new { id = address.Id }, dto);
     }
 
+    [Authorize(Roles = Roles.Managers)]
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<AddressDto>> Update(Guid id, UpsertAddressRequest request)
     {
@@ -114,6 +117,7 @@ public class AddressesController(VextaDbContext db, ICurrentUserService currentU
         return Ok(await GetDtoAsync(id));
     }
 
+    [Authorize(Roles = Roles.Managers)]
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
     {

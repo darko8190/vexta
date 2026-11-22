@@ -8,8 +8,13 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
 
-/** What a customer may open. Everything else belongs to the people who run the company. */
-const CLIENT_ROUTES = ["/tableau-de-bord", "/projets", "/factures"];
+/**
+ * What a customer may open. Everything else belongs to the people who run the company.
+ *
+ * /profil is on the list because it is theirs, not the company's: it holds their name and the
+ * button that resets their own password.
+ */
+const CLIENT_ROUTES = ["/tableau-de-bord", "/projets", "/factures", "/profil"];
 
 /**
  * The sidebar already offers a customer only their own two modules, but a URL typed or kept in

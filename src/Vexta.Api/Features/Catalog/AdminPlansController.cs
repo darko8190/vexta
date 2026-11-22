@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Stripe;
 using Vexta.Api.Data;
+using Vexta.Api.Auth;
 using Vexta.Api.Domain;
 using Vexta.Api.Services;
 
@@ -13,7 +14,7 @@ namespace Vexta.Api.Features.Catalog;
 
 [ApiController]
 [Route("api/admin/plans")]
-[Authorize(Roles = nameof(UserRole.SuperAdmin))]
+[Authorize(Roles = Roles.Platform)]
 public class AdminPlansController(VextaDbContext db, IStripeService stripe) : ControllerBase
 {
     private const long MinCents = 100;

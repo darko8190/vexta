@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Building2, Eye, LogOut, Settings } from "lucide-react";
+import { Building2, Eye, LogOut, Settings, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -233,6 +233,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </p>
               <p className="truncate text-xs font-normal text-muted-foreground">{user!.email}</p>
             </DropdownMenuLabel>
+          </DropdownMenuGroup>
+          <DropdownMenuSeparator />
+          {/* Everyone has one, customers included: it is where the password is reset, and
+              nobody should have to belong to a company to change their own password. */}
+          <DropdownMenuGroup>
+            <DropdownMenuItem render={<Link href="/profil" />}>
+              <UserRound />
+              Mon profil
+            </DropdownMenuItem>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
           <WorkspaceSwitcher />

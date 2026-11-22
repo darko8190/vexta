@@ -19,7 +19,10 @@ public interface IPlatformSettingsService
     Task ClearAsync(string key, CancellationToken ct = default);
 }
 
-public class PlatformSettingsService(VextaDbContext db, ISecretProtector protector) : IPlatformSettingsService
+public class PlatformSettingsService(
+    VextaDbContext db,
+    ISecretProtector protector,
+    ILogger<PlatformSettingsService> logger) : IPlatformSettingsService
 {
     public async Task<string?> GetAsync(string key, CancellationToken ct = default)
     {
@@ -41,14 +44,23 @@ public class PlatformSettingsService(VextaDbContext db, ISecretProtector protect
 
     // A value encrypted under a key that is no longer in the data protection key ring (e.g. the
     // ring was reset) must not take down the whole settings page — treat it as unset instead.
+    //
+    // But say so. Unset and unreadable look identical from every screen, and the difference is
+    // the difference between "enter your Mailgun key" and "your key folder is not a volume" —
+    // which cost an afternoon of wondering why email had stopped without anyone touching it.
     private string? TryUnprotect(string encryptedValue)
     {
         try
         {
             return protector.Unprotect(encryptedValue);
         }
-        catch (CryptographicException)
+        catch (CryptographicException ex)
         {
+            logger.LogError(
+                ex,
+                "Un réglage enregistré ne peut plus être déchiffré : les clés de protection des "
+                + "données ont changé. Les secrets stockés doivent être saisis de nouveau, et le "
+                + "dossier des clés doit être un volume qui survit aux redéploiements.");
             return null;
         }
     }

@@ -11,6 +11,7 @@ import {
   FolderOpen,
   HardHat,
   Info,
+  ListChecks,
   MapPin,
   Pencil,
   Plus,
@@ -27,6 +28,7 @@ import { ProjectCostTable } from "@/components/projects/detail/project-cost-tabl
 import { ProjectDocumentsSection } from "@/components/projects/detail/project-documents-section";
 import { ProjectExpensesSection } from "@/components/projects/detail/project-expenses-section";
 import { ProjectMaterialsSection } from "@/components/projects/detail/project-materials-section";
+import { ProjectTasksSection } from "@/components/projects/detail/project-tasks-section";
 import { ProjectTimesheetsSection } from "@/components/projects/detail/project-timesheets-section";
 import { ProjectInvoicesSection } from "@/components/projects/detail/project-invoices-section";
 import { SectionPlaceholder } from "@/components/projects/detail/section-placeholder";
@@ -138,6 +140,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       ]
     : [
         { key: "details", label: "Détails", icon: Info },
+        // Second, right after the record: on a job in progress this is the list people open
+        // first, and the badge counts what is left rather than what exists.
+        { key: "taches", label: "Tâches", count: counts?.openTasks ?? 0, icon: ListChecks },
         { key: "materiaux", label: "Matériaux", count: counts?.materials ?? 0, icon: HardHat },
         { key: "equipements", label: "Équipements", count: counts?.equipment ?? 0, icon: Wrench },
         { key: "assemblages", label: "Assemblages", count: counts?.assemblies ?? 0, icon: Blocks },
@@ -237,6 +242,10 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               {!isClient && <ProjectCostTable costs={summary?.costs} isLoading={summaryLoading} />}
             </div>
           )}
+
+          {/* No `locked`: the invoice says what the client owes, not that the punch list is
+              finished. A billed job can still have work to tick off. */}
+          {section === "taches" && <ProjectTasksSection projectId={project.id} />}
 
           {section === "materiaux" && <ProjectMaterialsSection projectId={project.id} locked={locked} />}
 

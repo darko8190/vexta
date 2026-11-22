@@ -2,13 +2,14 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Vexta.Api.Data;
+using Vexta.Api.Auth;
 using Vexta.Api.Domain;
 
 namespace Vexta.Api.Features.Catalog;
 
 [ApiController]
 [Route("api/admin/modules")]
-[Authorize(Roles = nameof(UserRole.SuperAdmin))]
+[Authorize(Roles = Roles.Platform)]
 public class AdminModulesController(VextaDbContext db) : ControllerBase
 {
     [HttpGet]

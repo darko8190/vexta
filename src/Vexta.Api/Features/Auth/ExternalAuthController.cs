@@ -145,7 +145,7 @@ public class ExternalAuthController(
         var token = membership is null
             ? tokenService.CreateAccessToken(user)
             : tokenService.CreateAccessToken(user, membership);
-        return Ok(new AuthResponse(token, UserDto.ForUser(user)));
+        return Ok(new AuthResponse(token, UserDto.ForHome(user, membership)));
     }
 
     /// <summary>What the "name your company" page shows, so it can greet the right person.</summary>

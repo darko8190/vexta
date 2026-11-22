@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Vexta.Api.Common;
 using Vexta.Api.Data;
+using Vexta.Api.Auth;
 using Vexta.Api.Domain;
 
 // Named after the policies and not after the folder on purpose: a namespace called
@@ -23,11 +24,10 @@ namespace Vexta.Api.Features.PricePolicies;
 [RequireActiveSubscription]
 public class PricePoliciesController(VextaDbContext db, ICurrentUserService currentUser) : ControllerBase
 {
-    private const string Owners = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.SuperAdmin)}";
-    private const string Staff = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.TenantUser)},{nameof(UserRole.SuperAdmin)}";
+
 
     [HttpGet]
-    [Authorize(Roles = Staff)]
+    [Authorize(Roles = Roles.Staff)]
     public async Task<ActionResult<List<PricePolicyDto>>> List(CancellationToken ct)
     {
         if (currentUser.TenantId is not { } tenantId) return Forbid();
@@ -39,7 +39,7 @@ public class PricePoliciesController(VextaDbContext db, ICurrentUserService curr
     }
 
     [HttpPost]
-    [Authorize(Roles = Owners)]
+    [Authorize(Roles = Roles.Owner)]
     [RequireBusinessTenant]
     public async Task<ActionResult<PricePolicyDto>> Create(SavePricePolicyRequest request, CancellationToken ct)
     {
@@ -71,7 +71,7 @@ public class PricePoliciesController(VextaDbContext db, ICurrentUserService curr
     }
 
     [HttpPut("{id:guid}")]
-    [Authorize(Roles = Owners)]
+    [Authorize(Roles = Roles.Owner)]
     public async Task<ActionResult<PricePolicyDto>> Update(
         Guid id, SavePricePolicyRequest request, CancellationToken ct)
     {
@@ -105,7 +105,7 @@ public class PricePoliciesController(VextaDbContext db, ICurrentUserService curr
     }
 
     [HttpDelete("{id:guid}")]
-    [Authorize(Roles = Owners)]
+    [Authorize(Roles = Roles.Owner)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
         if (currentUser.TenantId is not { } tenantId) return Forbid();

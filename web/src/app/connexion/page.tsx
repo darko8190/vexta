@@ -126,8 +126,16 @@ export default function LoginPage() {
               control={form.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <FieldLabel htmlFor="login-password">Mot de passe</FieldLabel>
+                    {/* Beside the field it concerns rather than at the bottom of the card:
+                        this is looked for at the moment the password will not come to mind. */}
+                    <Link
+                      href="/mot-de-passe-oublie"
+                      className="text-xs font-medium text-primary underline-offset-4 hover:underline"
+                    >
+                      Mot de passe oublié ?
+                    </Link>
                   </div>
                   <PasswordInput
                     {...field}

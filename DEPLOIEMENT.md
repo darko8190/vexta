@@ -249,7 +249,43 @@ de Mailgun par sa propre indirection (`include:dc-xxxx._spfm.mg.vexta.ca`) qui a
 endroit — c'est normal, il ne faut pas la remplacer par la valeur brute.
 
 Sans Mailgun, la plateforme fonctionne : les invitations d'employés ne partent simplement pas
-par courriel, et l'administrateur transmet le lien lui-même.
+par courriel, et l'administrateur transmet le lien lui-même. **Le mot de passe oublié, lui, ne
+fonctionne pas sans Mailgun** : il n'y a pas d'autre chemin pour délivrer le lien, et c'est la
+seule fonction qui en dépende absolument.
+
+#### Qui apparaît comme expéditeur
+
+L'adresse d'envoi reste toujours la vôtre — Mailgun n'envoie pas depuis un domaine qu'il ne
+possède pas. Le **nom** affiché à côté, lui, est celui de l'entreprise qui écrit : une facture de
+Construction Tremblay arrive de « Construction Tremblay », et son invitation d'employé aussi. Le
+nom configuré dans **Intégrations** sert de repli pour ce que la plateforme envoie elle-même.
+
+Les réinitialisations de mot de passe partent toujours au nom de **Vexta**, jamais de
+l'entreprise : un courriel qui semblerait venir de l'employeur serait exactement la forme du
+hameçonnage que ce flux attire.
+
+#### Mot de passe oublié
+
+Deux portes, un seul mécanisme :
+
+- **Page de connexion** → « Mot de passe oublié ? ». La réponse est la même pour une adresse
+  connue et une adresse inconnue — autrement la page devient un moyen de savoir qui a un compte
+  chez nous.
+- **Mon profil** → « Réinitialiser mon mot de passe ». Le lien part à l'adresse du compte, ce qui
+  *est* la confirmation par courriel. Aucun formulaire ne change le mot de passe depuis une
+  session ouverte : ça le changerait pour qui se trouve devant le clavier.
+
+Le lien est valable **2 heures**, ne fonctionne qu'une fois, et n'ouvre pas de session — la
+personne se reconnecte avec le mot de passe qu'elle vient de choisir. Il est signé avec le
+trousseau Data Protection, donc **le volume `api-keys` doit survivre aux redéploiements** : un
+trousseau neuf invalide tous les liens en vol et rend illisibles les clés d'API enregistrées.
+
+> Depuis cette version, le chemin du trousseau vaut `/data/keys` par défaut, sans rien dans
+> l'environnement. Un chemin relatif y était configuré : dans un conteneur il aboutissait à
+> `/app`, propriété de root alors que l'application tourne sans privilèges, donc le dossier ne
+> pouvait pas être créé et le trousseau repartait de zéro à chaque démarrage. Une seule ligne de
+> journal le signalait. Et un réglage qu'on ne peut plus déchiffrer se lisait comme un réglage
+> jamais saisi — il est maintenant journalisé pour ce qu'il est.
 
 ### Ressources humaines et nombre d'utilisateurs
 
@@ -388,6 +424,68 @@ créés par la migration avec leurs liens, mais **rattachés à aucun forfait** 
 voyez aujourd'hui ne change tant que vous ne les cochez pas dans un forfait. Si vous aviez déjà
 des modules marketing portant les mêmes titres, ils sont conservés tels quels — vous verrez donc
 deux lignes « Clients », celle sans écran et celle avec.
+
+### Rapports
+
+**Admin → Rapports** est le catalogue : chaque ligne décrit un rapport et le **module** auquel il
+est rattaché. Ce module est toute sa distribution — une entreprise ne se fait offrir que les
+rapports dont le module est dans son forfait, et un module réservé au propriétaire garde ses
+rapports pour lui.
+
+C'est donc le module, et non le rôle, qui décide qui voit quoi : « Heures par employé » rattaché
+à **Ressources humaines** (réservé au propriétaire) reste chez le propriétaire, tandis que
+« Charge de tâches » rattaché à **Projets** est visible de toute l'équipe. Plus fin qu'un rôle,
+et surtout : aucune entrée de menu ne mène à un 403.
+
+Pour que l'onglet apparaisse chez les entreprises, créez un module dans **Admin → Modules** :
+
+| Champ | Valeur |
+| --- | --- |
+| Titre | Rapports |
+| Lien | `/rapports` |
+| Icône | ChartBar |
+| Réservé au propriétaire | non |
+
+Puis cochez-le dans les forfaits concernés. Le menu intégré le contient déjà, donc un locataire
+sans forfait y accède sans rien faire.
+
+Le champ **Calcul** d'un rapport choisit la requête que l'API exécute. Trois sont en place :
+
+- **Charge de tâches** — qui porte quoi, et ce qui a dépassé son échéance ;
+- **Heures par employé** — les heures inscrites sur une période, et sur combien de chantiers ;
+- **Projets par statut** — combien de chantiers à chaque étape, et leur budget.
+
+Les cinq autres (rentabilité par projet, factures impayées, ventes par mois, valeur de
+l'inventaire, dépenses par type) apparaissent dans la liste suivies de « à venir » : le rapport
+peut être défini et placé dès maintenant, et la page le dit franchement au lieu d'afficher un
+tableau vide. Ils demandent le calcul des totaux de facture, qui n'est pas encore partagé entre
+le PDF et le reste de l'API.
+
+### Rôles des employés
+
+Chaque employé porte un rôle, choisi dans sa fiche avant même qu'un accès existe. Il est recopié
+sur son adhésion au moment où l'accès est accordé, et c'est cette adhésion que le jeton signe.
+
+| | Administrateur | Chargé de projet | Employé |
+| --- | --- | --- | --- |
+| Lire les clients, projets, factures, inventaire | oui | oui | oui |
+| Créer et modifier clients, projets, produits | oui | oui | non |
+| Factures | oui | oui | non |
+| Matériaux, heures, dépenses, notes, tâches d'un chantier | oui | oui | oui |
+| Rapports | selon le module | selon le module | selon le module |
+| Employés et équipes | tout | lecture | non |
+| Fiche entreprise, paramètres, politiques de prix, forfait | oui | non | non |
+
+Un employé change l'**état** d'une tâche — y compris « Bloquée » — mais ne la crée pas, ne la
+réassigne pas et ne la supprime pas.
+
+Changer le rôle de quelqu'un prend effet **au prochain appel** : `/api/auth/me` compare le rôle
+du jeton à celui de l'adhésion et réémet le jeton dès qu'ils diffèrent, sans attendre la
+fenêtre de glissement de 30 jours. Inutile de demander à la personne de se reconnecter.
+
+Le propriétaire de l'entreprise reste administrateur : le rétrograder laisserait une entreprise
+dont le propriétaire ne peut plus atteindre ses propres paramètres, et personne pour l'y
+remettre. Le champ est donc verrouillé sur sa fiche.
 
 ### Cloudflare R2
 

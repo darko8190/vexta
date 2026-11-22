@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Vexta.Api.Common;
 using Vexta.Api.Data;
+using Vexta.Api.Auth;
 using Vexta.Api.Domain;
 
 namespace Vexta.Api.Features.BillingSettings;
@@ -105,7 +106,7 @@ public class BillingSettingsController(VextaDbContext db, ICurrentUserService cu
     }
 
     [HttpPut]
-    [Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.SuperAdmin)}")]
+    [Authorize(Roles = Roles.Owner)]
     public async Task<ActionResult<BillingSettingsDto>> Save(SaveBillingSettingsRequest request, CancellationToken ct)
     {
         if (currentUser.TenantId is not { } tenantId) return Forbid();
@@ -165,7 +166,7 @@ public class BillingSettingsController(VextaDbContext db, ICurrentUserService cu
     /// decided what tax it charges.
     /// </summary>
     [HttpPut("pricing")]
-    [Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.SuperAdmin)}")]
+    [Authorize(Roles = Roles.Owner)]
     public async Task<ActionResult<BillingSettingsDto>> SavePricing(SavePricingRequest request, CancellationToken ct)
     {
         if (currentUser.TenantId is not { } tenantId) return Forbid();
@@ -208,7 +209,7 @@ public class BillingSettingsController(VextaDbContext db, ICurrentUserService cu
     /// company that clears the field gets the default back rather than an empty email.
     /// </summary>
     [HttpPut("email")]
-    [Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.SuperAdmin)}")]
+    [Authorize(Roles = Roles.Owner)]
     public async Task<ActionResult<BillingSettingsDto>> SaveInvoiceEmail(
         SaveInvoiceEmailRequest request, CancellationToken ct)
     {

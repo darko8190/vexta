@@ -119,7 +119,7 @@ public class EmployeeAccessService(
             {
                 UserId = existing.Id,
                 TenantId = employee.TenantId,
-                Role = UserRole.TenantUser
+                Role = employee.Role
             });
 
             employee.UserId = existing.Id;
@@ -141,6 +141,11 @@ public class EmployeeAccessService(
             Email = email,
             FirstName = employee.FirstName,
             LastName = employee.LastName,
+            // The account's own role, not the company's. Deliberately left at the lowest one:
+            // the owner of a space is recognised by holding TenantAdmin on the account, so
+            // copying a promoted employee's role here would make them look like the founder and
+            // their access impossible to revoke. What they may do in this company is on the
+            // membership below, which is what the token for this company is signed from.
             Role = UserRole.TenantUser,
             TenantId = employee.TenantId
         };
@@ -160,7 +165,7 @@ public class EmployeeAccessService(
         {
             UserId = user.Id,
             TenantId = employee.TenantId,
-            Role = UserRole.TenantUser
+            Role = employee.Role
         });
 
         employee.UserId = user.Id;
@@ -241,10 +246,14 @@ public class EmployeeAccessService(
             return false;
         }
 
-        var tenantName = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
+        var companyName = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
             .Where(t => t.Id == employee.TenantId)
             .Select(t => t.Name)
-            .FirstOrDefaultAsync(ct) ?? "votre équipe";
+            .FirstOrDefaultAsync(ct);
+
+        // Same split as the client invitation: the sentence needs words, the From header needs
+        // a real company name or nothing at all.
+        var tenantName = companyName ?? "votre équipe";
 
         var body = $"""
             <p>Bonjour {System.Net.WebUtility.HtmlEncode(employee.FirstName)},</p>
@@ -257,7 +266,8 @@ public class EmployeeAccessService(
 
         try
         {
-            await mailgun.SendAsync(employee.Email, employee.FullName, $"Votre accès à {tenantName}", body, ct);
+            await mailgun.SendAsync(
+                employee.Email, employee.FullName, $"Votre accès à {tenantName}", body, ct, companyName);
             return true;
         }
         catch (Exception ex)

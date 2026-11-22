@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Vexta.Api.Common;
 using Vexta.Api.Data;
+using Vexta.Api.Auth;
 using Vexta.Api.Domain;
 
 namespace Vexta.Api.Features.Company;
@@ -53,7 +54,7 @@ public class CompanyController(VextaDbContext db, ICurrentUserService currentUse
 
     [HttpPut("profile")]
     [StaffOnly]
-    [Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.SuperAdmin)}")]
+    [Authorize(Roles = Roles.Owner)]
     [RequireActiveSubscription]
     public async Task<ActionResult<CompanyProfileDto>> SaveProfile(SaveCompanyProfileRequest request, CancellationToken ct)
     {
@@ -110,7 +111,7 @@ public class CompanyController(VextaDbContext db, ICurrentUserService currentUse
     }
 
     [HttpPut("logo")]
-    [Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.SuperAdmin)}")]
+    [Authorize(Roles = Roles.Owner)]
     [RequireActiveSubscription]
     public async Task<IActionResult> UploadLogo(UploadCompanyLogoRequest request, CancellationToken ct)
     {
@@ -153,7 +154,7 @@ public class CompanyController(VextaDbContext db, ICurrentUserService currentUse
     }
 
     [HttpDelete("logo")]
-    [Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.SuperAdmin)}")]
+    [Authorize(Roles = Roles.Owner)]
     [RequireActiveSubscription]
     public async Task<IActionResult> DeleteLogo(CancellationToken ct)
     {

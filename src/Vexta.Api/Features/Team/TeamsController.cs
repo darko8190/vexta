@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Vexta.Api.Common;
 using Vexta.Api.Data;
+using Vexta.Api.Auth;
 using Vexta.Api.Domain;
 
 namespace Vexta.Api.Features.Team;
@@ -16,7 +17,7 @@ using TeamEntity = Vexta.Api.Domain.Team;
 [ApiController]
 [Route("api/hr")]
 [StaffOnly]
-[Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.SuperAdmin)}")]
+[Authorize(Roles = Roles.Managers)]
 [RequireActiveSubscription]
 public class HumanResourcesController(VextaDbContext db, ICurrentUserService currentUser) : ControllerBase
 {
@@ -47,6 +48,7 @@ public class HumanResourcesController(VextaDbContext db, ICurrentUserService cur
         return Ok(teams.Select(ToDto).ToList());
     }
 
+    [Authorize(Roles = Roles.Owner)]
     [HttpPost("teams")]
     [RequireBusinessTenant]
     public async Task<ActionResult<TeamDto>> CreateTeam(SaveTeamRequest request, CancellationToken ct)
@@ -77,6 +79,7 @@ public class HumanResourcesController(VextaDbContext db, ICurrentUserService cur
         return Ok(ToDto(await LoadTeamAsync(team.Id, ct))!);
     }
 
+    [Authorize(Roles = Roles.Owner)]
     [HttpPut("teams/{id:guid}")]
     public async Task<ActionResult<TeamDto>> UpdateTeam(Guid id, SaveTeamRequest request, CancellationToken ct)
     {
@@ -102,6 +105,7 @@ public class HumanResourcesController(VextaDbContext db, ICurrentUserService cur
         return Ok(ToDto(await LoadTeamAsync(id, ct))!);
     }
 
+    [Authorize(Roles = Roles.Owner)]
     [HttpDelete("teams/{id:guid}")]
     public async Task<IActionResult> DeleteTeam(Guid id, CancellationToken ct)
     {
@@ -125,6 +129,7 @@ public class HumanResourcesController(VextaDbContext db, ICurrentUserService cur
         return Ok(items);
     }
 
+    [Authorize(Roles = Roles.Owner)]
     [HttpPost("locations")]
     [RequireBusinessTenant]
     public async Task<ActionResult<CompanyLocationDto>> CreateLocation(SaveCompanyLocationRequest request, CancellationToken ct)
@@ -158,6 +163,7 @@ public class HumanResourcesController(VextaDbContext db, ICurrentUserService cur
         return Ok(ToLocationDto(location));
     }
 
+    [Authorize(Roles = Roles.Owner)]
     [HttpPut("locations/{id:guid}")]
     public async Task<ActionResult<CompanyLocationDto>> UpdateLocation(Guid id, SaveCompanyLocationRequest request, CancellationToken ct)
     {
@@ -183,6 +189,7 @@ public class HumanResourcesController(VextaDbContext db, ICurrentUserService cur
         return Ok(ToLocationDto(location));
     }
 
+    [Authorize(Roles = Roles.Owner)]
     [HttpDelete("locations/{id:guid}")]
     public async Task<IActionResult> DeleteLocation(Guid id, CancellationToken ct)
     {
@@ -220,6 +227,7 @@ public class HumanResourcesController(VextaDbContext db, ICurrentUserService cur
         return Ok(items.Select(ToDocumentDto).ToList());
     }
 
+    [Authorize(Roles = Roles.Owner)]
     [HttpPost("documents")]
     [RequireBusinessTenant]
     public async Task<ActionResult<HrDocumentDto>> CreateDocument(SaveHrDocumentRequest request, CancellationToken ct)
@@ -258,6 +266,7 @@ public class HumanResourcesController(VextaDbContext db, ICurrentUserService cur
         return Ok(ToDocumentDto(created));
     }
 
+    [Authorize(Roles = Roles.Owner)]
     [HttpDelete("documents/{id:guid}")]
     public async Task<IActionResult> DeleteDocument(Guid id, CancellationToken ct)
     {

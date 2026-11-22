@@ -12,7 +12,7 @@ namespace Vexta.Api.Features.Tenants;
 
 [ApiController]
 [Route("api/admin/tenants")]
-[Authorize(Roles = nameof(UserRole.SuperAdmin))]
+[Authorize(Roles = Roles.Platform)]
 public class TenantsController(
     VextaDbContext db,
     UserManager<ApplicationUser> userManager,
@@ -124,6 +124,7 @@ public class TenantsController(
             LastName = user.LastName,
             Email = user.Email!,
             JobTitle = "Responsable",
+            Role = UserRole.TenantAdmin,
             UserId = user.Id
         });
 
@@ -171,6 +172,9 @@ public class TenantsController(
             await Wipe(db.TimesheetEntries.Where(x => x.TenantId == id));
             await Wipe(db.ProjectDocuments.Where(x => x.TenantId == id));
             await Wipe(db.ProjectNotes.Where(x => x.TenantId == id));
+            // Before Teams, which a task may point at, and before Employees, whose join
+            // rows go with the task.
+            await Wipe(db.ProjectTasks.Where(x => x.TenantId == id));
             await Wipe(db.ProjectExpenses.Where(x => x.TenantId == id));
             await Wipe(db.ExpenseTypes.Where(x => x.TenantId == id));
 

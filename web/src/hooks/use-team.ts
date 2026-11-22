@@ -1,6 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { AccessGranted, Employee, EmployeeDetail, TeamList } from "@/lib/types";
+import type {
+  AccessGranted,
+  AssignableRole,
+  Employee,
+  EmployeeDetail,
+  TeamList,
+} from "@/lib/types";
 
 const TEAM_KEY = ["team", "employees"];
 
@@ -10,6 +16,8 @@ export interface SaveEmployeeValues {
   email: string;
   jobTitle: string | null;
   phone: string | null;
+  /** What they may do. The API refuses anything but the three a company can hand out. */
+  role: AssignableRole;
 }
 
 export function useTeamQuery() {

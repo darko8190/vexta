@@ -5,8 +5,31 @@ import type {
   InvoiceStatus,
   MarginMode,
   ProjectStatus,
+  ProjectTaskPriority,
+  ProjectTaskStatus,
   TenantSubscriptionStatus,
+  UserRole,
 } from "@/lib/types";
+
+/**
+ * The enum name is what travels; these are the words on screen. "Chargé de projet" is what the
+ * office calls the person, and ProjectManager is what the token says — neither is translatable
+ * into the other without this table.
+ */
+export const userRoleLabels: Record<UserRole, string> = {
+  SuperAdmin: "Super admin",
+  TenantAdmin: "Administrateur",
+  ProjectManager: "Chargé de projet",
+  TenantUser: "Employé",
+  Client: "Client",
+};
+
+/** What each role may do, said in one line under the choice. */
+export const userRoleHints: Record<"TenantAdmin" | "ProjectManager" | "TenantUser", string> = {
+  TenantAdmin: "Tout, y compris les employés, la fiche entreprise et le forfait.",
+  ProjectManager: "Les clients, les projets, l'inventaire et les factures. Pas les employés ni les paramètres.",
+  TenantUser: "Consulte les dossiers, et saisit son temps, ses dépenses et ses tâches.",
+};
 
 export const addressTypeLabels: Record<AddressType, string> = {
   Facturation: "Facturation",
@@ -21,6 +44,31 @@ export const projectStatusLabels: Record<ProjectStatus, string> = {
   AFacturer: "À facturer",
   Facture: "Facturé",
   Annule: "Annulé",
+};
+
+export const taskStatusLabels: Record<ProjectTaskStatus, string> = {
+  AFaire: "À faire",
+  EnCours: "En cours",
+  Bloquee: "Bloquée",
+  Terminee: "Terminée",
+};
+
+/**
+ * Bloquée is the one that stands out. A task waiting on a part is nobody's fault and will not
+ * move on its own, which is exactly what has to be noticed in a list.
+ */
+export const taskStatusBadgeVariant: Record<ProjectTaskStatus, "default" | "secondary" | "destructive" | "outline"> = {
+  AFaire: "outline",
+  EnCours: "default",
+  Bloquee: "destructive",
+  Terminee: "secondary",
+};
+
+export const taskPriorityLabels: Record<ProjectTaskPriority, string> = {
+  Basse: "Basse",
+  Normale: "Normale",
+  Haute: "Haute",
+  Urgente: "Urgente",
 };
 
 export const invoiceStatusLabels: Record<InvoiceStatus, string> = {

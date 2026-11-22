@@ -67,6 +67,8 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
     public DbSet<PricePolicy> PricePolicies => Set<PricePolicy>();
     public DbSet<PublicPage> PublicPages => Set<PublicPage>();
     public DbSet<JobPosting> JobPostings => Set<JobPosting>();
+    public DbSet<ProjectTask> ProjectTasks => Set<ProjectTask>();
+    public DbSet<Report> Reports => Set<Report>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -284,6 +286,48 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
                 && (CurrentClientId == null || m.Project!.ClientId == CurrentClientId));
         });
 
+        builder.Entity<ProjectTask>(e =>
+        {
+            e.HasOne(t => t.Project).WithMany(p => p.Tasks)
+                .HasForeignKey(t => t.ProjectId).OnDelete(DeleteBehavior.Cascade);
+
+            // SetNull: disbanding a crew must leave the work it was given standing, unassigned.
+            e.HasOne(t => t.AssignedTeam).WithMany()
+                .HasForeignKey(t => t.AssignedTeamId).OnDelete(DeleteBehavior.SetNull);
+
+            // The named people a task went to. Cascade from both sides is what a join table
+            // wants: removing an employee or deleting the task should take the link, and only
+            // the link, with it.
+            e.HasMany(t => t.Assignees).WithMany()
+                .UsingEntity("ProjectTaskAssignees");
+
+            e.Property(t => t.Title).HasMaxLength(200);
+            e.Property(t => t.Description).HasMaxLength(2000);
+            e.Property(t => t.EstimatedHours).HasPrecision(8, 2);
+
+            e.HasIndex(t => new { t.ProjectId, t.SortOrder });
+
+            // A task is work for the company, never something a customer reads: no client
+            // clause, so a signed-in customer sees none of them at all.
+            e.HasQueryFilter(t => t.TenantId == CurrentTenantId);
+        });
+
+        // Platform-wide content like plans and modules: no tenant filter. Which reports a
+        // company may open follows from its plan's modules, decided where they are listed.
+        builder.Entity<Report>(e =>
+        {
+            // Restrict: a module still carrying reports is untied from them on purpose.
+            e.HasOne(r => r.Module).WithMany()
+                .HasForeignKey(r => r.ModuleId).OnDelete(DeleteBehavior.Restrict);
+
+            e.Property(r => r.Key).HasMaxLength(60);
+            e.Property(r => r.Title).HasMaxLength(120);
+            e.Property(r => r.Description).HasMaxLength(500);
+            e.Property(r => r.Icon).HasMaxLength(40);
+
+            e.HasIndex(r => new { r.ModuleId, r.SortOrder });
+        });
+
         builder.Entity<TimesheetEntry>(e =>
         {
             e.HasOne(t => t.Project).WithMany(p => p.Timesheets)
@@ -485,6 +529,11 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.Property(x => x.JobTitle).HasMaxLength(100);
             e.Property(x => x.Phone).HasMaxLength(40);
             e.Property(x => x.InvitationTokenHash).HasMaxLength(64);
+
+            // Stated as a database default rather than left to the CLR one. UserRole's zero is
+            // SuperAdmin, so the column would otherwise have been added to every employee
+            // already on file carrying the platform's own role.
+            e.Property(x => x.Role).HasDefaultValue(UserRole.TenantUser);
 
             e.HasIndex(x => new { x.TenantId, x.Email }).IsUnique();
 

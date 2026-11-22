@@ -179,10 +179,15 @@ public class ClientAccessService(
     {
         if (!await mailgun.IsConfiguredAsync(ct)) return false;
 
-        var companyName = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
+        var tenantName = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
             .Where(t => t.Id == target.TenantId)
             .Select(t => t.Name)
-            .FirstOrDefaultAsync(ct) ?? "votre fournisseur";
+            .FirstOrDefaultAsync(ct);
+
+        // Two uses, two fallbacks. In the sentence a missing name has to become something
+        // readable; as the sender it has to stay null, because "votre fournisseur" in a From
+        // header is worse than the platform's own name.
+        var companyName = tenantName ?? "votre fournisseur";
 
         var body = $"""
             <p>Bonjour {System.Net.WebUtility.HtmlEncode(target.FirstName ?? "")},</p>
@@ -196,7 +201,8 @@ public class ClientAccessService(
         try
         {
             var fullName = $"{target.FirstName} {target.LastName}".Trim();
-            await mailgun.SendAsync(target.Email!, fullName, $"Vos documents chez {companyName}", body, ct);
+            await mailgun.SendAsync(
+                target.Email!, fullName, $"Vos documents chez {companyName}", body, ct, tenantName);
             return true;
         }
         catch (Exception ex)

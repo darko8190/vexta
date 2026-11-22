@@ -18,10 +18,18 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { useSaveEmployee } from "@/hooks/use-team";
 import { ApiError } from "@/lib/api";
-import type { Employee } from "@/lib/types";
+import { userRoleHints, userRoleLabels } from "@/lib/labels";
+import { assignableRoles, type AssignableRole, type Employee } from "@/lib/types";
 
 const formSchema = z.object({
   firstName: z.string().trim().min(1, "Le prénom est requis.").max(100, "100 caractères maximum."),
@@ -29,6 +37,7 @@ const formSchema = z.object({
   email: z.string().trim().min(1, "Le courriel est requis.").email("Courriel invalide."),
   jobTitle: z.string().trim().max(100, "100 caractères maximum."),
   phone: z.string().trim().max(40, "40 caractères maximum."),
+  role: z.enum(["TenantAdmin", "ProjectManager", "TenantUser"]),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -40,6 +49,9 @@ function toFormValues(employee?: Employee): FormValues {
     email: employee?.email ?? "",
     jobTitle: employee?.jobTitle ?? "",
     phone: employee?.phone ?? "",
+    // Employé by default, which can do the least: a form someone closes without thinking about
+    // the question must not hand out an administrator.
+    role: employee?.role ?? "TenantUser",
   };
 }
 
@@ -68,6 +80,10 @@ export function EmployeeFormSheet({
   // while an account is attached. Saying so here beats letting them type and be refused.
   const emailLocked = isEditing && Boolean(employee?.hasAccess);
 
+  // The founder stays an administrator: demoting them would leave a company whose owner cannot
+  // reach its own settings, and nobody left who can put it back.
+  const ownerLocked = Boolean(employee?.isOwner);
+
   async function onSubmit(values: FormValues) {
     try {
       await save.mutateAsync({
@@ -78,6 +94,7 @@ export function EmployeeFormSheet({
           email: values.email,
           jobTitle: values.jobTitle ? values.jobTitle : null,
           phone: values.phone ? values.phone : null,
+          role: values.role,
         },
       });
       toast.success(isEditing ? "Employé mis à jour." : "Employé ajouté.");
@@ -186,6 +203,42 @@ export function EmployeeFormSheet({
                   <FieldLabel htmlFor="employee-phone">Téléphone</FieldLabel>
                   <Input {...field} id="employee-phone" type="tel" placeholder="514 555-0199" aria-invalid={fieldState.invalid} />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              )}
+            />
+
+            <Controller
+              name="role"
+              control={form.control}
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel htmlFor="employee-role">
+                    Rôle
+                    <RequiredMark />
+                  </FieldLabel>
+                  <Select
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    // The founder keeps the company reachable. The API refuses the change too;
+                    // this stops the attempt rather than letting them pick and be refused.
+                    disabled={ownerLocked}
+                  >
+                    <SelectTrigger id="employee-role" className="w-full">
+                      <SelectValue>{(role: AssignableRole) => userRoleLabels[role]}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {assignableRoles.map((role) => (
+                        <SelectItem key={role} value={role}>
+                          {userRoleLabels[role]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FieldDescription>
+                    {ownerLocked
+                      ? "Le propriétaire de l'entreprise reste administrateur."
+                      : userRoleHints[field.value]}
+                  </FieldDescription>
                 </Field>
               )}
             />

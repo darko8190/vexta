@@ -6,6 +6,7 @@ import { Controller, useForm, useWatch } from "react-hook-form";
 import * as z from "zod";
 import { toast } from "sonner";
 import { ApiError } from "@/lib/api";
+import { dayIso, todayIso } from "@/lib/dates";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -56,6 +57,9 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
+/** A week. Long enough to be a plausible mandate, short enough that a wrong one gets corrected. */
+const DEFAULT_DURATION_IN_DAYS = 7;
+
 function toFormValues(project?: ProjectRecord, defaultClientId?: string): FormValues {
   return {
     clientId: project?.clientId ?? defaultClientId ?? "",
@@ -67,8 +71,11 @@ function toFormValues(project?: ProjectRecord, defaultClientId?: string): FormVa
     siteAddressId: project?.siteAddress?.id ?? "",
     description: project?.description ?? "",
     status: project?.status ?? "AFaire",
-    startDate: project?.startDate ?? "",
-    endDate: project?.endDate ?? "",
+    // A new job starts today and is pencilled in for a week: whoever opens this form is about
+    // to do the work, not to decide when. An existing project keeps what it was given, blank
+    // included — filling an empty date on an edit would quietly schedule an old job.
+    startDate: project ? (project.startDate ?? "") : todayIso(),
+    endDate: project ? (project.endDate ?? "") : dayIso(DEFAULT_DURATION_IN_DAYS),
     budget: project?.budget != null ? String(project.budget) : "",
     isTaxExempt: project?.isTaxExempt ?? false,
     pricePolicyId: project?.pricePolicyId ?? "",

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Vexta.Api.Common;
 using Vexta.Api.Data;
+using Vexta.Api.Auth;
 using Vexta.Api.Domain;
 using Vexta.Api.Services;
 
@@ -11,7 +12,7 @@ namespace Vexta.Api.Features.Clients;
 [ApiController]
 [Route("api/clients")]
 [StaffOnly]
-[Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.TenantUser)},{nameof(UserRole.SuperAdmin)}")]
+[Authorize(Roles = Roles.Staff)]
 [RequireActiveSubscription]
 public class ClientsController(
     VextaDbContext db,
@@ -68,6 +69,7 @@ public class ClientsController(
     private Task<ClientDto?> GetDtoAsync(Guid id) =>
         db.Clients.AsNoTracking().Where(c => c.Id == id).Select(ToDto()).FirstOrDefaultAsync();
 
+    [Authorize(Roles = Roles.Managers)]
     [HttpPost]
     [RequireBusinessTenant]
     public async Task<ActionResult<ClientDto>> Create(UpsertClientRequest request)
@@ -100,6 +102,7 @@ public class ClientsController(
         return CreatedAtAction(nameof(Get), new { id = client.Id }, await GetDtoAsync(client.Id));
     }
 
+    [Authorize(Roles = Roles.Managers)]
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<ClientDto>> Update(Guid id, UpsertClientRequest request)
     {
@@ -141,6 +144,7 @@ public class ClientsController(
         return Ok(await GetDtoAsync(id));
     }
 
+    [Authorize(Roles = Roles.Managers)]
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
     {
@@ -168,6 +172,7 @@ public class ClientsController(
         return Ok(items);
     }
 
+    [Authorize(Roles = Roles.Managers)]
     [HttpPost("{id:guid}/contacts")]
     [RequireBusinessTenant]
     public async Task<ActionResult<ClientContactDto>> CreateContact(Guid id, UpsertClientContactRequest request)
@@ -193,6 +198,7 @@ public class ClientsController(
         return Ok(ToContactDto(contact));
     }
 
+    [Authorize(Roles = Roles.Managers)]
     [HttpPut("{id:guid}/contacts/{contactId:guid}")]
     public async Task<ActionResult<ClientContactDto>> UpdateContact(Guid id, Guid contactId, UpsertClientContactRequest request)
     {
@@ -218,6 +224,7 @@ public class ClientsController(
         return Ok(ToContactDto(contact));
     }
 
+    [Authorize(Roles = Roles.Managers)]
     [HttpDelete("{id:guid}/contacts/{contactId:guid}")]
     public async Task<IActionResult> DeleteContact(Guid id, Guid contactId)
     {
@@ -235,6 +242,7 @@ public class ClientsController(
     /// Opens the portal to a particulier. An entreprise is a company and has nobody to be: its
     /// people are its contacts, and each of them is invited in their own right.
     /// </summary>
+    [Authorize(Roles = Roles.Managers)]
     [HttpPost("{id:guid}/acces")]
     [RequireBusinessTenant]
     public Task<ActionResult<ClientAccessGrantedDto>> GrantClientAccess(Guid id, CancellationToken ct) =>
@@ -242,15 +250,18 @@ public class ClientsController(
             () => db.Clients.FirstOrDefaultAsync(c => c.Id == id && c.Type == ClientType.Particulier, ct),
             client => client.Id, ct);
 
+    [Authorize(Roles = Roles.Managers)]
     [HttpPost("{id:guid}/acces/renvoyer")]
     [RequireBusinessTenant]
     public Task<ActionResult<ClientAccessGrantedDto>> ResendClientAccess(Guid id, CancellationToken ct) =>
         ResendAsync(() => db.Clients.FirstOrDefaultAsync(c => c.Id == id, ct), ct);
 
+    [Authorize(Roles = Roles.Managers)]
     [HttpDelete("{id:guid}/acces")]
     public Task<IActionResult> RevokeClientAccess(Guid id, CancellationToken ct) =>
         RevokeAsync(() => db.Clients.FirstOrDefaultAsync(c => c.Id == id, ct), ct);
 
+    [Authorize(Roles = Roles.Managers)]
     [HttpPost("{id:guid}/contacts/{contactId:guid}/acces")]
     [RequireBusinessTenant]
     public Task<ActionResult<ClientAccessGrantedDto>> GrantContactAccess(Guid id, Guid contactId, CancellationToken ct) =>
@@ -258,11 +269,13 @@ public class ClientsController(
             () => db.ClientContacts.FirstOrDefaultAsync(c => c.Id == contactId && c.ClientId == id, ct),
             contact => contact.ClientId, ct);
 
+    [Authorize(Roles = Roles.Managers)]
     [HttpPost("{id:guid}/contacts/{contactId:guid}/acces/renvoyer")]
     [RequireBusinessTenant]
     public Task<ActionResult<ClientAccessGrantedDto>> ResendContactAccess(Guid id, Guid contactId, CancellationToken ct) =>
         ResendAsync(() => db.ClientContacts.FirstOrDefaultAsync(c => c.Id == contactId && c.ClientId == id, ct), ct);
 
+    [Authorize(Roles = Roles.Managers)]
     [HttpDelete("{id:guid}/contacts/{contactId:guid}/acces")]
     public Task<IActionResult> RevokeContactAccess(Guid id, Guid contactId, CancellationToken ct) =>
         RevokeAsync(() => db.ClientContacts.FirstOrDefaultAsync(c => c.Id == contactId && c.ClientId == id, ct), ct);

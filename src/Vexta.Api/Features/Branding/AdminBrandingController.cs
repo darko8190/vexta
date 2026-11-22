@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Vexta.Api.Auth;
 using Vexta.Api.Domain;
 using Vexta.Api.Services;
 
@@ -8,7 +9,7 @@ namespace Vexta.Api.Features.Branding;
 /// <summary>Uploading and clearing the platform's logo and icon, from the super admin's session.</summary>
 [ApiController]
 [Route("api/admin/branding")]
-[Authorize(Roles = nameof(UserRole.SuperAdmin))]
+[Authorize(Roles = Roles.Platform)]
 public class AdminBrandingController(IBrandingService branding) : ControllerBase
 {
     [HttpPut("{slot}")]

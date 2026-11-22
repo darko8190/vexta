@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Vexta.Api.Common;
 using Vexta.Api.Data;
+using Vexta.Api.Auth;
 using Vexta.Api.Domain;
 
 namespace Vexta.Api.Features.Products;
@@ -17,7 +18,7 @@ namespace Vexta.Api.Features.Products;
 [ApiController]
 [Route("api/product-categories")]
 [StaffOnly]
-[Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.TenantUser)},{nameof(UserRole.SuperAdmin)}")]
+[Authorize(Roles = Roles.Staff)]
 [RequireActiveSubscription]
 public class ProductCategoriesController(VextaDbContext db, ICurrentUserService currentUser) : ControllerBase
 {
@@ -39,6 +40,7 @@ public class ProductCategoriesController(VextaDbContext db, ICurrentUserService 
         return Ok(items);
     }
 
+    [Authorize(Roles = Roles.Managers)]
     [HttpPost]
     [RequireBusinessTenant]
     public async Task<ActionResult<ProductCategoryDto>> Create(SaveCategoryRequest request, CancellationToken ct)
@@ -65,6 +67,7 @@ public class ProductCategoriesController(VextaDbContext db, ICurrentUserService 
         return Ok(new ProductCategoryDto(category.Id, category.Name, 0, []));
     }
 
+    [Authorize(Roles = Roles.Managers)]
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<ProductCategoryDto>> Update(
         Guid id, SaveCategoryRequest request, CancellationToken ct)
@@ -96,6 +99,7 @@ public class ProductCategoriesController(VextaDbContext db, ICurrentUserService 
     /// SetNull on their category is for. The sub-categories go with it — they have no meaning
     /// apart from their category.
     /// </summary>
+    [Authorize(Roles = Roles.Managers)]
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
@@ -107,6 +111,7 @@ public class ProductCategoriesController(VextaDbContext db, ICurrentUserService 
         return NoContent();
     }
 
+    [Authorize(Roles = Roles.Managers)]
     [HttpPost("{categoryId:guid}/subcategories")]
     [RequireBusinessTenant]
     public async Task<ActionResult<ProductSubCategoryDto>> CreateSubCategory(
@@ -135,6 +140,7 @@ public class ProductCategoriesController(VextaDbContext db, ICurrentUserService 
         return Ok(new ProductSubCategoryDto(subCategory.Id, subCategory.CategoryId, subCategory.Name, 0));
     }
 
+    [Authorize(Roles = Roles.Managers)]
     [HttpPut("{categoryId:guid}/subcategories/{id:guid}")]
     public async Task<ActionResult<ProductSubCategoryDto>> UpdateSubCategory(
         Guid categoryId, Guid id, SaveCategoryRequest request, CancellationToken ct)
@@ -162,6 +168,7 @@ public class ProductCategoriesController(VextaDbContext db, ICurrentUserService 
             await db.Products.CountAsync(p => p.SubCategoryId == id, ct)));
     }
 
+    [Authorize(Roles = Roles.Managers)]
     [HttpDelete("{categoryId:guid}/subcategories/{id:guid}")]
     public async Task<IActionResult> DeleteSubCategory(Guid categoryId, Guid id, CancellationToken ct)
     {

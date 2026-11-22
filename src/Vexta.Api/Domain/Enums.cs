@@ -1,5 +1,13 @@
 namespace Vexta.Api.Domain;
 
+/// <summary>
+/// What someone may do in one space. Shown as Administrateur, Chargé de projet and Employé —
+/// see Vexta.Api.Auth.Roles for the groupings the endpoints are gated on.
+///
+/// The numbers are stored, so a new role is appended rather than inserted. ProjectManager is 4
+/// even though it sits between TenantAdmin and TenantUser in authority: the order of the enum
+/// is not the order of the ladder, and renumbering would reassign every existing membership.
+/// </summary>
 public enum UserRole
 {
     SuperAdmin = 0,
@@ -11,7 +19,14 @@ public enum UserRole
     /// invoices and nothing else. Never counted against the plan's seats — seats are sold for
     /// the people who run the business, and a company does not pay per customer.
     /// </summary>
-    Client = 3
+    Client = 3,
+
+    /// <summary>
+    /// Chargé de projet: runs the jobs and bills them, but does not run the company. Everything
+    /// a company does day to day, minus the employees, the company card, the settings and the
+    /// plan — the four things an employee must not be able to turn on themselves.
+    /// </summary>
+    ProjectManager = 4
 }
 
 public enum TenantSubscriptionStatus

@@ -1,6 +1,7 @@
 import {
   Blocks,
   Boxes,
+  ChartBar,
   Building2,
   FileText,
   FolderKanban,
@@ -39,6 +40,9 @@ const tenantNav: NavItem[] = [
   { href: "/factures", label: "Factures", icon: FileText },
   { href: "/inventaire", label: "Inventaire", icon: Boxes },
   { href: "/outils", label: "Outils & Formation", icon: GraduationCap },
+  // In the built-in menu too, not only as a module: a company whose plan defines no modules
+  // falls back to this list, and it should not be the one company without its figures.
+  { href: "/rapports", label: "Rapports", icon: ChartBar },
 ];
 
 /**
@@ -76,6 +80,8 @@ const superAdminNav: NavItem[] = [
   { href: "/admin/tenants", label: "Locataires", icon: Building2 },
   { href: "/admin/forfaits", label: "Forfaits", icon: Tag },
   { href: "/admin/modules", label: "Modules", icon: Blocks },
+  // After Modules on purpose: a report is attached to one, so the module has to exist first.
+  { href: "/admin/rapports", label: "Rapports", icon: ChartBar },
   { href: "/admin/apparence", label: "Apparence", icon: Palette },
   { href: "/admin/parametres", label: "Intégrations", icon: Settings },
 ];

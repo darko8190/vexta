@@ -28,7 +28,9 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
 
   // Settings is where the payment is made, so it is never behind the wall. Nor is the super
   // admin's own area, which has no tenant to bill.
-  const exempt = !isTenantMember || user!.isImpersonating || pathname.startsWith("/parametres");
+  const exempt = !isTenantMember || user!.isImpersonating || pathname.startsWith("/parametres")
+    // An unpaid company still has people in it, and one of them may need their password back.
+    || pathname.startsWith("/profil");
 
   // While the state is unknown, the app stays as it is: a wall that flashes on every page load
   // would be worse than the one page of skeleton it replaces.

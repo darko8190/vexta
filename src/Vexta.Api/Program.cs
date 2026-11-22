@@ -41,8 +41,16 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.KnownProxies.Clear();
 });
 
-builder.Services.AddDataProtection()
-    .PersistKeysToFileSystem(new DirectoryInfo(builder.Configuration["DataProtection:KeyPath"] ?? "/data/keys"));
+// The keys that sign session-sliding tokens, password-reset links and the platform's stored
+// secrets. They have to outlive the container: a fresh key ring means every reset link in
+// flight stops working and every saved API key reads as unset.
+//
+// /data/keys and nothing else by default. A relative path used to be configured here, which
+// inside a container resolves to /app — owned by root, while the app runs as a non-root user —
+// so the directory could not be created, the ring fell back to memory, and the only sign of it
+// was one failed log line at startup. The compose files mount a volume at this path.
+var keyPath = builder.Configuration["DataProtection:KeyPath"] ?? "/data/keys";
+builder.Services.AddDataProtection().PersistKeysToFileSystem(new DirectoryInfo(keyPath));
 
 builder.AddNpgsqlDbContext<VextaDbContext>("vextadb");
 
@@ -59,6 +67,8 @@ builder.Services.AddScoped<IClientAccessService, ClientAccessService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IWorkspaceService, WorkspaceService>();
 builder.Services.AddScoped<IInvoicePdfService, InvoicePdfService>();
+builder.Services.AddScoped<IPasswordResetService, PasswordResetService>();
+builder.Services.AddScoped<IReportService, ReportService>();
 
 builder.Services
     .AddIdentityCore<ApplicationUser>(options =>
@@ -75,7 +85,20 @@ builder.Services
     .AddEntityFrameworkStores<VextaDbContext>()
     // SignInManager is what reads the provider's response back out of the external cookie
     // (GetExternalLoginInfoAsync). IdentityCore alone does not register it.
-    .AddSignInManager();
+    .AddSignInManager()
+    // What signs a password-reset token. Without it GeneratePasswordResetTokenAsync throws
+    // "No IUserTwoFactorTokenProvider named 'Default'" — and the reset mail never goes out.
+    .AddDefaultTokenProviders();
+
+// Two hours. A reset link sits in an inbox, so it should not still open the door tomorrow; the
+// sentence in the email quotes this number, from PasswordResetService.ResetLifetime.
+//
+// The tokens are signed with the data-protection keys, so the key folder has to be a volume
+// that survives a redeploy or every link in flight stops working.
+builder.Services.Configure<DataProtectionTokenProviderOptions>(options =>
+{
+    options.TokenLifespan = PasswordResetService.ResetLifetime;
+});
 
 // A rejected body answered with ValidationProblemDetails, which has no "message" field — so
 // the browser fell back to its generic sentence and the person was told nothing about which

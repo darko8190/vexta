@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Vexta.Api.Common;
 using Vexta.Api.Data;
+using Vexta.Api.Auth;
 using Vexta.Api.Domain;
 using Vexta.Api.Services;
 
@@ -12,7 +13,7 @@ namespace Vexta.Api.Features.Media;
 [ApiController]
 [Route("api/media")]
 [StaffOnly]
-[Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.TenantUser)},{nameof(UserRole.SuperAdmin)}")]
+[Authorize(Roles = Roles.Staff)]
 [RequireActiveSubscription]
 public partial class MediaController(
     VextaDbContext db,

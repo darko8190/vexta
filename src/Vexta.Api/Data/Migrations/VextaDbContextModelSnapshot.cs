@@ -182,6 +182,21 @@ namespace Vexta.Api.Data.Migrations
                     b.ToTable("ModulePlan");
                 });
 
+            modelBuilder.Entity("ProjectTaskAssignees", b =>
+                {
+                    b.Property<Guid>("AssigneesId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProjectTaskId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("AssigneesId", "ProjectTaskId");
+
+                    b.HasIndex("ProjectTaskId");
+
+                    b.ToTable("ProjectTaskAssignees");
+                });
+
             modelBuilder.Entity("Vexta.Api.Domain.Address", b =>
                 {
                     b.Property<Guid>("Id")
@@ -671,6 +686,11 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<string>("Phone")
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
+
+                    b.Property<int>("Role")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(2);
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -1659,6 +1679,70 @@ namespace Vexta.Api.Data.Migrations
                     b.ToTable("ProjectNotes");
                 });
 
+            modelBuilder.Entity("Vexta.Api.Domain.ProjectTask", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AssignedTeamId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CompletedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateOnly?>("DueDate")
+                        .HasColumnType("date");
+
+                    b.Property<decimal?>("EstimatedHours")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("numeric(8,2)");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly?>("StartDate")
+                        .HasColumnType("date");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssignedTeamId");
+
+                    b.HasIndex("ProjectId", "SortOrder");
+
+                    b.ToTable("ProjectTasks");
+                });
+
             modelBuilder.Entity("Vexta.Api.Domain.PublicPage", b =>
                 {
                     b.Property<Guid>("TenantId")
@@ -1691,6 +1775,54 @@ namespace Vexta.Api.Data.Migrations
                     b.HasKey("TenantId");
 
                     b.ToTable("PublicPages");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.Report", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Icon")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<bool>("IsPublished")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<Guid>("ModuleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ModuleId", "SortOrder");
+
+                    b.ToTable("Reports");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.Team", b =>
@@ -1982,6 +2114,21 @@ namespace Vexta.Api.Data.Migrations
                     b.HasOne("Vexta.Api.Domain.Plan", null)
                         .WithMany()
                         .HasForeignKey("PlansId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ProjectTaskAssignees", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.Employee", null)
+                        .WithMany()
+                        .HasForeignKey("AssigneesId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Vexta.Api.Domain.ProjectTask", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectTaskId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
@@ -2355,6 +2502,24 @@ namespace Vexta.Api.Data.Migrations
                     b.Navigation("Project");
                 });
 
+            modelBuilder.Entity("Vexta.Api.Domain.ProjectTask", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.Team", "AssignedTeam")
+                        .WithMany()
+                        .HasForeignKey("AssignedTeamId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Vexta.Api.Domain.Project", "Project")
+                        .WithMany("Tasks")
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AssignedTeam");
+
+                    b.Navigation("Project");
+                });
+
             modelBuilder.Entity("Vexta.Api.Domain.PublicPage", b =>
                 {
                     b.HasOne("Vexta.Api.Domain.Tenant", "Tenant")
@@ -2364,6 +2529,17 @@ namespace Vexta.Api.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.Report", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.Module", "Module")
+                        .WithMany()
+                        .HasForeignKey("ModuleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Module");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.Team", b =>
@@ -2511,6 +2687,8 @@ namespace Vexta.Api.Data.Migrations
                     b.Navigation("Materials");
 
                     b.Navigation("Notes");
+
+                    b.Navigation("Tasks");
 
                     b.Navigation("Timesheets");
                 });

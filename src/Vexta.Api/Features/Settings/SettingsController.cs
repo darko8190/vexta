@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Vexta.Api.Auth;
 using Vexta.Api.Domain;
 using Vexta.Api.Services;
 
@@ -7,7 +8,7 @@ namespace Vexta.Api.Features.Settings;
 
 [ApiController]
 [Route("api/admin/settings")]
-[Authorize(Roles = nameof(UserRole.SuperAdmin))]
+[Authorize(Roles = Roles.Platform)]
 public class SettingsController(
     IPlatformSettingsService settings,
     IR2StorageService r2,

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Mail, Pencil, Phone, Send, ShieldCheck, UsersRound } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { userRoleLabels } from "@/lib/labels";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/layout/empty-state";
@@ -127,6 +128,11 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
               ) : (
                 <Badge variant="default">Accès actif</Badge>
               )}
+              {/* Shown beside the state of their access, because the two answer the same
+                  question together: can this person get in, and what can they do once in. */}
+              <Badge variant={employee.role === "TenantUser" ? "outline" : "secondary"}>
+                {userRoleLabels[employee.role]}
+              </Badge>
             </div>
             <h1 className="mt-1 text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
               {employee.firstName} {employee.lastName}

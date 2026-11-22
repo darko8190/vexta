@@ -55,6 +55,8 @@ public record UpsertProjectRequest(
 /// badge: six requests to draw a menu is six chances to show a half-filled one.
 /// </summary>
 public record ProjectSectionCountsDto(
+    /// <summary>Only the work still open. A finished task is no longer something to do.</summary>
+    int OpenTasks,
     int Materials,
     int Equipment,
     int Assemblies,

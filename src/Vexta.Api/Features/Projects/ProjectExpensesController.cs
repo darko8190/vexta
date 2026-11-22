@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Vexta.Api.Common;
 using Vexta.Api.Data;
+using Vexta.Api.Auth;
 using Vexta.Api.Domain;
 using Vexta.Api.Services;
 
@@ -18,7 +19,7 @@ namespace Vexta.Api.Features.Projects;
 [ApiController]
 [Route("api/projects/{projectId:guid}/expenses")]
 [StaffOnly]
-[Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.TenantUser)},{nameof(UserRole.SuperAdmin)}")]
+[Authorize(Roles = Roles.Staff)]
 [RequireActiveSubscription]
 public class ProjectExpensesController(
     VextaDbContext db,
@@ -270,7 +271,7 @@ public class ProjectExpensesController(
 [ApiController]
 [Route("api/expense-types")]
 [StaffOnly]
-[Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.TenantUser)},{nameof(UserRole.SuperAdmin)}")]
+[Authorize(Roles = Roles.Staff)]
 [RequireActiveSubscription]
 public class ExpenseTypesController(VextaDbContext db, ICurrentUserService currentUser) : ControllerBase
 {

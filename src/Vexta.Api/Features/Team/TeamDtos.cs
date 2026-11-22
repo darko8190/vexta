@@ -1,3 +1,5 @@
+using Vexta.Api.Domain;
+
 namespace Vexta.Api.Features.Team;
 
 public record EmployeeDto(
@@ -7,6 +9,11 @@ public record EmployeeDto(
     string Email,
     string? JobTitle,
     string? Phone,
+    /// <summary>
+    /// Administrateur, Chargé de projet or Employé. Already decided before an access exists, so
+    /// the owner can set it while adding the person rather than in a second pass.
+    /// </summary>
+    UserRole Role,
     /// <summary>True once a sign-in account exists. This is what the seat limit counts.</summary>
     bool HasAccess,
     /// <summary>Access granted but the password never chosen: the invitation is still outstanding.</summary>
@@ -41,7 +48,12 @@ public record SaveEmployeeRequest(
     string LastName,
     string Email,
     string? JobTitle,
-    string? Phone);
+    string? Phone,
+    /// <summary>
+    /// Defaults to Employé, which is the role that can do the least: a form that forgot the
+    /// field must not quietly hand out an administrator.
+    /// </summary>
+    UserRole Role = UserRole.TenantUser);
 
 /// <summary>
 /// The link is returned even when the email went out, so the admin can hand it over directly

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Vexta.Api.Common;
 using Vexta.Api.Data;
+using Vexta.Api.Auth;
 using Vexta.Api.Domain;
 using Vexta.Api.Services;
 
@@ -19,7 +20,7 @@ namespace Vexta.Api.Features.Products;
 [ApiController]
 [Route("api/products")]
 [StaffOnly]
-[Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.TenantUser)},{nameof(UserRole.SuperAdmin)}")]
+[Authorize(Roles = Roles.Staff)]
 [RequireActiveSubscription]
 public class ProductsController(
     VextaDbContext db,
@@ -148,6 +149,7 @@ public class ProductsController(
         return counts is null ? NotFound() : Ok(new ProductSummaryDto(counts));
     }
 
+    [Authorize(Roles = Roles.Managers)]
     [HttpPost]
     [RequireBusinessTenant]
     public async Task<ActionResult<ProductDto>> Create(SaveProductRequest request, CancellationToken ct)
@@ -202,6 +204,7 @@ public class ProductsController(
         return CreatedAtAction(nameof(Get), new { id = product.Id }, dto);
     }
 
+    [Authorize(Roles = Roles.Managers)]
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<ProductDto>> Update(Guid id, SaveProductRequest request, CancellationToken ct)
     {
@@ -253,6 +256,7 @@ public class ProductsController(
         return Ok(await GetDtoAsync(id, ct));
     }
 
+    [Authorize(Roles = Roles.Managers)]
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
@@ -299,6 +303,7 @@ public class ProductsController(
         return Ok(await ImagesAsync(id, ct));
     }
 
+    [Authorize(Roles = Roles.Managers)]
     [HttpPost("{id:guid}/images")]
     [RequireBusinessTenant]
     public async Task<ActionResult<List<ProductImageDto>>> SaveImages(
@@ -373,6 +378,7 @@ public class ProductsController(
     /// A delivery, a count, a correction. The movement and the new quantity on the shelf are
     /// saved together: two SaveChanges would make it possible to have one without the other.
     /// </summary>
+    [Authorize(Roles = Roles.Managers)]
     [HttpPost("{id:guid}/stock")]
     [RequireBusinessTenant]
     public async Task<ActionResult<List<ProductStockEntryDto>>> AddStock(

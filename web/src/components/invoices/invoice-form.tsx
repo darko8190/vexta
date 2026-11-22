@@ -31,6 +31,7 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { usePdfDocument } from "@/hooks/use-pdf-document";
 import { cn } from "@/lib/utils";
 import { ApiError } from "@/lib/api";
+import { dayIso, todayIso } from "@/lib/dates";
 import {
   useCreateInvoice,
   useInvoiceDraftQuery,
@@ -75,16 +76,8 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-function todayIso() {
-  return new Date().toISOString().slice(0, 10);
-}
-
 /** The company's own payment terms decide the due date, not a hard-coded fortnight. */
-function dueInIso(days: number) {
-  const date = new Date();
-  date.setDate(date.getDate() + days);
-  return date.toISOString().slice(0, 10);
-}
+const dueInIso = dayIso;
 
 /**
  * The form's starting point: the invoice being edited, then the draft a project was read into,

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Vexta.Api.Common;
 using Vexta.Api.Data;
+using Vexta.Api.Auth;
 using Vexta.Api.Domain;
 using Vexta.Api.Services;
 
@@ -20,7 +21,7 @@ namespace Vexta.Api.Features.Projects;
 /// </summary>
 [ApiController]
 [Route("api/projects/{projectId:guid}/documents")]
-[Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.TenantUser)},{nameof(UserRole.SuperAdmin)},{nameof(UserRole.Client)}")]
+[Authorize(Roles = Roles.StaffAndClients)]
 [RequireActiveSubscription]
 public class ProjectDocumentsController(
     VextaDbContext db,
@@ -35,6 +36,7 @@ public class ProjectDocumentsController(
         return Ok(await LoadAsync(projectId, ct));
     }
 
+    [Authorize(Roles = Roles.Staff)]
     [HttpPost]
     [StaffOnly]
     [RequireBusinessTenant]
@@ -78,6 +80,7 @@ public class ProjectDocumentsController(
     /// Only the title and the filing change here. Replacing the file would silently turn the
     /// document someone already opened into another one, so that is an upload of its own.
     /// </summary>
+    [Authorize(Roles = Roles.Staff)]
     [HttpPut("{id:guid}")]
     [StaffOnly]
     public async Task<ActionResult<ProjectDocumentDto>> Update(
@@ -96,6 +99,7 @@ public class ProjectDocumentsController(
         return await OneAsync(projectId, id, ct);
     }
 
+    [Authorize(Roles = Roles.Staff)]
     [HttpDelete("{id:guid}")]
     [StaffOnly]
     public async Task<IActionResult> Delete(Guid projectId, Guid id, CancellationToken ct)

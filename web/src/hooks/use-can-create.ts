@@ -22,3 +22,23 @@ export function useIsClientUser() {
   const { user } = useAuth();
   return user?.role === "Client";
 }
+
+/**
+ * Whether this person may run the business rather than only work in it: an administrateur or a
+ * chargé de projet, and a super admin who has entered the company.
+ *
+ * What it gates is the writing — creating a client, a project, a task, an invoice. An employee
+ * still reads everything and still logs their own hours, expenses and tasks. The API enforces
+ * this (Roles.Managers); this only keeps the interface from offering a button that would come
+ * back 403.
+ */
+export function useCanManage() {
+  const { user } = useAuth();
+  if (!user) return false;
+
+  return (
+    user.role === "TenantAdmin" ||
+    user.role === "ProjectManager" ||
+    (user.role === "SuperAdmin" && user.isImpersonating)
+  );
+}

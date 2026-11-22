@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Vexta.Api.Common;
 using Vexta.Api.Data;
+using Vexta.Api.Auth;
 using Vexta.Api.Domain;
 
 namespace Vexta.Api.Features.Company;
@@ -21,7 +22,7 @@ namespace Vexta.Api.Features.Company;
 [ApiController]
 [Route("api/company")]
 [StaffOnly]
-[Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.SuperAdmin)}")]
+[Authorize(Roles = Roles.Owner)]
 [RequireActiveSubscription]
 public class PublicPageController(VextaDbContext db, ICurrentUserService currentUser) : ControllerBase
 {

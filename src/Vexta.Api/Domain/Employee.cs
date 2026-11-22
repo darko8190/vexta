@@ -26,6 +26,16 @@ public class Employee : IInvitable
     public string? Phone { get; set; }
 
     /// <summary>
+    /// What they may do once they can sign in: Administrateur, Chargé de projet or Employé.
+    ///
+    /// Kept here rather than only on the membership so the owner can decide it while the person
+    /// is still just a name on a list, and so the staff page can show it without reading a
+    /// membership that may not exist. Granting an access copies it onto the membership, which is
+    /// what the token is signed from — so this row is the intent and the membership is the fact.
+    /// </summary>
+    public UserRole Role { get; set; } = UserRole.TenantUser;
+
+    /// <summary>
     /// The sign-in account, or null when the employee is only on file. Revoking access deletes
     /// the account and clears this, which frees the seat; the employee record stays untouched.
     /// </summary>

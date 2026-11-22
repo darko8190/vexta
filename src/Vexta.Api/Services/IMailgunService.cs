@@ -11,7 +11,19 @@ public interface IMailgunService
     /// message. Silence would be worse: a caller that records "sent" on a refused message leaves
     /// someone waiting for an email that was never going to arrive.
     /// </summary>
-    Task SendAsync(string toEmail, string toName, string subject, string htmlBody, CancellationToken ct = default);
+    /// <summary>
+    /// <paramref name="fromName"/> is the name the recipient sees beside the address. A company's
+    /// own name goes there, so an invitation from Construction Tremblay arrives from Construction
+    /// Tremblay and not from us — the address stays ours because the sending domain is ours, and
+    /// Mailgun will not send as a domain it does not hold. Null falls back to the platform name.
+    /// </summary>
+    Task SendAsync(
+        string toEmail,
+        string toName,
+        string subject,
+        string htmlBody,
+        CancellationToken ct = default,
+        string? fromName = null);
 
     /// <summary>
     /// The same, with a file attached. An invoice email without the invoice in it is a message
@@ -25,7 +37,8 @@ public interface IMailgunService
         string fileName,
         string contentType,
         byte[] content,
-        CancellationToken ct = default);
+        CancellationToken ct = default,
+        string? fromName = null);
 
     /// <summary>
     /// The full form: people in copy, and as many files as the message carries.
@@ -41,7 +54,8 @@ public interface IMailgunService
         string htmlBody,
         IReadOnlyCollection<string> ccEmails,
         IReadOnlyCollection<EmailAttachment> attachments,
-        CancellationToken ct = default);
+        CancellationToken ct = default,
+        string? fromName = null);
 
     /// <summary>Sends a real message to prove the credentials and the sending domain work.</summary>
     Task SendTestAsync(string toEmail, CancellationToken ct = default);
@@ -64,8 +78,14 @@ public class MailgunService(IHttpClientFactory httpClientFactory, IPlatformSetti
         return values.Values.All(v => !string.IsNullOrWhiteSpace(v));
     }
 
-    public Task SendAsync(string toEmail, string toName, string subject, string htmlBody, CancellationToken ct = default) =>
-        PostAsync(toEmail, toName, subject, htmlBody, [], [], ct);
+    public Task SendAsync(
+        string toEmail,
+        string toName,
+        string subject,
+        string htmlBody,
+        CancellationToken ct = default,
+        string? fromName = null) =>
+        PostAsync(toEmail, toName, subject, htmlBody, [], [], ct, fromName);
 
     public Task SendWithAttachmentAsync(
         string toEmail,
@@ -75,10 +95,11 @@ public class MailgunService(IHttpClientFactory httpClientFactory, IPlatformSetti
         string fileName,
         string contentType,
         byte[] content,
-        CancellationToken ct = default) =>
+        CancellationToken ct = default,
+        string? fromName = null) =>
         PostAsync(
             toEmail, toName, subject, htmlBody,
-            [], [new EmailAttachment(fileName, contentType, content)], ct);
+            [], [new EmailAttachment(fileName, contentType, content)], ct, fromName);
 
     public Task SendWithAttachmentsAsync(
         string toEmail,
@@ -87,8 +108,9 @@ public class MailgunService(IHttpClientFactory httpClientFactory, IPlatformSetti
         string htmlBody,
         IReadOnlyCollection<string> ccEmails,
         IReadOnlyCollection<EmailAttachment> attachments,
-        CancellationToken ct = default) =>
-        PostAsync(toEmail, toName, subject, htmlBody, ccEmails, attachments, ct);
+        CancellationToken ct = default,
+        string? fromName = null) =>
+        PostAsync(toEmail, toName, subject, htmlBody, ccEmails, attachments, ct, fromName);
 
     private async Task PostAsync(
         string toEmail,
@@ -97,7 +119,8 @@ public class MailgunService(IHttpClientFactory httpClientFactory, IPlatformSetti
         string htmlBody,
         IReadOnlyCollection<string> ccEmails,
         IReadOnlyCollection<EmailAttachment> attachments,
-        CancellationToken ct)
+        CancellationToken ct,
+        string? senderName)
     {
         var values = await settings.GetManyAsync(
         [
@@ -111,7 +134,12 @@ public class MailgunService(IHttpClientFactory httpClientFactory, IPlatformSetti
         var apiKey = values[PlatformSettingKeys.MailgunApiKey];
         var domain = values[PlatformSettingKeys.MailgunDomain];
         var fromEmail = values[PlatformSettingKeys.MailgunFromEmail];
-        var fromName = values[PlatformSettingKeys.MailgunFromName] ?? "Vexta";
+        // The caller's name wins when it gave one: the recipient should see who is writing to
+        // them, not the platform they have never heard of. The configured name is the fallback
+        // for everything the platform itself sends.
+        var fromName = CleanSenderName(senderName)
+            ?? CleanSenderName(values[PlatformSettingKeys.MailgunFromName])
+            ?? "Vexta";
         var region = values[PlatformSettingKeys.MailgunRegion] ?? "us";
 
         if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(domain) || string.IsNullOrWhiteSpace(fromEmail))
@@ -176,6 +204,22 @@ public class MailgunService(IHttpClientFactory httpClientFactory, IPlatformSetti
             """;
 
         await SendAsync(toEmail, "Test Vexta", "Test d'envoi Vexta", body, ct);
+    }
+
+    /// <summary>
+    /// A display name fit to go in a From header, or null when there is nothing usable left.
+    ///
+    /// Tenant names are typed by people, so a quote, an angle bracket or a line break could end
+    /// the name early and let whatever follows be read as another header. Stripped rather than
+    /// escaped: a company called O'Brien keeps its apostrophe, and nobody's real name needs the
+    /// characters this removes.
+    /// </summary>
+    private static string? CleanSenderName(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return null;
+
+        var cleaned = new string(name.Where(c => !char.IsControl(c) && c != '"' && c != '<' && c != '>').ToArray()).Trim();
+        return cleaned.Length == 0 ? null : cleaned;
     }
 
     /// <summary>

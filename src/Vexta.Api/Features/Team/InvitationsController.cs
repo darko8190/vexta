@@ -105,7 +105,7 @@ public class InvitationsController(
             ? tokenService.CreateAccessToken(user)
             : tokenService.CreateAccessToken(user, membership);
 
-        return Ok(new AuthResponse(accessToken, UserDto.ForUser(user)));
+        return Ok(new AuthResponse(accessToken, UserDto.ForHome(user, membership)));
     }
 
     /// <summary>

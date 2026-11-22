@@ -6,6 +6,14 @@ namespace Vexta.Api.Features.Auth;
 
 public record LoginRequest(string Email, string Password);
 
+public record ForgotPasswordRequest(string Email);
+
+/// <summary>
+/// <paramref name="Token"/> is the whole last segment of the emailed link — it carries the
+/// account it belongs to, so the form never has to ask for the address again.
+/// </summary>
+public record ResetPasswordRequest(string Token, string Password);
+
 public record RegisterTenantRequest(
     string CompanyName,
     string FirstName,
@@ -47,6 +55,21 @@ public record UserDto(
         user.Tenant?.SubscriptionStatus.ToString(),
         TenantKind: user.Tenant?.Kind.ToString(),
         TenantBrandColor: user.Tenant?.BrandColor);
+
+    /// <summary>
+    /// The person in their home space, with the role that space gives them.
+    ///
+    /// Used wherever a token is minted from the home membership, which is every sign-in. The
+    /// account's own role is not what someone may do in a company: an employee promoted to
+    /// chargé de projet carries that on the membership, and the account stays at the lowest
+    /// role so the founder remains the only account holding TenantAdmin. Reporting the account
+    /// role here would hand the browser Employé while the API let the writes through — the
+    /// buttons gone and the permission there.
+    /// </summary>
+    public static UserDto ForHome(ApplicationUser user, TenantMembership? membership) =>
+        membership?.Tenant is { } tenant
+            ? ForWorkspace(user, tenant, membership.Role)
+            : ForUser(user);
 
     /// <summary>
     /// The same person seen from another of their spaces. The role comes from the membership,

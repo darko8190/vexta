@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import * as z from "zod";
+import { PASSWORD_HINT, passwordSchema } from "@/lib/password";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -28,7 +29,7 @@ const formSchema = z
     firstName: z.string().min(1, "Prénom requis."),
     lastName: z.string().min(1, "Nom requis."),
     email: z.string().min(1, "Le courriel est requis.").email("Courriel invalide."),
-    password: z.string().min(10, "Au moins 10 caractères."),
+    password: passwordSchema,
   })
   // A travailleur autonome has no company name to give; their space is named after them.
   .refine((values) => values.accountType === "personal" || values.companyName.trim().length >= 2, {
@@ -297,7 +298,7 @@ function RegisterForm({ initialPlanId }: { initialPlanId: string }) {
                     autoComplete="new-password"
                     aria-invalid={fieldState.invalid}
                   />
-                  <FieldDescription>Au moins 10 caractères.</FieldDescription>
+                  <FieldDescription>{PASSWORD_HINT}</FieldDescription>
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                 </Field>
               )}

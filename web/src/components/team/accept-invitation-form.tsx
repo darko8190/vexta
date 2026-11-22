@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
 import * as z from "zod";
+import { PASSWORD_HINT, passwordSchema } from "@/lib/password";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -12,12 +13,9 @@ import { Spinner } from "@/components/ui/spinner";
 import { PasswordInput } from "@/components/auth/password-input";
 import { useAuth } from "@/lib/auth-context";
 
-// 10 characters, matching the API's Identity options. Stating the rule beats failing on it.
-const MIN_LENGTH = 10;
-
 const formSchema = z
   .object({
-    password: z.string().min(MIN_LENGTH, `Au moins ${MIN_LENGTH} caractères.`),
+    password: passwordSchema,
     confirmation: z.string().min(1, "Confirmez votre mot de passe."),
   })
   .refine((values) => values.password === values.confirmation, {
@@ -86,7 +84,7 @@ export function AcceptInvitationForm({ token, email }: { token: string; email: s
               {fieldState.invalid ? (
                 <FieldError errors={[fieldState.error]} />
               ) : (
-                <FieldDescription>Au moins {MIN_LENGTH} caractères.</FieldDescription>
+                <FieldDescription>{PASSWORD_HINT}</FieldDescription>
               )}
             </Field>
           )}

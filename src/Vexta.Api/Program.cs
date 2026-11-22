@@ -69,6 +69,8 @@ builder.Services
         options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
     })
     .AddRoles<IdentityRole<Guid>>()
+    // Identity's refusals are shown to the person word for word, and its own are in English.
+    .AddErrorDescriber<FrenchIdentityErrors>()
     .AddEntityFrameworkStores<VextaDbContext>()
     // SignInManager is what reads the provider's response back out of the external cookie
     // (GetExternalLoginInfoAsync). IdentityCore alone does not register it.

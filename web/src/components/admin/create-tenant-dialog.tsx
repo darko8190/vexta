@@ -14,18 +14,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { PasswordInput } from "@/components/auth/password-input";
 import { useCreateTenant } from "@/hooks/use-tenants";
+import { ApiError } from "@/lib/api";
+import { PASSWORD_HINT, passwordSchema } from "@/lib/password";
 
 const formSchema = z.object({
   companyName: z.string().min(2, "Nom d'entreprise requis."),
   adminFirstName: z.string().min(1, "Prénom requis."),
   adminLastName: z.string().min(1, "Nom requis."),
   adminEmail: z.string().min(1, "Courriel requis.").email("Courriel invalide."),
-  adminPassword: z.string().min(10, "Au moins 10 caractères."),
+  adminPassword: passwordSchema,
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -43,8 +45,11 @@ export function CreateTenantDialog({ open, onOpenChange }: { open: boolean; onOp
       toast.success("Locataire créé avec un abonnement actif.");
       form.reset();
       onOpenChange(false);
-    } catch {
-      toast.error("Impossible de créer ce locataire.");
+    } catch (error) {
+      // The API says why — the address is taken, the password is too weak — and that reason is
+      // the only thing that tells the person what to change. Swallowing it left them with a
+      // dialog that refused and would not say what for.
+      toast.error(error instanceof ApiError ? error.message : "Impossible de créer ce locataire.");
     }
   }
 
@@ -113,6 +118,7 @@ export function CreateTenantDialog({ open, onOpenChange }: { open: boolean; onOp
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor="tenant-password">Mot de passe temporaire</FieldLabel>
                   <PasswordInput {...field} id="tenant-password" autoComplete="new-password" aria-invalid={fieldState.invalid} />
+                  <FieldDescription>{PASSWORD_HINT}</FieldDescription>
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                 </Field>
               )}

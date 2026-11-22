@@ -468,6 +468,12 @@ public class InvoicesController(
         }
 
         invoice.UpdatedAt = DateTimeOffset.UtcNow;
+
+        // The invoice has left, so the job it belongs to is billed. Written in the same save as
+        // the status above, because the two are one event: a project left behind would be a
+        // chantier still reading "À facturer" with its invoice already in a client's inbox.
+        await MarkProjectInvoicedAsync(invoice.ProjectId, invoice.Status);
+
         await db.SaveChangesAsync(ct);
 
         return Ok(new InvoiceSentDto(to, invoice.SentAt.Value, invoice.Status));
@@ -561,7 +567,16 @@ public class InvoicesController(
         invoice.UpdatedAt = DateTimeOffset.UtcNow;
 
         db.InvoiceLines.RemoveRange(invoice.Lines);
-        invoice.Lines = ToLineEntities(request.Lines, invoice.IsTaxExempt);
+
+        // Added through the DbSet rather than onto the parent's collection, which looks like a
+        // detail and is not: these rows carry a client-generated Guid key, and EF reads a key
+        // that is already set as "this row exists". Reached through a navigation it was marked
+        // Modified instead of Added, so the save issued an UPDATE for a line that had never
+        // been inserted — nought rows affected, and the whole request failed with a
+        // concurrency error. Add() states the intent and leaves nothing to infer.
+        var replacements = ToLineEntities(request.Lines, invoice.IsTaxExempt);
+        foreach (var line in replacements) line.InvoiceId = invoice.Id;
+        db.InvoiceLines.AddRange(replacements);
 
         // Also on an edit: an invoice can be attached to its project after the fact, and a
         // project that is only now being pointed at is a project that is only now billed.
@@ -811,14 +826,13 @@ public class InvoicesController(
         string.IsNullOrWhiteSpace(settings.Currency) ? "CAD" : settings.Currency.Trim().ToUpperInvariant();
 
     /// <summary>
-    /// Invoicing a job is what marks it billed — nobody comes back to a status list to say so,
-    /// which is the whole reason <see cref="ProjectStatus.Facture"/> exists.
+    /// Sending an invoice is what marks the job billed — nobody comes back to a status list to
+    /// say so, which is the whole reason <see cref="ProjectStatus.Facture"/> exists.
     ///
-    /// A draft invoice counts. The alternative is that the common case — raise the invoice,
-    /// check it, send it tomorrow — leaves the project sitting in "À facturer" with a finished
-    /// invoice attached to it, which is exactly the lie the status is meant to prevent. What
-    /// the draft says is "this job has been billed", and that is true the moment the document
-    /// exists; whether it has gone out is what the invoice's own status is for.
+    /// A draft does not count, and that is the point: a draft is a document being prepared, and
+    /// preparing it freezes nothing. The job is billed when the invoice has left — which also
+    /// means the figures behind it are now the ones a client is holding, and that is exactly the
+    /// moment they must stop moving.
     ///
     /// Tracks the project rather than issuing an UPDATE, so it is saved with the invoice.
     /// </summary>
@@ -826,10 +840,12 @@ public class InvoicesController(
     {
         if (projectId is not { } id) return;
 
-        // A cancelled invoice is a billing that was undone. It says nothing about the job having
-        // been billed, and leaving the project marked on the strength of it would hide work that
-        // still has to be charged for.
-        if (invoiceStatus == InvoiceStatus.Annulee) return;
+        // Sent, paid or overdue: all three say the invoice is out. A draft says it is not, and a
+        // cancelled one says a billing was undone — neither tells the job it has been charged.
+        if (invoiceStatus is not (InvoiceStatus.Envoyee or InvoiceStatus.Payee or InvoiceStatus.EnRetard))
+        {
+            return;
+        }
 
         var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == id);
         if (project is null) return;

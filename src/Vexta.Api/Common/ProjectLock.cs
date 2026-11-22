@@ -3,14 +3,18 @@ using Vexta.Api.Domain;
 namespace Vexta.Api.Common;
 
 /// <summary>
-/// What may still be changed on a job that has been billed.
+/// What may still be changed on a job whose invoice has gone out.
 ///
-/// Nothing, except the status itself. Once an invoice has gone out, the materials, the hours and
-/// the expenses behind it are the figures the client was charged from: editing them afterwards
-/// makes the job and the invoice disagree, and the invoice is the document that will be quoted
-/// back at the company.
+/// The rule is about money, not about records. Everything that can move an amount is frozen —
+/// the materials, the hours, the expenses, the budget, the tax answer, the price policy —
+/// because those are the figures the client was charged from, and the invoice is the document
+/// that will be quoted back at the company.
 ///
-/// The status stays open so the office can reopen the job deliberately — put it back to
+/// Documents and notes are not frozen, and deliberately so: a plan still arrives after the
+/// invoice, and a site journal that stops on billing day is a journal nobody trusts. Neither
+/// of them changes a total.
+///
+/// The status stays open too, so the office can reopen the job on purpose — put it back to
 /// À facturer, or cancel it — rather than being stuck with a frozen record and no way out.
 /// </summary>
 public static class ProjectLock

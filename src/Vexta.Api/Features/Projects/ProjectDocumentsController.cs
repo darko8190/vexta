@@ -43,14 +43,11 @@ public class ProjectDocumentsController(
     {
         if (currentUser.TenantId is not { } tenantId) return Forbid();
 
-        var status = await db.Projects.Where(p => p.Id == projectId)
-            .Select(p => (ProjectStatus?)p.Status).FirstOrDefaultAsync(ct);
-        if (status is null) return NotFound();
+        if (!await db.Projects.AnyAsync(p => p.Id == projectId, ct)) return NotFound();
 
-        // Locked once billed, and the notes beside it are not: a document is part of what was
-        // sold — a plan swapped after the invoice went out makes the file and the bill disagree
-        // — whereas writing down what happened on site is exactly what a closed job still needs.
-        if (ProjectLock.Problem(status.Value) is { } locked) return BadRequest(new { message = locked });
+        // Not locked when the job is billed, unlike its materials and its hours: a plan or a
+        // permit still arrives after the invoice, and filing one changes no amount. The lock on
+        // this project is about the figures the client was charged from — see ProjectLock.
 
         if (Problem(request) is { } problem) return BadRequest(new { message = problem });
 
@@ -86,14 +83,9 @@ public class ProjectDocumentsController(
     public async Task<ActionResult<ProjectDocumentDto>> Update(
         Guid projectId, Guid id, SaveProjectDocumentRequest request, CancellationToken ct)
     {
-        var document = await db.ProjectDocuments.Include(d => d.Project)
+        var document = await db.ProjectDocuments
             .FirstOrDefaultAsync(d => d.Id == id && d.ProjectId == projectId, ct);
         if (document is null) return NotFound();
-
-        if (document.Project is { } owner && ProjectLock.Problem(owner.Status) is { } locked)
-        {
-            return BadRequest(new { message = locked });
-        }
 
         if (Problem(request) is { } problem) return BadRequest(new { message = problem });
 
@@ -108,14 +100,9 @@ public class ProjectDocumentsController(
     [StaffOnly]
     public async Task<IActionResult> Delete(Guid projectId, Guid id, CancellationToken ct)
     {
-        var document = await db.ProjectDocuments.Include(d => d.Project)
+        var document = await db.ProjectDocuments
             .FirstOrDefaultAsync(d => d.Id == id && d.ProjectId == projectId, ct);
         if (document is null) return NotFound();
-
-        if (document.Project is { } owner && ProjectLock.Problem(owner.Status) is { } locked)
-        {
-            return BadRequest(new { message = locked });
-        }
 
         // Only the row filed against the job goes. The file stays in the library, where it may
         // be in use elsewhere, and removing it is that page's decision to make.

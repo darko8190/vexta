@@ -219,10 +219,10 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
         var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == id);
         if (project is null) return NotFound();
 
-        // A billed job is frozen except for its status. Everything else on it is what the
-        // client was charged from, and editing it afterwards makes the job and the invoice
-        // disagree — it is the invoice that will be quoted back at the company.
-        if (ProjectLock.IsBilled(project.Status) && ChangesMoreThanStatus(project, request))
+        // A billed job is frozen on money. A typo in the description or a late PO number can
+        // still be fixed; the budget, the tax answer and the price policy cannot, because those
+        // are the figures the invoice in the client's hands was built from.
+        if (ProjectLock.IsBilled(project.Status) && ChangesAmounts(project, request))
         {
             return BadRequest(new { message = ProjectLock.Problem(project.Status) });
         }
@@ -263,24 +263,21 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
     }
 
     /// <summary>
-    /// True when the request would change anything but the status.
+    /// True when the request would move one of the figures a sent invoice was built from.
     ///
-    /// Compared field by field rather than trusted from a flag, because the browser sends the
-    /// whole record back on every save: a form that only moved the status still posts the other
+    /// Compared field by field rather than trusted from a flag, because the browser posts the
+    /// whole record on every save: a form that only moved the status still sends the other
     /// fifteen fields, and refusing that save would lock the office out of reopening the job.
+    ///
+    /// The dates, the description, the PO number and the addresses are deliberately absent —
+    /// none of them changes a total, and a billed job still gets corrected. The client is here
+    /// all the same: a job that has been billed cannot change whose bill it is.
     /// </summary>
-    private static bool ChangesMoreThanStatus(Project project, UpsertProjectRequest request) =>
+    private static bool ChangesAmounts(Project project, UpsertProjectRequest request) =>
         project.ClientId != request.ClientId
-        || project.PoNumber != Clean(request.PoNumber)
-        || project.Description != request.Description
-        || project.StartDate != request.StartDate
-        || project.EndDate != request.EndDate
         || project.Budget != request.Budget
         || project.IsTaxExempt != (request.IsTaxExempt ?? project.IsTaxExempt)
-        || project.PricePolicyId != request.PricePolicyId
-        || project.ClientAddressId != request.ClientAddressId
-        || project.SameAddressAsClient != request.SameAddressAsClient
-        || project.SiteAddressId != (request.SameAddressAsClient ? null : request.SiteAddressId);
+        || project.PricePolicyId != request.PricePolicyId;
 
     /// <summary>
     /// Max + 1, not count + 1: deleting a project must not hand its number to the next one.

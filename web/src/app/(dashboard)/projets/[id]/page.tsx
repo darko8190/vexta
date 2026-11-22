@@ -117,6 +117,10 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     );
   }
 
+  // Billed means the invoice has gone out, so the figures behind it stop moving. Decided here,
+  // once, and handed down: two places deciding the same lock eventually disagree.
+  const locked = project.status === "Facture";
+
   const billing = addressLines(project.clientAddress);
   const site = project.sameAddressAsClient ? billing : addressLines(project.siteAddress);
   const counts = summary?.counts;
@@ -234,7 +238,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             </div>
           )}
 
-          {section === "materiaux" && <ProjectMaterialsSection projectId={project.id} />}
+          {section === "materiaux" && <ProjectMaterialsSection projectId={project.id} locked={locked} />}
 
           {section === "equipements" && (
             <SectionPlaceholder
@@ -252,9 +256,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             />
           )}
 
-          {section === "feuilles-de-temps" && <ProjectTimesheetsSection projectId={project.id} />}
+          {section === "feuilles-de-temps" && (
+            <ProjectTimesheetsSection projectId={project.id} locked={locked} />
+          )}
 
-          {section === "depenses" && <ProjectExpensesSection projectId={project.id} />}
+          {section === "depenses" && <ProjectExpensesSection projectId={project.id} locked={locked} />}
 
           {section === "frais" && (
             <SectionPlaceholder

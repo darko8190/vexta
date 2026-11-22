@@ -224,8 +224,10 @@ export function ProjectFormSheet({
             <AlertTitle>Projet facturé</AlertTitle>
             <AlertDescription className="space-y-3">
               <p>
-                Ce projet a été facturé : ses matériaux, ses heures et ses dépenses sont les
-                chiffres portés sur la facture. Rouvrez-le pour y toucher.
+                Sa facture est partie : le client, le budget, la politique de prix et la case
+                non taxable sont figés, comme ses matériaux, ses heures et ses dépenses. Les
+                dates, la description et les adresses restent corrigeables. Rouvrez le projet
+                pour toucher aux montants.
               </p>
               <Button type="button" size="sm" variant="outline" onClick={reopen} disabled={pending}>
                 {pending && <Spinner />}
@@ -241,10 +243,12 @@ export function ProjectFormSheet({
           onSubmit={form.handleSubmit(onSubmit)}
           noValidate
         >
-          {/* A fieldset rather than a disabled prop on each control: one attribute turns the
-              whole card read-only, and nothing can be added later that forgets to follow. */}
-          <fieldset disabled={billed} className="min-w-0 border-0 p-0">
           <FieldGroup>
+            {/* Frozen once the invoice has gone out: these four are what a total is built
+                from, and the document the client is holding was built from them. The dates, the
+                description and the PO number stay editable — correcting those changes nothing a
+                client was charged. */}
+            <fieldset disabled={billed} className="contents">
             <Controller
               name="clientId"
               control={form.control}
@@ -271,6 +275,7 @@ export function ProjectFormSheet({
                 </Field>
               )}
             />
+            </fieldset>
 
             <Controller
               name="description"
@@ -331,6 +336,7 @@ export function ProjectFormSheet({
               />
             </div>
 
+            <fieldset disabled={billed} className="contents">
             <Controller
               name="budget"
               control={form.control}
@@ -341,6 +347,7 @@ export function ProjectFormSheet({
                 </Field>
               )}
             />
+            </fieldset>
 
             <Controller
               name="poNumber"
@@ -358,6 +365,7 @@ export function ProjectFormSheet({
               )}
             />
 
+            <fieldset disabled={billed} className="contents">
             <Controller
               name="pricePolicyId"
               control={form.control}
@@ -419,6 +427,7 @@ export function ProjectFormSheet({
                 </Field>
               )}
             />
+            </fieldset>
 
             <Controller
               name="clientAddressId"
@@ -476,11 +485,12 @@ export function ProjectFormSheet({
               />
             )}
           </FieldGroup>
-          </fieldset>
         </form>
 
         <SheetFooter>
-          <Button type="submit" form="project-form" disabled={pending || billed}>
+          {/* Enabled even on a billed job: the money fields are frozen, the rest is not, and
+              a description that cannot be saved is a form that lies about being editable. */}
+          <Button type="submit" form="project-form" disabled={pending}>
             {pending && <Spinner />}
             {isEditing ? "Enregistrer" : "Créer le projet"}
           </Button>

@@ -186,16 +186,18 @@ public class ProjectExpensesController(
 
         if (known.Count != ids.Count) return "Une des photos téléversées est introuvable.";
 
-        for (var index = 0; index < ids.Count; index++)
+        // Added through the DbSet rather than onto the expense's collection, which looks like a
+        // detail and is not: these rows carry a client-generated Guid key, and EF reads a key
+        // that is already set as "this row exists". Reached through a navigation on an expense
+        // being edited it was marked Modified instead of Added, so the save issued an UPDATE
+        // for a photo that had never been inserted and failed on nought rows affected.
+        db.ProjectExpensePhotos.AddRange(ids.Select((assetId, index) => new ProjectExpensePhoto
         {
-            expense.Photos.Add(new ProjectExpensePhoto
-            {
-                TenantId = tenantId,
-                ExpenseId = expense.Id,
-                MediaAssetId = ids[index],
-                SortOrder = index
-            });
-        }
+            TenantId = tenantId,
+            ExpenseId = expense.Id,
+            MediaAssetId = assetId,
+            SortOrder = index
+        }));
 
         return null;
     }

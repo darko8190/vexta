@@ -7,8 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
+import { BilledNotice } from "@/components/projects/detail/billed-notice";
 import {
   MATERIAL_GRID,
+  MaterialReadRow,
   MaterialRow,
   formatMaterialAmount,
   materialLineTotal,
@@ -67,8 +69,19 @@ interface Draft {
  * pressed — the API refuses a material without a description, and inventing one so the row can
  * exist would put "Sans titre" rows in the project of anyone who pressed the button and walked
  * away. The draft lives here until it is worth keeping.
+ *
+ * `locked` is the project being billed, and the table becomes a table one reads: the API refuses
+ * these writes once the invoice is out, so offering a field that takes typing and then says no
+ * would only waste the keystrokes. The caller owns the flag — a second place deciding the same
+ * lock is a second place to get it wrong.
  */
-export function ProjectMaterialsSection({ projectId }: { projectId: string }) {
+export function ProjectMaterialsSection({
+  projectId,
+  locked,
+}: {
+  projectId: string;
+  locked?: boolean;
+}) {
   const { data, isLoading } = useProjectMaterialsQuery(projectId);
   const { data: settings } = useBillingSettingsQuery();
   const create = useCreateProjectMaterial(projectId);
@@ -173,7 +186,7 @@ export function ProjectMaterialsSection({ projectId }: { projectId: string }) {
     materials.reduce((sum, material) => sum + materialLineTotal(valuesOf(material)), 0) +
     drafts.reduce((sum, draft) => sum + materialLineTotal(draft.values), 0);
 
-  const addButton = (
+  const addButton = locked ? undefined : (
     <Button onClick={addDraft}>
       <Plus />
       Ajouter un matériau
@@ -193,6 +206,8 @@ export function ProjectMaterialsSection({ projectId }: { projectId: string }) {
         </div>
         {rows > 0 && addButton}
       </div>
+
+      {locked && <BilledNotice />}
 
       {isLoading ? (
         <div className="space-y-2">
@@ -224,34 +239,43 @@ export function ProjectMaterialsSection({ projectId }: { projectId: string }) {
             <span />
           </div>
 
-          {materials.map((material) => (
-            <MaterialRow
-              key={material.id}
-              values={valuesOf(material)}
-              marginMode={marginMode}
-              onChange={(next) => setEdits((previous) => ({ ...previous, [material.id]: next }))}
-              onCommit={(next) => void commitExisting(material, next)}
-              onRemove={() => setDeleteTarget(material)}
-              removeLabel={`Supprimer ${material.description || "le matériau"}`}
-            />
-          ))}
+          {materials.map((material) =>
+            locked ? (
+              <MaterialReadRow key={material.id} values={valuesOf(material)} />
+            ) : (
+              <MaterialRow
+                key={material.id}
+                values={valuesOf(material)}
+                marginMode={marginMode}
+                onChange={(next) => setEdits((previous) => ({ ...previous, [material.id]: next }))}
+                onCommit={(next) => void commitExisting(material, next)}
+                onRemove={() => setDeleteTarget(material)}
+                removeLabel={`Supprimer ${material.description || "le matériau"}`}
+              />
+            ),
+          )}
 
-          {drafts.map((draft) => (
-            <MaterialRow
-              key={draft.uid}
-              values={draft.values}
-              marginMode={marginMode}
-              onChange={(next) =>
-                setDrafts((previous) =>
-                  previous.map((row) => (row.uid === draft.uid ? { ...row, values: next } : row)),
-                )
-              }
-              onCommit={(next) => void commitDraft(draft.uid, next)}
-              // Nothing has been saved, so there is nothing to confirm losing.
-              onRemove={() => setDrafts((previous) => previous.filter((row) => row.uid !== draft.uid))}
-              removeLabel="Retirer cette ligne"
-            />
-          ))}
+          {/* A line still being typed when the project gets billed: there is nowhere to save it
+              any more, so it stops offering to. */}
+          {!locked &&
+            drafts.map((draft) => (
+              <MaterialRow
+                key={draft.uid}
+                values={draft.values}
+                marginMode={marginMode}
+                onChange={(next) =>
+                  setDrafts((previous) =>
+                    previous.map((row) => (row.uid === draft.uid ? { ...row, values: next } : row)),
+                  )
+                }
+                onCommit={(next) => void commitDraft(draft.uid, next)}
+                // Nothing has been saved, so there is nothing to confirm losing.
+                onRemove={() =>
+                  setDrafts((previous) => previous.filter((row) => row.uid !== draft.uid))
+                }
+                removeLabel="Retirer cette ligne"
+              />
+            ))}
 
           {/* The sum of what is on screen, including a draft that has not been saved yet: it
               is the figure someone is checking while they type, and the cost table beside the
@@ -265,8 +289,10 @@ export function ProjectMaterialsSection({ projectId }: { projectId: string }) {
         </div>
       )}
 
+      {/* The lock is read on every render, not only when the button that opens this was drawn:
+          a project can be invoiced from another tab while the dialog stands open. */}
       <ConfirmDeleteDialog
-        open={Boolean(deleteTarget)}
+        open={Boolean(deleteTarget) && !locked}
         onOpenChange={(open) => !open && setDeleteTarget(undefined)}
         title="Supprimer ce matériau ?"
         description={`« ${deleteTarget?.description} » sera retiré du projet et de ses coûts.`}

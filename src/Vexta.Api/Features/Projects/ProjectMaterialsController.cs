@@ -47,6 +47,7 @@ public class ProjectMaterialsController(VextaDbContext db, ICurrentUserService c
     {
         if (currentUser.TenantId is not { } tenantId) return Forbid();
         if (!await db.Projects.AnyAsync(p => p.Id == projectId, ct)) return NotFound();
+        if (await LockedAsync(projectId, ct) is { } locked) return BadRequest(new { message = locked });
         if (Problem(request) is { } problem) return BadRequest(new { message = problem });
         if (await UnknownProductAsync(request.ProductId, ct)) return BadRequest(new { message = ProductMissing });
 
@@ -79,10 +80,14 @@ public class ProjectMaterialsController(VextaDbContext db, ICurrentUserService c
 
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<ProjectMaterialDto>> Update(
-        Guid id, SaveProjectMaterialRequest request, CancellationToken ct)
+        Guid projectId, Guid id, SaveProjectMaterialRequest request, CancellationToken ct)
     {
-        var material = await db.ProjectMaterials.FirstOrDefaultAsync(m => m.Id == id, ct);
+        // Matched on the project too, not on the id alone: a line filed against another job is
+        // a not-found here rather than something this route will quietly rewrite.
+        var material = await db.ProjectMaterials
+            .FirstOrDefaultAsync(m => m.Id == id && m.ProjectId == projectId, ct);
         if (material is null) return NotFound();
+        if (await LockedAsync(projectId, ct) is { } locked) return BadRequest(new { message = locked });
         if (Problem(request) is { } problem) return BadRequest(new { message = problem });
         if (await UnknownProductAsync(request.ProductId, ct)) return BadRequest(new { message = ProductMissing });
 
@@ -102,10 +107,12 @@ public class ProjectMaterialsController(VextaDbContext db, ICurrentUserService c
     }
 
     [HttpDelete("{id:guid}")]
-    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+    public async Task<IActionResult> Delete(Guid projectId, Guid id, CancellationToken ct)
     {
-        var material = await db.ProjectMaterials.FirstOrDefaultAsync(m => m.Id == id, ct);
+        var material = await db.ProjectMaterials
+            .FirstOrDefaultAsync(m => m.Id == id && m.ProjectId == projectId, ct);
         if (material is null) return NotFound();
+        if (await LockedAsync(projectId, ct) is { } locked) return BadRequest(new { message = locked });
 
         // The ranks of the rows below are left alone: they are only an order, and renumbering
         // three hundred lines to close a gap is work whose result nobody can see.
@@ -141,6 +148,22 @@ public class ProjectMaterialsController(VextaDbContext db, ICurrentUserService c
     {
         if (productId is not { } id) return false;
         return !await db.Products.AnyAsync(p => p.Id == id, ct);
+    }
+
+    /// <summary>
+    /// The refusal to hand back when the job has been billed, or null while it is open.
+    ///
+    /// Read from the project on every write rather than trusted from the request: this row is
+    /// one of the figures the client was charged from, and the browser is not the authority on
+    /// whether that invoice has gone out.
+    /// </summary>
+    private async Task<string?> LockedAsync(Guid projectId, CancellationToken ct)
+    {
+        var status = await db.Projects.Where(p => p.Id == projectId)
+            .Select(p => (ProjectStatus?)p.Status)
+            .FirstOrDefaultAsync(ct);
+
+        return status is null ? null : ProjectLock.Problem(status.Value);
     }
 
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

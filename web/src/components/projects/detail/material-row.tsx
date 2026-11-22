@@ -41,6 +41,64 @@ function fieldValue(value: number | null | undefined): string {
   return value == null ? "" : String(value);
 }
 
+/** An amount the line may never have carried: a cost nobody filled in is a dash, not $0,00. */
+function amountOrDash(value: number | null | undefined): string {
+  return value == null ? "—" : formatMaterialAmount(value);
+}
+
+/**
+ * One cell of a frozen line. The heading sits above the table from lg; below that the columns
+ * collapse, so the cell carries its own label the way the editable fields do.
+ */
+function ReadCell({
+  label,
+  value,
+  numeric,
+}: {
+  label: string;
+  value: string;
+  numeric?: boolean;
+}) {
+  return (
+    <div
+      className={`flex min-w-0 items-center justify-between gap-2 ${numeric ? "lg:justify-end" : "lg:justify-start"}`}
+    >
+      <span className="text-sm font-medium text-muted-foreground lg:sr-only">{label}</span>
+      <span className={`text-sm text-foreground ${numeric ? "tabular-nums" : "break-words"}`}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * One material line of a billed project, read only.
+ *
+ * Shown as text rather than as disabled inputs: these are the figures somebody is checking
+ * against the invoice, and greyed-out fields read worse than a table. The columns are the same
+ * ones, so every number still sits under its own heading.
+ */
+export function MaterialReadRow({ values }: { values: SaveProjectMaterialValues }) {
+  return (
+    <div
+      className={`grid gap-2 rounded-lg border border-border p-3 ${MATERIAL_GRID} lg:items-center lg:gap-2`}
+    >
+      <ReadCell label="Code" value={values.code ?? "—"} />
+      <ReadCell label="Description" value={values.description} />
+      <ReadCell label="Unité" value={values.unit ?? "—"} />
+      <ReadCell label="Qté" value={String(values.quantity)} numeric />
+      <ReadCell label="Prix d'achat" value={amountOrDash(values.purchasePrice)} numeric />
+      <ReadCell
+        label="Marge %"
+        value={values.marginPercent == null ? "—" : `${values.marginPercent} %`}
+        numeric
+      />
+      <ReadCell label="Prix vendant" value={formatMaterialAmount(values.unitPrice)} numeric />
+      <ReadCell label="Total" value={formatMaterialAmount(materialLineTotal(values))} numeric />
+    </div>
+  );
+}
+
 /**
  * One material line, edited in place.
  *

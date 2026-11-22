@@ -23,6 +23,7 @@ import {
 import { ClickableRow } from "@/components/layout/clickable-row";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
+import { BilledNotice } from "@/components/projects/detail/billed-notice";
 import {
   TimesheetFormSheet,
   formatHours,
@@ -48,8 +49,21 @@ function dates(entry: TimesheetEntry): string {
     : `${formatDateOnly(entry.startDate)} → ${formatDateOnly(entry.endDate)}`;
 }
 
-/** The hours worked on one project. Pressing a row opens the entry. */
-export function ProjectTimesheetsSection({ projectId }: { projectId: string }) {
+/**
+ * The hours worked on one project. Pressing a row opens the entry.
+ *
+ * `locked` is the project being billed: the API refuses these writes once the invoice is out, so
+ * the table is shown as a table one reads rather than as rows that open a panel which could only
+ * fail on save. The caller owns the flag — a second place deciding the same lock is a second
+ * place to get it wrong.
+ */
+export function ProjectTimesheetsSection({
+  projectId,
+  locked,
+}: {
+  projectId: string;
+  locked?: boolean;
+}) {
   const { data, isLoading } = useTimesheetsQuery(projectId);
   const remove = useDeleteTimesheet(projectId);
 
@@ -60,12 +74,16 @@ export function ProjectTimesheetsSection({ projectId }: { projectId: string }) {
   const entries = data ?? [];
   const totalHours = entries.reduce((sum, entry) => sum + entry.hours, 0);
 
+  // Both still check the lock although neither has a button when it is on: the guard is what
+  // makes the panel unreachable, rather than it merely having nothing left to press.
   function openCreate() {
+    if (locked) return;
     setEditing(undefined);
     setFormOpen(true);
   }
 
   function openEdit(entry: TimesheetEntry) {
+    if (locked) return;
     setEditing(entry);
     setFormOpen(true);
   }
@@ -81,7 +99,7 @@ export function ProjectTimesheetsSection({ projectId }: { projectId: string }) {
     }
   }
 
-  const createButton = (
+  const createButton = locked ? undefined : (
     <Button onClick={openCreate}>
       <Plus />
       Ajouter des heures
@@ -99,6 +117,8 @@ export function ProjectTimesheetsSection({ projectId }: { projectId: string }) {
         </div>
         {createButton}
       </div>
+
+      {locked && <BilledNotice />}
 
       {isLoading ? (
         <div className="space-y-2">
@@ -122,56 +142,70 @@ export function ProjectTimesheetsSection({ projectId }: { projectId: string }) {
                 <TableHead className="w-48">Dates</TableHead>
                 <TableHead className="w-36">Heures</TableHead>
                 <TableHead className="w-24 text-right">Total</TableHead>
-                <TableHead className="w-10" />
+                {!locked && <TableHead className="w-10" />}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {entries.map((entry) => (
-                <ClickableRow
-                  key={entry.id}
-                  label={`Ouvrir les heures du ${entry.startDate}`}
-                  onOpen={() => openEdit(entry)}
-                >
-                  <TableCell className="font-medium">
-                    {/* The hours stay on the project when somebody leaves the payroll, so the
-                        line says so rather than showing a blank where a name was. */}
-                    {entry.employeeName ?? (
-                      <span className="text-muted-foreground">Employé retiré</span>
+              {entries.map((entry) => {
+                const cells = (
+                  <>
+                    <TableCell className="font-medium">
+                      {/* The hours stay on the project when somebody leaves the payroll, so the
+                          line says so rather than showing a blank where a name was. */}
+                      {entry.employeeName ?? (
+                        <span className="text-muted-foreground">Employé retiré</span>
+                      )}
+                      {entry.note && (
+                        <div className="line-clamp-1 text-xs font-normal text-muted-foreground">
+                          {entry.note}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground tabular-nums">
+                      {dates(entry)}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground tabular-nums">
+                      {span(entry)}
+                    </TableCell>
+                    <TableCell className="text-right font-medium tabular-nums">
+                      {formatHours(entry.hours)}
+                    </TableCell>
+                    {!locked && (
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label="Actions" />}>
+                            <MoreHorizontal />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openEdit(entry)}>
+                              <Pencil />
+                              Modifier
+                            </DropdownMenuItem>
+                            <DropdownMenuItem variant="destructive" onClick={() => setDeleteTarget(entry)}>
+                              <Trash2 />
+                              Supprimer
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
                     )}
-                    {entry.note && (
-                      <div className="line-clamp-1 text-xs font-normal text-muted-foreground">
-                        {entry.note}
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground tabular-nums">
-                    {dates(entry)}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground tabular-nums">
-                    {span(entry)}
-                  </TableCell>
-                  <TableCell className="text-right font-medium tabular-nums">
-                    {formatHours(entry.hours)}
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label="Actions" />}>
-                        <MoreHorizontal />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => openEdit(entry)}>
-                          <Pencil />
-                          Modifier
-                        </DropdownMenuItem>
-                        <DropdownMenuItem variant="destructive" onClick={() => setDeleteTarget(entry)}>
-                          <Trash2 />
-                          Supprimer
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </ClickableRow>
-              ))}
+                  </>
+                );
+
+                // A billed project's rows do not open: a row that announces itself as a button
+                // and then shows a panel nothing can be saved from is worse than a plain row.
+                return locked ? (
+                  <TableRow key={entry.id}>{cells}</TableRow>
+                ) : (
+                  <ClickableRow
+                    key={entry.id}
+                    label={`Ouvrir les heures du ${entry.startDate}`}
+                    onOpen={() => openEdit(entry)}
+                  >
+                    {cells}
+                  </ClickableRow>
+                );
+              })}
             </TableBody>
             <TableFooter>
               <TableRow>
@@ -181,22 +215,24 @@ export function ProjectTimesheetsSection({ projectId }: { projectId: string }) {
                 <TableCell className="text-right font-semibold tabular-nums">
                   {formatHours(totalHours)}
                 </TableCell>
-                <TableCell />
+                {!locked && <TableCell />}
               </TableRow>
             </TableFooter>
           </Table>
         </div>
       )}
 
+      {/* The lock is read on every render, not only when the control that opens these was drawn:
+          a project can be invoiced from another tab while a panel stands open. */}
       <TimesheetFormSheet
-        open={formOpen}
+        open={formOpen && !locked}
         onOpenChange={setFormOpen}
         projectId={projectId}
         entry={editing}
       />
 
       <ConfirmDeleteDialog
-        open={Boolean(deleteTarget)}
+        open={Boolean(deleteTarget) && !locked}
         onOpenChange={(open) => !open && setDeleteTarget(undefined)}
         title="Supprimer ces heures ?"
         description={`Le quart de ${deleteTarget?.employeeName ?? "cet employé"} du ${formatDateOnly(deleteTarget?.startDate)} sera retiré du projet.`}

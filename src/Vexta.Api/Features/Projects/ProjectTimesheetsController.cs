@@ -45,6 +45,7 @@ public class ProjectTimesheetsController(VextaDbContext db, ICurrentUserService 
     {
         if (currentUser.TenantId is not { } tenantId) return Forbid();
         if (!await db.Projects.AnyAsync(p => p.Id == projectId, ct)) return NotFound();
+        if (await LockedAsync(projectId, ct) is { } locked) return BadRequest(new { message = locked });
         if (await ProblemAsync(request, ct) is { } problem) return BadRequest(new { message = problem });
 
         var entry = new TimesheetEntry
@@ -76,6 +77,7 @@ public class ProjectTimesheetsController(VextaDbContext db, ICurrentUserService 
         var entry = await db.TimesheetEntries
             .FirstOrDefaultAsync(x => x.Id == id && x.ProjectId == projectId, ct);
         if (entry is null) return NotFound();
+        if (await LockedAsync(projectId, ct) is { } locked) return BadRequest(new { message = locked });
         if (await ProblemAsync(request, ct) is { } problem) return BadRequest(new { message = problem });
 
         entry.EmployeeId = request.EmployeeId;
@@ -98,6 +100,7 @@ public class ProjectTimesheetsController(VextaDbContext db, ICurrentUserService 
         var entry = await db.TimesheetEntries
             .FirstOrDefaultAsync(x => x.Id == id && x.ProjectId == projectId, ct);
         if (entry is null) return NotFound();
+        if (await LockedAsync(projectId, ct) is { } locked) return BadRequest(new { message = locked });
 
         db.TimesheetEntries.Remove(entry);
         await db.SaveChangesAsync(ct);
@@ -137,6 +140,22 @@ public class ProjectTimesheetsController(VextaDbContext db, ICurrentUserService 
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// The refusal to hand back when the job has been billed, or null while it is open.
+    ///
+    /// Read from the project on every write rather than trusted from the request: this row is
+    /// one of the figures the client was charged from, and the browser is not the authority on
+    /// whether that invoice has gone out.
+    /// </summary>
+    private async Task<string?> LockedAsync(Guid projectId, CancellationToken ct)
+    {
+        var status = await db.Projects.Where(p => p.Id == projectId)
+            .Select(p => (ProjectStatus?)p.Status)
+            .FirstOrDefaultAsync(ct);
+
+        return status is null ? null : ProjectLock.Problem(status.Value);
     }
 
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

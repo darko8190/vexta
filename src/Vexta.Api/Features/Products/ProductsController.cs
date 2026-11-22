@@ -327,16 +327,19 @@ public class ProductsController(
         db.ProductImages.RemoveRange(product.Images);
         product.Images.Clear();
 
-        for (var index = 0; index < ids.Count; index++)
+        // Added through the DbSet rather than onto the parent's collection, which looks like a
+        // detail and is not: these rows carry a client-generated Guid key, and EF reads a key
+        // that is already set as "this row exists". Reached through a navigation it was marked
+        // Modified instead of Added, so the save issued an UPDATE for a line that had never
+        // been inserted — nought rows affected, and the whole request failed with a
+        // concurrency error. Add() states the intent and leaves nothing to infer.
+        db.ProductImages.AddRange(ids.Select((assetId, index) => new ProductImage
         {
-            product.Images.Add(new ProductImage
-            {
-                TenantId = tenantId,
-                ProductId = product.Id,
-                MediaAssetId = ids[index],
-                SortOrder = index
-            });
-        }
+            TenantId = tenantId,
+            ProductId = product.Id,
+            MediaAssetId = assetId,
+            SortOrder = index
+        }));
 
         product.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);

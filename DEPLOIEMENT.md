@@ -223,7 +223,7 @@ endroit — c'est normal, il ne faut pas la remplacer par la valeur brute.
 Sans Mailgun, la plateforme fonctionne : les invitations d'employés ne partent simplement pas
 par courriel, et l'administrateur transmet le lien lui-même.
 
-### Équipe et nombre d'utilisateurs
+### Ressources humaines et nombre d'utilisateurs
 
 Chaque forfait porte une plage d'utilisateurs, **le propriétaire compris** : un forfait à 5
 donne 5 comptes au total, pas 5 en plus du propriétaire.
@@ -239,7 +239,8 @@ Baisser le maximum ne déconnecte personne : une entreprise déjà au-dessus gar
 jusqu'à ce qu'elle en retire. La page **Locataires** affiche `utilisés / permis` et passe le
 chiffre en rouge quand un locataire dépasse sa limite.
 
-Côté entreprise, la page **Équipe** liste les employés. Une fiche n'occupe aucun siège tant que
+Côté entreprise, la page **Ressources humaines** regroupe quatre sections — Employés,
+Équipes, Adresses et Documents — et c'est la première qui liste les employés. Une fiche n'occupe aucun siège tant que
 la case **Accès** n'est pas cochée. En la cochant :
 
 1. un compte sans mot de passe est créé — il est donc inutilisable tel quel ;
@@ -256,6 +257,11 @@ Décocher la case supprime le compte et libère le siège ; la fiche de l'employ
 >
 > Les forfaits qui existaient avant cette fonction ont été mis à 1 / 1 par les migrations, ce qui
 > correspond à ce qu'ils permettaient réellement. Relisez-les avant de vendre.
+
+Les **Documents** des ressources humaines passent par Cloudflare R2 : tant qu'il n'est pas
+configuré, le téléversement échoue. Le reste de la section fonctionne sans lui, et le **logo de
+l'entreprise** est rangé en base plutôt qu'en R2, pour la même raison que la marque de la
+plateforme — il doit survivre à une panne de stockage.
 
 ### Cloudflare R2
 

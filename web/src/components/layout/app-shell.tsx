@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Eye, LogOut, Settings } from "lucide-react";
+import { Building2, Eye, LogOut, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -163,8 +163,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <DropdownMenuSeparator />
           {/* Settings live here rather than in the sidebar: they are about the account, not a
               module you work in. */}
-          {user!.role !== "SuperAdmin" && (
+          {/* A super admin who has entered a tenant acts as its owner, so they get the owner's
+              entries — the same rule the sidebar follows. Outside a tenant there is no company
+              to show and no settings that apply. */}
+          {(user!.role !== "SuperAdmin" || user!.isImpersonating) && (
             <DropdownMenuGroup>
+              {/* Also in the sidebar. It is here because this is where you look for "who am I
+                  and what is my company", which is exactly what the card answers. */}
+              <DropdownMenuItem render={<Link href="/entreprise" />}>
+                <Building2 />
+                Fiche entreprise
+              </DropdownMenuItem>
               <DropdownMenuItem render={<Link href="/parametres" />}>
                 <Settings />
                 Paramètres

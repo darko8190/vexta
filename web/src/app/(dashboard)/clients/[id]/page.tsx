@@ -4,7 +4,7 @@ import { use, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Building2, FileText, FolderKanban, Mail, MapPin, Pencil, Phone, UserRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/layout/empty-state";
 import { ClientFormSheet } from "@/components/clients/client-form-sheet";
@@ -17,6 +17,7 @@ import {
 } from "@/components/clients/detail/client-related-lists";
 import { useClientQuery } from "@/hooks/use-clients";
 import { formatClientNumber } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 export default function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -40,7 +41,11 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
         icon={UserRound}
         title="Client introuvable"
         description="Cette fiche n'existe plus, ou vous n'y avez pas accès."
-        action={<Button render={<Link href="/clients" />}>Retour aux clients</Button>}
+        action={
+          <Link href="/clients" className={cn(buttonVariants())}>
+            Retour aux clients
+          </Link>
+        }
       />
     );
   }

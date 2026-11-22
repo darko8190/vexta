@@ -28,8 +28,14 @@ const tenantNav: NavItem[] = [
   { href: "/factures", label: "Factures", icon: FileText },
 ];
 
-/** Managing who can sign in belongs to the owner: an employee must not grant themselves access. */
-const tenantAdminNav: NavItem[] = [{ href: "/equipe", label: "Équipe", icon: UsersRound }];
+/**
+ * Managing who can sign in belongs to the owner: an employee must not grant themselves access.
+ * Entreprise sits last on purpose — it is the company's own card, consulted rather than worked in.
+ */
+const tenantAdminNav: NavItem[] = [
+  { href: "/ressources-humaines", label: "Ressources humaines", icon: UsersRound },
+  { href: "/entreprise", label: "Entreprise", icon: Building2 },
+];
 
 const superAdminNav: NavItem[] = [
   { href: "/tableau-de-bord", label: "Tableau de bord", icon: LayoutDashboard },

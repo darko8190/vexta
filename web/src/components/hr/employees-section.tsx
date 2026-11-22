@@ -17,7 +17,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
-import { PageHeader } from "@/components/layout/page-header";
 import { EmployeeFormSheet } from "@/components/team/employee-form-sheet";
 import { InvitationLinkDialog } from "@/components/team/invitation-link-dialog";
 import {
@@ -74,7 +73,7 @@ function AccessCell({
   );
 }
 
-export default function TeamPage() {
+export function EmployeesSection() {
   const { data, isLoading } = useTeamQuery();
   const grantAccess = useGrantAccess();
   const revokeAccess = useRevokeAccess();
@@ -147,11 +146,15 @@ export default function TeamPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Équipe"
-        description="Vos employés. Cochez « Accès » pour qu'une personne puisse se connecter à Vexta."
-        action={createButton}
-      />
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold text-foreground">Employés</h2>
+          <p className="text-sm text-muted-foreground">
+            Cochez « Accès » pour qu&apos;une personne puisse se connecter à Vexta.
+          </p>
+        </div>
+        {createButton}
+      </div>
 
       {seats && (
         <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">

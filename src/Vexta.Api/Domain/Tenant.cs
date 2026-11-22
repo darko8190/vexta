@@ -17,6 +17,14 @@ public class Tenant
     public string? StripeSubscriptionId { get; set; }
     public DateTimeOffset? CurrentPeriodEnd { get; set; }
 
+    // ---- The company's own profile, shown on its documents and filled in by its owner ----
+
+    public string? Description { get; set; }
+    public string? ContactEmail { get; set; }
+    public string? Phone { get; set; }
+
+    public TenantLogo? Logo { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public List<ApplicationUser> Users { get; set; } = [];

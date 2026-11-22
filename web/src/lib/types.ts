@@ -296,3 +296,81 @@ export interface Invitation {
   email: string;
   tenantName: string;
 }
+
+// ---- Ressources humaines ----
+
+export interface TeamMember {
+  id: string;
+  firstName: string;
+  lastName: string;
+  jobTitle: string | null;
+}
+
+export interface TeamRecord {
+  id: string;
+  name: string;
+  description: string | null;
+  leadEmployeeId: string | null;
+  leadName: string | null;
+  members: TeamMember[];
+  createdAt: string;
+}
+
+export interface CompanyLocation {
+  id: string;
+  label: string;
+  isPrimary: boolean;
+  line1: string;
+  line2: string | null;
+  city: string;
+  province: string | null;
+  postalCode: string;
+  country: string;
+  phone: string | null;
+}
+
+export interface HrDocument {
+  id: string;
+  title: string;
+  category: string | null;
+  employeeId: string | null;
+  employeeName: string | null;
+  mediaAssetId: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  createdAt: string;
+}
+
+/** The four counters behind the Ressources humaines pills. */
+export interface HrCounts {
+  employees: number;
+  teams: number;
+  locations: number;
+  documents: number;
+}
+
+// ---- Fiche entreprise ----
+
+export interface CompanyAddress {
+  label: string;
+  line1: string;
+  line2: string | null;
+  city: string;
+  province: string | null;
+  postalCode: string;
+  country: string;
+}
+
+export interface CompanyProfile {
+  id: string;
+  name: string;
+  slug: string;
+  kind: "Business" | "Personal";
+  description: string | null;
+  contactEmail: string | null;
+  phone: string | null;
+  /** Null when no logo is on file; otherwise the cache buster for its image URL. */
+  logoETag: string | null;
+  address: CompanyAddress | null;
+}

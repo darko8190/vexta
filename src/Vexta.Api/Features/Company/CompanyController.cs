@@ -1,0 +1,159 @@
+using System.Security.Cryptography;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Vexta.Api.Common;
+using Vexta.Api.Data;
+using Vexta.Api.Domain;
+
+namespace Vexta.Api.Features.Company;
+
+[ApiController]
+[Route("api/company")]
+public class CompanyController(VextaDbContext db, ICurrentUserService currentUser) : ControllerBase
+{
+    private const int MaxBytes = 2 * 1024 * 1024;
+
+    private static readonly HashSet<string> AllowedContentTypes =
+        new(StringComparer.OrdinalIgnoreCase) { "image/png", "image/jpeg", "image/webp", "image/svg+xml" };
+
+    /// <summary>
+    /// Readable by everyone in the company, not only its owner: the name, address and phone are
+    /// what people put on a quote, and an employee who cannot read them has to go and ask.
+    /// </summary>
+    [HttpGet("profile")]
+    [Authorize]
+    [RequireActiveSubscription]
+    public async Task<ActionResult<CompanyProfileDto>> Profile(CancellationToken ct)
+    {
+        if (currentUser.TenantId is not { } tenantId) return Forbid();
+
+        var tenant = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
+            .Where(t => t.Id == tenantId)
+            .Select(t => new
+            {
+                t.Id, t.Name, t.Slug, t.Kind, t.Description, t.ContactEmail, t.Phone,
+                LogoETag = t.Logo!.ETag
+            })
+            .FirstOrDefaultAsync(ct);
+
+        if (tenant is null) return NotFound();
+
+        var address = await db.CompanyLocations.AsNoTracking()
+            .Where(l => l.IsPrimary)
+            .Select(l => new CompanyAddressDto(l.Label, l.Line1, l.Line2, l.City, l.Province, l.PostalCode, l.Country))
+            .FirstOrDefaultAsync(ct);
+
+        return Ok(new CompanyProfileDto(
+            tenant.Id, tenant.Name, tenant.Slug, tenant.Kind.ToString(),
+            tenant.Description, tenant.ContactEmail, tenant.Phone, tenant.LogoETag, address));
+    }
+
+    [HttpPut("profile")]
+    [Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.SuperAdmin)}")]
+    [RequireActiveSubscription]
+    public async Task<ActionResult<CompanyProfileDto>> SaveProfile(SaveCompanyProfileRequest request, CancellationToken ct)
+    {
+        if (currentUser.TenantId is not { } tenantId) return Forbid();
+
+        if (string.IsNullOrWhiteSpace(request.Name)) return BadRequest(new { message = "Le nom est obligatoire." });
+        if (request.Name.Trim().Length > 200) return BadRequest(new { message = "200 caractères maximum." });
+        if (request.Description is { Length: > 2000 }) return BadRequest(new { message = "La description ne peut pas dépasser 2000 caractères." });
+
+        var tenant = await db.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.Id == tenantId, ct);
+        if (tenant is null) return NotFound();
+
+        // The slug is deliberately left alone: it is in links people have already saved.
+        tenant.Name = request.Name.Trim();
+        tenant.Description = Clean(request.Description);
+        tenant.ContactEmail = Clean(request.ContactEmail);
+        tenant.Phone = Clean(request.Phone);
+
+        await db.SaveChangesAsync(ct);
+        return await Profile(ct);
+    }
+
+    /// <summary>
+    /// Anonymous, like the platform's branding: a logo is shown on pages that may have no
+    /// session, and it is a public mark by nature. Scoped by the tenant id in the route.
+    /// </summary>
+    [HttpGet("{tenantId:guid}/logo")]
+    [AllowAnonymous]
+    public async Task<IActionResult> Logo(Guid tenantId, CancellationToken ct)
+    {
+        var logo = await db.TenantLogos.AsNoTracking().FirstOrDefaultAsync(l => l.TenantId == tenantId, ct);
+        if (logo is null) return NotFound();
+
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        // An SVG is a document: without this, one carrying a script would run on our origin.
+        Response.Headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; sandbox";
+
+        // The ETag is what lets the front end cache hard and still show a new logo at once.
+        return File(
+            logo.Content,
+            logo.ContentType,
+            lastModified: logo.UpdatedAt,
+            entityTag: new Microsoft.Net.Http.Headers.EntityTagHeaderValue($"\"{logo.ETag}\""));
+    }
+
+    [HttpPut("logo")]
+    [Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.SuperAdmin)}")]
+    [RequireActiveSubscription]
+    public async Task<IActionResult> UploadLogo(UploadCompanyLogoRequest request, CancellationToken ct)
+    {
+        if (currentUser.TenantId is not { } tenantId) return Forbid();
+
+        if (request.Content is null || request.Content.Length == 0)
+            return BadRequest(new { message = "Le fichier est vide." });
+        if (request.Content.Length > MaxBytes)
+            return BadRequest(new { message = "Le logo ne peut pas dépasser 2 Mo." });
+        if (!AllowedContentTypes.Contains(request.ContentType))
+            return BadRequest(new { message = "Formats acceptés : PNG, JPEG, WebP ou SVG." });
+
+        var etag = Convert.ToHexStringLower(SHA256.HashData(request.Content))[..32];
+
+        var logo = await db.TenantLogos.FirstOrDefaultAsync(l => l.TenantId == tenantId, ct);
+        if (logo is null)
+        {
+            logo = new TenantLogo
+            {
+                TenantId = tenantId,
+                ContentType = request.ContentType,
+                Content = request.Content,
+                ETag = etag
+            };
+            db.TenantLogos.Add(logo);
+        }
+        else
+        {
+            logo.ContentType = request.ContentType;
+            logo.Content = request.Content;
+            logo.ETag = etag;
+        }
+
+        logo.Width = request.Width;
+        logo.Height = request.Height;
+        logo.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await db.SaveChangesAsync(ct);
+        return Ok(new { eTag = etag });
+    }
+
+    [HttpDelete("logo")]
+    [Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.SuperAdmin)}")]
+    [RequireActiveSubscription]
+    public async Task<IActionResult> DeleteLogo(CancellationToken ct)
+    {
+        if (currentUser.TenantId is not { } tenantId) return Forbid();
+
+        var logo = await db.TenantLogos.FirstOrDefaultAsync(l => l.TenantId == tenantId, ct);
+        if (logo is null) return NoContent();
+
+        db.TenantLogos.Remove(logo);
+        await db.SaveChangesAsync(ct);
+        return NoContent();
+    }
+
+    private static string? Clean(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+}

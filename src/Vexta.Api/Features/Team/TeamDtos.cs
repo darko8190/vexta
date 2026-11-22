@@ -44,3 +44,70 @@ public record AccessGrantedDto(string InvitationUrl, DateTimeOffset ExpiresAt, b
 public record InvitationDto(string FirstName, string LastName, string Email, string TenantName);
 
 public record AcceptInvitationRequest(string Password);
+
+// ---- Teams: named groups of employees ----
+
+public record TeamMemberDto(Guid Id, string FirstName, string LastName, string? JobTitle);
+
+public record TeamDto(
+    Guid Id,
+    string Name,
+    string? Description,
+    Guid? LeadEmployeeId,
+    string? LeadName,
+    IReadOnlyList<TeamMemberDto> Members,
+    DateTimeOffset CreatedAt);
+
+public record SaveTeamRequest(
+    string Name,
+    string? Description,
+    Guid? LeadEmployeeId,
+    IReadOnlyList<Guid> MemberIds);
+
+// ---- Company locations ----
+
+public record CompanyLocationDto(
+    Guid Id,
+    string Label,
+    bool IsPrimary,
+    string Line1,
+    string? Line2,
+    string City,
+    string? Province,
+    string PostalCode,
+    string Country,
+    string? Phone);
+
+public record SaveCompanyLocationRequest(
+    string Label,
+    bool IsPrimary,
+    string Line1,
+    string? Line2,
+    string City,
+    string? Province,
+    string PostalCode,
+    string? Country,
+    string? Phone);
+
+// ---- HR documents ----
+
+public record HrDocumentDto(
+    Guid Id,
+    string Title,
+    string? Category,
+    Guid? EmployeeId,
+    string? EmployeeName,
+    Guid MediaAssetId,
+    string FileName,
+    string ContentType,
+    long SizeBytes,
+    DateTimeOffset CreatedAt);
+
+public record SaveHrDocumentRequest(
+    string Title,
+    string? Category,
+    Guid? EmployeeId,
+    Guid MediaAssetId);
+
+/// <summary>The four counters the Ressources humaines page shows on its pills.</summary>
+public record HrCountsDto(int Employees, int Teams, int Locations, int Documents);

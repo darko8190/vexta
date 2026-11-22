@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle2, CircleAlert } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Spinner } from "@/components/ui/spinner";
 
 type State =
@@ -88,7 +89,9 @@ export function CheckoutConfirmation() {
         <p className="max-w-sm text-sm text-muted-foreground">
           Votre paiement est confirmé. Vous pouvez vous connecter à votre espace Vexta.
         </p>
-        <Button render={<Link href="/connexion" />}>Se connecter</Button>
+        <Link href="/connexion" className={cn(buttonVariants())}>
+          Se connecter
+        </Link>
       </>
     );
   }
@@ -98,7 +101,9 @@ export function CheckoutConfirmation() {
       <CircleAlert className="size-12 text-amber-500" />
       <h1 className="text-xl font-semibold">Paiement en cours de confirmation</h1>
       <p className="max-w-sm text-sm text-muted-foreground">{state.message}</p>
-      <Button render={<Link href="/connexion" />}>Se connecter</Button>
+      <Link href="/connexion" className={cn(buttonVariants())}>
+        Se connecter
+      </Link>
     </>
   );
 }

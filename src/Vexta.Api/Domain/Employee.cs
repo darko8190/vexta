@@ -45,6 +45,8 @@ public class Employee
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 
+    public List<Team> Teams { get; set; } = [];
+
     public string FullName => $"{FirstName} {LastName}".Trim();
 
     /// <summary>

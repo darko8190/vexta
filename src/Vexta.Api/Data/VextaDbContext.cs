@@ -31,6 +31,10 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
     public DbSet<BrandingAsset> BrandingAssets => Set<BrandingAsset>();
     public DbSet<Employee> Employees => Set<Employee>();
     public DbSet<ClientContact> ClientContacts => Set<ClientContact>();
+    public DbSet<Team> Teams => Set<Team>();
+    public DbSet<CompanyLocation> CompanyLocations => Set<CompanyLocation>();
+    public DbSet<HrDocument> HrDocuments => Set<HrDocument>();
+    public DbSet<TenantLogo> TenantLogos => Set<TenantLogo>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -152,6 +156,65 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.HasIndex(x => x.InvitationTokenHash);
 
             e.HasQueryFilter(x => x.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<Team>(e =>
+        {
+            e.Property(t => t.Name).HasMaxLength(100);
+
+            // SetNull, not Cascade: a team outlives the person who used to run it.
+            e.HasOne(t => t.LeadEmployee).WithMany()
+                .HasForeignKey(t => t.LeadEmployeeId).OnDelete(DeleteBehavior.SetNull);
+
+            e.HasMany(t => t.Members).WithMany(x => x.Teams);
+            e.HasIndex(t => new { t.TenantId, t.Name }).IsUnique();
+            e.HasQueryFilter(t => t.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<CompanyLocation>(e =>
+        {
+            e.Property(l => l.Label).HasMaxLength(100);
+            e.Property(l => l.Line1).HasMaxLength(200);
+            e.Property(l => l.Line2).HasMaxLength(100);
+            e.Property(l => l.City).HasMaxLength(120);
+            e.Property(l => l.Province).HasMaxLength(80);
+            e.Property(l => l.PostalCode).HasMaxLength(20);
+            e.Property(l => l.Country).HasMaxLength(80);
+            e.Property(l => l.Phone).HasMaxLength(40);
+            e.HasQueryFilter(l => l.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<HrDocument>(e =>
+        {
+            e.Property(d => d.Title).HasMaxLength(200);
+            e.Property(d => d.Category).HasMaxLength(100);
+
+            // A document without its file is a broken promise, so removing the asset removes
+            // the row. Losing the employee only unfiles it — the document itself still matters.
+            e.HasOne(d => d.MediaAsset).WithMany()
+                .HasForeignKey(d => d.MediaAssetId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(d => d.Employee).WithMany()
+                .HasForeignKey(d => d.EmployeeId).OnDelete(DeleteBehavior.SetNull);
+
+            e.HasIndex(d => new { d.TenantId, d.CreatedAt });
+            e.HasQueryFilter(d => d.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<TenantLogo>(e =>
+        {
+            e.HasKey(l => l.TenantId);
+            e.HasOne(l => l.Tenant).WithOne(t => t.Logo)
+                .HasForeignKey<TenantLogo>(l => l.TenantId).OnDelete(DeleteBehavior.Cascade);
+            e.Property(l => l.ContentType).HasMaxLength(100);
+            e.Property(l => l.ETag).HasMaxLength(64);
+            // No query filter: the logo is fetched by tenant id from a route that has no session
+            // to filter on, the same way the platform's branding is.
+        });
+
+        builder.Entity<Tenant>(e =>
+        {
+            e.Property(t => t.ContactEmail).HasMaxLength(256);
+            e.Property(t => t.Phone).HasMaxLength(40);
         });
 
         // Platform-wide branding, like Plan and Module: no tenant query filter, because every

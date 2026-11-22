@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  toSaveValues,
   useBillingSettingsQuery,
   useSaveBillingSettings,
   type BillingSettings,
@@ -73,6 +74,9 @@ export function BillingSettingsCard() {
   async function onSubmit(values: FormValues) {
     try {
       await save.mutateAsync({
+        // The hourly rate, the margin mode and the default policy live in the same row and are
+        // edited in their own sections; they ride along untouched.
+        ...toSaveValues(settings),
         gstNumber: values.gstNumber || null,
         qstNumber: values.qstNumber || null,
         rbqNumber: values.rbqNumber || null,

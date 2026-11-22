@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Vexta.Api.Common;
 using Vexta.Api.Data;
 using Vexta.Api.Domain;
+using Vexta.Api.Services;
 using Vexta.Api.Features.BillingSettings;
 
 namespace Vexta.Api.Features.Invoices;
@@ -15,7 +16,11 @@ namespace Vexta.Api.Features.Invoices;
 // stops them changing anything.
 [Authorize(Roles = $"{nameof(UserRole.TenantAdmin)},{nameof(UserRole.TenantUser)},{nameof(UserRole.SuperAdmin)},{nameof(UserRole.Client)}")]
 [RequireActiveSubscription]
-public class InvoicesController(VextaDbContext db, ICurrentUserService currentUser, IInvoicePdfService pdf) : ControllerBase
+public class InvoicesController(
+    VextaDbContext db,
+    ICurrentUserService currentUser,
+    IInvoicePdfService pdf,
+    IMailgunService mailgun) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<PagedResult<InvoiceDto>>> List(
@@ -32,7 +37,9 @@ public class InvoicesController(VextaDbContext db, ICurrentUserService currentUs
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
-            invoices = invoices.Where(i => i.Number.Contains(query.Search) || i.Client!.Name.Contains(query.Search));
+            var pattern = $"%{query.Search.Trim()}%";
+            invoices = invoices.Where(i =>
+                EF.Functions.ILike(i.Number, pattern) || EF.Functions.ILike(i.Client!.Name, pattern));
         }
 
         var totalCount = await invoices.CountAsync();
@@ -43,9 +50,11 @@ public class InvoicesController(VextaDbContext db, ICurrentUserService currentUs
             .Take(query.PageSize)
             .Include(i => i.Client)
             .Include(i => i.Project)
+            .Include(i => i.PricePolicy)
             .ToListAsync();
 
-        var items = entities.Select(ToDto).ToList();
+        var (gst, qst) = await RatesAsync();
+        var items = entities.Select(i => ToDto(i, gst, qst)).ToList();
 
         return Ok(new PagedResult<InvoiceDto> { Items = items, Page = query.Page, PageSize = query.PageSize, TotalCount = totalCount });
     }
@@ -54,7 +63,10 @@ public class InvoicesController(VextaDbContext db, ICurrentUserService currentUs
     public async Task<ActionResult<InvoiceDto>> Get(Guid id)
     {
         var invoice = await LoadAsync(id);
-        return invoice is null ? NotFound() : Ok(ToDto(invoice));
+        if (invoice is null) return NotFound();
+
+        var (gst, qst) = await RatesAsync();
+        return Ok(ToDto(invoice, gst, qst));
     }
 
     /// <summary>
@@ -93,6 +105,86 @@ public class InvoicesController(VextaDbContext db, ICurrentUserService currentUs
         var bytes = await pdf.RenderDraftAsync(request, invoiceId, ct);
         Response.Headers.ContentDisposition = "inline; filename=\"Apercu-facture.pdf\"";
         return File(bytes, "application/pdf");
+    }
+
+    /// <summary>
+    /// Emails the invoice to the client with the PDF attached, and marks it sent.
+    ///
+    /// The status moves only once Mailgun has accepted the message. An invoice that says
+    /// "Envoyée" because a button was pressed is worse than no status at all: it is the record
+    /// someone checks before chasing a payment that was never asked for.
+    /// </summary>
+    [HttpPost("{id:guid}/send")]
+    [StaffOnly]
+    public async Task<ActionResult<InvoiceSentDto>> Send(Guid id, CancellationToken ct)
+    {
+        var invoice = await db.Invoices
+            .Include(i => i.Client)
+            .FirstOrDefaultAsync(i => i.Id == id, ct);
+
+        if (invoice is null) return NotFound();
+
+        if (invoice.Status == InvoiceStatus.Annulee)
+        {
+            return BadRequest(new { message = "Cette facture est annulée. Elle ne peut pas être envoyée." });
+        }
+
+        var email = invoice.Client?.Email?.Trim();
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            return BadRequest(new
+            {
+                message = $"{invoice.Client?.Name ?? "Ce client"} n'a pas de courriel. Ajoutez-le à sa fiche pour lui envoyer la facture."
+            });
+        }
+
+        var bytes = await pdf.RenderAsync(id, ct);
+        if (bytes is null) return NotFound();
+
+        var company = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
+            .Where(t => t.Id == invoice.TenantId)
+            .Select(t => t.Name)
+            .FirstOrDefaultAsync(ct) ?? "Votre fournisseur";
+
+        var body =
+            $"<p>Bonjour,</p>" +
+            $"<p>Vous trouverez ci-jointe la facture <strong>{invoice.Number}</strong> de {company}, " +
+            $"datée du {invoice.IssueDate:yyyy-MM-dd} et payable au plus tard le {invoice.DueDate:yyyy-MM-dd}.</p>" +
+            $"<p>Merci de votre confiance.</p>" +
+            $"<p style=\"color:#666\">{company}</p>";
+
+        try
+        {
+            await mailgun.SendWithAttachmentAsync(
+                email,
+                invoice.Client?.Name ?? email,
+                $"Facture {invoice.Number} — {company}",
+                body,
+                $"Facture-{invoice.Number}.pdf",
+                "application/pdf",
+                bytes,
+                ct);
+        }
+        catch (InvalidOperationException ex)
+        {
+            // Mailgun's own words, which say which field is wrong. Swallowing them here would
+            // leave the company guessing why nothing arrived.
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { message = ex.Message });
+        }
+
+        invoice.SentAt = DateTimeOffset.UtcNow;
+
+        // A paid invoice that is sent again stays paid: the status says where the money is, and
+        // re-sending a copy does not unmake a payment.
+        if (invoice.Status is InvoiceStatus.Brouillon or InvoiceStatus.Envoyee)
+        {
+            invoice.Status = InvoiceStatus.Envoyee;
+        }
+
+        invoice.UpdatedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(ct);
+
+        return Ok(new InvoiceSentDto(email, invoice.SentAt.Value, invoice.Status));
     }
 
     // Reading is open to the customer this record belongs to — the query filter already
@@ -136,6 +228,7 @@ public class InvoicesController(VextaDbContext db, ICurrentUserService currentUs
             Currency = string.IsNullOrWhiteSpace(request.Currency) ? "CAD" : request.Currency.Trim(),
             Notes = request.Notes,
             IsTaxExempt = exempt,
+            PricePolicyId = request.PricePolicyId ?? await DefaultPolicyAsync(request.ProjectId),
             Lines = ToLineEntities(request.Lines, exempt)
         };
 
@@ -147,7 +240,8 @@ public class InvoicesController(VextaDbContext db, ICurrentUserService currentUs
         await db.SaveChangesAsync();
 
         var created = await LoadAsync(invoice.Id);
-        return CreatedAtAction(nameof(Get), new { id = invoice.Id }, ToDto(created!));
+        var (gst, qst) = await RatesAsync();
+        return CreatedAtAction(nameof(Get), new { id = invoice.Id }, ToDto(created!, gst, qst));
     }
 
     [HttpPut("{id:guid}")]
@@ -167,6 +261,7 @@ public class InvoicesController(VextaDbContext db, ICurrentUserService currentUs
         invoice.Currency = string.IsNullOrWhiteSpace(request.Currency) ? "CAD" : request.Currency.Trim();
         invoice.Notes = request.Notes;
         invoice.IsTaxExempt = request.IsTaxExempt ?? invoice.IsTaxExempt;
+        invoice.PricePolicyId = request.PricePolicyId ?? invoice.PricePolicyId;
         invoice.UpdatedAt = DateTimeOffset.UtcNow;
 
         db.InvoiceLines.RemoveRange(invoice.Lines);
@@ -175,7 +270,8 @@ public class InvoicesController(VextaDbContext db, ICurrentUserService currentUs
         await db.SaveChangesAsync();
 
         var updated = await LoadAsync(id);
-        return Ok(ToDto(updated!));
+        var (gst, qst) = await RatesAsync();
+        return Ok(ToDto(updated!, gst, qst));
     }
 
     [HttpDelete("{id:guid}")]
@@ -200,6 +296,28 @@ public class InvoicesController(VextaDbContext db, ICurrentUserService currentUs
             return "Chaque ligne a besoin d'une description.";
 
         return null;
+    }
+
+    /// <summary>
+    /// The policy a new invoice starts with: the project's, and otherwise the company's
+    /// default. Stored on the invoice so a price stays explainable after the policy moves.
+    /// </summary>
+    private async Task<Guid?> DefaultPolicyAsync(Guid? projectId)
+    {
+        if (projectId is { } id)
+        {
+            var fromProject = await db.Projects.AsNoTracking()
+                .Where(p => p.Id == id)
+                .Select(p => p.PricePolicyId)
+                .FirstOrDefaultAsync();
+
+            if (fromProject is not null) return fromProject;
+        }
+
+        return await db.BillingSettings.AsNoTracking()
+            .Where(b => b.TenantId == currentUser.TenantId)
+            .Select(b => b.DefaultPricePolicyId)
+            .FirstOrDefaultAsync();
     }
 
     /// <summary>
@@ -235,10 +353,16 @@ public class InvoicesController(VextaDbContext db, ICurrentUserService currentUs
     private static List<InvoiceLine> ToLineEntities(List<InvoiceLineRequest> lines, bool isTaxExempt) => lines
         .Select((l, index) => new InvoiceLine
         {
+            Kind = l.Kind,
+            ProductId = l.ProductId,
             Description = l.Description?.Trim() ?? string.Empty,
             Quantity = l.Quantity,
+            PurchasePrice = l.PurchasePrice,
+            MarginPercent = l.MarginPercent,
             UnitPrice = l.UnitPrice,
-            TaxRatePercent = isTaxExempt ? 0m : l.TaxRatePercent,
+            // Forced, not trusted: a line that still claims to be taxable on an invoice printed
+            // without tax is a document whose own total contradicts it.
+            IsTaxable = !isTaxExempt && l.IsTaxable,
             SortOrder = index
         })
         .ToList();
@@ -246,22 +370,56 @@ public class InvoicesController(VextaDbContext db, ICurrentUserService currentUs
     private Task<Invoice?> LoadAsync(Guid id) => db.Invoices
         .Include(i => i.Client)
         .Include(i => i.Project)
+        .Include(i => i.PricePolicy)
         .Include(i => i.Lines.OrderBy(l => l.SortOrder))
         .FirstOrDefaultAsync(i => i.Id == id);
 
-    private static InvoiceDto ToDto(Invoice invoice)
+    /// <summary>
+    /// The two rates an invoice is taxed with. They belong to the company, so they are read
+    /// once per request rather than carried on every line.
+    /// </summary>
+    private async Task<(decimal Gst, decimal Qst)> RatesAsync(CancellationToken ct = default)
+    {
+        var settings = await db.BillingSettings.AsNoTracking()
+            .Where(b => b.TenantId == currentUser.TenantId)
+            .Select(b => new { b.GstRate, b.QstRate })
+            .FirstOrDefaultAsync(ct);
+
+        return (settings?.GstRate ?? 0m, settings?.QstRate ?? 0m);
+    }
+
+    internal static string RateLabel(string name, decimal rate) =>
+        $"{name} ({rate.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)} %)";
+
+    private static decimal Round(decimal value) => Math.Round(value, 2, MidpointRounding.AwayFromZero);
+
+    private static InvoiceDto ToDto(Invoice invoice, decimal gstRate, decimal qstRate)
     {
         var lines = invoice.Lines.OrderBy(l => l.SortOrder)
-            .Select(l => new InvoiceLineDto(l.Id, l.Description, l.Quantity, l.UnitPrice, l.TaxRatePercent, l.SortOrder))
+            .Select(l => new InvoiceLineDto(
+                l.Id, l.Kind, l.ProductId, l.Description, l.Quantity,
+                l.PurchasePrice, l.MarginPercent, l.UnitPrice, l.IsTaxable, l.SortOrder))
             .ToList();
 
-        var subtotal = lines.Sum(l => l.Quantity * l.UnitPrice);
-        var taxTotal = lines.Sum(l => l.Quantity * l.UnitPrice * l.TaxRatePercent / 100m);
+        var subtotal = Round(lines.Sum(l => l.Quantity * l.UnitPrice));
+
+        // Only what is taxable carries tax, and an exempt invoice has nothing taxable on it.
+        var taxableBase = invoice.IsTaxExempt
+            ? 0m
+            : lines.Where(l => l.IsTaxable).Sum(l => l.Quantity * l.UnitPrice);
+
+        var tax1 = Round(taxableBase * gstRate / 100m);
+        var tax2 = Round(taxableBase * qstRate / 100m);
 
         return new InvoiceDto(
             invoice.Id, invoice.Number, invoice.ClientId, invoice.Client?.Name ?? string.Empty,
             invoice.ProjectId, invoice.Project?.Number,
             invoice.Status, invoice.IssueDate, invoice.DueDate, invoice.Currency, invoice.Notes,
-            invoice.IsTaxExempt, subtotal, taxTotal, subtotal + taxTotal, lines, invoice.CreatedAt, invoice.UpdatedAt);
+            invoice.IsTaxExempt, invoice.PricePolicyId, invoice.PricePolicy?.Name, invoice.SentAt,
+            subtotal,
+            RateLabel("TPS", gstRate), tax1,
+            RateLabel("TVQ", qstRate), tax2,
+            tax1 + tax2, subtotal + tax1 + tax2,
+            lines, invoice.CreatedAt, invoice.UpdatedAt);
     }
 }

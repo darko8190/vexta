@@ -144,6 +144,9 @@ export interface ProjectRecord {
   budget: number | null;
   /** No tax on this job. Taken from the client when the project is created. */
   isTaxExempt: boolean;
+  /** The margin applied to catalogue lines on this job, if one was chosen. */
+  pricePolicyId: string | null;
+  pricePolicyName: string | null;
   clientAddress: ProjectAddress | null;
   sameAddressAsClient: boolean;
   /** Null when the work happens at the billing address. */
@@ -160,12 +163,27 @@ export function formatProjectNumber(n: number): string {
 
 export type InvoiceStatus = "Brouillon" | "Envoyee" | "Payee" | "EnRetard" | "Annulee";
 
+/** What a line is. The kind decides where its price comes from. */
+export type InvoiceLineKind =
+  | "Materiaux"
+  | "MainDOeuvre"
+  | "Equipement"
+  | "FraisSupplementaires"
+  | "Autre";
+
 export interface InvoiceLine {
   id?: string;
+  kind: InvoiceLineKind;
+  /** The catalogue entry this line came from, for a material or a piece of equipment. */
+  productId?: string | null;
   description: string;
   quantity: number;
+  purchasePrice?: number | null;
+  marginPercent?: number | null;
+  /** The selling price per unit — what the client is charged. */
   unitPrice: number;
-  taxRatePercent: number;
+  /** Whether the company's two rates apply. The rates themselves belong to the invoice. */
+  isTaxable: boolean;
   sortOrder?: number;
 }
 
@@ -182,9 +200,19 @@ export interface InvoiceRecord {
   dueDate: string;
   currency: string;
   notes: string | null;
-  /** No tax on this invoice. Every line's rate is zero while it is set. */
+  /** No tax on this invoice. No line is taxable while it is set. */
   isTaxExempt: boolean;
+  /** Which margin the catalogue lines were priced with, if any. */
+  pricePolicyId: string | null;
+  pricePolicyName: string | null;
+  /** When it was emailed to the client, or null if it never was. */
+  sentAt: string | null;
   subtotal: number;
+  /** The two taxes, named and separate — "TPS (5 %)" and what it comes to. */
+  tax1Label: string;
+  tax1: number;
+  tax2Label: string;
+  tax2: number;
   taxTotal: number;
   total: number;
   lines: InvoiceLine[];
@@ -522,4 +550,180 @@ export interface ProjectExpense {
 export interface ProjectExpenseDetail {
   expense: ProjectExpense;
   photos: ExpensePhoto[];
+}
+
+// ---- Catalogue, pricing and the company's public page ----
+
+/** How a purchase price becomes a selling price. See MarginMode on the API. */
+export type MarginMode = "Multiplication" | "Division";
+
+export type EmploymentType = "TempsPlein" | "TempsPartiel" | "Contrat" | "Saisonnier" | "Stage";
+
+/** A named margin, chosen on a project or an invoice. */
+export interface PricePolicy {
+  id: string;
+  name: string;
+  marginPercent: number;
+  description: string | null;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProductCategory {
+  id: string;
+  name: string;
+  productCount: number;
+  subCategories: ProductSubCategory[];
+}
+
+export interface ProductSubCategory {
+  id: string;
+  categoryId: string;
+  name: string;
+  productCount: number;
+}
+
+/** A product as a list shows it. A-0001 is its number. */
+export interface ProductRecord {
+  id: string;
+  number: number;
+  code: string | null;
+  title: string;
+  description: string | null;
+  categoryId: string | null;
+  categoryName: string | null;
+  subCategoryId: string | null;
+  subCategoryName: string | null;
+  barcode: string | null;
+  minimumQuantity: number | null;
+  maximumQuantity: number | null;
+  tracksInventory: boolean;
+  /** What is on the shelf. */
+  quantityOnHand: number;
+  /** Committed to projects and invoices that have not been settled. */
+  quantityReserved: number;
+  /** On hand minus reserved. */
+  quantityAvailable: number;
+  purchasePrice: number | null;
+  marginPercent: number | null;
+  sellingPrice: number | null;
+  installationMinutes: number | null;
+  note: string | null;
+  /** Null for a product; set for a variant of one. */
+  parentProductId: string | null;
+  parentTitle: string | null;
+  variantCount: number;
+  imageCount: number;
+  isPublic: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProductImage {
+  id: string;
+  mediaAssetId: string;
+  fileName: string;
+  contentType: string;
+  url: string | null;
+  sortOrder: number;
+}
+
+export interface ProductPriceEntry {
+  id: string;
+  purchasePrice: number | null;
+  marginPercent: number | null;
+  sellingPrice: number | null;
+  changedByName: string | null;
+  createdAt: string;
+}
+
+export interface ProductStockEntry {
+  id: string;
+  quantityChange: number;
+  quantityAfter: number;
+  reason: string | null;
+  createdByName: string | null;
+  createdAt: string;
+}
+
+/** The badges on a product's own rail. */
+export interface ProductSectionCounts {
+  images: number;
+  variants: number;
+  suppliers: number;
+  stockEntries: number;
+  priceEntries: number;
+  purchases: number;
+}
+
+/** A position shown on the company's public page. */
+export interface JobPosting {
+  id: string;
+  title: string;
+  description: string | null;
+  location: string | null;
+  employmentType: EmploymentType;
+  compensation: string | null;
+  applyTo: string | null;
+  isPublished: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** What the company writes on its public page, as its owner edits it. */
+export interface PublicPageSettings {
+  isPublished: boolean;
+  headline: string | null;
+  about: string | null;
+  contactNote: string | null;
+  showProducts: boolean;
+  showJobs: boolean;
+  /** Where the page lives: /e/{slug}. */
+  slug: string;
+  updatedAt: string | null;
+}
+
+/** The same page as a visitor reads it, with nothing private on it. */
+export interface PublicCompany {
+  name: string;
+  slug: string;
+  headline: string | null;
+  about: string | null;
+  contactNote: string | null;
+  email: string | null;
+  phone: string | null;
+  logoETag: string | null;
+  tenantId: string;
+  brandColor: string | null;
+  address: CompanyAddress | null;
+  products: PublicProduct[];
+  jobs: JobPosting[];
+}
+
+export interface PublicProduct {
+  id: string;
+  number: number;
+  title: string;
+  description: string | null;
+  categoryName: string | null;
+  sellingPrice: number | null;
+  imageUrl: string | null;
+}
+
+/**
+ * A catalogue hit as the invoice line picker shows it. Deliberately small: the picker runs on
+ * every keystroke and a line only needs what it is about to copy onto itself.
+ */
+export interface ProductSearchResult {
+  id: string;
+  number: number;
+  code: string | null;
+  title: string;
+  categoryName: string | null;
+  purchasePrice: number | null;
+  marginPercent: number | null;
+  sellingPrice: number | null;
+  tracksInventory: boolean;
+  quantityAvailable: number;
 }

@@ -39,7 +39,7 @@ public partial class MediaController(
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
-            assets = assets.Where(m => m.FileName.Contains(query.Search));
+            assets = assets.Where(m => EF.Functions.ILike(m.FileName, $"%{query.Search.Trim()}%"));
         }
 
         var totalCount = await assets.CountAsync();

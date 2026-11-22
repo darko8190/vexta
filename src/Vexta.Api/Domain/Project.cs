@@ -34,6 +34,13 @@ public class Project
     /// </summary>
     public bool IsTaxExempt { get; set; }
 
+    /// <summary>
+    /// The margin applied to catalogue lines on this job. Null falls back to the company's
+    /// default policy, which is what most projects use.
+    /// </summary>
+    public Guid? PricePolicyId { get; set; }
+    public PricePolicy? PricePolicy { get; set; }
+
     /// <summary>Which of the client's addresses to bill. Null when none is on file yet.</summary>
     public Guid? ClientAddressId { get; set; }
     public Address? ClientAddress { get; set; }

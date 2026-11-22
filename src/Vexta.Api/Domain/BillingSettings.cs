@@ -38,6 +38,23 @@ public class BillingSettings
     /// </summary>
     public int NextInvoiceNumber { get; set; } = 1;
 
+    /// <summary>
+    /// What an hour of labour is charged at by default. The starting point for a Main-d'œuvre
+    /// line, not a ceiling — a line can always be priced differently.
+    /// </summary>
+    public decimal? DefaultHourlyRate { get; set; }
+
+    /// <summary>
+    /// How a purchase price becomes a selling price here. Both conventions are called "la
+    /// marge" on site and they give different numbers, so the company says which one it means
+    /// once rather than per product.
+    /// </summary>
+    public MarginMode MarginMode { get; set; } = MarginMode.Multiplication;
+
+    /// <summary>The policy used by a project or an invoice that names none.</summary>
+    public Guid? DefaultPricePolicyId { get; set; }
+    public PricePolicy? DefaultPricePolicy { get; set; }
+
     /// <summary>Days between issue and due date, used to fill the date in.</summary>
     public int PaymentTermsDays { get; set; } = 30;
 
@@ -46,6 +63,16 @@ public class BillingSettings
 
     /// <summary>The line at the bottom: late fees, how to pay, a thank you.</summary>
     public string? FooterNote { get; set; }
+
+    /// <summary>
+    /// When the company last saved its billing card — its taxes, its numbering, its terms.
+    ///
+    /// This, not the row existing, is what unlocks invoicing. The row is now created by other
+    /// screens too (an hourly rate, a margin mode), and letting any of them stand in for
+    /// "we have settled our taxes" would put guessed Québec rates on a real invoice from a
+    /// company that never looked at them.
+    /// </summary>
+    public DateTimeOffset? ConfiguredAt { get; set; }
 
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

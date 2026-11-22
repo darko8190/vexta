@@ -12,6 +12,8 @@ export interface InvoiceFormValues {
   notes?: string;
   /** Omitted on a new invoice means "take the project's answer, or the client's". */
   isTaxExempt?: boolean | null;
+  /** Which margin catalogue lines are priced with. Omitted takes the project's, then the default. */
+  pricePolicyId?: string | null;
   lines: InvoiceLine[];
 }
 
@@ -68,5 +70,15 @@ export function useDeleteInvoice() {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       queryClient.invalidateQueries({ queryKey: ["clients"] });
     },
+  });
+}
+
+/** Emails the invoice to the client with the PDF attached and marks it sent. */
+export function useSendInvoice() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api.post<{ email: string; sentAt: string; status: InvoiceStatus }>(`invoices/${id}/send`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["invoices"] }),
   });
 }

@@ -67,3 +67,42 @@ public enum InvoiceStatus
     EnRetard = 3,
     Annulee = 4
 }
+
+/// <summary>
+/// What a line on an invoice is. The kind decides where its price comes from: a material or a
+/// piece of equipment is looked up in the catalogue, labour is priced from the company's hourly
+/// rate, and the last two are typed by hand.
+/// </summary>
+public enum InvoiceLineKind
+{
+    Materiaux = 0,
+    MainDOeuvre = 1,
+    Equipement = 2,
+    FraisSupplementaires = 3,
+    Autre = 4
+}
+
+/// <summary>
+/// How a company turns a purchase price into a selling price. The two conventions give
+/// different numbers from the same percentage and both are called "la marge" on site, so it is
+/// a company-wide setting rather than a guess:
+///
+/// Multiplication — markup on cost: vendant = achat × (1 + marge / 100). 100 $ at 35 % = 135 $.
+/// Division — margin on the selling price: vendant = achat ÷ (1 − marge / 100). 100 $ at 35 % =
+/// 153,85 $, and the profit really is 35 % of what the client pays.
+/// </summary>
+public enum MarginMode
+{
+    Multiplication = 0,
+    Division = 1
+}
+
+/// <summary>What a job posting offers. Shown on the company's public page.</summary>
+public enum EmploymentType
+{
+    TempsPlein = 0,
+    TempsPartiel = 1,
+    Contrat = 2,
+    Saisonnier = 3,
+    Stage = 4
+}

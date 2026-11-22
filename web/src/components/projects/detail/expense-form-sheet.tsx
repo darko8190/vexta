@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { RequiredMark } from "@/components/ui/required-mark";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Sheet,
@@ -253,7 +254,10 @@ export function ExpenseFormSheet({
               control={form.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="expense-name">Nom</FieldLabel>
+                  <FieldLabel htmlFor="expense-name">
+                    Nom
+                    <RequiredMark />
+                  </FieldLabel>
                   <Input
                     {...field}
                     id="expense-name"
@@ -270,7 +274,10 @@ export function ExpenseFormSheet({
               control={form.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="expense-type">Type</FieldLabel>
+                  <FieldLabel htmlFor="expense-type">
+                    Type
+                    <RequiredMark />
+                  </FieldLabel>
                   <div className="flex gap-2">
                     <Select
                       // null, not undefined: Base UI reads undefined as an uncontrolled select

@@ -26,6 +26,16 @@ public class Invoice
     /// </summary>
     public bool IsTaxExempt { get; set; }
 
+    /// <summary>
+    /// Which margin the catalogue lines on this invoice were priced with. Taken from the
+    /// project, or the company's default, and kept so a price can be explained months later.
+    /// </summary>
+    public Guid? PricePolicyId { get; set; }
+    public PricePolicy? PricePolicy { get; set; }
+
+    /// <summary>When it was emailed to the client, or null if it never was.</summary>
+    public DateTimeOffset? SentAt { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 
@@ -38,9 +48,35 @@ public class InvoiceLine
     public Guid InvoiceId { get; set; }
     public Invoice? Invoice { get; set; }
 
+    public InvoiceLineKind Kind { get; set; } = InvoiceLineKind.Autre;
+
+    /// <summary>
+    /// The catalogue entry this line was taken from, for a material or a piece of equipment.
+    /// Null for anything typed by hand, and SetNull when the product is deleted: the line is
+    /// what was sold and must survive the catalogue being tidied up.
+    /// </summary>
+    public Guid? ProductId { get; set; }
+    public Product? Product { get; set; }
+
     public required string Description { get; set; }
     public decimal Quantity { get; set; } = 1;
+
+    /// <summary>What it cost the company. Kept on the line so the margin on a sent invoice
+    /// stays readable even after the product's own price has moved.</summary>
+    public decimal? PurchasePrice { get; set; }
+
+    /// <summary>In percent, applied the way the company's MarginMode says.</summary>
+    public decimal? MarginPercent { get; set; }
+
+    /// <summary>The selling price: what the client is charged per unit.</summary>
     public decimal UnitPrice { get; set; }
-    public decimal TaxRatePercent { get; set; }
+
+    /// <summary>
+    /// Whether the company's two tax rates apply to this line. It replaced a per-line rate: the
+    /// rates belong to the company, not to the line, and letting each line carry its own was an
+    /// invitation to print an invoice whose taxes nobody could reconcile.
+    /// </summary>
+    public bool IsTaxable { get; set; } = true;
+
     public int SortOrder { get; set; }
 }

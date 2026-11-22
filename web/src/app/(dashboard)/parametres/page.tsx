@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Building2, CreditCard } from "lucide-react";
+import { Building2, Clock, CreditCard, Percent, Receipt } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,9 +13,14 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { PageHeader } from "@/components/layout/page-header";
+import { SectionNav, type NavSection } from "@/components/layout/section-nav";
 import { BillingSettingsCard } from "@/components/settings/billing-settings-card";
+import { HourlyRateCard } from "@/components/settings/hourly-rate-card";
+import { MarginModeCard } from "@/components/settings/margin-mode-card";
+import { PricePoliciesCard } from "@/components/settings/price-policies-card";
 import { useBillingStateQuery, type BillingState } from "@/hooks/use-billing";
 import { usePublicPlansQuery } from "@/hooks/use-catalog";
+import { usePricePoliciesQuery } from "@/hooks/use-price-policies";
 import { ApiError, api } from "@/lib/api";
 import { tenantStatusBadgeVariant, tenantStatusLabels } from "@/lib/labels";
 import { formatCents } from "@/lib/money";
@@ -242,9 +247,38 @@ function PersonalSpace({ state }: { state: BillingState }) {
 export default function SettingsPage() {
   const { data, isLoading } = useBillingStateQuery();
 
+  // Only the owner of a company sets these: they decide what every invoice says about taxes
+  // and terms, what an hour costs and what a margin means. Everyone else gets the one section
+  // they can read rather than a rail of empty panels.
+  const canManage = data?.kind === "Business" && data.canManage;
+
+  // Asked for here for the badge, and skipped entirely for anyone who may not read it.
+  const { data: policies } = usePricePoliciesQuery(canManage === true);
+
+  const [section, setSection] = useState("abonnement");
+
+  const sections: NavSection[] = [
+    { key: "abonnement", label: "Abonnement", icon: CreditCard },
+    ...(canManage
+      ? [
+          { key: "facturation", label: "Facturation", icon: Receipt },
+          { key: "taux", label: "Taux", icon: Clock },
+          // The only count that means anything on this page; the others are one thing each.
+          { key: "marge", label: "Marge et prix", count: policies?.length ?? 0, icon: Percent },
+        ]
+      : []),
+  ];
+
+  // Derived rather than corrected in an effect: a section that stops existing while it is open
+  // falls back to the one every account has.
+  const active = sections.some((item) => item.key === section) ? section : "abonnement";
+
   return (
     <div>
-      <PageHeader title="Paramètres" description="Votre espace Vexta et son abonnement." />
+      <PageHeader
+        title="Paramètres"
+        description="Votre espace Vexta, son abonnement et vos règles de prix."
+      />
 
       <Suspense fallback={null}>
         <PaymentReturnNotice />
@@ -252,14 +286,34 @@ export default function SettingsPage() {
 
       {isLoading || !data ? (
         <Skeleton className="h-48 max-w-lg" />
-      ) : data.kind === "Personal" ? (
-        <PersonalSpace state={data} />
       ) : (
-        <div className="space-y-6">
-          <BusinessSubscription state={data} />
-          {/* Only the owner sets these: they decide what every invoice the company sends says
-              about its taxes and its terms. */}
-          {data.canManage && <BillingSettingsCard />}
+        /* The rail sits beside the content from md up and becomes a scrollable row below it. */
+        <div className="flex flex-col gap-4 md:flex-row md:gap-6">
+          {sections.length > 1 && (
+            <SectionNav
+              sections={sections}
+              active={active}
+              onSelect={setSection}
+              label="Sections des paramètres"
+            />
+          )}
+
+          <div className="min-w-0 flex-1">
+            {active === "abonnement" &&
+              (data.kind === "Personal" ? (
+                <PersonalSpace state={data} />
+              ) : (
+                <BusinessSubscription state={data} />
+              ))}
+            {active === "facturation" && <BillingSettingsCard />}
+            {active === "taux" && <HourlyRateCard />}
+            {active === "marge" && (
+              <div className="space-y-6">
+                <MarginModeCard />
+                <PricePoliciesCard />
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

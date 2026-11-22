@@ -1,3 +1,5 @@
+using Vexta.Api.Domain;
+
 namespace Vexta.Api.Features.Company;
 
 /// <summary>
@@ -37,3 +39,50 @@ public record SaveCompanyProfileRequest(
 
 /// <summary>Base64 rather than multipart, for the same reason as the platform branding upload.</summary>
 public record UploadCompanyLogoRequest(string ContentType, byte[] Content, int Width, int Height);
+
+// ---- The company's own public page, as its owner edits it ----
+
+/// <summary>
+/// What the owner has written for /e/{slug}. The slug is carried along so the editor can show
+/// the address the page will live at without asking for the profile as well.
+/// </summary>
+public record PublicPageSettingsDto(
+    bool IsPublished,
+    string? Headline,
+    string? About,
+    string? ContactNote,
+    bool ShowProducts,
+    bool ShowJobs,
+    string Slug,
+    /// <summary>Null while nothing has ever been saved — the page is defaults, not a record.</summary>
+    DateTimeOffset? UpdatedAt);
+
+public record SavePublicPageRequest(
+    bool IsPublished,
+    string? Headline,
+    string? About,
+    string? ContactNote,
+    bool ShowProducts,
+    bool ShowJobs);
+
+/// <summary>A position, as the owner's table and the public page both read it.</summary>
+public record JobPostingDto(
+    Guid Id,
+    string Title,
+    string? Description,
+    string? Location,
+    EmploymentType EmploymentType,
+    string? Compensation,
+    string? ApplyTo,
+    bool IsPublished,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt);
+
+public record SaveJobPostingRequest(
+    string Title,
+    string? Description,
+    string? Location,
+    EmploymentType EmploymentType,
+    string? Compensation,
+    string? ApplyTo,
+    bool IsPublished);

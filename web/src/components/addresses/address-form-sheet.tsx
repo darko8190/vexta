@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { RequiredMark } from "@/components/ui/required-mark";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Sheet,
@@ -132,7 +133,10 @@ export function AddressFormSheet({
               control={form.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="address-client">Client</FieldLabel>
+                  <FieldLabel htmlFor="address-client">
+                    Client
+                    <RequiredMark />
+                  </FieldLabel>
                   <ClientSelect id="address-client" value={field.value} onChange={field.onChange} invalid={fieldState.invalid} />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                 </Field>
@@ -166,7 +170,10 @@ export function AddressFormSheet({
               control={form.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="address-line1">Adresse</FieldLabel>
+                  <FieldLabel htmlFor="address-line1">
+                    Adresse
+                    <RequiredMark />
+                  </FieldLabel>
                   <Input {...field} id="address-line1" aria-invalid={fieldState.invalid} />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                 </Field>
@@ -190,7 +197,10 @@ export function AddressFormSheet({
                 control={form.control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="address-city">Ville</FieldLabel>
+                    <FieldLabel htmlFor="address-city">
+                    Ville
+                    <RequiredMark />
+                  </FieldLabel>
                     <Input {...field} id="address-city" aria-invalid={fieldState.invalid} />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
@@ -214,7 +224,10 @@ export function AddressFormSheet({
                 control={form.control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="address-postal">Code postal</FieldLabel>
+                    <FieldLabel htmlFor="address-postal">
+                    Code postal
+                    <RequiredMark />
+                  </FieldLabel>
                     <Input {...field} id="address-postal" aria-invalid={fieldState.invalid} />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
@@ -225,7 +238,10 @@ export function AddressFormSheet({
                 control={form.control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="address-country">Pays</FieldLabel>
+                    <FieldLabel htmlFor="address-country">
+                    Pays
+                    <RequiredMark />
+                  </FieldLabel>
                     <Input {...field} id="address-country" aria-invalid={fieldState.invalid} />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>

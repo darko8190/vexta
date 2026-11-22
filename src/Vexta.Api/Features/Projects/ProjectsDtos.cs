@@ -19,6 +19,9 @@ public record ProjectDto(
     decimal? Budget,
     /// <summary>No tax on this job. Defaulted from the client, then owned by the project.</summary>
     bool IsTaxExempt,
+    /// <summary>The margin applied to catalogue lines on this job, if one was chosen.</summary>
+    Guid? PricePolicyId,
+    string? PricePolicyName,
     ProjectAddressDto? ClientAddress,
     bool SameAddressAsClient,
     /// <summary>Null when the work happens at the billing address — see SameAddressAsClient.</summary>
@@ -37,6 +40,8 @@ public record UpsertProjectRequest(
     decimal? Budget,
     /// <summary>Null means "take the client's answer", which is what a new project does.</summary>
     bool? IsTaxExempt,
+    /// <summary>Null leaves the company's default policy to answer for this job.</summary>
+    Guid? PricePolicyId,
     Guid? ClientAddressId,
     bool SameAddressAsClient,
     /// <summary>Ignored when SameAddressAsClient is true.</summary>

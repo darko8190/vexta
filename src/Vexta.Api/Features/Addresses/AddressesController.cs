@@ -26,8 +26,14 @@ public class AddressesController(VextaDbContext db, ICurrentUserService currentU
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
+            // ILike, not Contains: Contains becomes a case-sensitive LIKE on Postgres, and
+            // nobody searches in the case the record was typed in.
+            var pattern = $"%{query.Search.Trim()}%";
+
             addresses = addresses.Where(a =>
-                a.City.Contains(query.Search) || a.Line1.Contains(query.Search) || a.Client!.Name.Contains(query.Search));
+                EF.Functions.ILike(a.City, pattern)
+                || EF.Functions.ILike(a.Line1, pattern)
+                || EF.Functions.ILike(a.Client!.Name, pattern));
         }
 
         var totalCount = await addresses.CountAsync();

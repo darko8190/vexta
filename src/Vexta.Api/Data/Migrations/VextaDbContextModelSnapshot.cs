@@ -324,6 +324,16 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset?>("ConfiguredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("DefaultHourlyRate")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)");
+
+                    b.Property<Guid?>("DefaultPricePolicyId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("FooterNote")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
@@ -340,6 +350,9 @@ namespace Vexta.Api.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
+
+                    b.Property<int>("MarginMode")
+                        .HasColumnType("integer");
 
                     b.Property<int>("NextInvoiceNumber")
                         .HasColumnType("integer");
@@ -366,6 +379,8 @@ namespace Vexta.Api.Data.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("TenantId");
+
+                    b.HasIndex("DefaultPricePolicyId");
 
                     b.ToTable("BillingSettings");
                 });
@@ -760,8 +775,14 @@ namespace Vexta.Api.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("PricePolicyId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("ProjectId")
                         .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("SentAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
@@ -775,6 +796,8 @@ namespace Vexta.Api.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ClientId");
+
+                    b.HasIndex("PricePolicyId");
 
                     b.HasIndex("ProjectId");
 
@@ -797,16 +820,29 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<Guid>("InvoiceId")
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("IsTaxable")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal?>("MarginPercent")
+                        .HasPrecision(6, 3)
+                        .HasColumnType("numeric(6,3)");
+
+                    b.Property<Guid?>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("PurchasePrice")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)");
+
                     b.Property<decimal>("Quantity")
                         .HasPrecision(14, 3)
                         .HasColumnType("numeric(14,3)");
 
                     b.Property<int>("SortOrder")
                         .HasColumnType("integer");
-
-                    b.Property<decimal>("TaxRatePercent")
-                        .HasPrecision(6, 3)
-                        .HasColumnType("numeric(6,3)");
 
                     b.Property<decimal>("UnitPrice")
                         .HasPrecision(14, 2)
@@ -816,7 +852,58 @@ namespace Vexta.Api.Data.Migrations
 
                     b.HasIndex("InvoiceId");
 
+                    b.HasIndex("ProductId");
+
                     b.ToTable("InvoiceLines");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.JobPosting", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ApplyTo")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("Compensation")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<int>("EmploymentType")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsPublished")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Location")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "CreatedAt");
+
+                    b.ToTable("JobPostings");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.MediaAsset", b =>
@@ -976,6 +1063,299 @@ namespace Vexta.Api.Data.Migrations
                     b.ToTable("PlatformSettings");
                 });
 
+            modelBuilder.Entity("Vexta.Api.Domain.PricePolicy", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal>("MarginPercent")
+                        .HasPrecision(6, 3)
+                        .HasColumnType("numeric(6,3)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("PricePolicies");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.Product", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Barcode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid?>("CategoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<int?>("InstallationMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsPublic")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal?>("MarginPercent")
+                        .HasPrecision(6, 3)
+                        .HasColumnType("numeric(6,3)");
+
+                    b.Property<decimal?>("MaximumQuantity")
+                        .HasPrecision(14, 3)
+                        .HasColumnType("numeric(14,3)");
+
+                    b.Property<decimal?>("MinimumQuantity")
+                        .HasPrecision(14, 3)
+                        .HasColumnType("numeric(14,3)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("ParentProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("PurchasePrice")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)");
+
+                    b.Property<decimal>("QuantityOnHand")
+                        .HasPrecision(14, 3)
+                        .HasColumnType("numeric(14,3)");
+
+                    b.Property<decimal?>("SellingPrice")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)");
+
+                    b.Property<Guid?>("SubCategoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<bool>("TracksInventory")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CategoryId");
+
+                    b.HasIndex("ParentProductId");
+
+                    b.HasIndex("SubCategoryId");
+
+                    b.HasIndex("TenantId", "Barcode");
+
+                    b.HasIndex("TenantId", "Number")
+                        .IsUnique();
+
+                    b.ToTable("Products");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.ProductCategory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("ProductCategories");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.ProductImage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("MediaAssetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MediaAssetId");
+
+                    b.HasIndex("ProductId", "SortOrder");
+
+                    b.ToTable("ProductImages");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.ProductPriceEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ChangedById")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("MarginPercent")
+                        .HasPrecision(6, 3)
+                        .HasColumnType("numeric(6,3)");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("PurchasePrice")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)");
+
+                    b.Property<decimal?>("SellingPrice")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId", "CreatedAt");
+
+                    b.ToTable("ProductPriceEntries");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.ProductStockEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("QuantityAfter")
+                        .HasPrecision(14, 3)
+                        .HasColumnType("numeric(14,3)");
+
+                    b.Property<decimal>("QuantityChange")
+                        .HasPrecision(14, 3)
+                        .HasColumnType("numeric(14,3)");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId", "CreatedAt");
+
+                    b.ToTable("ProductStockEntries");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.ProductSubCategory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CategoryId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("ProductSubCategories");
+                });
+
             modelBuilder.Entity("Vexta.Api.Domain.Project", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1011,6 +1391,9 @@ namespace Vexta.Api.Data.Migrations
                         .HasMaxLength(60)
                         .HasColumnType("character varying(60)");
 
+                    b.Property<Guid?>("PricePolicyId")
+                        .HasColumnType("uuid");
+
                     b.Property<bool>("SameAddressAsClient")
                         .HasColumnType("boolean");
 
@@ -1034,6 +1417,8 @@ namespace Vexta.Api.Data.Migrations
                     b.HasIndex("ClientAddressId");
 
                     b.HasIndex("ClientId");
+
+                    b.HasIndex("PricePolicyId");
 
                     b.HasIndex("SiteAddressId");
 
@@ -1121,6 +1506,40 @@ namespace Vexta.Api.Data.Migrations
                     b.HasIndex("ExpenseId", "SortOrder");
 
                     b.ToTable("ProjectExpensePhotos");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.PublicPage", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("About")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<string>("ContactNote")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Headline")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<bool>("IsPublished")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("ShowJobs")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("ShowProducts")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("TenantId");
+
+                    b.ToTable("PublicPages");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.Team", b =>
@@ -1389,11 +1808,18 @@ namespace Vexta.Api.Data.Migrations
 
             modelBuilder.Entity("Vexta.Api.Domain.BillingSettings", b =>
                 {
+                    b.HasOne("Vexta.Api.Domain.PricePolicy", "DefaultPricePolicy")
+                        .WithMany()
+                        .HasForeignKey("DefaultPricePolicyId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Vexta.Api.Domain.Tenant", "Tenant")
                         .WithOne()
                         .HasForeignKey("Vexta.Api.Domain.BillingSettings", "TenantId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("DefaultPricePolicy");
 
                     b.Navigation("Tenant");
                 });
@@ -1478,12 +1904,19 @@ namespace Vexta.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Vexta.Api.Domain.PricePolicy", "PricePolicy")
+                        .WithMany()
+                        .HasForeignKey("PricePolicyId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Vexta.Api.Domain.Project", "Project")
                         .WithMany("Invoices")
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Client");
+
+                    b.Navigation("PricePolicy");
 
                     b.Navigation("Project");
                 });
@@ -1496,7 +1929,14 @@ namespace Vexta.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Vexta.Api.Domain.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Invoice");
+
+                    b.Navigation("Product");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.MediaAsset", b =>
@@ -1520,6 +1960,82 @@ namespace Vexta.Api.Data.Migrations
                     b.Navigation("ParentModule");
                 });
 
+            modelBuilder.Entity("Vexta.Api.Domain.Product", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.ProductCategory", "Category")
+                        .WithMany("Products")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Vexta.Api.Domain.Product", "ParentProduct")
+                        .WithMany("Variants")
+                        .HasForeignKey("ParentProductId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Vexta.Api.Domain.ProductSubCategory", "SubCategory")
+                        .WithMany("Products")
+                        .HasForeignKey("SubCategoryId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Category");
+
+                    b.Navigation("ParentProduct");
+
+                    b.Navigation("SubCategory");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.ProductImage", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.MediaAsset", "MediaAsset")
+                        .WithMany()
+                        .HasForeignKey("MediaAssetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Vexta.Api.Domain.Product", "Product")
+                        .WithMany("Images")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("MediaAsset");
+
+                    b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.ProductPriceEntry", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.Product", "Product")
+                        .WithMany("PriceHistory")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.ProductStockEntry", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.Product", "Product")
+                        .WithMany("StockHistory")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.ProductSubCategory", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.ProductCategory", "Category")
+                        .WithMany("SubCategories")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Category");
+                });
+
             modelBuilder.Entity("Vexta.Api.Domain.Project", b =>
                 {
                     b.HasOne("Vexta.Api.Domain.Address", "ClientAddress")
@@ -1533,6 +2049,11 @@ namespace Vexta.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Vexta.Api.Domain.PricePolicy", "PricePolicy")
+                        .WithMany()
+                        .HasForeignKey("PricePolicyId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Vexta.Api.Domain.Address", "SiteAddress")
                         .WithMany()
                         .HasForeignKey("SiteAddressId")
@@ -1541,6 +2062,8 @@ namespace Vexta.Api.Data.Migrations
                     b.Navigation("Client");
 
                     b.Navigation("ClientAddress");
+
+                    b.Navigation("PricePolicy");
 
                     b.Navigation("SiteAddress");
                 });
@@ -1581,6 +2104,17 @@ namespace Vexta.Api.Data.Migrations
                     b.Navigation("Expense");
 
                     b.Navigation("MediaAsset");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.PublicPage", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.Tenant", "Tenant")
+                        .WithOne()
+                        .HasForeignKey("Vexta.Api.Domain.PublicPage", "TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Tenant");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.Team", b =>
@@ -1674,6 +2208,29 @@ namespace Vexta.Api.Data.Migrations
             modelBuilder.Entity("Vexta.Api.Domain.Plan", b =>
                 {
                     b.Navigation("Tenants");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.Product", b =>
+                {
+                    b.Navigation("Images");
+
+                    b.Navigation("PriceHistory");
+
+                    b.Navigation("StockHistory");
+
+                    b.Navigation("Variants");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.ProductCategory", b =>
+                {
+                    b.Navigation("Products");
+
+                    b.Navigation("SubCategories");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.ProductSubCategory", b =>
+                {
+                    b.Navigation("Products");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.Project", b =>

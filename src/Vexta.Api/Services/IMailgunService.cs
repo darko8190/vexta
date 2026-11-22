@@ -13,6 +13,20 @@ public interface IMailgunService
     /// </summary>
     Task SendAsync(string toEmail, string toName, string subject, string htmlBody, CancellationToken ct = default);
 
+    /// <summary>
+    /// The same, with a file attached. An invoice email without the invoice in it is a message
+    /// asking someone to go and find their invoice.
+    /// </summary>
+    Task SendWithAttachmentAsync(
+        string toEmail,
+        string toName,
+        string subject,
+        string htmlBody,
+        string fileName,
+        string contentType,
+        byte[] content,
+        CancellationToken ct = default);
+
     /// <summary>Sends a real message to prove the credentials and the sending domain work.</summary>
     Task SendTestAsync(string toEmail, CancellationToken ct = default);
 }
@@ -27,7 +41,27 @@ public class MailgunService(IHttpClientFactory httpClientFactory, IPlatformSetti
         return values.Values.All(v => !string.IsNullOrWhiteSpace(v));
     }
 
-    public async Task SendAsync(string toEmail, string toName, string subject, string htmlBody, CancellationToken ct = default)
+    public Task SendAsync(string toEmail, string toName, string subject, string htmlBody, CancellationToken ct = default) =>
+        SendAsync(toEmail, toName, subject, htmlBody, attachment: null, ct);
+
+    public Task SendWithAttachmentAsync(
+        string toEmail,
+        string toName,
+        string subject,
+        string htmlBody,
+        string fileName,
+        string contentType,
+        byte[] content,
+        CancellationToken ct = default) =>
+        SendAsync(toEmail, toName, subject, htmlBody, (fileName, contentType, content), ct);
+
+    private async Task SendAsync(
+        string toEmail,
+        string toName,
+        string subject,
+        string htmlBody,
+        (string FileName, string ContentType, byte[] Content)? attachment,
+        CancellationToken ct)
     {
         var values = await settings.GetManyAsync(
         [
@@ -65,6 +99,13 @@ public class MailgunService(IHttpClientFactory httpClientFactory, IPlatformSetti
             { new StringContent(subject), "subject" },
             { new StringContent(htmlBody), "html" }
         };
+
+        if (attachment is { } file)
+        {
+            var part = new ByteArrayContent(file.Content);
+            part.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(file.ContentType);
+            form.Add(part, "attachment", file.FileName);
+        }
 
         // The full URL, not BaseAddress plus a relative path. Relative resolution replaces the
         // last segment of the base path, so a base of ".../v3" and a relative "domain/messages"

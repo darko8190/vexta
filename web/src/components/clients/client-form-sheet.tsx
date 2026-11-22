@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { RequiredMark } from "@/components/ui/required-mark";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -215,7 +216,10 @@ export function ClientFormSheet({
                 control={form.control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="client-company">Nom d&apos;entreprise</FieldLabel>
+                    <FieldLabel htmlFor="client-company">
+                    Nom d&apos;entreprise
+                    <RequiredMark />
+                  </FieldLabel>
                     <Input {...field} id="client-company" placeholder="Constructions ABC" aria-invalid={fieldState.invalid} />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
@@ -229,7 +233,10 @@ export function ClientFormSheet({
                 control={form.control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="client-firstname">Prénom</FieldLabel>
+                    <FieldLabel htmlFor="client-firstname">
+                    Prénom
+                    <RequiredMark />
+                  </FieldLabel>
                     <Input {...field} id="client-firstname" placeholder="Marie" aria-invalid={fieldState.invalid} />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
@@ -240,7 +247,10 @@ export function ClientFormSheet({
                 control={form.control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="client-lastname">Nom</FieldLabel>
+                    <FieldLabel htmlFor="client-lastname">
+                    Nom
+                    <RequiredMark />
+                  </FieldLabel>
                     <Input {...field} id="client-lastname" placeholder="Roy" aria-invalid={fieldState.invalid} />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>

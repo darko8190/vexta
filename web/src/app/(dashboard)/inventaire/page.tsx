@@ -4,20 +4,23 @@ import { useState } from "react";
 import { Blocks, ClipboardList, Package, Warehouse, Wrench } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { SectionNav, type NavSection } from "@/components/layout/section-nav";
+import { ProductsSection } from "@/components/products/products-section";
 import { SectionPlaceholder } from "@/components/projects/detail/section-placeholder";
+import { useProductCountQuery } from "@/hooks/use-products";
 
 /**
  * Pattern 1 — List / Index, with the record type chosen from the rail.
  *
- * The five sections are in place and empty: the structure is what says what inventory will
- * hold, and each one gets its records the way Dépenses got its own. Nothing here pretends to
- * store anything yet.
+ * Produits holds real records; the other four are in place and empty, because the structure is
+ * what says what inventory will hold and each one gets its records the way this one got its.
+ * Nothing in them pretends to store anything yet.
  */
 export default function InventoryPage() {
   const [section, setSection] = useState("produits");
+  const { data: productCount } = useProductCountQuery();
 
   const sections: NavSection[] = [
-    { key: "produits", label: "Produits", count: 0, icon: Package },
+    { key: "produits", label: "Produits", count: productCount ?? 0, icon: Package },
     { key: "equipements", label: "Équipements", count: 0, icon: Wrench },
     { key: "entrepot", label: "Entrepôt", count: 0, icon: Warehouse },
     { key: "assemblages", label: "Assemblages", count: 0, icon: Blocks },
@@ -40,13 +43,7 @@ export default function InventoryPage() {
         />
 
         <div className="min-w-0 flex-1">
-          {section === "produits" && (
-            <SectionPlaceholder
-              icon={Package}
-              title="Produits"
-              description="Ce que vous gardez en stock et revendez."
-            />
-          )}
+          {section === "produits" && <ProductsSection />}
           {section === "equipements" && (
             <SectionPlaceholder
               icon={Wrench}

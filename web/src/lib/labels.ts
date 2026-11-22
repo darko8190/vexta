@@ -1,4 +1,12 @@
-import type { AddressType, InvoiceStatus, ProjectStatus, TenantSubscriptionStatus } from "@/lib/types";
+import type {
+  AddressType,
+  EmploymentType,
+  InvoiceLineKind,
+  InvoiceStatus,
+  MarginMode,
+  ProjectStatus,
+  TenantSubscriptionStatus,
+} from "@/lib/types";
 
 export const addressTypeLabels: Record<AddressType, string> = {
   Facturation: "Facturation",
@@ -51,4 +59,25 @@ export const tenantStatusBadgeVariant: Record<TenantSubscriptionStatus, "default
   Active: "default",
   PastDue: "destructive",
   Canceled: "destructive",
+};
+
+export const invoiceLineKindLabels: Record<InvoiceLineKind, string> = {
+  Materiaux: "Matériaux",
+  MainDOeuvre: "Main-d'œuvre",
+  Equipement: "Équipement",
+  FraisSupplementaires: "Frais supplémentaires",
+  Autre: "Autre",
+};
+
+export const marginModeLabels: Record<MarginMode, string> = {
+  Multiplication: "Multiplication",
+  Division: "Division",
+};
+
+export const employmentTypeLabels: Record<EmploymentType, string> = {
+  TempsPlein: "Temps plein",
+  TempsPartiel: "Temps partiel",
+  Contrat: "Contrat",
+  Saisonnier: "Saisonnier",
+  Stage: "Stage",
 };

@@ -54,6 +54,15 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
     public DbSet<ProjectExpense> ProjectExpenses => Set<ProjectExpense>();
     public DbSet<ExpenseType> ExpenseTypes => Set<ExpenseType>();
     public DbSet<ProjectExpensePhoto> ProjectExpensePhotos => Set<ProjectExpensePhoto>();
+    public DbSet<Product> Products => Set<Product>();
+    public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
+    public DbSet<ProductSubCategory> ProductSubCategories => Set<ProductSubCategory>();
+    public DbSet<ProductImage> ProductImages => Set<ProductImage>();
+    public DbSet<ProductPriceEntry> ProductPriceEntries => Set<ProductPriceEntry>();
+    public DbSet<ProductStockEntry> ProductStockEntries => Set<ProductStockEntry>();
+    public DbSet<PricePolicy> PricePolicies => Set<PricePolicy>();
+    public DbSet<PublicPage> PublicPages => Set<PublicPage>();
+    public DbSet<JobPosting> JobPostings => Set<JobPosting>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -179,6 +188,8 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
                 .HasForeignKey(p => p.ClientAddressId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne(p => p.SiteAddress).WithMany()
                 .HasForeignKey(p => p.SiteAddressId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(p => p.PricePolicy).WithMany()
+                .HasForeignKey(p => p.PricePolicyId).OnDelete(DeleteBehavior.SetNull);
             e.HasQueryFilter(p => p.TenantId == CurrentTenantId
                 && (CurrentClientId == null || p.ClientId == CurrentClientId));
         });
@@ -188,6 +199,10 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.HasOne(i => i.Client).WithMany(c => c.Invoices).HasForeignKey(i => i.ClientId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(i => i.Project).WithMany(p => p.Invoices).HasForeignKey(i => i.ProjectId).OnDelete(DeleteBehavior.SetNull);
             e.HasIndex(i => new { i.TenantId, i.Number }).IsUnique();
+
+            // SetNull: retiring a policy must not take the invoices priced with it.
+            e.HasOne(i => i.PricePolicy).WithMany()
+                .HasForeignKey(i => i.PricePolicyId).OnDelete(DeleteBehavior.SetNull);
             e.HasQueryFilter(i => i.TenantId == CurrentTenantId
                 && (CurrentClientId == null || i.ClientId == CurrentClientId));
         });
@@ -197,7 +212,12 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.HasOne(l => l.Invoice).WithMany(i => i.Lines).HasForeignKey(l => l.InvoiceId).OnDelete(DeleteBehavior.Cascade);
             e.Property(l => l.Quantity).HasPrecision(14, 3);
             e.Property(l => l.UnitPrice).HasPrecision(14, 2);
-            e.Property(l => l.TaxRatePercent).HasPrecision(6, 3);
+            e.Property(l => l.PurchasePrice).HasPrecision(14, 2);
+            e.Property(l => l.MarginPercent).HasPrecision(6, 3);
+
+            // SetNull: a sold line outlives the catalogue entry it came from.
+            e.HasOne(l => l.Product).WithMany()
+                .HasForeignKey(l => l.ProductId).OnDelete(DeleteBehavior.SetNull);
             e.HasQueryFilter(l => l.Invoice!.TenantId == CurrentTenantId
                 && (CurrentClientId == null || l.Invoice!.ClientId == CurrentClientId));
         });
@@ -248,6 +268,124 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.HasIndex(p => new { p.ExpenseId, p.SortOrder });
             e.HasQueryFilter(p => p.TenantId == CurrentTenantId
                 && (CurrentClientId == null || p.Expense!.Project!.ClientId == CurrentClientId));
+        });
+
+        builder.Entity<PricePolicy>(e =>
+        {
+            e.Property(p => p.Name).HasMaxLength(100);
+            e.Property(p => p.Description).HasMaxLength(500);
+            e.Property(p => p.MarginPercent).HasPrecision(6, 3);
+            e.HasIndex(p => new { p.TenantId, p.Name }).IsUnique();
+            e.HasQueryFilter(p => p.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<ProductCategory>(e =>
+        {
+            e.Property(c => c.Name).HasMaxLength(100);
+            e.HasIndex(c => new { c.TenantId, c.Name }).IsUnique();
+            e.HasQueryFilter(c => c.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<ProductSubCategory>(e =>
+        {
+            e.Property(c => c.Name).HasMaxLength(100);
+
+            // Cascade: a sub-category has no meaning without its category, and the products
+            // that used it keep their own category.
+            e.HasOne(c => c.Category).WithMany(c => c.SubCategories)
+                .HasForeignKey(c => c.CategoryId).OnDelete(DeleteBehavior.Cascade);
+
+            e.HasIndex(c => new { c.CategoryId, c.Name }).IsUnique();
+            e.HasQueryFilter(c => c.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<Product>(e =>
+        {
+            e.Property(p => p.Code).HasMaxLength(60);
+            e.Property(p => p.Title).HasMaxLength(200);
+            e.Property(p => p.Description).HasMaxLength(4000);
+            e.Property(p => p.Barcode).HasMaxLength(64);
+            e.Property(p => p.Note).HasMaxLength(4000);
+            e.Property(p => p.PurchasePrice).HasPrecision(14, 2);
+            e.Property(p => p.SellingPrice).HasPrecision(14, 2);
+            e.Property(p => p.MarginPercent).HasPrecision(6, 3);
+            e.Property(p => p.QuantityOnHand).HasPrecision(14, 3);
+            e.Property(p => p.MinimumQuantity).HasPrecision(14, 3);
+            e.Property(p => p.MaximumQuantity).HasPrecision(14, 3);
+
+            // SetNull, not Restrict: tidying up a category must not refuse because something
+            // still uses it, and a product without a category is a product, not an error.
+            e.HasOne(p => p.Category).WithMany(c => c.Products)
+                .HasForeignKey(p => p.CategoryId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(p => p.SubCategory).WithMany(c => c.Products)
+                .HasForeignKey(p => p.SubCategoryId).OnDelete(DeleteBehavior.SetNull);
+
+            // Restrict: deleting a product that has variants would take real stock with it, so
+            // the variants are dealt with first, deliberately.
+            e.HasOne(p => p.ParentProduct).WithMany(p => p.Variants)
+                .HasForeignKey(p => p.ParentProductId).OnDelete(DeleteBehavior.Restrict);
+
+            e.HasIndex(p => new { p.TenantId, p.Number }).IsUnique();
+            e.HasIndex(p => new { p.TenantId, p.Barcode });
+            e.HasQueryFilter(p => p.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<ProductImage>(e =>
+        {
+            e.HasOne(i => i.Product).WithMany(p => p.Images)
+                .HasForeignKey(i => i.ProductId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(i => i.MediaAsset).WithMany()
+                .HasForeignKey(i => i.MediaAssetId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(i => new { i.ProductId, i.SortOrder });
+            e.HasQueryFilter(i => i.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<ProductPriceEntry>(e =>
+        {
+            e.HasOne(h => h.Product).WithMany(p => p.PriceHistory)
+                .HasForeignKey(h => h.ProductId).OnDelete(DeleteBehavior.Cascade);
+            e.Property(h => h.PurchasePrice).HasPrecision(14, 2);
+            e.Property(h => h.SellingPrice).HasPrecision(14, 2);
+            e.Property(h => h.MarginPercent).HasPrecision(6, 3);
+            e.HasIndex(h => new { h.ProductId, h.CreatedAt });
+            e.HasQueryFilter(h => h.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<ProductStockEntry>(e =>
+        {
+            e.HasOne(h => h.Product).WithMany(p => p.StockHistory)
+                .HasForeignKey(h => h.ProductId).OnDelete(DeleteBehavior.Cascade);
+            e.Property(h => h.QuantityChange).HasPrecision(14, 3);
+            e.Property(h => h.QuantityAfter).HasPrecision(14, 3);
+            e.Property(h => h.Reason).HasMaxLength(200);
+            e.HasIndex(h => new { h.ProductId, h.CreatedAt });
+            e.HasQueryFilter(h => h.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<PublicPage>(e =>
+        {
+            e.HasKey(p => p.TenantId);
+            e.HasOne(p => p.Tenant).WithOne()
+                .HasForeignKey<PublicPage>(p => p.TenantId).OnDelete(DeleteBehavior.Cascade);
+            e.Property(p => p.Headline).HasMaxLength(200);
+            e.Property(p => p.About).HasMaxLength(4000);
+            e.Property(p => p.ContactNote).HasMaxLength(1000);
+
+            // No query filter: this page is read by a visitor with no session at all, scoped by
+            // the slug in the route — the same way the company's logo is.
+        });
+
+        builder.Entity<JobPosting>(e =>
+        {
+            e.Property(j => j.Title).HasMaxLength(200);
+            e.Property(j => j.Description).HasMaxLength(4000);
+            e.Property(j => j.Location).HasMaxLength(200);
+            e.Property(j => j.Compensation).HasMaxLength(200);
+            e.Property(j => j.ApplyTo).HasMaxLength(300);
+            e.HasIndex(j => new { j.TenantId, j.CreatedAt });
+
+            // No query filter, for the same reason as the page it appears on. Every staff query
+            // scopes by tenant explicitly.
         });
 
         builder.Entity<PlatformSetting>(e =>
@@ -332,6 +470,9 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.Property(b => b.InvoicePrefix).HasMaxLength(10);
             e.Property(b => b.GstRate).HasPrecision(6, 3);
             e.Property(b => b.QstRate).HasPrecision(6, 3);
+            e.Property(b => b.DefaultHourlyRate).HasPrecision(14, 2);
+            e.HasOne(b => b.DefaultPricePolicy).WithMany()
+                .HasForeignKey(b => b.DefaultPricePolicyId).OnDelete(DeleteBehavior.SetNull);
             e.Property(b => b.Terms).HasMaxLength(2000);
             e.Property(b => b.FooterNote).HasMaxLength(2000);
 

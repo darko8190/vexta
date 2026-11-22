@@ -25,13 +25,15 @@ public class ClientsController(
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
-            var search = query.Search;
+            // ILike, not Contains: Contains becomes a case-sensitive LIKE on Postgres, and
+            // nobody searches in the case the record was typed in.
+            var pattern = $"%{query.Search.Trim()}%";
             clients = clients.Where(c =>
-                c.Name.Contains(search)
-                || (c.CompanyName != null && c.CompanyName.Contains(search))
-                || (c.FirstName != null && c.FirstName.Contains(search))
-                || (c.LastName != null && c.LastName.Contains(search))
-                || (c.Email != null && c.Email.Contains(search)));
+                EF.Functions.ILike(c.Name, pattern)
+                || (c.CompanyName != null && EF.Functions.ILike(c.CompanyName, pattern))
+                || (c.FirstName != null && EF.Functions.ILike(c.FirstName, pattern))
+                || (c.LastName != null && EF.Functions.ILike(c.LastName, pattern))
+                || (c.Email != null && EF.Functions.ILike(c.Email, pattern)));
         }
 
         var totalCount = await clients.CountAsync();

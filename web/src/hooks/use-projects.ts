@@ -17,6 +17,8 @@ export interface ProjectFormValues {
   budget?: number | null;
   /** Omitted on a new project means "take the client's answer". */
   isTaxExempt?: boolean | null;
+  /** Null leaves the company's default policy to answer for this job. */
+  pricePolicyId?: string | null;
   clientAddressId?: string | null;
   sameAddressAsClient: boolean;
   /** Ignored by the server when sameAddressAsClient is true. */

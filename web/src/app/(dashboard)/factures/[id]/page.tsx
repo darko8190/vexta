@@ -3,7 +3,7 @@
 import { use, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, FileText, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, FileText, Pencil, Send, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -12,10 +12,12 @@ import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
 import { InvoicePdfViewer } from "@/components/invoices/invoice-pdf-viewer";
 import { useIsClientUser } from "@/hooks/use-can-create";
-import { useDeleteInvoice, useInvoiceQuery } from "@/hooks/use-invoices";
+import { Spinner } from "@/components/ui/spinner";
+import { useDeleteInvoice, useInvoiceQuery, useSendInvoice } from "@/hooks/use-invoices";
 import { usePdfDocument } from "@/hooks/use-pdf-document";
 import { ApiError } from "@/lib/api";
 import { invoiceStatusBadgeVariant, invoiceStatusLabels } from "@/lib/labels";
+import { formatDateOnly } from "@/lib/dates";
 import { formatProjectNumber } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -36,6 +38,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const isClient = useIsClientUser();
   const { data: invoice, isLoading, isError } = useInvoiceQuery(id);
   const deleteInvoice = useDeleteInvoice();
+  const sendInvoice = useSendInvoice();
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const pdf = usePdfDocument(invoice ? `invoices/${id}/pdf` : null);
@@ -62,6 +65,17 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         }
       />
     );
+  }
+
+  async function onSend() {
+    try {
+      const result = await sendInvoice.mutateAsync(id);
+      toast.success(`Facture envoyée à ${result.email}.`);
+    } catch (error) {
+      // The API says what is wrong — no address on the client's file, Mailgun refusing the
+      // key. Replacing that with "réessayez" sends someone to press the same button again.
+      toast.error(error instanceof ApiError ? error.message : "Impossible d'envoyer cette facture.");
+    }
   }
 
   async function onDelete() {
@@ -109,6 +123,14 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 <Trash2 />
                 Supprimer
               </Button>
+              {/* A cancelled invoice is not sent again: the status is the record someone
+                  checks before chasing a payment. */}
+              {invoice.status !== "Annulee" && (
+                <Button variant="outline" size="sm" disabled={sendInvoice.isPending} onClick={onSend}>
+                  {sendInvoice.isPending ? <Spinner /> : <Send />}
+                  {invoice.sentAt ? "Renvoyer" : "Envoyer"}
+                </Button>
+              )}
               {/* An anchor, not a Button rendering one: Base UI warns that a button rendered
                   as something else loses what a button is. */}
               <Link
@@ -125,11 +147,11 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <dt className="text-muted-foreground">Émise le</dt>
-            <dd className="text-foreground">{invoice.issueDate}</dd>
+            <dd className="text-foreground">{formatDateOnly(invoice.issueDate)}</dd>
           </div>
           <div>
             <dt className="text-muted-foreground">Échéance</dt>
-            <dd className="text-foreground">{invoice.dueDate}</dd>
+            <dd className="text-foreground">{formatDateOnly(invoice.dueDate)}</dd>
           </div>
           <div>
             <dt className="text-muted-foreground">Projet</dt>
@@ -141,6 +163,12 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             <dt className="text-muted-foreground">Total</dt>
             <dd className="font-medium text-foreground">{money(invoice.total, invoice.currency)}</dd>
           </div>
+          {invoice.sentAt && (
+            <div>
+              <dt className="text-muted-foreground">Envoyée le</dt>
+              <dd className="text-foreground">{formatDateOnly(invoice.sentAt)}</dd>
+            </div>
+          )}
         </dl>
       </div>
 

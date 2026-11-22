@@ -31,12 +31,16 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
             // own PO, and its number — typed either as 12 or as P-0012, which is how it is read
             // off a document.
             var search = query.Search.Trim();
+
+            // ILike, not Contains: Contains becomes a case-sensitive LIKE on Postgres, and
+            // nobody searches in the case the record was typed in.
+            var pattern = $"%{search}%";
             var digits = new string(search.Where(char.IsDigit).ToArray());
             var number = int.TryParse(digits, out var parsed) ? parsed : (int?)null;
 
             projects = projects.Where(p =>
-                p.Client!.Name.Contains(search)
-                || p.PoNumber!.Contains(search)
+                EF.Functions.ILike(p.Client!.Name, pattern)
+                || (p.PoNumber != null && EF.Functions.ILike(p.PoNumber, pattern))
                 || (number != null && p.Number == number));
         }
 
@@ -169,7 +173,8 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
             Budget = request.Budget,
             // The client's answer is the starting point, not the rule: a tax-exempt client can
             // still have a job that does not qualify, so the project owns the flag from here on.
-            IsTaxExempt = request.IsTaxExempt ?? client.IsTaxExempt
+            IsTaxExempt = request.IsTaxExempt ?? client.IsTaxExempt,
+            PricePolicyId = request.PricePolicyId
         };
 
         ApplyAddresses(project, request);
@@ -197,6 +202,7 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
         project.EndDate = request.EndDate;
         project.Budget = request.Budget;
         project.IsTaxExempt = request.IsTaxExempt ?? project.IsTaxExempt;
+        project.PricePolicyId = request.PricePolicyId;
         project.UpdatedAt = DateTimeOffset.UtcNow;
 
         ApplyAddresses(project, request);
@@ -278,6 +284,8 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
         p.EndDate,
         p.Budget,
         p.IsTaxExempt,
+        p.PricePolicyId,
+        p.PricePolicy!.Name,
         p.ClientAddress == null
             ? null
             : new ProjectAddressDto(p.ClientAddress.Id, p.ClientAddress.Line1, p.ClientAddress.Line2,

@@ -9,6 +9,7 @@ import { ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { RequiredMark } from "@/components/ui/required-mark";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -28,9 +29,14 @@ import { FieldDescription } from "@/components/ui/field";
 import { useClientQuery } from "@/hooks/use-clients";
 import { useCreateProject, useUpdateProject, type ProjectFormValues } from "@/hooks/use-projects";
 import { projectStatusLabels } from "@/lib/labels";
-import { formatProjectNumber, type ProjectRecord, type ProjectStatus } from "@/lib/types";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { formatProjectNumber, type PricePolicy, type ProjectRecord, type ProjectStatus } from "@/lib/types";
 
 const statuses = Object.keys(projectStatusLabels) as ProjectStatus[];
+
+/** Base UI needs a value for every item, and "" is not one. */
+const NO_POLICY = "aucune";
 
 const formSchema = z.object({
   clientId: z.string().min(1, "Le client est requis."),
@@ -44,6 +50,7 @@ const formSchema = z.object({
   endDate: z.string().optional().or(z.literal("")),
   budget: z.string().optional().or(z.literal("")),
   isTaxExempt: z.boolean(),
+  pricePolicyId: z.string().optional().or(z.literal("")),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -63,6 +70,7 @@ function toFormValues(project?: ProjectRecord, defaultClientId?: string): FormVa
     endDate: project?.endDate ?? "",
     budget: project?.budget != null ? String(project.budget) : "",
     isTaxExempt: project?.isTaxExempt ?? false,
+    pricePolicyId: project?.pricePolicyId ?? "",
   };
 }
 
@@ -107,6 +115,7 @@ export function ProjectFormSheet({
       endDate: values.endDate || null,
       budget: values.budget ? Number(values.budget) : null,
       isTaxExempt: values.isTaxExempt,
+      pricePolicyId: values.pricePolicyId || null,
     };
 
     try {
@@ -129,6 +138,12 @@ export function ProjectFormSheet({
   // render, and the repo already follows this convention elsewhere.
   const clientId = useWatch({ control: form.control, name: "clientId" });
   const sameAddress = useWatch({ control: form.control, name: "sameAddressAsClient" });
+
+  // Shares its cache with the settings screen that manages them; this form only reads.
+  const { data: policies } = useQuery({
+    queryKey: ["price-policies"],
+    queryFn: () => api.get<PricePolicy[]>("price-policies"),
+  });
 
   // Only while creating: an existing project owns its own answer, and re-reading the client's
   // would quietly change the tax on a job that has already been invoiced.
@@ -171,7 +186,10 @@ export function ProjectFormSheet({
               control={form.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="project-client">Client</FieldLabel>
+                  <FieldLabel htmlFor="project-client">
+                    Client
+                    <RequiredMark />
+                  </FieldLabel>
                   <ClientPicker
                     id="project-client"
                     value={field.value}
@@ -272,6 +290,41 @@ export function ProjectFormSheet({
                   ) : (
                     <FieldDescription>Le bon de commande du client, repris sur ses factures.</FieldDescription>
                   )}
+                </Field>
+              )}
+            />
+
+            <Controller
+              name="pricePolicyId"
+              control={form.control}
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel htmlFor="project-policy">Politique de prix</FieldLabel>
+                  <Select
+                    value={field.value || null}
+                    onValueChange={(value) => field.onChange(value === NO_POLICY ? "" : (value ?? ""))}
+                  >
+                    <SelectTrigger id="project-policy" className="w-full">
+                      <SelectValue>
+                        {(value: string) =>
+                          !value
+                            ? "Politique par défaut"
+                            : (policies?.find((policy) => policy.id === value)?.name ?? "Chargement…")
+                        }
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_POLICY}>Politique par défaut</SelectItem>
+                      {(policies ?? []).map((policy) => (
+                        <SelectItem key={policy.id} value={policy.id}>
+                          {policy.name} — {policy.marginPercent} %
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FieldDescription>
+                    La marge appliquée aux matériaux et aux équipements de ce projet.
+                  </FieldDescription>
                 </Field>
               )}
             />

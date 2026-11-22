@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { RequiredMark } from "@/components/ui/required-mark";
 import {
   Sheet,
   SheetClose,
@@ -109,7 +110,10 @@ export function EmployeeFormSheet({
               control={form.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="employee-firstname">Prénom</FieldLabel>
+                  <FieldLabel htmlFor="employee-firstname">
+                    Prénom
+                    <RequiredMark />
+                  </FieldLabel>
                   <Input {...field} id="employee-firstname" placeholder="Marie" aria-invalid={fieldState.invalid} />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                 </Field>
@@ -121,7 +125,10 @@ export function EmployeeFormSheet({
               control={form.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="employee-lastname">Nom</FieldLabel>
+                  <FieldLabel htmlFor="employee-lastname">
+                    Nom
+                    <RequiredMark />
+                  </FieldLabel>
                   <Input {...field} id="employee-lastname" placeholder="Tremblay" aria-invalid={fieldState.invalid} />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                 </Field>
@@ -133,7 +140,10 @@ export function EmployeeFormSheet({
               control={form.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="employee-email">Courriel</FieldLabel>
+                  <FieldLabel htmlFor="employee-email">
+                    Courriel
+                    <RequiredMark />
+                  </FieldLabel>
                   <Input
                     {...field}
                     id="employee-email"

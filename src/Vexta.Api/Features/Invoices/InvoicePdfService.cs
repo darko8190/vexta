@@ -43,7 +43,7 @@ public class InvoicePdfService(VextaDbContext db, ICurrentUserService currentUse
             invoice.Currency,
             invoice.Notes,
             invoice.Lines.OrderBy(l => l.SortOrder)
-                .Select(l => (l.Description, l.Quantity, l.UnitPrice, l.TaxRatePercent))
+                .Select(l => (l.Description, l.Quantity, l.UnitPrice, l.IsTaxable))
                 .ToList(),
             invoice.IsTaxExempt,
             ct);
@@ -76,7 +76,7 @@ public class InvoicePdfService(VextaDbContext db, ICurrentUserService currentUse
             request.DueDate,
             request.Currency,
             request.Notes,
-            request.Lines.Select(l => (l.Description ?? string.Empty, l.Quantity, l.UnitPrice, l.TaxRatePercent)).ToList(),
+            request.Lines.Select(l => (l.Description ?? string.Empty, l.Quantity, l.UnitPrice, l.IsTaxable)).ToList(),
             await DraftExemptionAsync(request, invoiceId, ct),
             ct);
 
@@ -128,7 +128,7 @@ public class InvoicePdfService(VextaDbContext db, ICurrentUserService currentUse
         DateOnly dueDate,
         string currency,
         string? notes,
-        IReadOnlyList<(string Description, decimal Quantity, decimal UnitPrice, decimal TaxRatePercent)> lines,
+        IReadOnlyList<(string Description, decimal Quantity, decimal UnitPrice, bool IsTaxable)> lines,
         bool isTaxExempt,
         CancellationToken ct)
     {
@@ -216,34 +216,26 @@ public class InvoicePdfService(VextaDbContext db, ICurrentUserService currentUse
     private static readonly List<InvoicePdfAmount> ExemptLine = [new InvoicePdfAmount("Non taxable", 0m)];
 
     /// <summary>
-    /// TPS and TVQ separately whenever the company's own two rates account for the tax charged
-    /// on every taxable line — which is the normal case, and the one the law expects to see
-    /// itemised. Anything else collapses to a single "Taxes" line rather than printing a
-    /// breakdown that does not add up to what is owed.
+    /// The company's two taxes, each on the lines that carry tax. They are always both printed
+    /// and always separate: a Québec invoice has to show the TPS and the TVQ with the
+    /// registration numbers they were charged under, and a single "Taxes" figure is the one
+    /// thing a supplier gets asked to break down.
     /// </summary>
     private static List<InvoicePdfAmount> TaxLines(
-        IReadOnlyList<(string Description, decimal Quantity, decimal UnitPrice, decimal TaxRatePercent)> lines,
+        IReadOnlyList<(string Description, decimal Quantity, decimal UnitPrice, bool IsTaxable)> lines,
         Domain.BillingSettings? settings)
     {
-        var taxed = lines.Where(l => l.TaxRatePercent > 0).ToList();
-        var charged = Round(taxed.Sum(l => l.Quantity * l.UnitPrice * l.TaxRatePercent / 100m));
-        if (charged == 0) return [];
+        if (settings is null) return [];
 
-        var combined = (settings?.GstRate ?? 0) + (settings?.QstRate ?? 0);
-        var uniform = combined > 0 && taxed.All(l => Math.Abs(l.TaxRatePercent - combined) < 0.001m);
-        if (!uniform) return [new InvoicePdfAmount("Taxes", charged)];
-
-        var taxableBase = taxed.Sum(l => l.Quantity * l.UnitPrice);
-        var gst = Round(taxableBase * settings!.GstRate / 100m);
-
-        // The remainder, not a second rounding: the two lines have to add up to the tax the
-        // invoice actually charges, down to the cent.
-        var qst = charged - gst;
+        var taxableBase = lines.Where(l => l.IsTaxable).Sum(l => l.Quantity * l.UnitPrice);
+        if (taxableBase == 0) return [];
 
         return
         [
-            new InvoicePdfAmount(TaxLabel("TPS", settings.GstRate, settings.GstNumber), gst),
-            new InvoicePdfAmount(TaxLabel("TVQ", settings.QstRate, settings.QstNumber), qst)
+            new InvoicePdfAmount(TaxLabel("TPS", settings.GstRate, settings.GstNumber),
+                Round(taxableBase * settings.GstRate / 100m)),
+            new InvoicePdfAmount(TaxLabel("TVQ", settings.QstRate, settings.QstNumber),
+                Round(taxableBase * settings.QstRate / 100m))
         ];
     }
 

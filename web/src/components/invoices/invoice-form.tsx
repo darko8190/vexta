@@ -3,22 +3,23 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
+import { Controller, useFieldArray, useForm, useWatch, type UseFormReturn } from "react-hook-form";
 import * as z from "zod";
 import { toast } from "sonner";
-import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FieldDescription } from "@/components/ui/field";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { RequiredMark } from "@/components/ui/required-mark";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
 import Link from "next/link";
 import { ClientPicker } from "@/components/clients/client-picker";
 import { ProjectPicker } from "@/components/invoices/project-picker";
+import { InvoiceLineRows, type LinesForm } from "@/components/invoices/invoice-line-rows";
 import { InvoicePdfViewer } from "@/components/invoices/invoice-pdf-viewer";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { buttonVariants } from "@/components/ui/button";
@@ -30,16 +31,27 @@ import { usePdfDocument } from "@/hooks/use-pdf-document";
 import { cn } from "@/lib/utils";
 import { ApiError } from "@/lib/api";
 import { useCreateInvoice, useUpdateInvoice, type InvoiceFormValues } from "@/hooks/use-invoices";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
 import { invoiceStatusLabels } from "@/lib/labels";
-import type { InvoiceRecord, InvoiceStatus } from "@/lib/types";
+import type { InvoiceRecord, InvoiceStatus, PricePolicy } from "@/lib/types";
 
 const statuses = Object.keys(invoiceStatusLabels) as InvoiceStatus[];
 
+/** Base UI needs a value for every item, and "" is not one. */
+const NO_POLICY = "aucune";
+
+const lineKinds = ["Materiaux", "MainDOeuvre", "Equipement", "FraisSupplementaires", "Autre"] as const;
+
 const lineSchema = z.object({
+  kind: z.enum(lineKinds),
+  productId: z.string().nullable(),
   description: z.string().min(1, "Description requise."),
   quantity: z.number().min(0.001, "Quantité invalide."),
+  purchasePrice: z.number().min(0, "Prix invalide.").nullable(),
+  marginPercent: z.number().nullable(),
   unitPrice: z.number().min(0, "Prix invalide."),
-  taxRatePercent: z.number().min(0, "Taux invalide."),
+  isTaxable: z.boolean(),
 });
 
 const formSchema = z.object({
@@ -51,6 +63,7 @@ const formSchema = z.object({
   currency: z.string().min(1, "Devise requise."),
   notes: z.string().optional().or(z.literal("")),
   isTaxExempt: z.boolean(),
+  pricePolicyId: z.string().optional().or(z.literal("")),
   lines: z.array(lineSchema).min(1, "Ajoutez au moins une ligne."),
 });
 
@@ -71,7 +84,6 @@ function toFormValues(
   invoice?: InvoiceRecord,
   defaultClientId?: string,
   termsDays = 30,
-  taxRate = 0,
   defaultProjectId?: string,
 ): FormValues {
   return {
@@ -83,17 +95,43 @@ function toFormValues(
     currency: invoice?.currency ?? "CAD",
     notes: invoice?.notes ?? "",
     isTaxExempt: invoice?.isTaxExempt ?? false,
+    pricePolicyId: invoice?.pricePolicyId ?? "",
     lines: invoice?.lines?.length
       ? invoice.lines.map((l) => ({
+          kind: l.kind,
+          productId: l.productId ?? null,
           description: l.description,
           quantity: l.quantity,
+          purchasePrice: l.purchasePrice ?? null,
+          marginPercent: l.marginPercent ?? null,
           unitPrice: l.unitPrice,
-          taxRatePercent: l.taxRatePercent,
+          isTaxable: l.isTaxable,
         }))
-      // The first line gets the company's rates like any other. Zero is not a neutral
-      // default on an invoice — it is a claim that nothing is taxable.
-      : [{ description: "", quantity: 1, unitPrice: 0, taxRatePercent: taxRate }],
+      // Taxable by default. Zero is not a neutral starting point on an invoice — it is a
+      // claim that nothing on it is taxable, which is wrong on nearly every line.
+      : [
+          {
+            kind: "Materiaux" as const,
+            productId: null,
+            description: "",
+            quantity: 1,
+            purchasePrice: null,
+            marginPercent: null,
+            unitPrice: 0,
+            isTaxable: !(invoice?.isTaxExempt ?? false),
+          },
+        ],
   };
+}
+
+/** Each tax is rounded on its own, the way the API stores and the PDF prints them. */
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+/** "TPS (5 %)" — the rate is the company's, so it is shown rather than asked for. */
+function rateLabel(name: string, rate: number): string {
+  return `${name} (${rate.toLocaleString("fr-CA", { maximumFractionDigits: 3 })} %)`;
 }
 
 function formatCurrency(amount: number, currency: string) {
@@ -119,21 +157,13 @@ export function InvoiceForm({
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: toFormValues(invoice, defaultClientId, 30, 0, defaultProjectId),
+    defaultValues: toFormValues(invoice, defaultClientId, 30, defaultProjectId),
   });
 
   useEffect(() => {
-    form.reset(
-      toFormValues(
-        invoice,
-        defaultClientId,
-        settings?.paymentTermsDays,
-        (settings?.gstRate ?? 0) + (settings?.qstRate ?? 0),
-        defaultProjectId,
-      ),
-    );
+    form.reset(toFormValues(invoice, defaultClientId, settings?.paymentTermsDays, defaultProjectId));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [invoice?.id, settings?.paymentTermsDays, settings?.gstRate, settings?.qstRate]);
+  }, [invoice?.id, settings?.paymentTermsDays]);
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "lines" });
   const clientId = useWatch({ control: form.control, name: "clientId" });
@@ -145,6 +175,17 @@ export function InvoiceForm({
   const notes = useWatch({ control: form.control, name: "notes" });
   const status = useWatch({ control: form.control, name: "status" });
   const isTaxExempt = useWatch({ control: form.control, name: "isTaxExempt" });
+  const pricePolicyId = useWatch({ control: form.control, name: "pricePolicyId" });
+
+  // Shares its cache with the settings screen that manages them; this form only reads.
+  const { data: policies } = useQuery({
+    queryKey: ["price-policies"],
+    queryFn: () => api.get<PricePolicy[]>("price-policies"),
+  });
+
+  // What the chosen policy charges on catalogue lines. Null means "use the product's own".
+  const policyMargin =
+    policies?.find((policy) => policy.id === pricePolicyId)?.marginPercent ?? null;
 
   // Set as soon as the box is touched, so the inheritance below stops overriding a decision
   // someone has just made about this invoice.
@@ -169,12 +210,9 @@ export function InvoiceForm({
 
     form.setValue("isTaxExempt", inheritedExemption);
     (form.getValues("lines") ?? []).forEach((_, index) => {
-      form.setValue(
-        `lines.${index}.taxRatePercent`,
-        inheritedExemption ? 0 : (settings?.gstRate ?? 0) + (settings?.qstRate ?? 0),
-      );
+      form.setValue(`lines.${index}.isTaxable`, !inheritedExemption);
     });
-  }, [isEditing, exemptTouched, inheritedExemption, settings?.gstRate, settings?.qstRate, form]);
+  }, [isEditing, exemptTouched, inheritedExemption, form]);
 
   // The document is built by the API from what is on screen, so the preview is the invoice
   // rather than a second drawing of it. Debounced: it is a round trip, and one per keystroke
@@ -190,14 +228,19 @@ export function InvoiceForm({
         currency,
         notes: notes || null,
         isTaxExempt,
+        pricePolicyId: pricePolicyId || null,
         lines: (lines ?? []).map((line) => ({
+          kind: line.kind,
+          productId: line.productId ?? null,
           description: line.description ?? "",
           quantity: Number(line.quantity) || 0,
+          purchasePrice: line.purchasePrice ?? null,
+          marginPercent: line.marginPercent ?? null,
           unitPrice: Number(line.unitPrice) || 0,
-          taxRatePercent: Number(line.taxRatePercent) || 0,
+          isTaxable: Boolean(line.isTaxable),
         })),
       }),
-    [clientId, projectId, status, issueDate, dueDate, currency, notes, isTaxExempt, lines],
+    [clientId, projectId, status, issueDate, dueDate, currency, notes, isTaxExempt, pricePolicyId, lines],
   );
 
   const debouncedDraft = useDebouncedValue(draft, 500);
@@ -215,28 +258,33 @@ export function InvoiceForm({
 
   // A new line carries the company's own rates. Zero is not a neutral default on an invoice —
   // it is a claim that nothing is taxable, and it would be wrong on nearly every line.
-  const companyTaxRate = (settings?.gstRate ?? 0) + (settings?.qstRate ?? 0);
+  const gstRate = settings?.gstRate ?? 0;
+  const qstRate = settings?.qstRate ?? 0;
+  const combinedRateLabel = `${(gstRate + qstRate).toLocaleString("fr-CA", { maximumFractionDigits: 3 })} %`;
 
-  // Zero on an exempt invoice, so a line added after the box is ticked does not quietly
-  // reintroduce the tax the invoice says it is not charging.
-  const defaultTaxRate = isTaxExempt ? 0 : companyTaxRate;
-
-  /** Rewrites every line's rate, which is what makes the box a decision and not a label. */
+  /** Ticking the box untaxes every line, which is what makes it a decision and not a label. */
   function applyExemption(exempt: boolean) {
     setExemptTouched(true);
     form.setValue("isTaxExempt", exempt);
 
     (form.getValues("lines") ?? []).forEach((_, index) => {
-      form.setValue(`lines.${index}.taxRatePercent`, exempt ? 0 : companyTaxRate);
+      form.setValue(`lines.${index}.isTaxable`, !exempt);
     });
   }
 
   const subtotal = lines?.reduce((sum, l) => sum + (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0), 0) ?? 0;
-  const taxTotal =
-    lines?.reduce(
-      (sum, l) => sum + (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0) * ((Number(l.taxRatePercent) || 0) / 100),
-      0,
-    ) ?? 0;
+
+  // Only what is taxable carries tax, and an exempt invoice has nothing taxable on it. The
+  // same arithmetic the API runs when it saves, so the figures here are the figures stored.
+  const taxableBase = isTaxExempt
+    ? 0
+    : (lines ?? []).reduce(
+        (sum, l) => sum + (l.isTaxable ? (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0) : 0),
+        0,
+      );
+
+  const tax1 = round2((taxableBase * gstRate) / 100);
+  const tax2 = round2((taxableBase * qstRate) / 100);
 
   async function onSubmit(values: FormValues) {
     const payload: InvoiceFormValues = {
@@ -248,6 +296,7 @@ export function InvoiceForm({
       currency: values.currency,
       notes: values.notes || undefined,
       isTaxExempt: values.isTaxExempt,
+      pricePolicyId: values.pricePolicyId || null,
       lines: values.lines,
     };
 
@@ -301,7 +350,10 @@ export function InvoiceForm({
                 control={form.control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="invoice-client">Client</FieldLabel>
+                    <FieldLabel htmlFor="invoice-client">
+                      Client
+                      <RequiredMark />
+                    </FieldLabel>
                     <ClientPicker
                       id="invoice-client"
                       value={field.value}
@@ -330,6 +382,41 @@ export function InvoiceForm({
             </div>
 
             <Controller
+              name="pricePolicyId"
+              control={form.control}
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel htmlFor="invoice-policy">Politique de prix</FieldLabel>
+                  <Select
+                    value={field.value || null}
+                    onValueChange={(value) => field.onChange(value === NO_POLICY ? "" : (value ?? ""))}
+                  >
+                    <SelectTrigger id="invoice-policy" className="w-full sm:max-w-sm">
+                      <SelectValue>
+                        {(value: string) =>
+                          !value
+                            ? "Marge du produit"
+                            : (policies?.find((policy) => policy.id === value)?.name ?? "Chargement…")
+                        }
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_POLICY}>Marge du produit</SelectItem>
+                      {(policies ?? []).map((policy) => (
+                        <SelectItem key={policy.id} value={policy.id}>
+                          {policy.name} — {policy.marginPercent} %
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FieldDescription>
+                    La marge appliquée aux matériaux et aux équipements pris dans le catalogue.
+                  </FieldDescription>
+                </Field>
+              )}
+            />
+
+            <Controller
               name="isTaxExempt"
               control={form.control}
               render={({ field }) => (
@@ -347,7 +434,7 @@ export function InvoiceForm({
                   <FieldDescription>
                     {field.value
                       ? "Aucune taxe n'est facturée. La facture l'indique sous le total."
-                      : "Cochez pour une vente exonérée. Les taux des lignes passent à zéro."}
+                      : "Cochez pour une vente exonérée. Aucune ligne ne sera taxée."}
                   </FieldDescription>
                 </Field>
               )}
@@ -381,7 +468,10 @@ export function InvoiceForm({
                 control={form.control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="invoice-issue">Date d&apos;émission</FieldLabel>
+                    <FieldLabel htmlFor="invoice-issue">
+                      Date d&apos;émission
+                      <RequiredMark />
+                    </FieldLabel>
                     <Input {...field} id="invoice-issue" type="date" aria-invalid={fieldState.invalid} />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
@@ -393,7 +483,10 @@ export function InvoiceForm({
                 control={form.control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="invoice-due">Date d&apos;échéance</FieldLabel>
+                    <FieldLabel htmlFor="invoice-due">
+                      Date d&apos;échéance
+                      <RequiredMark />
+                    </FieldLabel>
                     <Input {...field} id="invoice-due" type="date" aria-invalid={fieldState.invalid} />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
@@ -407,7 +500,10 @@ export function InvoiceForm({
                 control={form.control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="invoice-currency">Devise</FieldLabel>
+                    <FieldLabel htmlFor="invoice-currency">
+                      Devise
+                      <RequiredMark />
+                    </FieldLabel>
                     <Input {...field} id="invoice-currency" className="uppercase" aria-invalid={fieldState.invalid} />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
@@ -430,120 +526,55 @@ export function InvoiceForm({
       </Card>
 
       <Card>
-        <CardHeader className="flex-row items-center justify-between space-y-0">
+        <CardHeader>
           <CardTitle className="text-base">Lignes de facturation</CardTitle>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => append({ description: "", quantity: 1, unitPrice: 0, taxRatePercent: defaultTaxRate })}
-          >
-            <Plus />
-            Ajouter une ligne
-          </Button>
         </CardHeader>
         <CardContent className="space-y-4">
           {form.formState.errors.lines?.message && (
             <p className="text-sm font-medium text-destructive">{form.formState.errors.lines.message}</p>
           )}
 
-          <div className="space-y-3">
-            {fields.map((lineField, index) => (
-              <div key={lineField.id} className="flex flex-col gap-2 rounded-lg border border-border p-3 sm:flex-row sm:items-start">
-                <div className="grid flex-1 gap-2 sm:grid-cols-[1fr_90px_110px_90px]">
-                  <Controller
-                    name={`lines.${index}.description`}
-                    control={form.control}
-                    render={({ field, fieldState }) => (
-                      <Field data-invalid={fieldState.invalid}>
-                        <FieldLabel className="sr-only">Description</FieldLabel>
-                        <Input {...field} placeholder="Description" aria-invalid={fieldState.invalid} />
-                        {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                      </Field>
-                    )}
-                  />
-                  <Controller
-                    name={`lines.${index}.quantity`}
-                    control={form.control}
-                    render={({ field }) => (
-                      <Field>
-                        <FieldLabel className="sr-only">Quantité</FieldLabel>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          placeholder="Qté"
-                          value={field.value}
-                          onChange={(e) => field.onChange(e.target.valueAsNumber || 0)}
-                        />
-                      </Field>
-                    )}
-                  />
-                  <Controller
-                    name={`lines.${index}.unitPrice`}
-                    control={form.control}
-                    render={({ field }) => (
-                      <Field>
-                        <FieldLabel className="sr-only">Prix unitaire</FieldLabel>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          placeholder="Prix"
-                          value={field.value}
-                          onChange={(e) => field.onChange(e.target.valueAsNumber || 0)}
-                        />
-                      </Field>
-                    )}
-                  />
-                  <Controller
-                    name={`lines.${index}.taxRatePercent`}
-                    control={form.control}
-                    render={({ field }) => (
-                      <Field>
-                        <FieldLabel className="sr-only">Taxe %</FieldLabel>
-                        <Input
-                          type="number"
-                          step="0.001"
-                          min="0"
-                          placeholder="Taxe %"
-                          // Disabled rather than hidden on an exempt invoice: the column stays
-                          // where it is, showing the zero that is actually being saved.
-                          disabled={isTaxExempt}
-                          value={field.value}
-                          onChange={(e) => field.onChange(e.target.valueAsNumber || 0)}
-                        />
-                      </Field>
-                    )}
-                  />
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Retirer la ligne"
-                  disabled={fields.length === 1}
-                  onClick={() => remove(index)}
-                  className="shrink-0 self-center"
-                >
-                  <Trash2 />
-                </Button>
-              </div>
-            ))}
-          </div>
+          <InvoiceLineRows
+            // The rows only touch `lines`; the cast is what keeps them from having to know
+            // about the fifteen other fields on this form.
+            form={form as unknown as UseFormReturn<LinesForm>}
+            fields={fields}
+            append={append}
+            remove={remove}
+            marginMode={settings?.marginMode ?? "Multiplication"}
+            policyMarginPercent={policyMargin}
+            hourlyRate={settings?.defaultHourlyRate ?? null}
+            isTaxExempt={isTaxExempt}
+            taxRateLabel={combinedRateLabel}
+          />
 
           <div className="ml-auto w-full max-w-xs space-y-1 border-t border-border pt-3 text-sm">
             <div className="flex justify-between text-muted-foreground">
               <span>Sous-total</span>
-              <span>{formatCurrency(subtotal, currency)}</span>
+              <span className="tabular-nums">{formatCurrency(subtotal, currency)}</span>
             </div>
-            <div className="flex justify-between text-muted-foreground">
-              <span>{isTaxExempt ? "Taxes (non taxable)" : "Taxes"}</span>
-              <span>{formatCurrency(taxTotal, currency)}</span>
-            </div>
+            {isTaxExempt ? (
+              <div className="flex justify-between text-muted-foreground">
+                <span>Taxes (non taxable)</span>
+                <span className="tabular-nums">{formatCurrency(0, currency)}</span>
+              </div>
+            ) : (
+              <>
+                {/* Both taxes, always named. A single "taxes" figure is the one thing a
+                    supplier gets asked to break down the moment it files a return. */}
+                <div className="flex justify-between text-muted-foreground">
+                  <span>{rateLabel("TPS", gstRate)}</span>
+                  <span className="tabular-nums">{formatCurrency(tax1, currency)}</span>
+                </div>
+                <div className="flex justify-between text-muted-foreground">
+                  <span>{rateLabel("TVQ", qstRate)}</span>
+                  <span className="tabular-nums">{formatCurrency(tax2, currency)}</span>
+                </div>
+              </>
+            )}
             <div className="flex justify-between text-base font-semibold text-foreground">
               <span>Total</span>
-              <span>{formatCurrency(subtotal + taxTotal, currency)}</span>
+              <span className="tabular-nums">{formatCurrency(subtotal + tax1 + tax2, currency)}</span>
             </div>
           </div>
         </CardContent>

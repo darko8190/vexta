@@ -32,12 +32,25 @@ const externalErrors: Record<string, string> = {
 
 // Its own component because useSearchParams suspends, and the form must not wait on it.
 function ExternalError() {
-  const code = useSearchParams().get("erreur");
-  if (!code) return null;
+  const params = useSearchParams();
+  const code = params.get("erreur");
+
+  // Set when the app sent the person here rather than them arriving on their own. The status is
+  // named because "you were signed out" and "the server refused" look identical from the chair,
+  // and only one of them is the person's problem.
+  const session = params.get("session");
+
+  if (!code && !session) return null;
+
+  const message = code
+    ? externalErrors[code] ?? "La connexion n'a pas abouti. Réessayez."
+    : session === "1"
+      ? "Votre session a pris fin. Reconnectez-vous."
+      : `Votre session a pris fin (code ${session}). Reconnectez-vous.`;
 
   return (
     <p className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
-      {externalErrors[code] ?? "La connexion n'a pas abouti. Réessayez."}
+      {message}
     </p>
   );
 }

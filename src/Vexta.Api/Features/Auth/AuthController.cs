@@ -94,7 +94,17 @@ public class AuthController(
             }
         }
 
-        SlideSession(() => tokenService.CreateAccessToken(user));
+        // A client's token carries the client record they are confined to, and a member's
+        // carries the role their membership gives them — neither of those lives on the account
+        // row. Renewing from the account alone would quietly drop the first and guess at the
+        // second, so the membership is used whenever this person has one here.
+        var home = currentUser.TenantId is { } own
+            ? await workspaces.FindAsync(user.Id, own, HttpContext.RequestAborted)
+            : null;
+
+        SlideSession(() => home is not null
+            ? tokenService.CreateAccessToken(user, home)
+            : tokenService.CreateAccessToken(user));
         return Ok(UserDto.ForUser(user));
     }
 

@@ -49,8 +49,15 @@ const AuthContext = createContext<AuthContextValue | null>(null);
  */
 type SessionRead =
   | { kind: "signed-in"; user: User }
-  | { kind: "signed-out" }
+  | { kind: "signed-out"; status: number }
   | { kind: "unreachable" };
+
+/**
+ * The status behind the last sign-out, kept so the sign-in page can say what happened instead
+ * of appearing for no stated reason. Being dropped on the sign-in screen with no explanation is
+ * the part nobody can report back, and it is what made this bug take several rounds to chase.
+ */
+export let lastSignOutStatus: number | null = null;
 
 async function readSession(): Promise<SessionRead> {
   try {
@@ -67,7 +74,7 @@ async function readSession(): Promise<SessionRead> {
     // every single deploy — a 500 from a database hiccup, or a proxy error page that carries no
     // header of ours at all. Reading any of those as "signed out" is what kept bouncing people
     // to the sign-in page mid-session. Their cookie was never cleared; only this line gave up.
-    if (response.status === 401 || response.status === 403) return { kind: "signed-out" };
+    if (response.status === 401 || response.status === 403) return { kind: "signed-out", status: response.status };
 
     return { kind: "unreachable" };
   } catch {
@@ -88,6 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (result.kind === "unreachable") {
       setUnreachable(true);
     } else {
+      if (result.kind === "signed-out") lastSignOutStatus = result.status;
       setUser(result.kind === "signed-in" ? result.user : null);
       setUnreachable(false);
     }

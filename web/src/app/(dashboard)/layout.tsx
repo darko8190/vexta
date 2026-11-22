@@ -11,7 +11,7 @@ import { ClientRouteGuard } from "@/components/layout/client-route-guard";
 import { EmptyState } from "@/components/layout/empty-state";
 import { SubscriptionGate } from "@/components/layout/subscription-gate";
 import { API_UNREACHABLE_MESSAGE } from "@/lib/api-unreachable";
-import { useAuth } from "@/lib/auth-context";
+import { lastSignOutStatus, useAuth } from "@/lib/auth-context";
 
 export default function DashboardGroupLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, unreachable, refresh } = useAuth();
@@ -22,7 +22,11 @@ export default function DashboardGroupLayout({ children }: { children: React.Rea
     // an answer of "no", and sending them to the sign-in page over a restart loses whatever they
     // were in the middle of for nothing.
     if (!loading && !user && !unreachable) {
-      router.replace("/connexion");
+      // The code travels with the redirect so the sign-in page can say why it appeared. A
+      // session that ends without a word is one nobody can report, and it costs a deploy just
+      // to learn which refusal was behind it.
+      const reason = lastSignOutStatus ? `?session=${lastSignOutStatus}` : "?session=1";
+      router.replace(`/connexion${reason}`);
     }
   }, [loading, user, unreachable, router]);
 

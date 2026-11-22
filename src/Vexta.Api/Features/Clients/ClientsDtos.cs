@@ -52,7 +52,7 @@ public record ClientAddressDto(
     string PostalCode,
     string Country);
 
-public record ClientSummaryDto(Guid Id, string Name, string? Email);
+public record ClientSummaryDto(Guid Id, int Number, string Name, string? Email);
 
 /// <summary>
 /// The invitation link is returned whether or not the email went out: Mailgun is optional, and

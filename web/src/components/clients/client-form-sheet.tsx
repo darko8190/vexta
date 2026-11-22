@@ -103,10 +103,13 @@ export function ClientFormSheet({
   open,
   onOpenChange,
   client,
+  onCreated,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   client?: ClientRecord;
+  /** Called with the new client, so a picker that opened this sheet can select it. */
+  onCreated?: (client: ClientRecord) => void;
 }) {
   const isEditing = Boolean(client);
   const create = useCreateClient();
@@ -148,7 +151,7 @@ export function ClientFormSheet({
       if (client) {
         await update.mutateAsync({ id: client.id, values: payload });
       } else {
-        await create.mutateAsync(payload);
+        onCreated?.(await create.mutateAsync(payload));
       }
       toast.success(isEditing ? "Client mis à jour." : "Client créé.");
       onOpenChange(false);

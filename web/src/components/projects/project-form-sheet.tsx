@@ -2,9 +2,10 @@
 
 import { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import * as z from "zod";
 import { toast } from "sonner";
+import { ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -20,16 +21,23 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
-import { ClientSelect } from "@/components/clients/client-select";
+import { AddressPicker } from "@/components/addresses/address-picker";
+import { ClientPicker } from "@/components/clients/client-picker";
+import { Checkbox } from "@/components/ui/checkbox";
+import { FieldDescription } from "@/components/ui/field";
 import { useCreateProject, useUpdateProject, type ProjectFormValues } from "@/hooks/use-projects";
 import { projectStatusLabels } from "@/lib/labels";
-import type { ProjectRecord, ProjectStatus } from "@/lib/types";
+import { formatProjectNumber, type ProjectRecord, type ProjectStatus } from "@/lib/types";
 
 const statuses = Object.keys(projectStatusLabels) as ProjectStatus[];
 
 const formSchema = z.object({
   clientId: z.string().min(1, "Le client est requis."),
   name: z.string().min(1, "Le nom est requis."),
+  poNumber: z.string().trim().max(60, "60 caractères maximum.").optional().or(z.literal("")),
+  clientAddressId: z.string().optional().or(z.literal("")),
+  sameAddressAsClient: z.boolean(),
+  siteAddressId: z.string().optional().or(z.literal("")),
   description: z.string().optional().or(z.literal("")),
   status: z.custom<ProjectStatus>((v) => typeof v === "string" && statuses.includes(v as ProjectStatus)),
   startDate: z.string().optional().or(z.literal("")),
@@ -43,6 +51,12 @@ function toFormValues(project?: ProjectRecord, defaultClientId?: string): FormVa
   return {
     clientId: project?.clientId ?? defaultClientId ?? "",
     name: project?.name ?? "",
+    poNumber: project?.poNumber ?? "",
+    clientAddressId: project?.clientAddress?.id ?? "",
+    // A new project bills and works at the same place until someone says otherwise, which is
+    // the common case and saves picking the same address twice.
+    sameAddressAsClient: project?.sameAddressAsClient ?? true,
+    siteAddressId: project?.siteAddress?.id ?? "",
     description: project?.description ?? "",
     status: project?.status ?? "Planifie",
     startDate: project?.startDate ?? "",
@@ -79,6 +93,10 @@ export function ProjectFormSheet({
     const payload: ProjectFormValues = {
       clientId: values.clientId,
       name: values.name.trim(),
+      poNumber: values.poNumber?.trim() || null,
+      clientAddressId: values.clientAddressId || null,
+      sameAddressAsClient: values.sameAddressAsClient,
+      siteAddressId: values.sameAddressAsClient ? null : values.siteAddressId || null,
       description: values.description || undefined,
       status: values.status,
       startDate: values.startDate || null,
@@ -95,19 +113,28 @@ export function ProjectFormSheet({
         toast.success("Projet créé.");
       }
       onOpenChange(false);
-    } catch {
-      toast.error("Impossible d'enregistrer le projet.");
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Impossible d'enregistrer le projet.");
     }
   }
 
   const pending = createProject.isPending || updateProject.isPending;
+
+  // useWatch rather than form.watch: the React Compiler lint refuses a subscription read during
+  // render, and the repo already follows this convention elsewhere.
+  const clientId = useWatch({ control: form.control, name: "clientId" });
+  const sameAddress = useWatch({ control: form.control, name: "sameAddressAsClient" });
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-md">
         <SheetHeader>
           <SheetTitle>{isEditing ? "Modifier le projet" : "Nouveau projet"}</SheetTitle>
-          <SheetDescription>Suivez l&apos;avancement d&apos;un mandat pour un client.</SheetDescription>
+          <SheetDescription>
+            {isEditing && project
+              ? `Numéro ${formatProjectNumber(project.number)} — attribué automatiquement et jamais réutilisé.`
+              : "Le numéro est attribué automatiquement à la création."}
+          </SheetDescription>
         </SheetHeader>
 
         <form
@@ -123,7 +150,19 @@ export function ProjectFormSheet({
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor="project-client">Client</FieldLabel>
-                  <ClientSelect id="project-client" value={field.value} onChange={field.onChange} invalid={fieldState.invalid} />
+                  <ClientPicker
+                    id="project-client"
+                    value={field.value}
+                    onChange={(next) => {
+                      field.onChange(next);
+                      // The addresses belonged to the client being replaced. Keeping them would
+                      // submit another client's address, which the server refuses — and if it
+                      // did not, it would print the wrong street on the invoice.
+                      form.setValue("clientAddressId", "");
+                      form.setValue("siteAddressId", "");
+                    }}
+                    invalid={fieldState.invalid}
+                  />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                 </Field>
               )}
@@ -207,6 +246,78 @@ export function ProjectFormSheet({
                 </Field>
               )}
             />
+
+            <Controller
+              name="poNumber"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor="project-po">Numéro de PO</FieldLabel>
+                  <Input {...field} id="project-po" placeholder="PO-4471" aria-invalid={fieldState.invalid} />
+                  {fieldState.invalid ? (
+                    <FieldError errors={[fieldState.error]} />
+                  ) : (
+                    <FieldDescription>Le bon de commande du client, repris sur ses factures.</FieldDescription>
+                  )}
+                </Field>
+              )}
+            />
+
+            <Controller
+              name="clientAddressId"
+              control={form.control}
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel htmlFor="project-client-address">Adresse du client</FieldLabel>
+                  <AddressPicker
+                    id="project-client-address"
+                    clientId={clientId}
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                  />
+                  <FieldDescription>Celle qui apparaît sur la facture.</FieldDescription>
+                </Field>
+              )}
+            />
+
+            <Controller
+              name="sameAddressAsClient"
+              control={form.control}
+              render={({ field }) => (
+                <Field orientation="horizontal">
+                  <Checkbox
+                    id="project-same-address"
+                    checked={field.value}
+                    onCheckedChange={(checked) => field.onChange(checked === true)}
+                  />
+                  <FieldLabel htmlFor="project-same-address" className="font-normal">
+                    Les travaux ont lieu à cette adresse
+                  </FieldLabel>
+                </Field>
+              )}
+            />
+
+            {/* Only asked for when it differs. Showing it always would invite the same address
+                to be entered twice, and a copy goes stale the moment the client moves. */}
+            {!sameAddress && (
+              <Controller
+                name="siteAddressId"
+                control={form.control}
+                render={({ field }) => (
+                  <Field>
+                    <FieldLabel htmlFor="project-site-address">Adresse du projet</FieldLabel>
+                    <AddressPicker
+                      id="project-site-address"
+                      clientId={clientId}
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                      placeholder="Rechercher le lieu des travaux…"
+                    />
+                    <FieldDescription>Où le travail se fait, quand ce n&apos;est pas là où va la facture.</FieldDescription>
+                  </Field>
+                )}
+              />
+            )}
           </FieldGroup>
         </form>
 

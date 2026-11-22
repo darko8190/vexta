@@ -60,11 +60,14 @@ export function AddressFormSheet({
   onOpenChange,
   address,
   defaultClientId,
+  onCreated,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   address?: AddressRecord;
   defaultClientId?: string;
+  /** Called with the new address, so a picker that opened this sheet can select it. */
+  onCreated?: (address: AddressRecord) => void;
 }) {
   const isEditing = Boolean(address);
   const createAddress = useCreateAddress();
@@ -91,7 +94,7 @@ export function AddressFormSheet({
         await updateAddress.mutateAsync({ id: address.id, values: payload });
         toast.success("Adresse mise à jour.");
       } else {
-        await createAddress.mutateAsync(payload);
+        onCreated?.(await createAddress.mutateAsync(payload));
         toast.success("Adresse créée.");
       }
       onOpenChange(false);

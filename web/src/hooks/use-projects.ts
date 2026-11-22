@@ -5,11 +5,16 @@ import type { PagedResult, ProjectRecord, ProjectStatus } from "@/lib/types";
 export interface ProjectFormValues {
   clientId: string;
   name: string;
+  poNumber?: string | null;
   description?: string;
   status: ProjectStatus;
   startDate?: string | null;
   endDate?: string | null;
   budget?: number | null;
+  clientAddressId?: string | null;
+  sameAddressAsClient: boolean;
+  /** Ignored by the server when sameAddressAsClient is true. */
+  siteAddressId?: string | null;
 }
 
 export function useProjectsQuery(page: number, search: string, clientId?: string, status?: ProjectStatus) {

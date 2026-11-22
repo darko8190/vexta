@@ -51,7 +51,7 @@ public class ClientsController(
     {
         var items = await db.Clients.AsNoTracking()
             .OrderBy(c => c.Name)
-            .Select(c => new ClientSummaryDto(c.Id, c.Name, c.Email))
+            .Select(c => new ClientSummaryDto(c.Id, c.Number, c.Name, c.Email))
             .ToListAsync();
         return Ok(items);
     }

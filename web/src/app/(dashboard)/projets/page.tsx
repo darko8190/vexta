@@ -25,7 +25,7 @@ import { ProjectFormSheet } from "@/components/projects/project-form-sheet";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useDeleteProject, useProjectsQuery } from "@/hooks/use-projects";
 import { projectStatusBadgeVariant, projectStatusLabels } from "@/lib/labels";
-import type { ProjectRecord } from "@/lib/types";
+import { formatProjectNumber, type ProjectRecord } from "@/lib/types";
 
 function formatCurrency(amount: number | null) {
   if (amount == null) return "—";
@@ -124,6 +124,7 @@ export default function ProjectsPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Numéro</TableHead>
                 <TableHead>Projet</TableHead>
                 <TableHead>Client</TableHead>
                 <TableHead>Statut</TableHead>
@@ -140,7 +141,15 @@ export default function ProjectsPage() {
                   label={`Modifier ${projectItem.name}`}
                   onOpen={() => openEdit(projectItem)}
                 >
-                  <TableCell className="font-medium">{projectItem.name}</TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground tabular-nums">
+                    {formatProjectNumber(projectItem.number)}
+                  </TableCell>
+                  <TableCell className="font-medium">
+                    {projectItem.name}
+                    {projectItem.poNumber && (
+                      <div className="text-xs font-normal text-muted-foreground">PO {projectItem.poNumber}</div>
+                    )}
+                  </TableCell>
                   <TableCell className="text-muted-foreground">{projectItem.clientName}</TableCell>
                   <TableCell>
                     <Badge variant={projectStatusBadgeVariant[projectItem.status]}>

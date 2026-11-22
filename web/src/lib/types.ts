@@ -90,6 +90,7 @@ export function formatClientNumber(n: number): string {
 
 export interface ClientSummary {
   id: string;
+  number: number;
   name: string;
   email: string | null;
 }
@@ -114,19 +115,42 @@ export interface AddressRecord {
 
 export type ProjectStatus = "Planifie" | "EnCours" | "EnPause" | "Termine" | "Annule";
 
+/** An address as a project shows it: enough to recognise, not the whole record. */
+export interface ProjectAddress {
+  id: string;
+  line1: string;
+  line2: string | null;
+  city: string;
+  province: string | null;
+  postalCode: string;
+}
+
 export interface ProjectRecord {
   id: string;
+  /** Sequential within the company. Shown as P-0001. */
+  number: number;
   clientId: string;
   clientName: string;
   name: string;
+  /** The client's own purchase order, printed on this project's invoices. */
+  poNumber: string | null;
   description: string | null;
   status: ProjectStatus;
   startDate: string | null;
   endDate: string | null;
   budget: number | null;
+  clientAddress: ProjectAddress | null;
+  sameAddressAsClient: boolean;
+  /** Null when the work happens at the billing address. */
+  siteAddress: ProjectAddress | null;
   invoiceCount: number;
   createdAt: string;
   updatedAt: string;
+}
+
+/** P-0001. Padded so the column sorts and scans cleanly. */
+export function formatProjectNumber(n: number): string {
+  return `P-${String(n).padStart(4, "0")}`;
 }
 
 export type InvoiceStatus = "Brouillon" | "Envoyee" | "Payee" | "EnRetard" | "Annulee";

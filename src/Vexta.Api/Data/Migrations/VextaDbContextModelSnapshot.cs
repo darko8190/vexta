@@ -892,6 +892,9 @@ namespace Vexta.Api.Data.Migrations
                         .HasPrecision(14, 2)
                         .HasColumnType("numeric(14,2)");
 
+                    b.Property<Guid?>("ClientAddressId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("ClientId")
                         .HasColumnType("uuid");
 
@@ -908,6 +911,19 @@ namespace Vexta.Api.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<int>("Number")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PoNumber")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<bool>("SameAddressAsClient")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid?>("SiteAddressId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateOnly?>("StartDate")
                         .HasColumnType("date");
 
@@ -922,7 +938,14 @@ namespace Vexta.Api.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ClientAddressId");
+
                     b.HasIndex("ClientId");
+
+                    b.HasIndex("SiteAddressId");
+
+                    b.HasIndex("TenantId", "Number")
+                        .IsUnique();
 
                     b.ToTable("Projects");
                 });
@@ -1301,13 +1324,27 @@ namespace Vexta.Api.Data.Migrations
 
             modelBuilder.Entity("Vexta.Api.Domain.Project", b =>
                 {
+                    b.HasOne("Vexta.Api.Domain.Address", "ClientAddress")
+                        .WithMany()
+                        .HasForeignKey("ClientAddressId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Vexta.Api.Domain.Client", "Client")
                         .WithMany("Projects")
                         .HasForeignKey("ClientId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Vexta.Api.Domain.Address", "SiteAddress")
+                        .WithMany()
+                        .HasForeignKey("SiteAddressId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Client");
+
+                    b.Navigation("ClientAddress");
+
+                    b.Navigation("SiteAddress");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.Team", b =>

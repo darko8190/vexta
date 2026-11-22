@@ -156,6 +156,18 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
         {
             e.HasOne(p => p.Client).WithMany(c => c.Projects).HasForeignKey(p => p.ClientId).OnDelete(DeleteBehavior.Cascade);
             e.Property(p => p.Budget).HasPrecision(14, 2);
+            e.Property(p => p.PoNumber).HasMaxLength(60);
+
+            // Unique so a race between two simultaneous creations fails loudly instead of
+            // quietly handing two projects the same number.
+            e.HasIndex(p => new { p.TenantId, p.Number }).IsUnique();
+
+            // SetNull: deleting an address must not take the project with it. The project keeps
+            // its history and simply has no address on file until one is chosen again.
+            e.HasOne(p => p.ClientAddress).WithMany()
+                .HasForeignKey(p => p.ClientAddressId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(p => p.SiteAddress).WithMany()
+                .HasForeignKey(p => p.SiteAddressId).OnDelete(DeleteBehavior.SetNull);
             e.HasQueryFilter(p => p.TenantId == CurrentTenantId
                 && (CurrentClientId == null || p.ClientId == CurrentClientId));
         });

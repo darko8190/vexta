@@ -101,9 +101,111 @@ public class TenantsController(
             return BadRequest(new { message = string.Join(" ", createResult.Errors.Select(e => e.Description)) });
         }
 
+        // The person running the company is a person who works there, and both of the places
+        // that say so have to be written here.
+        //
+        // The membership is what the space switcher reads and what the seat count counts, so
+        // without it this account owned a company it could not open and the Locataires page
+        // reported 0 / 1 users for a tenant that plainly had one.
+        db.TenantMemberships.Add(new TenantMembership
+        {
+            UserId = user.Id,
+            TenantId = tenant.Id,
+            Role = UserRole.TenantAdmin
+        });
+
+        // And the employee record, because Ressources humaines is where a company looks for the
+        // people who work there. Created with the account already linked — the invitation flow
+        // exists to hand out a password, and this one was just given one.
+        db.Employees.Add(new Employee
+        {
+            TenantId = tenant.Id,
+            FirstName = user.FirstName,
+            LastName = user.LastName,
+            Email = user.Email!,
+            JobTitle = "Responsable",
+            UserId = user.Id
+        });
+
         await db.SaveChangesAsync();
 
         return Ok(new TenantDto(tenant.Id, tenant.Name, tenant.Slug, tenant.Kind.ToString(), tenant.SubscriptionStatus.ToString(), null, tenant.CreatedAt, 1, 0, null, null, 1));
+    }
+
+    /// <summary>
+    /// Removes a space and everything in it.
+    ///
+    /// Done by hand rather than left to the database. Only eight tables carry a foreign key back
+    /// to Tenants; the rest — projects, invoices, products, the whole of Ressources humaines —
+    /// hold a bare TenantId with no constraint behind it, so deleting the tenant row alone would
+    /// leave every one of those rows in place, invisible to the filters and attached to a
+    /// company that no longer exists.
+    ///
+    /// The order is the one the remaining constraints impose: expenses before the expense types
+    /// they name, a product's parent link cleared before the products themselves. One
+    /// transaction, so a tenant is either gone or untouched.
+    ///
+    /// Stripe is not told. A subscription keeps billing until it is cancelled there, which is
+    /// deliberate: this endpoint must never be able to end someone's billing by accident.
+    /// </summary>
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+    {
+        var tenant = await db.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.Id == id, ct);
+        if (tenant is null) return NotFound(new { message = "Ce locataire n'existe plus." });
+
+        // Through the execution strategy, not a bare BeginTransaction. The Npgsql provider is
+        // configured to retry on a transient failure, and a retrying strategy refuses to take
+        // part in a transaction it did not open — it has no way to replay work that has already
+        // been committed halfway. Everything below therefore runs inside one retriable unit.
+        var strategy = db.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await db.Database.BeginTransactionAsync(ct);
+
+            async Task Wipe<T>(IQueryable<T> rows) where T : class =>
+                await rows.IgnoreQueryFilters().ExecuteDeleteAsync(ct);
+
+            await Wipe(db.ProjectExpensePhotos.Where(x => x.TenantId == id));
+            await Wipe(db.ProjectMaterials.Where(x => x.TenantId == id));
+            await Wipe(db.TimesheetEntries.Where(x => x.TenantId == id));
+            await Wipe(db.ProjectDocuments.Where(x => x.TenantId == id));
+            await Wipe(db.ProjectNotes.Where(x => x.TenantId == id));
+            await Wipe(db.ProjectExpenses.Where(x => x.TenantId == id));
+            await Wipe(db.ExpenseTypes.Where(x => x.TenantId == id));
+
+            // Invoice lines go with their invoice, which does cascade.
+            await Wipe(db.Invoices.Where(x => x.TenantId == id));
+            await Wipe(db.Projects.Where(x => x.TenantId == id));
+
+            await Wipe(db.ProductImages.Where(x => x.TenantId == id));
+            await Wipe(db.ProductPriceEntries.Where(x => x.TenantId == id));
+            await Wipe(db.ProductStockEntries.Where(x => x.TenantId == id));
+            // A product can name another as its parent, and that link refuses the delete rather
+            // than following it, so it is cut first.
+            await db.Products.IgnoreQueryFilters()
+                .Where(x => x.TenantId == id && x.ParentProductId != null)
+                .ExecuteUpdateAsync(set => set.SetProperty(x => x.ParentProductId, (Guid?)null), ct);
+            await Wipe(db.Products.Where(x => x.TenantId == id));
+            await Wipe(db.ProductSubCategories.Where(x => x.TenantId == id));
+            await Wipe(db.ProductCategories.Where(x => x.TenantId == id));
+
+            await Wipe(db.ClientContacts.Where(x => x.TenantId == id));
+            await Wipe(db.Addresses.Where(x => x.TenantId == id));
+            await Wipe(db.HrDocuments.Where(x => x.TenantId == id));
+            await Wipe(db.JobPostings.Where(x => x.TenantId == id));
+            await Wipe(db.CompanyLocations.Where(x => x.TenantId == id));
+            await Wipe(db.Teams.Where(x => x.TenantId == id));
+            await Wipe(db.PricePolicies.Where(x => x.TenantId == id));
+
+            // The last of them cascade from the tenant row itself: users, memberships, employees,
+            // clients, billing settings, media, public pages and the logo.
+            await Wipe(db.Tenants.Where(t => t.Id == id));
+
+            await transaction.CommitAsync(ct);
+        });
+
+        return NoContent();
     }
 
     [HttpPatch("{id:guid}/subscription-status")]

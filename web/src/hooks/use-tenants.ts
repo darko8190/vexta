@@ -31,6 +31,15 @@ export function useCreateTenant() {
   });
 }
 
+/** Removes the space and everything in it. Stripe keeps billing until it is cancelled there. */
+export function useDeleteTenant() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`admin/tenants/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["tenants"] }),
+  });
+}
+
 export function useUpdateTenantSubscriptionStatus() {
   const queryClient = useQueryClient();
   return useMutation({

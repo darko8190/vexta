@@ -21,7 +21,9 @@ services:
     image: postgres:18-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-vextadb}
+      # Named per environment, not "vextadb" in both. Two stacks on one machine should
+      # not be one typo in a host name away from writing into each other.
+      POSTGRES_DB: ${POSTGRES_DB:-vextaprod}
       POSTGRES_USER: ${POSTGRES_USER:-vexta}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD est obligatoire}
     volumes:
@@ -39,7 +41,7 @@ services:
         aliases:
           - vexta-prod-db
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vexta} -d ${POSTGRES_DB:-vextadb}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vexta} -d ${POSTGRES_DB:-vextaprod}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -55,7 +57,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
 
       # The Aspire Npgsql component reads this key; "vextadb" is the name the code asks for.
-      ConnectionStrings__vextadb: Host=vexta-prod-db;Port=5432;Database=${POSTGRES_DB:-vextadb};Username=${POSTGRES_USER:-vexta};Password=${POSTGRES_PASSWORD};Include Error Detail=false
+      ConnectionStrings__vextadb: Host=vexta-prod-db;Port=5432;Database=${POSTGRES_DB:-vextaprod};Username=${POSTGRES_USER:-vexta};Password=${POSTGRES_PASSWORD};Include Error Detail=false
 
       # Signs every session token. Changing it signs everyone out; losing it is harmless.
       Jwt__SigningKey: ${JWT_SIGNING_KEY:?JWT_SIGNING_KEY est obligatoire}

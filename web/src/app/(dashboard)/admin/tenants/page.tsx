@@ -10,6 +10,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CreateTenantDialog } from "@/components/admin/create-tenant-dialog";
+import { DeleteTenantDialog } from "@/components/admin/delete-tenant-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
 import { LoadErrorState } from "@/components/layout/load-error-state";
 import { PageHeader } from "@/components/layout/page-header";
@@ -198,7 +199,10 @@ function BusinessTenants({ search, onCreate }: { search: string; onCreate: () =>
                     {new Date(tenantItem.createdAt).toLocaleDateString("fr-CA")}
                   </TableCell>
                   <TableCell className="text-right">
-                    <EnterButton id={tenantItem.id} />
+                    <div className="flex justify-end gap-2">
+                      <EnterButton id={tenantItem.id} />
+                      <DeleteTenantDialog id={tenantItem.id} name={tenantItem.name} />
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -273,7 +277,10 @@ function PersonalTenants({ search }: { search: string }) {
                     {new Date(tenantItem.createdAt).toLocaleDateString("fr-CA")}
                   </TableCell>
                   <TableCell className="text-right">
-                    <EnterButton id={tenantItem.id} />
+                    <div className="flex justify-end gap-2">
+                      <EnterButton id={tenantItem.id} />
+                      <DeleteTenantDialog id={tenantItem.id} name={tenantItem.name} />
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

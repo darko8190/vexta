@@ -16,7 +16,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const data = text ? JSON.parse(text) : null;
 
   if (!response.ok) {
-    throw new ApiError(data?.message ?? "Une erreur est survenue.", response.status);
+    // The status is part of the sentence when nothing else explains the failure. A bare
+    // "Une erreur est survenue." is the one message nobody can act on and nobody can report:
+    // it cost two rounds of deploying just to learn which code was behind it.
+    throw new ApiError(
+      data?.message ?? `Une erreur est survenue (code ${response.status}).`,
+      response.status,
+    );
   }
 
   return data as T;

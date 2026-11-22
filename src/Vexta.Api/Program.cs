@@ -180,6 +180,28 @@ var app = builder.Build();
 // browser can only report as a generic failure with nothing tying it to the log.
 app.UseExceptionHandler(_ => { });
 
+// A refusal decided by the pipeline rather than by a controller — 401 from the bearer handler,
+// 403 from an authorization policy, 404 for an address that matches nothing — answers with no
+// body whatsoever. The browser has nothing to read, so all of them reached the person as the
+// same "Une erreur est survenue.", with no way to tell a dead session from a missing right.
+// Only responses that wrote nothing of their own are filled in; a controller's own refusal,
+// with its own wording, passes through untouched.
+app.UseStatusCodePages(async context =>
+{
+    var response = context.HttpContext.Response;
+    var message = response.StatusCode switch
+    {
+        StatusCodes.Status401Unauthorized => "Votre session n'est plus valide. Reconnectez-vous.",
+        StatusCodes.Status403Forbidden => "Vous n'avez pas les droits nécessaires pour cette action.",
+        StatusCodes.Status404NotFound => "Cette ressource est introuvable.",
+        StatusCodes.Status405MethodNotAllowed => "Cette action n'est pas permise sur cette adresse.",
+        StatusCodes.Status415UnsupportedMediaType => "Le format de la demande n'est pas accepté.",
+        _ => $"La demande a échoué (code {response.StatusCode})."
+    };
+
+    await response.WriteAsJsonAsync(new { message, status = response.StatusCode });
+});
+
 // First in the pipeline: everything downstream that reads the scheme, host or client IP has to
 // see the real ones, not the proxy's.
 app.UseForwardedHeaders();

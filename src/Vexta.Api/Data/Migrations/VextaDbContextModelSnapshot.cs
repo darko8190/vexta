@@ -319,6 +319,54 @@ namespace Vexta.Api.Data.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
+            modelBuilder.Entity("Vexta.Api.Domain.BillingSettings", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("FooterNote")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("GstNumber")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<decimal>("GstRate")
+                        .HasPrecision(6, 3)
+                        .HasColumnType("numeric(6,3)");
+
+                    b.Property<string>("InvoicePrefix")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<int>("NextInvoiceNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("PaymentTermsDays")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("QstNumber")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<decimal>("QstRate")
+                        .HasPrecision(6, 3)
+                        .HasColumnType("numeric(6,3)");
+
+                    b.Property<string>("Terms")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("TenantId");
+
+                    b.ToTable("BillingSettings");
+                });
+
             modelBuilder.Entity("Vexta.Api.Domain.BrandingAsset", b =>
                 {
                     b.Property<string>("Slot")
@@ -1206,6 +1254,17 @@ namespace Vexta.Api.Data.Migrations
                         .WithMany("Users")
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.BillingSettings", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.Tenant", "Tenant")
+                        .WithOne()
+                        .HasForeignKey("Vexta.Api.Domain.BillingSettings", "TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("Tenant");
                 });

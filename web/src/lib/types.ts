@@ -171,6 +171,8 @@ export interface InvoiceRecord {
   clientName: string;
   projectId: string | null;
   projectName: string | null;
+  /** The project's own number, so a reference reads P-0007 and never a GUID. */
+  projectNumber: number | null;
   status: InvoiceStatus;
   issueDate: string;
   dueDate: string;

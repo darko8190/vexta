@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { PageHeader } from "@/components/layout/page-header";
+import { BillingSettingsCard } from "@/components/settings/billing-settings-card";
 import { useBillingStateQuery, type BillingState } from "@/hooks/use-billing";
 import { usePublicPlansQuery } from "@/hooks/use-catalog";
 import { ApiError, api } from "@/lib/api";
@@ -254,7 +255,12 @@ export default function SettingsPage() {
       ) : data.kind === "Personal" ? (
         <PersonalSpace state={data} />
       ) : (
-        <BusinessSubscription state={data} />
+        <div className="space-y-6">
+          <BusinessSubscription state={data} />
+          {/* Only the owner sets these: they decide what every invoice the company sends says
+              about its taxes and its terms. */}
+          {data.canManage && <BillingSettingsCard />}
+        </div>
       )}
     </div>
   );

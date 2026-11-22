@@ -11,6 +11,8 @@ public record InvoiceDto(
     string ClientName,
     Guid? ProjectId,
     string? ProjectName,
+    /// <summary>The project's own number, so a reference reads P-0007 and never a GUID.</summary>
+    int? ProjectNumber,
     InvoiceStatus Status,
     DateOnly IssueDate,
     DateOnly DueDate,

@@ -14,11 +14,20 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
-import { ClientSelect } from "@/components/clients/client-select";
-import { ProjectSelect } from "@/components/invoices/project-select";
+import Link from "next/link";
+import { ClientPicker } from "@/components/clients/client-picker";
+import { ProjectPicker } from "@/components/invoices/project-picker";
+import { InvoicePreview } from "@/components/invoices/invoice-preview";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { buttonVariants } from "@/components/ui/button";
+import { useBillingSettingsQuery } from "@/hooks/use-billing-settings";
+import { useClientSummaryQuery } from "@/hooks/use-clients";
+import { useProjectsQuery } from "@/hooks/use-projects";
+import { cn } from "@/lib/utils";
+import { ApiError } from "@/lib/api";
 import { useCreateInvoice, useUpdateInvoice, type InvoiceFormValues } from "@/hooks/use-invoices";
 import { invoiceStatusLabels } from "@/lib/labels";
-import type { InvoiceRecord, InvoiceStatus } from "@/lib/types";
+import { formatProjectNumber, type InvoiceRecord, type InvoiceStatus } from "@/lib/types";
 
 const statuses = Object.keys(invoiceStatusLabels) as InvoiceStatus[];
 
@@ -46,19 +55,25 @@ function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function inTwoWeeksIso() {
+/** The company's own payment terms decide the due date, not a hard-coded fortnight. */
+function dueInIso(days: number) {
   const date = new Date();
-  date.setDate(date.getDate() + 14);
+  date.setDate(date.getDate() + days);
   return date.toISOString().slice(0, 10);
 }
 
-function toFormValues(invoice?: InvoiceRecord, defaultClientId?: string): FormValues {
+function toFormValues(
+  invoice?: InvoiceRecord,
+  defaultClientId?: string,
+  termsDays = 30,
+  taxRate = 0,
+): FormValues {
   return {
     clientId: invoice?.clientId ?? defaultClientId ?? "",
     projectId: invoice?.projectId ?? "",
     status: invoice?.status ?? "Brouillon",
     issueDate: invoice?.issueDate ?? todayIso(),
-    dueDate: invoice?.dueDate ?? inTwoWeeksIso(),
+    dueDate: invoice?.dueDate ?? dueInIso(termsDays),
     currency: invoice?.currency ?? "CAD",
     notes: invoice?.notes ?? "",
     lines: invoice?.lines?.length
@@ -68,7 +83,9 @@ function toFormValues(invoice?: InvoiceRecord, defaultClientId?: string): FormVa
           unitPrice: l.unitPrice,
           taxRatePercent: l.taxRatePercent,
         }))
-      : [{ description: "", quantity: 1, unitPrice: 0, taxRatePercent: 0 }],
+      // The first line gets the company's rates like any other. Zero is not a neutral
+      // default on an invoice — it is a claim that nothing is taxable.
+      : [{ description: "", quantity: 1, unitPrice: 0, taxRatePercent: taxRate }],
   };
 }
 
@@ -82,20 +99,43 @@ export function InvoiceForm({ invoice, defaultClientId }: { invoice?: InvoiceRec
   const createInvoice = useCreateInvoice();
   const updateInvoice = useUpdateInvoice();
 
+  const { data: settings, isLoading: settingsLoading } = useBillingSettingsQuery();
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: toFormValues(invoice, defaultClientId),
   });
 
   useEffect(() => {
-    form.reset(toFormValues(invoice, defaultClientId));
+    form.reset(
+      toFormValues(
+        invoice,
+        defaultClientId,
+        settings?.paymentTermsDays,
+        (settings?.gstRate ?? 0) + (settings?.qstRate ?? 0),
+      ),
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [invoice?.id]);
+  }, [invoice?.id, settings?.paymentTermsDays, settings?.gstRate, settings?.qstRate]);
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "lines" });
   const clientId = useWatch({ control: form.control, name: "clientId" });
+  const projectId = useWatch({ control: form.control, name: "projectId" });
   const currency = useWatch({ control: form.control, name: "currency" }) || "CAD";
   const lines = useWatch({ control: form.control, name: "lines" });
+  const issueDate = useWatch({ control: form.control, name: "issueDate" });
+  const dueDate = useWatch({ control: form.control, name: "dueDate" });
+  const notes = useWatch({ control: form.control, name: "notes" });
+
+  const { data: clients } = useClientSummaryQuery();
+  const { data: projects } = useProjectsQuery(1, "", clientId || undefined);
+
+  const client = clients?.find((c) => c.id === clientId);
+  const project = projects?.items.find((p) => p.id === projectId);
+
+  // A new line carries the company's own rates. Zero is not a neutral default on an invoice —
+  // it is a claim that nothing is taxable, and it would be wrong on nearly every line.
+  const defaultTaxRate = (settings?.gstRate ?? 0) + (settings?.qstRate ?? 0);
 
   const subtotal = lines?.reduce((sum, l) => sum + (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0), 0) ?? 0;
   const taxTotal =
@@ -125,14 +165,34 @@ export function InvoiceForm({ invoice, defaultClientId }: { invoice?: InvoiceRec
         toast.success("Facture créée.");
       }
       router.push("/factures");
-    } catch {
-      toast.error("Impossible d'enregistrer la facture.");
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Impossible d'enregistrer la facture.");
     }
   }
 
   const pending = createInvoice.isPending || updateInvoice.isPending;
 
+  // Only on the way in. An invoice that already exists can still be corrected — locking someone
+  // out of fixing a typo because a settings page is blank would be punishing the wrong thing.
+  if (!isEditing && !settingsLoading && settings && !settings.configured) {
+    return (
+      <Alert className="max-w-xl">
+        <AlertTitle>Paramètres de facturation à remplir</AlertTitle>
+        <AlertDescription className="space-y-3">
+          <p>
+            Vos taxes, votre numérotation et vos conditions de paiement apparaissent sur chaque
+            facture. Réglez-les une fois, puis revenez ici.
+          </p>
+          <Link href="/parametres" className={cn(buttonVariants({ size: "sm" }))}>
+            Aller aux paramètres
+          </Link>
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
   return (
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_26rem]">
     <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="space-y-6">
       <Card>
         <CardHeader>
@@ -147,11 +207,12 @@ export function InvoiceForm({ invoice, defaultClientId }: { invoice?: InvoiceRec
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="invoice-client">Client</FieldLabel>
-                    <ClientSelect
+                    <ClientPicker
                       id="invoice-client"
                       value={field.value}
                       onChange={(v) => {
                         field.onChange(v);
+                        // The project belonged to the client being replaced.
                         form.setValue("projectId", "");
                       }}
                       invalid={fieldState.invalid}
@@ -167,7 +228,7 @@ export function InvoiceForm({ invoice, defaultClientId }: { invoice?: InvoiceRec
                 render={({ field }) => (
                   <Field>
                     <FieldLabel htmlFor="invoice-project">Projet (optionnel)</FieldLabel>
-                    <ProjectSelect id="invoice-project" clientId={clientId} value={field.value ?? ""} onChange={field.onChange} />
+                    <ProjectPicker id="invoice-project" clientId={clientId} value={field.value ?? ""} onChange={field.onChange} />
                   </Field>
                 )}
               />
@@ -256,7 +317,7 @@ export function InvoiceForm({ invoice, defaultClientId }: { invoice?: InvoiceRec
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => append({ description: "", quantity: 1, unitPrice: 0, taxRatePercent: 0 })}
+            onClick={() => append({ description: "", quantity: 1, unitPrice: 0, taxRatePercent: defaultTaxRate })}
           >
             <Plus />
             Ajouter une ligne
@@ -376,5 +437,24 @@ export function InvoiceForm({ invoice, defaultClientId }: { invoice?: InvoiceRec
         </Button>
       </div>
     </form>
+
+      {/* Beside the form on a wide screen, under it otherwise — stacking beats a preview too
+          narrow to read. Sticky so it stays in view while the lines are being filled in. */}
+      <aside className="xl:sticky xl:top-6 xl:self-start">
+        <p className="mb-2 text-sm font-medium text-foreground">Aperçu</p>
+        <InvoicePreview
+          number={invoice?.number ?? settings?.nextInvoiceLabel ?? "—"}
+          clientName={client?.name ?? ""}
+          projectLabel={project ? `${formatProjectNumber(project.number)} — ${project.name}` : null}
+          poNumber={project?.poNumber ?? null}
+          issueDate={issueDate}
+          dueDate={dueDate}
+          currency={currency}
+          notes={notes}
+          lines={lines ?? []}
+          settings={settings}
+        />
+      </aside>
+    </div>
   );
 }

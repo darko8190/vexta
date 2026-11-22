@@ -311,6 +311,28 @@ conserve la fiche.
 > Un client peut lister ses factures mais pas encore en ouvrir une : le seul écran de détail est
 > le formulaire de modification, et le lui montrer serait pire que le manque.
 
+### Paramètres de facturation
+
+Une entreprise ne peut pas créer de facture avant d'avoir rempli **Paramètres → Facturation**,
+une fois. Une facture est un document légal : deviner le taux de taxe ou la numérotation à la
+place de l'entreprise n'est pas un service à lui rendre.
+
+Ce qu'elle y règle :
+
+- **Taxes** — numéros de TPS et TVQ (laissés vides si elle n'est pas inscrite) et les taux
+  appliqués par défaut à chaque nouvelle ligne. Les valeurs du Québec sont pré-remplies : 5 % et
+  9,975 %.
+- **Numérotation** — un préfixe et le prochain numéro, par exemple `F-0001`. Le numéro **ne peut
+  pas reculer** sur une facture déjà émise : il est relevé automatiquement. Supprimer une facture
+  ne rend pas son numéro — c'est une référence que des gens citent.
+- **Délai et conditions** — le délai fixe la date d'échéance d'une nouvelle facture, les
+  conditions s'impriment dessus.
+- **Mentions** — la ligne du bas : intérêts de retard, mode de paiement, remerciement.
+
+Le formulaire de facture affiche **l'aperçu à droite**, construit à partir de ce qui est à
+l'écran. Il sert à attraper une mauvaise adresse ou un numéro de taxe manquant avant l'envoi,
+pas à remplacer le document final.
+
 ### Cloudflare R2
 
 1. Créez un seau et un jeton d'API R2 (lecture + écriture).

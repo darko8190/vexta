@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Vexta.Api.Common;
 using Vexta.Api.Data;
 using Vexta.Api.Domain;
+using Vexta.Api.Features.BillingSettings;
 
 namespace Vexta.Api.Features.Invoices;
 
@@ -69,10 +70,23 @@ public class InvoicesController(VextaDbContext db, ICurrentUserService currentUs
         }
 
         var tenantId = currentUser.TenantId!.Value;
+
+        // An invoice is a legal document. Its number, its tax rates and its payment terms are
+        // the company's to decide, and inventing them on their behalf would put wrong figures
+        // on something a client pays against.
+        var settings = await db.BillingSettings.FirstOrDefaultAsync(b => b.TenantId == tenantId);
+        if (settings is null)
+        {
+            return BadRequest(new
+            {
+                message = "Remplissez les paramètres de facturation avant de créer une facture."
+            });
+        }
+
         var invoice = new Invoice
         {
             TenantId = tenantId,
-            Number = await NextInvoiceNumberAsync(tenantId),
+            Number = InvoiceNumbering.Format(settings.InvoicePrefix, settings.NextInvoiceNumber),
             ClientId = request.ClientId,
             ProjectId = request.ProjectId,
             Status = request.Status,
@@ -82,6 +96,10 @@ public class InvoicesController(VextaDbContext db, ICurrentUserService currentUs
             Notes = request.Notes,
             Lines = ToLineEntities(request.Lines)
         };
+
+        // Advanced here, not derived from a count: deleting an invoice must never hand its
+        // number to the next one.
+        settings.NextInvoiceNumber++;
 
         db.Invoices.Add(invoice);
         await db.SaveChangesAsync();
@@ -132,11 +150,7 @@ public class InvoicesController(VextaDbContext db, ICurrentUserService currentUs
         return NoContent();
     }
 
-    private async Task<string> NextInvoiceNumberAsync(Guid tenantId)
-    {
-        var count = await db.Invoices.IgnoreQueryFilters().CountAsync(i => i.TenantId == tenantId);
-        return $"INV-{count + 1:0000}";
-    }
+
 
     private static List<InvoiceLine> ToLineEntities(List<InvoiceLineRequest> lines) => lines
         .Select((l, index) => new InvoiceLine
@@ -166,7 +180,7 @@ public class InvoicesController(VextaDbContext db, ICurrentUserService currentUs
 
         return new InvoiceDto(
             invoice.Id, invoice.Number, invoice.ClientId, invoice.Client?.Name ?? string.Empty,
-            invoice.ProjectId, invoice.Project?.Name,
+            invoice.ProjectId, invoice.Project?.Name, invoice.Project?.Number,
             invoice.Status, invoice.IssueDate, invoice.DueDate, invoice.Currency, invoice.Notes,
             subtotal, taxTotal, subtotal + taxTotal, lines, invoice.CreatedAt, invoice.UpdatedAt);
     }

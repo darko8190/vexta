@@ -50,6 +50,7 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
     public DbSet<HrDocument> HrDocuments => Set<HrDocument>();
     public DbSet<TenantLogo> TenantLogos => Set<TenantLogo>();
     public DbSet<TenantMembership> TenantMemberships => Set<TenantMembership>();
+    public DbSet<BillingSettings> BillingSettings => Set<BillingSettings>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -260,6 +261,25 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
 
             e.HasIndex(d => new { d.TenantId, d.CreatedAt });
             e.HasQueryFilter(d => d.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<BillingSettings>(e =>
+        {
+            e.HasKey(b => b.TenantId);
+            e.HasOne(b => b.Tenant).WithOne()
+                .HasForeignKey<BillingSettings>(b => b.TenantId).OnDelete(DeleteBehavior.Cascade);
+
+            e.Property(b => b.GstNumber).HasMaxLength(40);
+            e.Property(b => b.QstNumber).HasMaxLength(40);
+            e.Property(b => b.InvoicePrefix).HasMaxLength(10);
+            e.Property(b => b.GstRate).HasPrecision(6, 3);
+            e.Property(b => b.QstRate).HasPrecision(6, 3);
+            e.Property(b => b.Terms).HasMaxLength(2000);
+            e.Property(b => b.FooterNote).HasMaxLength(2000);
+
+            // No query filter: keyed by tenant id and only ever read for the current one, like
+            // the logo. A filter here would hide the row from the very request that needs it
+            // during sign-up, before a tenant claim exists.
         });
 
         builder.Entity<TenantLogo>(e =>

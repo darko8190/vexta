@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getToken, setToken } from "@/lib/session";
 import { apiFetch, isUnreachable } from "@/lib/api-server";
 
-const ACCESS_TOKEN_SECONDS = 60 * 60 * 12;
 
 async function swapToken(path: string) {
   const token = await getToken();
@@ -23,7 +22,7 @@ async function swapToken(path: string) {
     return NextResponse.json(data ?? { message: "Action impossible." }, { status: response.status });
   }
 
-  await setToken(data.accessToken, ACCESS_TOKEN_SECONDS);
+  await setToken(data.accessToken);
   return NextResponse.json({ user: data.user });
 }
 

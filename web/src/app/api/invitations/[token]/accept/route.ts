@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { setToken } from "@/lib/session";
 import { apiFetch, isUnreachable } from "@/lib/api-server";
 
-const ACCESS_TOKEN_SECONDS = 60 * 60 * 12;
 
 /**
  * Accepting lands the employee straight in their space. Signing them in here rather than
@@ -29,6 +28,6 @@ export async function POST(
     return NextResponse.json(data ?? { message: "Impossible d'activer cet accès." }, { status: response.status });
   }
 
-  await setToken(data.accessToken, ACCESS_TOKEN_SECONDS);
+  await setToken(data.accessToken);
   return NextResponse.json({ user: data.user });
 }

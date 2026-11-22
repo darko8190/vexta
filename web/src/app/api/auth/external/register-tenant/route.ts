@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { setToken } from "@/lib/session";
 import { apiFetch, isUnreachable } from "@/lib/api-server";
 
-const ACCESS_TOKEN_SECONDS = 60 * 60 * 12;
 
 /** Finishes a provider sign-up: Stripe for a business space, a session for a free personal one. */
 export async function POST(request: NextRequest) {
@@ -23,7 +22,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (data?.session) {
-    await setToken(data.session.accessToken, ACCESS_TOKEN_SECONDS);
+    await setToken(data.session.accessToken);
     return NextResponse.json({ user: data.session.user });
   }
 

@@ -17,6 +17,13 @@ public interface ICurrentUserService
 
     /// <summary>A customer of the tenant rather than someone who works there.</summary>
     bool IsClient { get; }
+
+    /// <summary>
+    /// When the current token stops being accepted. Read from the token itself rather than
+    /// recomputed, so it stays right even after the configured lifetime is changed: a token
+    /// issued under the old setting keeps the expiry it was signed with.
+    /// </summary>
+    DateTimeOffset? ExpiresAt { get; }
 }
 
 public class CurrentUserService(IHttpContextAccessor accessor) : ICurrentUserService
@@ -42,6 +49,12 @@ public class CurrentUserService(IHttpContextAccessor accessor) : ICurrentUserSer
     public bool IsClient => Role == UserRole.Client;
 
     public bool IsImpersonating => User?.FindFirstValue(VextaClaimTypes.Impersonating) == "true";
+
+    // "exp" is seconds since the epoch, per the JWT spec.
+    public DateTimeOffset? ExpiresAt =>
+        long.TryParse(User?.FindFirstValue("exp"), out var seconds)
+            ? DateTimeOffset.FromUnixTimeSeconds(seconds)
+            : null;
 }
 
 public static class VextaClaimTypes

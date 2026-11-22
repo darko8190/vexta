@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { setToken } from "@/lib/session";
 import { apiFetch, isUnreachable } from "@/lib/api-server";
 
-const ACCESS_TOKEN_SECONDS = 60 * 60 * 12;
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
@@ -24,7 +23,7 @@ export async function POST(request: NextRequest) {
   // A personal space is free, so the API returns a session instead of a Stripe URL: the cookie
   // is set here, server-side, exactly as it is on login.
   if (data?.session) {
-    await setToken(data.session.accessToken, ACCESS_TOKEN_SECONDS);
+    await setToken(data.session.accessToken);
     return NextResponse.json({ user: data.session.user });
   }
 

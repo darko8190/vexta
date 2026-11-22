@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore;
 using Vexta.Api.Auth;
 using Vexta.Api.Common;
@@ -18,7 +19,8 @@ public class AuthController(
     ITokenService tokenService,
     ITenantSignupService tenantSignup,
     IWorkspaceService workspaces,
-    ICurrentUserService currentUser) : ControllerBase
+    ICurrentUserService currentUser,
+    IOptions<JwtOptions> jwtOptions) : ControllerBase
 {
     [HttpPost("login")]
     [AllowAnonymous]
@@ -74,6 +76,7 @@ public class AuthController(
             var tenant = await db.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.Id == impersonated);
             if (tenant is not null)
             {
+                SlideSession(() => tokenService.CreateAccessToken(user, impersonatedTenantId: tenant.Id));
                 return Ok(UserDto.ForImpersonation(user, tenant));
             }
         }
@@ -86,11 +89,35 @@ public class AuthController(
             var membership = await workspaces.FindAsync(user.Id, current, HttpContext.RequestAborted);
             if (membership?.Tenant is not null)
             {
+                SlideSession(() => tokenService.CreateAccessToken(user, membership));
                 return Ok(UserDto.ForWorkspace(user, membership.Tenant, membership.Role));
             }
         }
 
+        SlideSession(() => tokenService.CreateAccessToken(user));
         return Ok(UserDto.ForUser(user));
+    }
+
+    /// <summary>
+    /// Pushes the session's expiry back while the app is being used, so the configured window is
+    /// an idle window rather than a hard stop. Without it the token is a countdown that starts
+    /// at sign-in: someone working in Vexta all month would still be thrown out mid-task.
+    ///
+    /// Only past the halfway mark, so an app that polls does not mint a token per request, and
+    /// the browser is not handed a new cookie on every page it opens.
+    ///
+    /// The caller passes a factory rather than a token: building one costs a signature, and the
+    /// usual answer here is that nothing needs to be built at all.
+    /// </summary>
+    private void SlideSession(Func<string> issue)
+    {
+        var expiry = currentUser.ExpiresAt;
+        if (expiry is null) return;
+
+        var window = TimeSpan.FromMinutes(jwtOptions.Value.AccessTokenMinutes);
+        if (expiry.Value - DateTimeOffset.UtcNow > window / 2) return;
+
+        Response.Headers[AuthHeaders.RenewedToken] = issue();
     }
 
     /// <summary>Every space this person can work in, to fill the switcher.</summary>

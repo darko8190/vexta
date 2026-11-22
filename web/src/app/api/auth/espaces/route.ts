@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getToken, setToken } from "@/lib/session";
 import { apiFetch, isUnreachable } from "@/lib/api-server";
 
-const ACCESS_TOKEN_SECONDS = 60 * 60 * 12;
 
 /**
  * The spaces this person can work in, and the switch between them. It lives here rather than on
@@ -49,6 +48,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(data ?? { message: "Changement d'espace impossible." }, { status: response.status });
   }
 
-  await setToken(data.accessToken, ACCESS_TOKEN_SECONDS);
+  await setToken(data.accessToken);
   return NextResponse.json({ user: data.user });
 }

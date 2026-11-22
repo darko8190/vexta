@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { setToken } from "@/lib/session";
 import { apiFetch, isUnreachable } from "@/lib/api-server";
 
-const ACCESS_TOKEN_SECONDS = 60 * 60 * 12;
 
 /** Turns the callback's one-time code into a session cookie, server-side. */
 export async function POST(request: NextRequest) {
@@ -25,6 +24,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  await setToken(data.accessToken, ACCESS_TOKEN_SECONDS);
+  await setToken(data.accessToken);
   return NextResponse.json({ user: data.user });
 }

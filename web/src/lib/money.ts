@@ -17,3 +17,22 @@ export function formatCents(cents: number, currency = "CAD"): string {
     minimumFractionDigits: cents % 100 === 0 ? 0 : 2,
   }).format(cents / 100);
 }
+
+/**
+ * An amount already in dollars, as fr-CA money: "1 234,56 $".
+ *
+ * Distinct from formatCents, which takes an integer number of cents. The API sends decimals for
+ * everything that was always a decimal — an invoice total, an account balance — and converting
+ * those to cents just to format them is a rounding step nobody asked for.
+ *
+ * Always two decimals, unlike formatCents: these are figures people reconcile, and a balance
+ * that reads "40 $" beside one that reads "39,95 $" is a column that will not line up.
+ */
+export function formatAmount(amount: number, currency = "CAD"): string {
+  return new Intl.NumberFormat("fr-CA", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}

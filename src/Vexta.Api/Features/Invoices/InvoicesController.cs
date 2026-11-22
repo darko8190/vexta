@@ -498,8 +498,14 @@ public class InvoicesController(
     [RequireBusinessTenant]
     public async Task<ActionResult<InvoiceDto>> Create(UpsertInvoiceRequest request)
     {
-        var clientExists = await db.Clients.AnyAsync(c => c.Id == request.ClientId);
-        if (!clientExists) return BadRequest(new { message = "Client introuvable." });
+        var client = await db.Clients.AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Id == request.ClientId);
+        if (client is null) return BadRequest(new { message = "Client introuvable." });
+
+        // Only a new invoice, and only for a barred client. Work already done still gets billed:
+        // barring somebody is a decision about the future, not a reason to hand over labour for
+        // free. What it stops is a new document going out to a client the company has closed.
+        if (client.WorkRefusal() is { } refusal) return BadRequest(new { message = refusal });
 
         if (LineProblem(request) is { } lineError) return BadRequest(new { message = lineError });
 
@@ -984,25 +990,20 @@ public class InvoicesController(
                 l.PurchasePrice, l.MarginPercent, l.UnitPrice, l.IsTaxable, l.SortOrder))
             .ToList();
 
-        var subtotal = Round(lines.Sum(l => l.Quantity * l.UnitPrice));
-
-        // Only what is taxable carries tax, and an exempt invoice has nothing taxable on it.
-        var taxableBase = invoice.IsTaxExempt
-            ? 0m
-            : lines.Where(l => l.IsTaxable).Sum(l => l.Quantity * l.UnitPrice);
-
-        var tax1 = Round(taxableBase * gstRate / 100m);
-        var tax2 = Round(taxableBase * qstRate / 100m);
+        // The same arithmetic the PDF uses, which is the point of InvoiceTotals: the screen
+        // used to sum the raw amounts and round once while the paper rounded each line, so the
+        // same invoice could read a cent apart in the two places.
+        var totals = InvoiceTotals.For(invoice.Lines, gstRate, qstRate, invoice.IsTaxExempt);
 
         return new InvoiceDto(
             invoice.Id, invoice.Number, invoice.ClientId, invoice.Client?.Name ?? string.Empty,
             invoice.ProjectId, invoice.Project?.Number,
             invoice.Status, invoice.IssueDate, invoice.DueDate, invoice.Currency, invoice.Notes,
             invoice.IsTaxExempt, invoice.PricePolicyId, invoice.PricePolicy?.Name, invoice.SentAt,
-            subtotal,
-            RateLabel("TPS", gstRate), tax1,
-            RateLabel("TVQ", qstRate), tax2,
-            tax1 + tax2, subtotal + tax1 + tax2,
+            totals.Subtotal,
+            RateLabel("TPS", gstRate), totals.Gst,
+            RateLabel("TVQ", qstRate), totals.Qst,
+            totals.TaxTotal, totals.Total,
             lines, invoice.CreatedAt, invoice.UpdatedAt);
     }
 }

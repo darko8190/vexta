@@ -186,10 +186,14 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
     public async Task<ActionResult<ProjectDto>> Create(UpsertProjectRequest request)
     {
         var client = await db.Clients.AsNoTracking()
-            .Where(c => c.Id == request.ClientId)
-            .Select(c => new { c.IsTaxExempt })
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(c => c.Id == request.ClientId);
         if (client is null) return BadRequest(new { message = "Client introuvable." });
+
+        // A barred client gets no new work. Checked at creation only: a job already under way
+        // when the decision was taken still has to be finished and billed, and freezing it
+        // would punish the company rather than the client.
+        if (client.WorkRefusal() is { } refusal) return BadRequest(new { message = refusal });
+
         if (await InvalidAddressesAsync(request) is { } addressError) return BadRequest(new { message = addressError });
 
         var tenantId = currentUser.TenantId!.Value;

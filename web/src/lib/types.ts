@@ -79,9 +79,139 @@ export interface ClientRecord {
   contactCount: number;
   projectCount: number;
   invoiceCount: number;
+  /** Only the ones still in service. */
+  assetCount: number;
+  /** Positive is owed; negative is a credit the client is holding. */
+  accountBalance: number;
+  /** Barred outright: no new project, no new invoice, nothing ordered publicly. */
+  isBlocked: boolean;
+  blockedReason: string | null;
+  /** The account is barred but the client is not: they pay as they go. */
+  isAccountBlocked: boolean;
+  accountBlockedReason: string | null;
   access: ClientAccess;
   createdAt: string;
   updatedAt: string;
+}
+
+// ---- Actifs : what a client owns that work gets done on ----
+
+/**
+ * A vehicle at a garage, a building for a contractor, a furnace for a refrigeration shop.
+ *
+ * Deliberately not called a vehicle: Vexta is project management for any trade, and the moment
+ * one of them gets its own screen the next one needs its own too.
+ */
+export interface ClientAsset {
+  id: string;
+  label: string;
+  /** "Toyota Corolla 2018", or the label when the make and model were never filled. */
+  designation: string;
+  category: string | null;
+  make: string | null;
+  model: string | null;
+  year: number | null;
+  serialNumber: string | null;
+  reference: string | null;
+  usage: number | null;
+  usageUnit: string | null;
+  addressId: string | null;
+  addressLine: string | null;
+  notes: string | null;
+  /** False once it is sold, scrapped or no longer serviced. Kept, because the work is history. */
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface SaveClientAssetValues {
+  label: string;
+  category: string | null;
+  make: string | null;
+  model: string | null;
+  year: number | null;
+  serialNumber: string | null;
+  reference: string | null;
+  usage: number | null;
+  usageUnit: string | null;
+  addressId: string | null;
+  notes: string | null;
+  isActive: boolean;
+}
+
+// ---- Compte client ----
+
+export type AccountEntryKind = "Charge" | "Paiement" | "Ajustement";
+
+export interface ClientAccountEntry {
+  id: string;
+  date: string;
+  kind: AccountEntryKind;
+  /** Signed: positive is owed, negative reduces the balance. */
+  amount: number;
+  description: string;
+  invoiceId: string | null;
+  invoiceNumber: string | null;
+  createdAt: string;
+}
+
+export interface ClientAccount {
+  balance: number;
+  totalCharged: number;
+  totalPaid: number;
+  isBlocked: boolean;
+  blockedReason: string | null;
+  isAccountBlocked: boolean;
+  accountBlockedReason: string | null;
+  entries: ClientAccountEntry[];
+}
+
+export interface SaveAccountEntryValues {
+  kind: AccountEntryKind;
+  /** Always positive. The API decides the sign from the kind. */
+  amount: number;
+  description: string;
+  date: string | null;
+  /** Only read for an Ajustement, where the direction is the person's to choose. */
+  reducesBalance: boolean;
+}
+
+// ---- Paiements de facture ----
+
+export type PaymentMethod =
+  | "Comptant"
+  | "Interac"
+  | "Carte"
+  | "Cheque"
+  | "Virement"
+  | "PorteAuCompte"
+  | "Autre";
+
+export interface InvoicePayment {
+  id: string;
+  date: string;
+  amount: number;
+  method: PaymentMethod;
+  reference: string | null;
+  note: string | null;
+  createdAt: string;
+}
+
+/** The payments and the three figures they are read against, which travel together. */
+export interface InvoicePayments {
+  total: number;
+  paid: number;
+  outstanding: number;
+  /** Why "porté au compte" cannot be used, or null when it can. */
+  accountRefusal: string | null;
+  payments: InvoicePayment[];
+}
+
+export interface SaveInvoicePaymentValues {
+  amount: number;
+  method: PaymentMethod;
+  date: string | null;
+  reference: string | null;
+  note: string | null;
 }
 
 export interface ClientContact {

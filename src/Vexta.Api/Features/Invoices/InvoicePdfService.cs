@@ -183,8 +183,15 @@ public class InvoicePdfService(VextaDbContext db, ICurrentUserService currentUse
                 Round(l.Quantity * l.UnitPrice)))
             .ToList();
 
-        var subtotal = Round(items.Sum(l => l.Amount));
-        var taxes = isTaxExempt ? ExemptLine : TaxLines(lines, settings);
+        // One arithmetic, shared with the screen and with payments: see InvoiceTotals.
+        var totals = InvoiceTotals.For(
+            lines.Select(l => new InvoiceTotals.Line(l.Quantity, l.UnitPrice, l.IsTaxable)),
+            settings?.GstRate ?? 0m,
+            settings?.QstRate ?? 0m,
+            isTaxExempt);
+
+        var subtotal = totals.Subtotal;
+        var taxes = isTaxExempt ? ExemptLine : TaxLines(totals, settings);
 
         return new InvoicePdfModel
         {
@@ -221,26 +228,23 @@ public class InvoicePdfService(VextaDbContext db, ICurrentUserService currentUse
     private static readonly List<InvoicePdfAmount> ExemptLine = [new InvoicePdfAmount("Non taxable", 0m)];
 
     /// <summary>
-    /// The company's two taxes, each on the lines that carry tax. They are always both printed
-    /// and always separate: a Québec invoice has to show the TPS and the TVQ with the
-    /// registration numbers they were charged under, and a single "Taxes" figure is the one
-    /// thing a supplier gets asked to break down.
+    /// The two amounts InvoiceTotals worked out, given the names the paper has to show: a Québec
+    /// invoice carries the TPS and the TVQ with the registration numbers they were charged
+    /// under, and a single "Taxes" figure is the one thing a supplier gets asked to break down.
+    ///
+    /// Nothing to print when the company has no settings yet, or when nothing on the invoice is
+    /// taxable — a 0,00 $ TPS line on a labour-only invoice invites a question that has no
+    /// interesting answer.
     /// </summary>
     private static List<InvoicePdfAmount> TaxLines(
-        IReadOnlyList<(string Description, decimal Quantity, decimal UnitPrice, bool IsTaxable)> lines,
-        Domain.BillingSettings? settings)
+        InvoiceTotalsResult totals, Domain.BillingSettings? settings)
     {
-        if (settings is null) return [];
-
-        var taxableBase = lines.Where(l => l.IsTaxable).Sum(l => l.Quantity * l.UnitPrice);
-        if (taxableBase == 0) return [];
+        if (settings is null || totals.TaxTotal == 0) return [];
 
         return
         [
-            new InvoicePdfAmount(TaxLabel("TPS", settings.GstRate, settings.GstNumber),
-                Round(taxableBase * settings.GstRate / 100m)),
-            new InvoicePdfAmount(TaxLabel("TVQ", settings.QstRate, settings.QstNumber),
-                Round(taxableBase * settings.QstRate / 100m))
+            new InvoicePdfAmount(TaxLabel("TPS", settings.GstRate, settings.GstNumber), totals.Gst),
+            new InvoicePdfAmount(TaxLabel("TVQ", settings.QstRate, settings.QstNumber), totals.Qst)
         ];
     }
 

@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/table";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
+import { InvoicePaymentsSection } from "@/components/invoices/invoice-payments-section";
 import { InvoicePdfViewer } from "@/components/invoices/invoice-pdf-viewer";
 import { InvoiceSendDialog } from "@/components/invoices/invoice-send-dialog";
 import { useIsClientUser } from "@/hooks/use-can-create";
@@ -208,6 +209,9 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           switches at: a 30rem document next to a table of amounts clips one of the two, and a
           total nobody can read is worse than a document further down the page. */}
       <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_30rem]">
+        {/* One grid child, two stacked panels. Placing the payments with col-start would leave
+            the preview to auto-place itself beside them instead of beside the lines. */}
+        <div className="min-w-0 space-y-6">
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Lignes</CardTitle>
@@ -281,6 +285,13 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             </Table>
           </CardContent>
         </Card>
+
+        {/* Under the lines, in the same column: the money that came in belongs beside the
+            money that was asked for, and a customer reading their own invoice sees what they
+            have paid on it. A draft has nothing to pay yet — the API refuses it and says why,
+            so the panel would only offer a button that fails. */}
+        {invoice.status !== "Brouillon" && <InvoicePaymentsSection invoiceId={invoice.id} />}
+        </div>
 
         {/* Beside the lines on a wide screen, under them otherwise. Sticky so the document
             stays in view while a long list of lines is being read. */}

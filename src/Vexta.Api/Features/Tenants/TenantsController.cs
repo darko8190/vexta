@@ -179,6 +179,11 @@ public class TenantsController(
             await Wipe(db.ExpenseTypes.Where(x => x.TenantId == id));
 
             // Invoice lines go with their invoice, which does cascade.
+            // Before the invoices they hang off, and before the clients they belong to. Both
+            // would cascade from the database, but this sweep is explicit about everything so
+            // that reading it tells you what a deleted tenant takes with it.
+            await Wipe(db.InvoicePayments.Where(x => x.TenantId == id));
+            await Wipe(db.ClientAccountEntries.Where(x => x.TenantId == id));
             await Wipe(db.Invoices.Where(x => x.TenantId == id));
             await Wipe(db.Projects.Where(x => x.TenantId == id));
 
@@ -195,6 +200,8 @@ public class TenantsController(
             await Wipe(db.ProductCategories.Where(x => x.TenantId == id));
 
             await Wipe(db.ClientContacts.Where(x => x.TenantId == id));
+            // Before the addresses some of them point at.
+            await Wipe(db.ClientAssets.Where(x => x.TenantId == id));
             await Wipe(db.Addresses.Where(x => x.TenantId == id));
             await Wipe(db.HrDocuments.Where(x => x.TenantId == id));
             await Wipe(db.JobPostings.Where(x => x.TenantId == id));

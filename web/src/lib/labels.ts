@@ -1,9 +1,11 @@
 import type {
+  AccountEntryKind,
   AddressType,
   EmploymentType,
   InvoiceLineKind,
   InvoiceStatus,
   MarginMode,
+  PaymentMethod,
   ProjectStatus,
   ProjectTaskPriority,
   ProjectTaskStatus,
@@ -69,6 +71,27 @@ export const taskPriorityLabels: Record<ProjectTaskPriority, string> = {
   Normale: "Normale",
   Haute: "Haute",
   Urgente: "Urgente",
+};
+
+/**
+ * "Porté au compte" is the one that is not really a payment: the invoice is settled and the
+ * client owes the money on their account instead. The wording says so rather than leaving
+ * somebody to work out why the till does not balance.
+ */
+export const paymentMethodLabels: Record<PaymentMethod, string> = {
+  Comptant: "Comptant",
+  Interac: "Interac",
+  Carte: "Carte",
+  Cheque: "Chèque",
+  Virement: "Virement",
+  PorteAuCompte: "Porté au compte",
+  Autre: "Autre",
+};
+
+export const accountEntryKindLabels: Record<AccountEntryKind, string> = {
+  Charge: "Charge",
+  Paiement: "Paiement",
+  Ajustement: "Ajustement",
 };
 
 export const invoiceStatusLabels: Record<InvoiceStatus, string> = {

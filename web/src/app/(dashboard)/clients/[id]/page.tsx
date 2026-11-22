@@ -2,12 +2,34 @@
 
 import { use, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Building2, FileText, FolderKanban, Mail, MapPin, Pencil, Phone, UserRound } from "lucide-react";
+import {
+  ArrowLeft,
+  Building2,
+  Car,
+  FileText,
+  FolderKanban,
+  Lock,
+  Mail,
+  MapPin,
+  Pencil,
+  Phone,
+  UserRound,
+  Wallet,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/layout/empty-state";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { BlockClientDialog } from "@/components/clients/block-client-dialog";
 import { ClientFormSheet } from "@/components/clients/client-form-sheet";
+import { ClientAccountSection } from "@/components/clients/detail/client-account-section";
+import { ClientAssetsSection } from "@/components/clients/detail/client-assets-section";
 import { ClientContactsSection } from "@/components/clients/detail/client-contacts-section";
 import { SectionNav, type NavSection } from "@/components/layout/section-nav";
 import {
@@ -15,15 +37,19 @@ import {
   ClientInvoicesSection,
   ClientProjectsSection,
 } from "@/components/clients/detail/client-related-lists";
+import { useIsOwner } from "@/hooks/use-can-create";
 import { useClientQuery } from "@/hooks/use-clients";
+import { formatAmount } from "@/lib/money";
 import { formatClientNumber } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export default function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { data: client, isLoading, isError } = useClientQuery(id);
+  const isOwner = useIsOwner();
   const [section, setSection] = useState("contacts");
   const [editOpen, setEditOpen] = useState(false);
+  const [blockScope, setBlockScope] = useState<"client" | "account" | null>(null);
 
   if (isLoading) {
     return (
@@ -52,9 +78,13 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
 
   const sections: NavSection[] = [
     { key: "contacts", label: "Contacts", count: client.contactCount, icon: UserRound },
+    { key: "actifs", label: "Actifs", count: client.assetCount, icon: Car },
     { key: "adresses", label: "Adresses", count: client.addressCount, icon: MapPin },
     { key: "projets", label: "Projets", count: client.projectCount, icon: FolderKanban },
     { key: "factures", label: "Factures", count: client.invoiceCount, icon: FileText },
+    // No count: a balance is one figure, not a number of things, and it is shown on the card
+    // above rather than squeezed into a badge.
+    { key: "compte", label: "Compte", icon: Wallet },
   ];
 
   const address = client.primaryAddress;
@@ -82,6 +112,19 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
                 {client.type === "Entreprise" ? "Entreprise" : "Particulier"}
               </Badge>
               {client.isTaxExempt && <Badge variant="outline">Non taxable</Badge>}
+              {/* Leading the card, because it changes what every button below it will do. */}
+              {client.isBlocked && (
+                <Badge variant="destructive">
+                  <Lock />
+                  Bloqué
+                </Badge>
+              )}
+              {!client.isBlocked && client.isAccountBlocked && (
+                <Badge variant="destructive">
+                  <Lock />
+                  Compte bloqué
+                </Badge>
+              )}
             </div>
             <h1 className="mt-1 text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
               {client.name}
@@ -93,13 +136,75 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
             )}
           </div>
 
-          <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
-            <Pencil />
-            Modifier
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+              <Pencil />
+              Modifier
+            </Button>
+
+            {/* Who the company will do business with at all is the owner's call, not a chargé
+                de projet's — the API says the same. */}
+            {isOwner && (
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={<Button variant="outline" size="icon" aria-label="Blocage" />}
+                >
+                  <Lock />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setBlockScope("account")}>
+                    {client.isAccountBlocked ? "Débloquer le compte" : "Bloquer le compte"}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    variant={client.isBlocked ? undefined : "destructive"}
+                    onClick={() => setBlockScope("client")}
+                  >
+                    {client.isBlocked ? "Débloquer le client" : "Bloquer le client"}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
         </div>
 
+        {(client.isBlocked || client.isAccountBlocked) && (
+          <p
+            className="mt-4 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+            role="status"
+          >
+            <Lock className="mt-0.5 size-4 shrink-0" />
+            <span>
+              {client.isBlocked
+                ? client.blockedReason
+                  ? `Client bloqué : ${client.blockedReason}`
+                  : "Client bloqué."
+                : client.accountBlockedReason
+                  ? `Compte bloqué : ${client.accountBlockedReason}`
+                  : "Compte bloqué."}{" "}
+              {client.isBlocked
+                ? "Aucun nouveau projet ni nouvelle facture."
+                : "Rien de plus ne peut être porté au compte."}
+            </span>
+          </p>
+        )}
+
         <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+          {/* Shown on the card and not only in the Compte section: what a client owes is the
+              thing you want to know before picking up the phone to them. */}
+          {client.accountBalance !== 0 && (
+            <div>
+              <dt className="text-muted-foreground">Solde au compte</dt>
+              <dd
+                className={
+                  client.accountBalance > 0
+                    ? "font-medium text-destructive tabular-nums"
+                    : "text-foreground tabular-nums"
+                }
+              >
+                {formatAmount(client.accountBalance)}
+              </dd>
+            </div>
+          )}
           {client.phone && (
             <div>
               <dt className="text-muted-foreground">Téléphone</dt>
@@ -144,6 +249,8 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
 
         <div className="min-w-0 flex-1">
           {section === "contacts" && <ClientContactsSection clientId={client.id} />}
+          {section === "actifs" && <ClientAssetsSection clientId={client.id} />}
+          {section === "compte" && <ClientAccountSection clientId={client.id} />}
           {section === "adresses" && <ClientAddressesSection clientId={client.id} />}
           {section === "projets" && <ClientProjectsSection clientId={client.id} />}
           {section === "factures" && <ClientInvoicesSection clientId={client.id} />}
@@ -151,6 +258,15 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
       </div>
 
       <ClientFormSheet open={editOpen} onOpenChange={setEditOpen} client={client} />
+
+      {blockScope && (
+        <BlockClientDialog
+          open
+          onOpenChange={(next) => !next && setBlockScope(null)}
+          client={client}
+          scope={blockScope}
+        />
+      )}
     </div>
   );
 }

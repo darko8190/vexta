@@ -425,6 +425,84 @@ voyez aujourd'hui ne change tant que vous ne les cochez pas dans un forfait. Si 
 des modules marketing portant les mêmes titres, ils sont conservés tels quels — vous verrez donc
 deux lignes « Clients », celle sans écran et celle avec.
 
+### Actifs, comptes clients et paiements
+
+#### Actifs
+
+Un **actif** est ce que le client possède et sur quoi vous travaillez : un véhicule pour un
+garage, un immeuble pour un entrepreneur, une fournaise pour un frigoriste. Le sous-onglet
+**Actifs** d'une fiche client les liste.
+
+Volontairement pas appelé « véhicule » : dès qu'un métier obtient sa propre table, le suivant en
+veut une aussi. Et pas « équipement » non plus — ce mot désigne déjà l'outillage de
+l'entreprise dans l'inventaire, et l'auto d'un client n'est pas l'équipement du garage.
+
+Les champs sont ceux que tous les métiers remplissent vraiment : un nom, une catégorie libre,
+marque, modèle, année, un numéro de série (NIV, plaque signalétique), une référence (plaque
+d'immatriculation, numéro d'unité), un relevé d'usage avec son unité, et une adresse pour ce qui
+ne se déplace pas. Les deux numéros sont indexés : on retrouve une auto avec une plaque, pas
+seulement avec un nom.
+
+Un actif vendu ou mis au rebut se décoche — **Toujours en service** — plutôt que de se
+supprimer. Le travail fait dessus reste de l'histoire, et l'histoire ne cesse pas d'être vraie
+parce qu'une auto a changé de mains.
+
+> Pas encore relié aux projets. Un bon de travail ne dit donc pas sur quel actif il porte ; c'est
+> l'étape suivante évidente et elle n'est pas faite.
+
+#### Compte client
+
+Chaque client a un compte : un relevé de ce qui a été porté dessus et de ce qui a été payé. Le
+solde est **la somme des lignes** et n'est stocké nulle part — un solde stocké et une liste de
+lignes sont deux choses qui doivent concorder, et un jour elles ne concordent plus.
+
+Trois types de lignes : **Charge** (une facture portée au compte), **Paiement** (de l'argent
+reçu) et **Ajustement** (solde d'ouverture, note de crédit, correction). Aucun formulaire
+n'affiche de signe négatif : on saisit un montant positif et le type décide du sens.
+
+#### Paiements de facture
+
+Le bloc **Paiements** apparaît sous les lignes d'une facture dès qu'elle n'est plus un brouillon.
+Plusieurs paiements par facture — un acompte puis le solde, c'est deux lignes — et ce qui reste à
+encaisser est le total moins ces lignes.
+
+La facture passe à **Payée** quand l'arithmétique le dit, pas quand quelqu'un pense à changer un
+menu. Retirer un paiement la ramène à Envoyée, ou à En retard si l'échéance est passée.
+
+Méthodes : comptant, Interac, carte, chèque, virement, **porté au compte**, autre. « Porté au
+compte » est la seule qui n'encaisse rien : la facture est réglée sur papier et le montant
+s'ajoute au compte du client, dans la même écriture — il n'y a pas d'instant où la facture est
+payée et où le compte l'ignore. Retirer ce paiement retire aussi la charge.
+
+> Le total d'une facture se calculait à **deux** endroits qui ne s'accordaient pas au cent près :
+> l'écran additionnait les montants bruts puis arrondissait, le PDF arrondissait chaque ligne
+> puis additionnait. Les deux passent maintenant par `InvoiceTotals`, et c'est la méthode du PDF
+> qui a été retenue — c'est la colonne que le client a entre les mains. Quelques factures
+> existantes peuvent donc afficher un cent de différence à l'écran : c'est la correction, pas
+> l'erreur.
+
+#### Bloquer un client
+
+Deux niveaux, parce que ce sont deux décisions différentes. Réservés au **propriétaire** : un
+chargé de projet décide ce qui se construit, pas avec qui l'entreprise fait affaire.
+
+| | Ce que ça arrête | Ce que ça laisse passer |
+| --- | --- | --- |
+| **Compte bloqué** | Plus rien ne peut être porté au compte | Les projets, les factures, et **les paiements** — sans quoi le client ne pourrait pas régler le solde qui a causé le blocage |
+| **Client bloqué** | Nouveau projet, nouvelle facture, nouvel actif, commande sur la page publique | Les projets et factures en cours, les paiements, le relevé |
+
+Rien n'est supprimé et rien ne cesse d'être vrai : ses projets, ses factures et ce qu'il doit
+restent exactement où ils sont. Bloquer est une décision commerciale, pas une raison de perdre
+ce qui a été fait ni ce qui est dû.
+
+La **raison** saisie est reprise mot pour mot dans le refus — c'est ce que lira la personne au
+comptoir dans trois mois, et une porte qui se ferme sans un mot est une porte que personne ne
+peut expliquer.
+
+> La commande sur la page publique n'existe pas encore. Le blocage est écrit pour elle :
+> `Client.WorkRefusal()` est le seul endroit qui répond « peut-on prendre du travail de ce
+> client », et l'endpoint de commande n'aura qu'à l'appeler.
+
 ### Rapports
 
 **Admin → Rapports** est le catalogue : chaque ligne décrit un rapport et le **module** auquel il

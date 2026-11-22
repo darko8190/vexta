@@ -156,6 +156,59 @@ public class ClientsController(
         return NoContent();
     }
 
+    /// <summary>
+    /// Barring a client, or letting them back in.
+    ///
+    /// Nothing is deleted and nothing stops being true: their projects, their invoices and what
+    /// they owe stay exactly where they are. What changes is that no new work may be taken on
+    /// and nothing may be ordered on the company's public page.
+    ///
+    /// Reserved to the owner. A chargé de projet decides what gets built; who the company will
+    /// do business with at all is not theirs.
+    /// </summary>
+    [Authorize(Roles = Roles.Owner)]
+    [HttpPut("{id:guid}/blocage")]
+    public async Task<ActionResult<ClientDto>> Block(Guid id, BlockClientRequest request, CancellationToken ct)
+    {
+        var client = await db.Clients.FirstOrDefaultAsync(c => c.Id == id, ct);
+        if (client is null) return NotFound();
+        if (Reason(request.Reason) is { } tooLong) return BadRequest(new { message = tooLong });
+
+        client.IsBlocked = request.IsBlocked;
+        // Cleared on the way back in, so a client barred twice does not carry last year's
+        // reason into this year's refusal.
+        client.BlockedReason = request.IsBlocked ? Clean(request.Reason) : null;
+        client.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await db.SaveChangesAsync(ct);
+        return Ok(await GetDtoAsync(id));
+    }
+
+    /// <summary>
+    /// Barring the account alone: the work goes on and the invoices go out, nothing more may be
+    /// put on the tab. The common answer to a client who is slow to pay, and it costs them
+    /// nothing else.
+    /// </summary>
+    [Authorize(Roles = Roles.Owner)]
+    [HttpPut("{id:guid}/blocage-compte")]
+    public async Task<ActionResult<ClientDto>> BlockAccount(
+        Guid id, BlockAccountRequest request, CancellationToken ct)
+    {
+        var client = await db.Clients.FirstOrDefaultAsync(c => c.Id == id, ct);
+        if (client is null) return NotFound();
+        if (Reason(request.Reason) is { } tooLong) return BadRequest(new { message = tooLong });
+
+        client.IsAccountBlocked = request.IsBlocked;
+        client.AccountBlockedReason = request.IsBlocked ? Clean(request.Reason) : null;
+        client.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await db.SaveChangesAsync(ct);
+        return Ok(await GetDtoAsync(id));
+    }
+
+    private static string? Reason(string? reason) =>
+        reason?.Trim().Length > 300 ? "La raison ne peut pas dépasser 300 caractères." : null;
+
     // ---- Contacts ----
 
     [HttpGet("{id:guid}/contacts")]
@@ -438,6 +491,12 @@ public class ClientsController(
         c.Contacts.Count,
         c.Projects.Count,
         c.Invoices.Count,
+        c.Assets.Count(a => a.IsActive),
+        c.AccountEntries.Sum(e => (decimal?)e.Amount) ?? 0m,
+        c.IsBlocked,
+        c.BlockedReason,
+        c.IsAccountBlocked,
+        c.AccountBlockedReason,
         new ClientAccessDto(
             c.UserId != null,
             c.InvitationTokenHash != null && c.InvitationExpiresAt > DateTimeOffset.UtcNow,

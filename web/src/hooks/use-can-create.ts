@@ -42,3 +42,17 @@ export function useCanManage() {
     (user.role === "SuperAdmin" && user.isImpersonating)
   );
 }
+
+/**
+ * The owner of the company, or a super admin standing in for them.
+ *
+ * Narrower than useCanManage: a chargé de projet decides what gets built, but who the company
+ * will do business with at all — barring a client, barring their account — is not theirs. The
+ * API enforces it (Roles.Owner); this keeps the interface from offering a 403.
+ */
+export function useIsOwner() {
+  const { user } = useAuth();
+  if (!user) return false;
+
+  return user.role === "TenantAdmin" || (user.role === "SuperAdmin" && user.isImpersonating);
+}

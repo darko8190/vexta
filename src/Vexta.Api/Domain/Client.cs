@@ -46,6 +46,52 @@ public class Client : IInvitable
     public bool IsTaxExempt { get; set; }
 
     /// <summary>
+    /// Barred outright: no new project, no new invoice, nothing ordered on the company's public
+    /// page. The record and its history stay exactly where they are — barring a client is a
+    /// commercial decision, not a reason to lose what they already owe or what was done for them.
+    ///
+    /// Two levels on purpose, because the two reasons are different. This one is "we will not
+    /// work for them again". <see cref="IsAccountBlocked"/> is "they pay up front from now on",
+    /// which is a far more common answer and should not have to cost them their file.
+    /// </summary>
+    public bool IsBlocked { get; set; }
+
+    /// <summary>
+    /// Said back to whoever hits the refusal, and printed on the client's own card. A door that
+    /// closes without a word is one nobody can explain to the person standing at the counter.
+    /// </summary>
+    public string? BlockedReason { get; set; }
+
+    /// <summary>
+    /// The account is barred but the client is not: work goes on, invoices go out, and nothing
+    /// more may be put on the account. They pay as they go.
+    /// </summary>
+    public bool IsAccountBlocked { get; set; }
+
+    public string? AccountBlockedReason { get; set; }
+
+    /// <summary>
+    /// Why nothing more may go on this client's account, or null when something may.
+    ///
+    /// A barred client is barred from the account too — saying otherwise would let a client we
+    /// will not work for keep running a tab. Written once, here, so the invoice form and the
+    /// payment endpoint cannot disagree about it.
+    /// </summary>
+    public string? AccountRefusal() =>
+        IsBlocked
+            ? Because("Ce client est bloqué", BlockedReason)
+            : IsAccountBlocked
+                ? Because("Le compte de ce client est bloqué", AccountBlockedReason)
+                : null;
+
+    /// <summary>Why no new work may be taken on for this client, or null when it may.</summary>
+    public string? WorkRefusal() =>
+        IsBlocked ? Because("Ce client est bloqué", BlockedReason) : null;
+
+    private static string Because(string what, string? reason) =>
+        string.IsNullOrWhiteSpace(reason) ? $"{what}." : $"{what} : {reason.Trim()}";
+
+    /// <summary>
     /// The sign-in account of a particulier who was given access to their own files, or null.
     /// An entreprise is a company and has no one to be: its people are its Contacts, and access
     /// is granted to them individually.
@@ -64,4 +110,6 @@ public class Client : IInvitable
     public List<ClientContact> Contacts { get; set; } = [];
     public List<Project> Projects { get; set; } = [];
     public List<Invoice> Invoices { get; set; } = [];
+    public List<ClientAsset> Assets { get; set; } = [];
+    public List<ClientAccountEntry> AccountEntries { get; set; } = [];
 }

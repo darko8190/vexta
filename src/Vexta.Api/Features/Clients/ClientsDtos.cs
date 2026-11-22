@@ -24,6 +24,18 @@ public record ClientDto(
     int ContactCount,
     int ProjectCount,
     int InvoiceCount,
+    int AssetCount,
+    /// <summary>
+    /// What this client owes on their account. Positive is owed; negative is a credit they are
+    /// holding. Summed from the account's own lines, which are the only record of it.
+    /// </summary>
+    decimal AccountBalance,
+    /// <summary>Barred outright: no new project, no new invoice, nothing ordered publicly.</summary>
+    bool IsBlocked,
+    string? BlockedReason,
+    /// <summary>The account is barred but the client is not: they pay as they go.</summary>
+    bool IsAccountBlocked,
+    string? AccountBlockedReason,
     /// <summary>Whether this particulier can sign in to see their own files, and where they are.</summary>
     ClientAccessDto Access,
     DateTimeOffset CreatedAt,

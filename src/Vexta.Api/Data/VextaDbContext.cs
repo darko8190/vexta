@@ -69,6 +69,9 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
     public DbSet<JobPosting> JobPostings => Set<JobPosting>();
     public DbSet<ProjectTask> ProjectTasks => Set<ProjectTask>();
     public DbSet<Report> Reports => Set<Report>();
+    public DbSet<ClientAsset> ClientAssets => Set<ClientAsset>();
+    public DbSet<ClientAccountEntry> ClientAccountEntries => Set<ClientAccountEntry>();
+    public DbSet<InvoicePayment> InvoicePayments => Set<InvoicePayment>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -154,6 +157,76 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
 
             e.HasQueryFilter(c => c.TenantId == CurrentTenantId
                 && (CurrentClientId == null || c.Id == CurrentClientId));
+        });
+
+        builder.Entity<ClientAsset>(e =>
+        {
+            e.HasOne(a => a.Client).WithMany(c => c.Assets)
+                .HasForeignKey(a => a.ClientId).OnDelete(DeleteBehavior.Cascade);
+
+            // SetNull: losing an address must not delete the building that stood at it.
+            e.HasOne(a => a.Address).WithMany()
+                .HasForeignKey(a => a.AddressId).OnDelete(DeleteBehavior.SetNull);
+
+            e.Property(a => a.Label).HasMaxLength(200);
+            e.Property(a => a.Category).HasMaxLength(60);
+            e.Property(a => a.Make).HasMaxLength(80);
+            e.Property(a => a.Model).HasMaxLength(80);
+            e.Property(a => a.SerialNumber).HasMaxLength(80);
+            e.Property(a => a.Reference).HasMaxLength(60);
+            e.Property(a => a.UsageUnit).HasMaxLength(20);
+            e.Property(a => a.Notes).HasMaxLength(2000);
+            e.Property(a => a.Usage).HasPrecision(14, 2);
+
+            e.HasIndex(a => a.ClientId);
+
+            // Searched by the number stamped on the thing, which is how a counter clerk finds a
+            // car when the customer gives a plate and not a name.
+            e.HasIndex(a => new { a.TenantId, a.SerialNumber });
+            e.HasIndex(a => new { a.TenantId, a.Reference });
+
+            // Follows the client's own filter: a signed-in customer sees their own assets and
+            // nobody else's, which is the same promise the client record itself makes.
+            e.HasQueryFilter(a => a.TenantId == CurrentTenantId
+                && (CurrentClientId == null || a.ClientId == CurrentClientId));
+        });
+
+        builder.Entity<ClientAccountEntry>(e =>
+        {
+            e.HasOne(x => x.Client).WithMany(c => c.AccountEntries)
+                .HasForeignKey(x => x.ClientId).OnDelete(DeleteBehavior.Cascade);
+
+            // SetNull, not Cascade: the client still owes the money after somebody deletes a
+            // draft invoice, and an account that quietly rebalances itself when a document is
+            // tidied up is an account nobody can reconcile.
+            e.HasOne(x => x.Invoice).WithMany()
+                .HasForeignKey(x => x.InvoiceId).OnDelete(DeleteBehavior.SetNull);
+
+            e.Property(x => x.Amount).HasPrecision(14, 2);
+            e.Property(x => x.Description).HasMaxLength(300);
+
+            // The statement is read in date order, newest first, for one client at a time.
+            e.HasIndex(x => new { x.ClientId, x.Date });
+
+            e.HasQueryFilter(x => x.TenantId == CurrentTenantId
+                && (CurrentClientId == null || x.ClientId == CurrentClientId));
+        });
+
+        builder.Entity<InvoicePayment>(e =>
+        {
+            e.HasOne(p => p.Invoice).WithMany()
+                .HasForeignKey(p => p.InvoiceId).OnDelete(DeleteBehavior.Cascade);
+
+            e.Property(p => p.Amount).HasPrecision(14, 2);
+            e.Property(p => p.Reference).HasMaxLength(80);
+            e.Property(p => p.Note).HasMaxLength(300);
+
+            e.HasIndex(p => new { p.InvoiceId, p.Date });
+
+            // Follows the invoice's own filter, so a customer reading their own invoice sees
+            // what they have paid on it and nothing from anybody else's.
+            e.HasQueryFilter(p => p.TenantId == CurrentTenantId
+                && (CurrentClientId == null || p.Invoice!.ClientId == CurrentClientId));
         });
 
         builder.Entity<ClientContact>(e =>

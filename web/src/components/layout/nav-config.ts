@@ -38,6 +38,16 @@ const tenantAdminNav: NavItem[] = [
 ];
 
 /**
+ * A personal space holds nothing yet. Clients, projects and invoices belong to a company, and
+ * offering them here would open three screens whose only content is an invitation to buy a
+ * business plan. What goes in a personal space is still being decided; until then the space is
+ * honestly empty rather than furnished with other people's furniture.
+ */
+const personalNav: NavItem[] = [
+  { href: "/tableau-de-bord", label: "Tableau de bord", icon: LayoutDashboard },
+];
+
+/**
  * A customer sees their own files and nothing else. The labels say "mes" on purpose: the same
  * two routes show the whole company to staff, and the possessive is what tells a client what
  * they are looking at without them having to work it out from an unexpectedly short list.
@@ -64,11 +74,10 @@ export function getNavItems(
 ): NavItem[] {
   if (role === "SuperAdmin" && !isImpersonating) return superAdminNav;
   if (role === "Client") return clientNav;
+  if (tenantKind === "Personal") return personalNav;
 
   // A super admin who has entered a tenant acts as its owner, so they get the owner's items too.
   const isOwner = role === "TenantAdmin" || (role === "SuperAdmin" && isImpersonating);
 
-  // A personal space has no employees to manage and no company card to fill, so the owner's
-  // items would open on two screens with nothing in them.
-  return isOwner && tenantKind !== "Personal" ? [...tenantNav, ...tenantAdminNav] : tenantNav;
+  return isOwner ? [...tenantNav, ...tenantAdminNav] : tenantNav;
 }

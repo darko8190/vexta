@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, FileText, FolderKanban, Users } from "lucide-react";
+import { Building2, FileText, FolderKanban, UserRound, Users } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
+import { UpgradeCta } from "@/components/layout/upgrade-cta";
 import { useClientsQuery } from "@/hooks/use-clients";
 import { useProjectsQuery } from "@/hooks/use-projects";
 import { useInvoicesQuery } from "@/hooks/use-invoices";
@@ -48,6 +50,22 @@ function TenantDashboard() {
       <StatCard href="/projets" label="Projets" value={projects?.totalCount ?? "—"} icon={FolderKanban} />
       <StatCard href="/factures" label="Factures" value={invoices?.totalCount ?? "—"} icon={FileText} />
     </div>
+  );
+}
+
+/**
+ * Nothing yet, and it says so. A personal space is free and holds none of the company modules,
+ * so tiles linking to clients, projects and invoices would each lead to a screen whose only
+ * content is an invitation to buy a business plan. What belongs here is still being decided.
+ */
+function PersonalDashboard() {
+  return (
+    <EmptyState
+      icon={UserRound}
+      title="Votre espace personnel est vide"
+      description="Rien à gérer ici pour l'instant. Les clients, les projets et les factures appartiennent à un compte entreprise."
+      action={<UpgradeCta />}
+    />
   );
 }
 
@@ -103,6 +121,8 @@ export default function DashboardPage() {
         <SuperAdminDashboard />
       ) : user?.role === "Client" ? (
         <ClientDashboard />
+      ) : user?.tenantKind === "Personal" ? (
+        <PersonalDashboard />
       ) : (
         <TenantDashboard />
       )}

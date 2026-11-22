@@ -275,6 +275,10 @@ vivre sur le compte. Il vit sur l'appartenance, et le jeton en porte une à la f
 
 - L'espace personnel est créé au premier passage dans le sélecteur, y compris pour les comptes
   qui existaient avant. Rien à migrer.
+- Il est **vide pour l'instant** : son menu ne contient que le tableau de bord. Les clients, les
+  projets et les factures appartiennent à un compte entreprise, et les offrir ici ouvrirait trois
+  écrans dont le seul contenu serait une invitation à changer de forfait. Ce qui ira dans cet
+  espace reste à décider.
 - Un super admin n'a ni appartenance ni espace personnel : il entre dans un locataire, ce qui
   reste un mécanisme distinct.
 - Demander un espace où l'on n'a pas d'appartenance est refusé, même si le locataire existe.

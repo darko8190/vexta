@@ -2,35 +2,90 @@
 
 import { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import * as z from "zod";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
-import { useCreateClient, useUpdateClient, type ClientFormValues } from "@/hooks/use-clients";
-import type { ClientRecord } from "@/lib/types";
+import { useCreateClient, useUpdateClient } from "@/hooks/use-clients";
+import { ApiError } from "@/lib/api";
+import { formatClientNumber, type ClientRecord } from "@/lib/types";
 
-const formSchema = z.object({
-  name: z.string().min(1, "Le nom est requis."),
-  email: z.string().email("Courriel invalide.").optional().or(z.literal("")),
-  phone: z.string().optional().or(z.literal("")),
-  taxId: z.string().optional().or(z.literal("")),
-  notes: z.string().optional().or(z.literal("")),
-});
+const PROVINCES = [
+  "Québec",
+  "Ontario",
+  "Nouveau-Brunswick",
+  "Nouvelle-Écosse",
+  "Île-du-Prince-Édouard",
+  "Terre-Neuve-et-Labrador",
+  "Manitoba",
+  "Saskatchewan",
+  "Alberta",
+  "Colombie-Britannique",
+  "Yukon",
+  "Territoires du Nord-Ouest",
+  "Nunavut",
+];
+
+const formSchema = z
+  .object({
+    type: z.enum(["Particulier", "Entreprise"]),
+    companyName: z.string().trim().max(200, "200 caractères maximum."),
+    firstName: z.string().trim().min(1, "Le prénom est requis.").max(100, "100 caractères maximum."),
+    lastName: z.string().trim().min(1, "Le nom est requis.").max(100, "100 caractères maximum."),
+    phone: z.string().trim().max(40, "40 caractères maximum."),
+    email: z.string().trim().max(256).refine((v) => v === "" || z.string().email().safeParse(v).success, "Courriel invalide."),
+    line1: z.string().trim().max(200, "200 caractères maximum."),
+    apartment: z.string().trim().max(40, "40 caractères maximum."),
+    city: z.string().trim().max(120, "120 caractères maximum."),
+    postalCode: z.string().trim().max(20, "20 caractères maximum."),
+    province: z.string().trim(),
+    country: z.string().trim().max(80, "80 caractères maximum."),
+  })
+  // A company has to be named; a person does not.
+  .refine((v) => v.type !== "Entreprise" || v.companyName.length > 0, {
+    message: "Le nom d'entreprise est requis.",
+    path: ["companyName"],
+  })
+  // An address is optional, but a half-filled one would print wrong on an invoice.
+  .refine((v) => v.line1 === "" || v.city.length > 0, {
+    message: "La ville est requise avec une adresse.",
+    path: ["city"],
+  })
+  .refine((v) => v.line1 === "" || v.postalCode.length > 0, {
+    message: "Le code postal est requis avec une adresse.",
+    path: ["postalCode"],
+  });
 
 type FormValues = z.infer<typeof formSchema>;
 
 function toFormValues(client?: ClientRecord): FormValues {
   return {
-    name: client?.name ?? "",
-    email: client?.email ?? "",
+    type: client?.type ?? "Entreprise",
+    companyName: client?.companyName ?? "",
+    firstName: client?.firstName ?? "",
+    lastName: client?.lastName ?? "",
     phone: client?.phone ?? "",
-    taxId: client?.taxId ?? "",
-    notes: client?.notes ?? "",
+    email: client?.email ?? "",
+    line1: client?.primaryAddress?.line1 ?? "",
+    apartment: client?.primaryAddress?.apartment ?? "",
+    city: client?.primaryAddress?.city ?? "",
+    postalCode: client?.primaryAddress?.postalCode ?? "",
+    province: client?.primaryAddress?.province ?? "Québec",
+    country: client?.primaryAddress?.country ?? "Canada",
   };
 }
 
@@ -44,8 +99,9 @@ export function ClientFormSheet({
   client?: ClientRecord;
 }) {
   const isEditing = Boolean(client);
-  const createClient = useCreateClient();
-  const updateClient = useUpdateClient();
+  const create = useCreateClient();
+  const update = useUpdateClient();
+  const pending = create.isPending || update.isPending;
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -56,38 +112,50 @@ export function ClientFormSheet({
     if (open) form.reset(toFormValues(client));
   }, [open, client, form]);
 
+  const type = useWatch({ control: form.control, name: "type" });
+
   async function onSubmit(values: FormValues) {
-    const payload: ClientFormValues = {
-      name: values.name.trim(),
-      email: values.email || undefined,
-      phone: values.phone || undefined,
-      taxId: values.taxId || undefined,
-      notes: values.notes || undefined,
+    const payload = {
+      type: values.type,
+      companyName: values.type === "Entreprise" ? values.companyName : null,
+      firstName: values.firstName,
+      lastName: values.lastName,
+      email: values.email || null,
+      phone: values.phone || null,
+      primaryAddress: values.line1
+        ? {
+            line1: values.line1,
+            apartment: values.apartment || null,
+            city: values.city,
+            province: values.province || null,
+            postalCode: values.postalCode,
+            country: values.country || "Canada",
+          }
+        : null,
     };
 
     try {
-      if (isEditing && client) {
-        await updateClient.mutateAsync({ id: client.id, values: payload });
-        toast.success("Client mis à jour.");
+      if (client) {
+        await update.mutateAsync({ id: client.id, values: payload });
       } else {
-        await createClient.mutateAsync(payload);
-        toast.success("Client créé.");
+        await create.mutateAsync(payload);
       }
+      toast.success(isEditing ? "Client mis à jour." : "Client créé.");
       onOpenChange(false);
-    } catch {
-      toast.error("Impossible d'enregistrer le client.");
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Impossible d'enregistrer ce client.");
     }
   }
 
-  const pending = createClient.isPending || updateClient.isPending;
-
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-md">
+      <SheetContent className="sm:max-w-xl">
         <SheetHeader>
           <SheetTitle>{isEditing ? "Modifier le client" : "Nouveau client"}</SheetTitle>
           <SheetDescription>
-            {isEditing ? "Mettez à jour les informations du client." : "Ajoutez un nouveau client à votre répertoire."}
+            {isEditing && client
+              ? `Numéro ${formatClientNumber(client.number)} — attribué automatiquement et jamais réutilisé.`
+              : "Le numéro est attribué automatiquement à la création."}
           </SheetDescription>
         </SheetHeader>
 
@@ -99,58 +167,177 @@ export function ClientFormSheet({
         >
           <FieldGroup>
             <Controller
-              name="name"
+              name="type"
+              control={form.control}
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel htmlFor="client-type">Type</FieldLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger id="client-type" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Particulier">Particulier</SelectItem>
+                      <SelectItem value="Entreprise">Entreprise</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+              )}
+            />
+
+            {type === "Entreprise" && (
+              <Controller
+                name="companyName"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="client-company">Nom d&apos;entreprise</FieldLabel>
+                    <Input {...field} id="client-company" placeholder="Constructions ABC" aria-invalid={fieldState.invalid} />
+                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  </Field>
+                )}
+              />
+            )}
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Controller
+                name="firstName"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="client-firstname">Prénom</FieldLabel>
+                    <Input {...field} id="client-firstname" placeholder="Marie" aria-invalid={fieldState.invalid} />
+                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  </Field>
+                )}
+              />
+              <Controller
+                name="lastName"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="client-lastname">Nom</FieldLabel>
+                    <Input {...field} id="client-lastname" placeholder="Roy" aria-invalid={fieldState.invalid} />
+                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  </Field>
+                )}
+              />
+            </div>
+            {type === "Entreprise" && (
+              <FieldDescription>La personne à joindre chez ce client.</FieldDescription>
+            )}
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Controller
+                name="phone"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="client-phone">Téléphone</FieldLabel>
+                    <Input {...field} id="client-phone" type="tel" placeholder="514 555-0199" aria-invalid={fieldState.invalid} />
+                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  </Field>
+                )}
+              />
+              <Controller
+                name="email"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="client-email">Courriel</FieldLabel>
+                    <Input {...field} id="client-email" type="email" placeholder="marie@abc.ca" aria-invalid={fieldState.invalid} />
+                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  </Field>
+                )}
+              />
+            </div>
+
+            <Separator />
+
+            <Controller
+              name="line1"
               control={form.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="client-name">Nom</FieldLabel>
-                  <Input {...field} id="client-name" placeholder="Acme inc." aria-invalid={fieldState.invalid} />
-                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  <FieldLabel htmlFor="client-line1">Adresse</FieldLabel>
+                  <Input {...field} id="client-line1" placeholder="1200 rue Principale" aria-invalid={fieldState.invalid} />
+                  {fieldState.invalid ? (
+                    <FieldError errors={[fieldState.error]} />
+                  ) : (
+                    <FieldDescription>Facultative. D&apos;autres adresses s&apos;ajoutent depuis la fiche du client.</FieldDescription>
+                  )}
                 </Field>
               )}
             />
 
+            <div className="grid gap-4 sm:grid-cols-[1fr_8rem]">
+              <Controller
+                name="city"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="client-city">Ville</FieldLabel>
+                    <Input {...field} id="client-city" placeholder="Québec" aria-invalid={fieldState.invalid} />
+                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  </Field>
+                )}
+              />
+              <Controller
+                name="apartment"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="client-apartment">Appart.</FieldLabel>
+                    <Input {...field} id="client-apartment" placeholder="4B" aria-invalid={fieldState.invalid} />
+                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  </Field>
+                )}
+              />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Controller
+                name="postalCode"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="client-postal">Code postal</FieldLabel>
+                    <Input {...field} id="client-postal" placeholder="G1R 2B5" aria-invalid={fieldState.invalid} />
+                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  </Field>
+                )}
+              />
+              <Controller
+                name="province"
+                control={form.control}
+                render={({ field }) => (
+                  <Field>
+                    <FieldLabel htmlFor="client-province">Province</FieldLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger id="client-province" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PROVINCES.map((province) => (
+                          <SelectItem key={province} value={province}>
+                            {province}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                )}
+              />
+            </div>
+
             <Controller
-              name="email"
+              name="country"
               control={form.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="client-email">Courriel</FieldLabel>
-                  <Input {...field} id="client-email" type="email" aria-invalid={fieldState.invalid} />
+                  <FieldLabel htmlFor="client-country">Pays</FieldLabel>
+                  <Input {...field} id="client-country" placeholder="Canada" aria-invalid={fieldState.invalid} />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                </Field>
-              )}
-            />
-
-            <Controller
-              name="phone"
-              control={form.control}
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel htmlFor="client-phone">Téléphone</FieldLabel>
-                  <Input {...field} id="client-phone" />
-                </Field>
-              )}
-            />
-
-            <Controller
-              name="taxId"
-              control={form.control}
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel htmlFor="client-taxid">Numéro d&apos;entreprise</FieldLabel>
-                  <Input {...field} id="client-taxid" placeholder="TPS/TVQ" />
-                </Field>
-              )}
-            />
-
-            <Controller
-              name="notes"
-              control={form.control}
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel htmlFor="client-notes">Notes</FieldLabel>
-                  <Textarea {...field} id="client-notes" rows={3} />
                 </Field>
               )}
             />

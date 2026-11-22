@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { MoreHorizontal, Pencil, Plus, Trash2, Users } from "lucide-react";
+import Link from "next/link";
+import { ExternalLink, MoreHorizontal, Pencil, Plus, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,7 @@ import { PaginationBar } from "@/components/layout/pagination-bar";
 import { SearchInput } from "@/components/layout/search-input";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useClientsQuery, useDeleteClient } from "@/hooks/use-clients";
-import type { ClientRecord } from "@/lib/types";
+import { formatClientNumber, type ClientRecord } from "@/lib/types";
 
 export default function ClientsPage() {
   const canCreate = useCanCreate();
@@ -114,28 +115,41 @@ export default function ClientsPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-24">Numéro</TableHead>
                 <TableHead>Nom</TableHead>
-                <TableHead>Courriel</TableHead>
-                <TableHead>Téléphone</TableHead>
-                <TableHead className="text-center">Adresses</TableHead>
-                <TableHead className="text-center">Projets</TableHead>
-                <TableHead className="text-center">Factures</TableHead>
+                {/* Hidden on narrow screens: the name and number are what identify a row, and
+                    the rest is one tap away on the client's own page. */}
+                <TableHead className="hidden md:table-cell">Courriel</TableHead>
+                <TableHead className="hidden lg:table-cell">Téléphone</TableHead>
+                <TableHead className="hidden text-center sm:table-cell">Projets</TableHead>
+                <TableHead className="hidden text-center sm:table-cell">Factures</TableHead>
                 <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {data.items.map((clientItem) => (
                 <TableRow key={clientItem.id}>
-                  <TableCell className="font-medium">{clientItem.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{clientItem.email ?? "—"}</TableCell>
-                  <TableCell className="text-muted-foreground">{clientItem.phone ?? "—"}</TableCell>
-                  <TableCell className="text-center">
-                    <Badge variant="secondary">{clientItem.addressCount}</Badge>
+                  <TableCell className="font-mono text-xs text-muted-foreground tabular-nums">
+                    {formatClientNumber(clientItem.number)}
                   </TableCell>
-                  <TableCell className="text-center">
+                  <TableCell>
+                    <Link
+                      href={`/clients/${clientItem.id}`}
+                      className="group/name inline-flex items-center gap-1.5 font-medium text-foreground underline-offset-4 hover:underline"
+                    >
+                      {clientItem.name}
+                      <ExternalLink className="size-3 opacity-0 transition-opacity group-hover/name:opacity-60" />
+                    </Link>
+                    <div className="text-xs text-muted-foreground">
+                      {clientItem.type === "Entreprise" ? "Entreprise" : "Particulier"}
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden text-muted-foreground md:table-cell">{clientItem.email ?? "—"}</TableCell>
+                  <TableCell className="hidden text-muted-foreground lg:table-cell">{clientItem.phone ?? "—"}</TableCell>
+                  <TableCell className="hidden text-center sm:table-cell">
                     <Badge variant="secondary">{clientItem.projectCount}</Badge>
                   </TableCell>
-                  <TableCell className="text-center">
+                  <TableCell className="hidden text-center sm:table-cell">
                     <Badge variant="secondary">{clientItem.invoiceCount}</Badge>
                   </TableCell>
                   <TableCell>
@@ -144,6 +158,10 @@ export default function ClientsPage() {
                         <MoreHorizontal />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        <DropdownMenuItem render={<Link href={`/clients/${clientItem.id}`} />}>
+                          <ExternalLink />
+                          Ouvrir la fiche
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => openEdit(clientItem)}>
                           <Pencil />
                           Modifier

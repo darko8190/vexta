@@ -1,16 +1,16 @@
-import Link from "next/link";
-import { CheckCircle2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Suspense } from "react";
+import { Spinner } from "@/components/ui/spinner";
+import { CheckoutConfirmation } from "@/components/auth/checkout-confirmation";
+
+export const metadata = { title: "Abonnement" };
 
 export default function RegisterSuccessPage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background px-4 text-center">
-      <CheckCircle2 className="size-12 text-primary" />
-      <h1 className="text-xl font-semibold">Abonnement activé</h1>
-      <p className="max-w-sm text-sm text-muted-foreground">
-        Votre paiement a été confirmé. Vous pouvez maintenant vous connecter à votre espace Vexta.
-      </p>
-      <Button render={<Link href="/connexion" />}>Se connecter</Button>
+      {/* useSearchParams suspends, and the session id is the whole reason this page exists. */}
+      <Suspense fallback={<Spinner className="size-8 text-muted-foreground" />}>
+        <CheckoutConfirmation />
+      </Suspense>
     </div>
   );
 }

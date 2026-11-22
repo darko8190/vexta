@@ -25,6 +25,16 @@ public enum TenantKind
     Personal = 1
 }
 
+/// <summary>
+/// A particulier is one person; an entreprise is a company reached through a contact person.
+/// Both carry a contact name, which is why the name fields are not conditional in the data.
+/// </summary>
+public enum ClientType
+{
+    Particulier = 0,
+    Entreprise = 1
+}
+
 public enum AddressType
 {
     Facturation = 0,

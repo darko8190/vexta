@@ -3,9 +3,7 @@ import {
   Building2,
   FileText,
   FolderKanban,
-  Images,
   LayoutDashboard,
-  MapPin,
   Palette,
   Settings,
   Tag,
@@ -20,13 +18,14 @@ export interface NavItem {
   icon: typeof LayoutDashboard;
 }
 
+// Adresses and Bibliothèque are deliberately absent: addresses belong inside a client's own
+// record, and the media library is reached from wherever a file is being attached. Their routes
+// still work — they are just not top-level destinations.
 const tenantNav: NavItem[] = [
   { href: "/tableau-de-bord", label: "Tableau de bord", icon: LayoutDashboard },
   { href: "/clients", label: "Clients", icon: Users },
-  { href: "/adresses", label: "Adresses", icon: MapPin },
   { href: "/projets", label: "Projets", icon: FolderKanban },
   { href: "/factures", label: "Factures", icon: FileText },
-  { href: "/bibliotheque", label: "Bibliothèque", icon: Images },
 ];
 
 /** Managing who can sign in belongs to the owner: an employee must not grant themselves access. */

@@ -21,6 +21,9 @@ public record BillingStateDto(
 
 public record UpgradeToBusinessRequest(string CompanyName, Guid PlanId);
 
+/// <summary>The id Stripe appends to the return URL once checkout is finished.</summary>
+public record ConfirmCheckoutRequest(string SessionId);
+
 [ApiController]
 [Route("api/billing")]
 public class BillingController(
@@ -126,7 +129,7 @@ public class BillingController(
                 tenant,
                 CurrentEmail(),
                 priceId,
-                successUrl: $"{FrontendUrl}/parametres?abonnement=succes",
+                successUrl: $"{FrontendUrl}/parametres?abonnement=succes&session_id={{CHECKOUT_SESSION_ID}}",
                 cancelUrl: $"{FrontendUrl}/parametres",
                 sessionMetadata: metadata);
 
@@ -135,6 +138,48 @@ public class BillingController(
         catch (InvalidOperationException ex)
         {
             logger.LogError(ex, "Paiement impossible pour {Tenant}: Stripe n'est pas configuré.", tenant.Slug);
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new
+            {
+                message = "Le paiement est momentanément indisponible. Réessayez plus tard."
+            });
+        }
+    }
+
+    /// <summary>
+    /// What the return page calls. Anonymous on purpose: after paying at Stripe, a brand new
+    /// company lands back here with no session yet, and bouncing them to a login form while
+    /// their space still says "incomplet" is exactly the moment they lose faith in the product.
+    ///
+    /// Knowing a session id grants nothing: the state applied is whatever Stripe reports for it,
+    /// and an unpaid session activates nothing.
+    /// </summary>
+    [HttpPost("confirm")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ConfirmCheckout(ConfirmCheckoutRequest request, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.SessionId))
+        {
+            return BadRequest(new { message = "Session de paiement manquante." });
+        }
+
+        try
+        {
+            var tenantId = await stripeService.ConfirmCheckoutSessionAsync(request.SessionId.Trim(), db, ct);
+            if (tenantId is null)
+            {
+                return Ok(new { activated = false, message = "Ce paiement n'est pas encore confirmé par Stripe." });
+            }
+
+            return Ok(new { activated = true });
+        }
+        catch (StripeException ex)
+        {
+            logger.LogWarning(ex, "Confirmation de la session {Session} refusée par Stripe.", request.SessionId);
+            return BadRequest(new { message = "Stripe ne reconnaît pas cette session de paiement." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            logger.LogError(ex, "Confirmation impossible : Stripe n'est pas configuré.");
             return StatusCode(StatusCodes.Status503ServiceUnavailable, new
             {
                 message = "Le paiement est momentanément indisponible. Réessayez plus tard."
@@ -157,8 +202,17 @@ public class BillingController(
         }
         catch (StripeException ex)
         {
-            logger.LogWarning(ex, "Signature de webhook Stripe invalide.");
-            return BadRequest();
+            // The reason goes in the body on purpose: Stripe shows it in the dashboard next to
+            // the failed delivery, which is the only place anyone looks when a webhook fails.
+            logger.LogWarning(ex, "Webhook Stripe refusé.");
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            // No signing secret configured yet. A 400 tells Stripe to retry, which is right:
+            // the deliveries queue up and go through once the secret is entered.
+            logger.LogWarning(ex, "Webhook Stripe reçu sans secret de signature configuré.");
+            return BadRequest(new { message = ex.Message });
         }
     }
 

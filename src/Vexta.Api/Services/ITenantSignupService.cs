@@ -138,7 +138,7 @@ public class TenantSignupService(
                 tenant,
                 user.Email!,
                 plan!.StripePriceId!,
-                successUrl: $"{frontendUrl}/inscription/succes",
+                successUrl: $"{frontendUrl}/inscription/succes?session_id={{CHECKOUT_SESSION_ID}}",
                 cancelUrl: $"{frontendUrl}/inscription/annule",
                 ct: ct);
 

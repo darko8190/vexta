@@ -23,18 +23,58 @@ export interface PagedResult<T> {
   totalPages: number;
 }
 
+export type ClientType = "Particulier" | "Entreprise";
+
+/** The address fields as the client form asks for them, stored as the primary address. */
+export interface ClientAddress {
+  id: string | null;
+  line1: string;
+  /** Apartment or suite. */
+  apartment: string | null;
+  city: string;
+  province: string | null;
+  postalCode: string;
+  country: string;
+}
+
 export interface ClientRecord {
   id: string;
+  /** Sequential within the company. Shown as C-0001. */
+  number: number;
+  type: ClientType;
+  companyName: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  /** The company for an entreprise, the person for a particulier. */
   name: string;
   email: string | null;
   phone: string | null;
   taxId: string | null;
   notes: string | null;
+  primaryAddress: ClientAddress | null;
   addressCount: number;
+  contactCount: number;
   projectCount: number;
   invoiceCount: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ClientContact {
+  id: string;
+  clientId: string;
+  firstName: string;
+  lastName: string;
+  role: string | null;
+  email: string | null;
+  phone: string | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+/** C-0001. Padded so the column sorts and scans cleanly. */
+export function formatClientNumber(n: number): string {
+  return `C-${String(n).padStart(4, "0")}`;
 }
 
 export interface ClientSummary {

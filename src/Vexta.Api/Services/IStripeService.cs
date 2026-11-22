@@ -31,6 +31,13 @@ public interface IStripeService
         CancellationToken ct = default);
     Task<Event> ConstructEventAsync(string payload, string signatureHeader, CancellationToken ct = default);
     Task ApplySubscriptionEventAsync(Event stripeEvent, VextaDbContext db, CancellationToken ct = default);
+
+    /// <summary>
+    /// Reads a finished checkout session back from Stripe and applies it, so the return page can
+    /// activate the space without waiting for a webhook. Returns the tenant it activated, or null
+    /// when Stripe says the session was not paid.
+    /// </summary>
+    Task<Guid?> ConfirmCheckoutSessionAsync(string sessionId, VextaDbContext db, CancellationToken ct = default);
 }
 
 public class StripeService(IPlatformSettingsService settings, ILogger<StripeService> logger) : IStripeService
@@ -150,7 +157,74 @@ public class StripeService(IPlatformSettingsService settings, ILogger<StripeServ
         {
             throw new InvalidOperationException("Stripe webhook secret n'est pas configuré.");
         }
-        return EventUtility.ConstructEvent(payload, signatureHeader, webhookSecret);
+        // throwOnApiVersionMismatch defaults to true, which rejects every event whose api_version
+        // differs from the one this Stripe.net build was cut against. An account pinned to an
+        // older version then has every webhook refused with a StripeException that reads exactly
+        // like a bad signature — and the subscription never activates.
+        //
+        // Turning it off is safe for what is read here: client_reference_id, customer,
+        // subscription, metadata and a subscription's status have been stable for years. The
+        // signature itself is still verified; only the version check is waived.
+        return EventUtility.ConstructEvent(payload, signatureHeader, webhookSecret, throwOnApiVersionMismatch: false);
+    }
+
+    public async Task<Guid?> ConfirmCheckoutSessionAsync(string sessionId, VextaDbContext db, CancellationToken ct)
+    {
+        var secretKey = await GetSecretKeyAsync(ct);
+        if (string.IsNullOrWhiteSpace(secretKey))
+        {
+            throw new InvalidOperationException("Stripe n'est pas configuré.");
+        }
+
+        var service = new SessionService(new StripeClient(secretKey));
+        var session = await service.GetAsync(sessionId, cancellationToken: ct);
+
+        // Stripe is the authority, not the browser that came back. A session id alone proves
+        // nothing: what counts is Stripe saying this one is finished and paid.
+        if (session.Status != "complete" || session.PaymentStatus == "unpaid")
+        {
+            return null;
+        }
+
+        return await ApplyCheckoutSessionAsync(session, db, ct);
+    }
+
+    /// <summary>
+    /// Turns a paid checkout session into an active space. Shared by the webhook and the return
+    /// page, and safe to run twice: it writes the same values either way.
+    /// </summary>
+    private async Task<Guid?> ApplyCheckoutSessionAsync(Session session, VextaDbContext db, CancellationToken ct)
+    {
+        if (!Guid.TryParse(session.ClientReferenceId, out var tenantId)) return null;
+
+        var tenant = await db.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.Id == tenantId, ct);
+        if (tenant is null) return null;
+
+        tenant.StripeCustomerId = session.CustomerId;
+        tenant.StripeSubscriptionId = session.SubscriptionId;
+        tenant.SubscriptionStatus = TenantSubscriptionStatus.Active;
+
+        // A personal space becomes a business one only once the money has actually
+        // arrived — the name and plan were parked in the session when checkout started.
+        if (session.Metadata is not null
+            && session.Metadata.TryGetValue(UpgradeNameKey, out var companyName)
+            && !string.IsNullOrWhiteSpace(companyName))
+        {
+            tenant.Name = companyName.Trim();
+            tenant.Kind = TenantKind.Business;
+            tenant.Slug = await TenantSlug.UniqueAsync(
+                companyName,
+                candidate => db.Tenants.IgnoreQueryFilters().AnyAsync(t => t.Slug == candidate && t.Id != tenant.Id, ct));
+
+            if (session.Metadata.TryGetValue(UpgradePlanKey, out var planId)
+                && Guid.TryParse(planId, out var parsedPlanId))
+            {
+                tenant.PlanId = parsedPlanId;
+            }
+        }
+
+        await db.SaveChangesAsync(ct);
+        return tenant.Id;
     }
 
     public async Task ApplySubscriptionEventAsync(Event stripeEvent, VextaDbContext db, CancellationToken ct)
@@ -160,35 +234,7 @@ public class StripeService(IPlatformSettingsService settings, ILogger<StripeServ
             case "checkout.session.completed":
             {
                 if (stripeEvent.Data.Object is not Session session) return;
-                if (!Guid.TryParse(session.ClientReferenceId, out var tenantId)) return;
-
-                var tenant = await db.Tenants.FindAsync([tenantId], ct);
-                if (tenant is null) return;
-
-                tenant.StripeCustomerId = session.CustomerId;
-                tenant.StripeSubscriptionId = session.SubscriptionId;
-                tenant.SubscriptionStatus = TenantSubscriptionStatus.Active;
-
-                // A personal space becomes a business one only once the money has actually
-                // arrived — the name and plan were parked in the session when checkout started.
-                if (session.Metadata is not null
-                    && session.Metadata.TryGetValue(UpgradeNameKey, out var companyName)
-                    && !string.IsNullOrWhiteSpace(companyName))
-                {
-                    tenant.Name = companyName.Trim();
-                    tenant.Kind = TenantKind.Business;
-                    tenant.Slug = await TenantSlug.UniqueAsync(
-                        companyName,
-                        candidate => db.Tenants.AnyAsync(t => t.Slug == candidate && t.Id != tenant.Id, ct));
-
-                    if (session.Metadata.TryGetValue(UpgradePlanKey, out var planId)
-                        && Guid.TryParse(planId, out var parsedPlanId))
-                    {
-                        tenant.PlanId = parsedPlanId;
-                    }
-                }
-
-                await db.SaveChangesAsync(ct);
+                await ApplyCheckoutSessionAsync(session, db, ct);
                 break;
             }
             case "customer.subscription.updated":

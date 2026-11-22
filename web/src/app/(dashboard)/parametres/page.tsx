@@ -1,8 +1,8 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Building2, CreditCard } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -31,14 +31,61 @@ interface BillingState {
   planCurrency: string | null;
 }
 
+/**
+ * Confirms the payment rather than telling the person to reload until something happens. The
+ * webhook is still the authority for everything afterwards; this just closes the one gap where
+ * a company has paid and its own space says otherwise.
+ */
 function PaymentReturnNotice() {
-  const settled = useSearchParams().get("abonnement") === "succes";
-  if (!settled) return null;
+  const params = useSearchParams();
+  const settled = params.get("abonnement") === "succes";
+  const sessionId = params.get("session_id");
+  const queryClient = useQueryClient();
+  const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!settled) return;
+    let cancelled = false;
+
+    async function confirm() {
+      if (!sessionId) {
+        setNotice("Paiement reçu. L'activation suit la confirmation de Stripe.");
+        return;
+      }
+
+      setNotice("Paiement reçu. Confirmation auprès de Stripe…");
+      try {
+        const response = await fetch("/api/billing/confirm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId }),
+        });
+        const data = await response.json().catch(() => null);
+        if (cancelled) return;
+
+        if (response.ok && data?.activated) {
+          setNotice("Paiement confirmé. Votre abonnement est actif.");
+          queryClient.invalidateQueries({ queryKey: ["billing-state"] });
+          return;
+        }
+
+        setNotice(data?.message ?? "Stripe n'a pas encore confirmé ce paiement.");
+      } catch {
+        if (!cancelled) setNotice("Paiement reçu, mais la confirmation a échoué. Rechargez dans un instant.");
+      }
+    }
+
+    confirm();
+    return () => {
+      cancelled = true;
+    };
+  }, [settled, sessionId, queryClient]);
+
+  if (!notice) return null;
 
   return (
     <p className="mb-4 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-foreground">
-      Paiement reçu. L&apos;activation se fait dès que Stripe nous confirme la transaction —
-      rechargez la page dans un instant si rien n&apos;a changé.
+      {notice}
     </p>
   );
 }

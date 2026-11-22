@@ -30,6 +30,7 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
     public DbSet<Module> Modules => Set<Module>();
     public DbSet<BrandingAsset> BrandingAssets => Set<BrandingAsset>();
     public DbSet<Employee> Employees => Set<Employee>();
+    public DbSet<ClientContact> ClientContacts => Set<ClientContact>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -71,6 +72,26 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
         builder.Entity<Client>(e =>
         {
             e.HasOne(c => c.Tenant).WithMany(t => t.Clients).HasForeignKey(c => c.TenantId).OnDelete(DeleteBehavior.Cascade);
+            e.Property(c => c.CompanyName).HasMaxLength(200);
+            e.Property(c => c.FirstName).HasMaxLength(100);
+            e.Property(c => c.LastName).HasMaxLength(100);
+
+            // Unique so a race between two simultaneous creations fails loudly instead of
+            // quietly handing two clients the same number.
+            e.HasIndex(c => new { c.TenantId, c.Number }).IsUnique();
+
+            e.HasQueryFilter(c => c.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<ClientContact>(e =>
+        {
+            e.HasOne(c => c.Client).WithMany(c => c.Contacts).HasForeignKey(c => c.ClientId).OnDelete(DeleteBehavior.Cascade);
+            e.Property(c => c.FirstName).HasMaxLength(100);
+            e.Property(c => c.LastName).HasMaxLength(100);
+            e.Property(c => c.Role).HasMaxLength(100);
+            e.Property(c => c.Email).HasMaxLength(256);
+            e.Property(c => c.Phone).HasMaxLength(40);
+            e.HasIndex(c => c.ClientId);
             e.HasQueryFilter(c => c.TenantId == CurrentTenantId);
         });
 

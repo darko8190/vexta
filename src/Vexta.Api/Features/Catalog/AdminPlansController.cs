@@ -206,7 +206,8 @@ public class AdminPlansController(VextaDbContext db, IStripeService stripe) : Co
             p.StripePriceId,
             p.Modules
                 .OrderBy(m => m.SortOrder).ThenBy(m => m.Title)
-                .Select(m => new ModuleDto(m.Id, m.Icon, m.Title, m.Description, m.SortOrder, m.IsPublished))
+                .Select(m => new ModuleDto(m.Id, m.Icon, m.Title, m.Description, m.SortOrder, m.IsPublished,
+                    m.NavHref, m.ParentModuleId, m.OwnerOnly))
                 .ToList(),
             tenantCount);
 }

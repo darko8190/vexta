@@ -1,8 +1,12 @@
 namespace Vexta.Api.Domain;
 
 /// <summary>
-/// A capability shown on the public site and checked off on the plans that include it. It is
-/// marketing content: nothing in the application is opened or closed by a module.
+/// A capability shown on the public site, checked off on the plans that include it, and — when
+/// it carries a <see cref="NavHref"/> — an entry in the sidebar of every company whose plan
+/// includes it. One row is both what is sold and what is opened, so the two cannot drift.
+///
+/// A module with no NavHref is marketing only: something a plan includes that has no screen of
+/// its own, like "soutien téléphonique".
 /// </summary>
 public class Module
 {
@@ -16,6 +20,26 @@ public class Module
 
     public int SortOrder { get; set; }
     public bool IsPublished { get; set; } = true;
+
+    /// <summary>
+    /// The route this module opens, such as /clients. Null for a module that sells something
+    /// without a screen behind it.
+    /// </summary>
+    public string? NavHref { get; set; }
+
+    /// <summary>
+    /// The module this one sits under in the sidebar. One level deep on purpose: a sidebar that
+    /// nests further stops being something you can scan.
+    /// </summary>
+    public Guid? ParentModuleId { get; set; }
+    public Module? ParentModule { get; set; }
+    public List<Module> Children { get; set; } = [];
+
+    /// <summary>
+    /// Shown only to the owner of the company. Human resources and the company's own card are
+    /// not an employee's to open, and an entry that answers 403 is worse than no entry.
+    /// </summary>
+    public bool OwnerOnly { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
@@ -33,7 +57,8 @@ public static class ModuleIcons
         "Users", "MapPin", "FolderKanban", "FileText", "LayoutDashboard", "ShieldCheck",
         "Images", "HardDrive", "CreditCard", "Receipt", "Calendar", "Clock",
         "Mail", "Phone", "Bell", "Search", "ChartBar", "TrendingUp",
-        "Settings", "Lock", "Cloud", "Smartphone", "Truck", "Wrench"
+        "Settings", "Lock", "Cloud", "Smartphone", "Truck", "Wrench",
+        "Building2", "UsersRound"
     };
 
     public static bool IsAllowed(string? icon) => icon is not null && Allowed.Contains(icon);

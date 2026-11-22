@@ -16,13 +16,22 @@ export interface NavItem {
   href: string;
   label: string;
   icon: typeof LayoutDashboard;
+  /** 0 for a tab, 1 for a sub-tab. One level deep: a sidebar that nests further stops scanning. */
+  depth?: number;
 }
 
 // Adresses and Bibliothèque are deliberately absent: addresses belong inside a client's own
 // record, and the media library is reached from wherever a file is being attached. Their routes
 // still work — they are just not top-level destinations.
+/** Always first and never a module: a company must have somewhere to land. */
+export const dashboardNavItem: NavItem = {
+  href: "/tableau-de-bord",
+  label: "Tableau de bord",
+  icon: LayoutDashboard,
+};
+
 const tenantNav: NavItem[] = [
-  { href: "/tableau-de-bord", label: "Tableau de bord", icon: LayoutDashboard },
+  dashboardNavItem,
   { href: "/clients", label: "Clients", icon: Users },
   { href: "/projets", label: "Projets", icon: FolderKanban },
   { href: "/factures", label: "Factures", icon: FileText },

@@ -18,23 +18,61 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { VextaIcon, VextaLockup } from "@/components/brand/vexta-logo";
-import { getNavItems } from "@/components/layout/nav-config";
+import { dashboardNavItem, getNavItems, type NavItem } from "@/components/layout/nav-config";
 import { NavLinks } from "@/components/layout/nav-links";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
+import { useNavigationQuery, type NavigationItem } from "@/hooks/use-navigation";
+import { moduleIcon } from "@/lib/module-icons";
 import { useAuth } from "@/lib/auth-context";
 
 function initials(firstName: string, lastName: string) {
   return `${firstName[0] ?? ""}${lastName[0] ?? ""}`.toUpperCase();
 }
 
+/** One level of nesting, flattened with a depth so a single list can render both. */
+function flatten(items: NavigationItem[], depth = 0): NavItem[] {
+  return items.flatMap((item) => [
+    { href: item.href, label: item.title, icon: moduleIcon(item.icon), depth },
+    ...flatten(item.children, depth + 1),
+  ]);
+}
+
+/**
+ * The sidebar: built from the modules this company's plan includes, or the built-in menu when
+ * its plan defines none.
+ *
+ * The fallback is not a nicety. A company with no plan — every tenant created by hand — would
+ * otherwise open to a sidebar with nothing in it and no way to reach anything.
+ */
+function useTenantNavItems(): NavItem[] {
+  const { user } = useAuth();
+
+  // Only a company's own menu comes from modules. A super admin outside a tenant, a customer and
+  // a personal space each have a fixed one, and asking would be a refused request.
+  const fromModules =
+    Boolean(user) &&
+    user!.role !== "Client" &&
+    user!.tenantKind !== "Personal" &&
+    (user!.role !== "SuperAdmin" || user!.isImpersonating);
+
+  const { data } = useNavigationQuery(fromModules);
+  const builtIn = getNavItems(user?.role, user?.isImpersonating, user?.tenantKind);
+
+  if (!fromModules || !data || data.length === 0) return builtIn;
+
+  return [dashboardNavItem, ...flatten(data)];
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, logout, exitTenant } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  if (!user) return null;
+  // Before the early return: a hook cannot be called conditionally, and the shell renders
+  // nothing until the session is known.
+  const navItems = useTenantNavItems();
 
-  const navItems = getNavItems(user.role, user.isImpersonating, user.tenantKind);
+  if (!user) return null;
 
   return (
     <div className="flex min-h-screen flex-col bg-background">

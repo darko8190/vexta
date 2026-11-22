@@ -224,6 +224,11 @@ export interface ModuleRecord {
   description: string;
   sortOrder: number;
   isPublished: boolean;
+  /** The route it opens in a tenant's sidebar. Null for a module with no screen of its own. */
+  navHref: string | null;
+  parentModuleId: string | null;
+  /** Only the owner of the company sees it in their menu. */
+  ownerOnly: boolean;
 }
 
 export interface PlanRecord {

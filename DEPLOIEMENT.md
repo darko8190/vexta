@@ -333,6 +333,34 @@ Le formulaire de facture affiche **l'aperçu à droite**, construit à partir de
 l'écran. Il sert à attraper une mauvaise adresse ou un numéro de taxe manquant avant l'envoi,
 pas à remplacer le document final.
 
+### Modules et menu des entreprises
+
+Un module n'est plus seulement du contenu marketing. Quand il porte un **lien** — `/clients`,
+`/projets` — il devient une entrée du menu latéral de toutes les entreprises dont le forfait
+l'inclut. Une seule ligne décrit à la fois ce qui est vendu et ce qui est ouvert, donc les deux
+ne peuvent plus diverger.
+
+Chaque module peut aussi être :
+
+- un **sous-onglet** d'un autre, sur un seul niveau — un menu qui s'imbrique plus profond cesse
+  d'être lisible d'un coup d'œil ;
+- **réservé au propriétaire**, pour les ressources humaines et la fiche entreprise, qu'un
+  employé n'a pas à ouvrir. Une entrée qui répond 403 est pire que pas d'entrée.
+
+> **La règle à retenir** : dès qu'un forfait inclut **au moins un** module avec un lien, le menu
+> de ses locataires vient **entièrement** des modules. Il ne s'ajoute pas au menu intégré, il le
+> remplace. Un forfait qui n'en inclut aucun garde le menu intégré — c'est ce qui permet à un
+> locataire sans forfait, donc à tous ceux créés à la main, d'atteindre quoi que ce soit.
+
+Le tableau de bord est toujours là, en premier, et n'est pas un module : une entreprise doit
+avoir un endroit où atterrir.
+
+Les cinq modules standards (Clients, Projets, Factures, Ressources humaines, Entreprise) sont
+créés par la migration avec leurs liens, mais **rattachés à aucun forfait** : rien de ce que vous
+voyez aujourd'hui ne change tant que vous ne les cochez pas dans un forfait. Si vous aviez déjà
+des modules marketing portant les mêmes titres, ils sont conservés tels quels — vous verrez donc
+deux lignes « Clients », celle sans écran et celle avec.
+
 ### Cloudflare R2
 
 1. Créez un seau et un jeton d'API R2 (lecture + écriture).

@@ -20,6 +20,9 @@ export interface SaveModuleValues {
   description: string;
   sortOrder: number;
   isPublished: boolean;
+  navHref: string | null;
+  parentModuleId: string | null;
+  ownerOnly: boolean;
 }
 
 export interface SavePlanValues {
@@ -51,6 +54,8 @@ export function useSaveModule() {
       queryClient.invalidateQueries({ queryKey: ["admin", "modules"] });
       // A module's title and icon show inside every plan that includes it.
       queryClient.invalidateQueries({ queryKey: ["admin", "plans"] });
+      // A module is also a menu entry now, so the sidebar it feeds is stale too.
+      queryClient.invalidateQueries({ queryKey: ["navigation"] });
       await revalidatePublicSite();
     },
   });

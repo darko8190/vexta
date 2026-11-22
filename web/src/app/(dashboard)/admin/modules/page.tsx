@@ -19,6 +19,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { ModuleFormSheet } from "@/components/catalog/module-form-sheet";
 import { useDeleteModule, useModulesQuery } from "@/hooks/use-catalog";
 import { ApiError } from "@/lib/api";
+import { ClickableRow } from "@/components/layout/clickable-row";
 import { moduleIcon } from "@/lib/module-icons";
 import type { ModuleRecord } from "@/lib/types";
 
@@ -82,6 +83,7 @@ export default function ModulesPage() {
                 <TableHead className="w-12">Icône</TableHead>
                 <TableHead>Titre</TableHead>
                 <TableHead>Description</TableHead>
+                <TableHead>Onglet</TableHead>
                 <TableHead className="w-24">Ordre</TableHead>
                 <TableHead className="w-28">Statut</TableHead>
                 <TableHead className="w-10" />
@@ -91,13 +93,35 @@ export default function ModulesPage() {
               {data.map((module) => {
                 const Icon = moduleIcon(module.icon);
                 return (
-                  <TableRow key={module.id}>
+                  <ClickableRow
+                    key={module.id}
+                    label={`Modifier ${module.title}`}
+                    onOpen={() => {
+                      setEditing(module);
+                      setFormOpen(true);
+                    }}
+                  >
                     <TableCell>
                       <Icon className="size-4 text-muted-foreground" />
                     </TableCell>
                     <TableCell className="font-medium">{module.title}</TableCell>
                     <TableCell className="max-w-md truncate text-muted-foreground">
                       {module.description}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {module.navHref ? (
+                        <span className="flex flex-col">
+                          <span className="font-mono text-xs">{module.navHref}</span>
+                          <span className="text-xs">
+                            {module.parentModuleId
+                              ? `Sous-onglet de ${data?.find((m) => m.id === module.parentModuleId)?.title ?? "—"}`
+                              : "Onglet principal"}
+                            {module.ownerOnly ? " · propriétaire" : ""}
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="text-xs">Aucun écran</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-muted-foreground tabular-nums">{module.sortOrder}</TableCell>
                     <TableCell>
@@ -127,7 +151,7 @@ export default function ModulesPage() {
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
-                  </TableRow>
+                  </ClickableRow>
                 );
               })}
             </TableBody>
@@ -135,7 +159,7 @@ export default function ModulesPage() {
         </div>
       )}
 
-      <ModuleFormSheet open={formOpen} onOpenChange={setFormOpen} module={editing} />
+      <ModuleFormSheet open={formOpen} onOpenChange={setFormOpen} module={editing} modules={data ?? []} />
 
       <ConfirmDeleteDialog
         open={Boolean(deleteTarget)}

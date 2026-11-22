@@ -43,6 +43,14 @@ export function NavLinks({
               expandOnHover
                 ? "w-10 group-hover/sidebar:w-full group-focus-within/sidebar:w-full"
                 : "w-full",
+              // A sub-tab is only indented once there is room to show the indent. In the
+              // 64 px rail it sits under its parent at the same x, because an icon shifted
+              // right in a strip that narrow just looks misaligned.
+              item.depth
+                ? expandOnHover
+                  ? "group-hover/sidebar:pl-9 group-focus-within/sidebar:pl-9"
+                  : "pl-9"
+                : undefined,
               active
                 ? "bg-sidebar-accent text-sidebar-accent-foreground"
                 : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",

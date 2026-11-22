@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Sheet,
@@ -34,6 +35,13 @@ const formSchema = z.object({
   // breaks react-hook-form's typing. Parsed on submit instead.
   sortOrder: z.string().trim().regex(/^\d{1,3}$/, "Entrez un nombre entre 0 et 999."),
   isPublished: z.boolean(),
+  navHref: z
+    .string()
+    .trim()
+    .max(100, "100 caractères maximum.")
+    .refine((v) => v === "" || (v.startsWith("/") && !v.startsWith("//")), "Le lien doit commencer par / et rester interne."),
+  parentModuleId: z.string(),
+  ownerOnly: z.boolean(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -45,19 +53,32 @@ function toFormValues(module?: ModuleRecord): FormValues {
     description: module?.description ?? "",
     sortOrder: String(module?.sortOrder ?? 0),
     isPublished: module?.isPublished ?? true,
+    navHref: module?.navHref ?? "",
+    parentModuleId: module?.parentModuleId ?? NO_PARENT,
+    ownerOnly: module?.ownerOnly ?? false,
   };
 }
+
+/** The select needs a value for "none"; null is not one it can hold. */
+const NO_PARENT = "aucun";
 
 export function ModuleFormSheet({
   open,
   onOpenChange,
   module,
+  modules = [],
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   module?: ModuleRecord;
+  /** Every module, so a parent can be chosen. */
+  modules?: ModuleRecord[];
 }) {
   const isEditing = Boolean(module);
+
+  // A module cannot be its own parent, and a sub-tab cannot have sub-tabs of its own: both
+  // would make a menu that renders itself for ever.
+  const parents = modules.filter((m) => m.id !== module?.id && !m.parentModuleId && m.navHref);
   const save = useSaveModule();
 
   const form = useForm<FormValues>({
@@ -73,7 +94,12 @@ export function ModuleFormSheet({
     try {
       await save.mutateAsync({
         id: module?.id,
-        values: { ...values, sortOrder: Number(values.sortOrder) },
+        values: {
+          ...values,
+          sortOrder: Number(values.sortOrder),
+          navHref: values.navHref || null,
+          parentModuleId: values.parentModuleId === NO_PARENT ? null : values.parentModuleId,
+        },
       });
       toast.success(isEditing ? "Module mis à jour." : "Module créé.");
       onOpenChange(false);
@@ -192,6 +218,76 @@ export function ModuleFormSheet({
                     onCheckedChange={(checked) => field.onChange(checked === true)}
                   />
                   <FieldLabel htmlFor="module-published">Afficher sur le site public</FieldLabel>
+                </Field>
+              )}
+            />
+
+            <div className="border-t border-border pt-4">
+              <p className="text-sm font-medium text-foreground">Onglet dans l&apos;application</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Un module avec un lien devient une entrée du menu des entreprises dont le forfait
+                l&apos;inclut. Dès qu&apos;un forfait en définit au moins un, son menu vient
+                entièrement des modules.
+              </p>
+            </div>
+
+            <Controller
+              name="navHref"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor="module-href">Lien</FieldLabel>
+                  <Input {...field} id="module-href" placeholder="/clients" aria-invalid={fieldState.invalid} />
+                  {fieldState.invalid ? (
+                    <FieldError errors={[fieldState.error]} />
+                  ) : (
+                    <FieldDescription>Laissez vide pour un module sans écran.</FieldDescription>
+                  )}
+                </Field>
+              )}
+            />
+
+            <Controller
+              name="parentModuleId"
+              control={form.control}
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel htmlFor="module-parent">Sous-onglet de</FieldLabel>
+                  <Select value={field.value} onValueChange={(v) => field.onChange(v ?? NO_PARENT)}>
+                    <SelectTrigger id="module-parent" className="w-full">
+                      {/* Children, not a bare SelectValue: without them it renders the raw
+                          value, so the "aucun" sentinel would show through as itself. */}
+                      <SelectValue>
+                        {parents.find((p) => p.id === field.value)?.title ?? "Aucun — onglet principal"}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_PARENT}>Aucun — onglet principal</SelectItem>
+                      {parents.map((parent) => (
+                        <SelectItem key={parent.id} value={parent.id}>
+                          {parent.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FieldDescription>Un seul niveau : un sous-onglet n&apos;en a pas lui-même.</FieldDescription>
+                </Field>
+              )}
+            />
+
+            <Controller
+              name="ownerOnly"
+              control={form.control}
+              render={({ field }) => (
+                <Field orientation="horizontal">
+                  <Checkbox
+                    id="module-owner-only"
+                    checked={field.value}
+                    onCheckedChange={(checked) => field.onChange(checked === true)}
+                  />
+                  <FieldLabel htmlFor="module-owner-only">
+                    Réservé au propriétaire de l&apos;entreprise
+                  </FieldLabel>
                 </Field>
               )}
             />

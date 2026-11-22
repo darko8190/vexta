@@ -1,6 +1,16 @@
 namespace Vexta.Api.Features.Catalog;
 
-public record ModuleDto(Guid Id, string Icon, string Title, string Description, int SortOrder, bool IsPublished);
+public record ModuleDto(
+    Guid Id,
+    string Icon,
+    string Title,
+    string Description,
+    int SortOrder,
+    bool IsPublished,
+    /// <summary>The route it opens in a tenant's sidebar. Null for a module with no screen.</summary>
+    string? NavHref,
+    Guid? ParentModuleId,
+    bool OwnerOnly);
 
 public record PlanDto(
     Guid Id,
@@ -32,7 +42,15 @@ public record PublicPlanDto(
     int MaxUsers,
     IReadOnlyList<PublicModuleDto> Modules);
 
-public record SaveModuleRequest(string Icon, string Title, string Description, int SortOrder, bool IsPublished);
+public record SaveModuleRequest(
+    string Icon,
+    string Title,
+    string Description,
+    int SortOrder,
+    bool IsPublished,
+    string? NavHref = null,
+    Guid? ParentModuleId = null,
+    bool OwnerOnly = false);
 
 public record SavePlanRequest(
     string Name,

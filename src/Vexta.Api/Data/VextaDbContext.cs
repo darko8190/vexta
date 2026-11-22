@@ -100,6 +100,13 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
 
         builder.Entity<Module>(e =>
         {
+            e.Property(m => m.NavHref).HasMaxLength(100);
+
+            // Restrict, not cascade: deleting a parent must not silently take its children's
+            // sidebar entries with it. They are untied first, deliberately.
+            e.HasOne(m => m.ParentModule).WithMany(m => m.Children)
+                .HasForeignKey(m => m.ParentModuleId).OnDelete(DeleteBehavior.Restrict);
+
             e.HasIndex(m => m.SortOrder);
         });
 

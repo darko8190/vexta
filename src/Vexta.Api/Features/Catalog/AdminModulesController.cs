@@ -16,7 +16,8 @@ public class AdminModulesController(VextaDbContext db) : ControllerBase
     {
         var modules = await db.Modules.AsNoTracking()
             .OrderBy(m => m.SortOrder).ThenBy(m => m.Title)
-            .Select(m => new ModuleDto(m.Id, m.Icon, m.Title, m.Description, m.SortOrder, m.IsPublished))
+            .Select(m => new ModuleDto(m.Id, m.Icon, m.Title, m.Description, m.SortOrder, m.IsPublished,
+                m.NavHref, m.ParentModuleId, m.OwnerOnly))
             .ToListAsync(ct);
 
         return Ok(modules);
@@ -40,7 +41,10 @@ public class AdminModulesController(VextaDbContext db) : ControllerBase
             Title = request.Title.Trim(),
             Description = request.Description.Trim(),
             SortOrder = request.SortOrder,
-            IsPublished = request.IsPublished
+            IsPublished = request.IsPublished,
+            NavHref = CleanHref(request.NavHref),
+            ParentModuleId = request.ParentModuleId,
+            OwnerOnly = request.OwnerOnly
         };
 
         db.Modules.Add(module);
@@ -68,6 +72,9 @@ public class AdminModulesController(VextaDbContext db) : ControllerBase
         module.Description = request.Description.Trim();
         module.SortOrder = request.SortOrder;
         module.IsPublished = request.IsPublished;
+        module.NavHref = CleanHref(request.NavHref);
+        module.ParentModuleId = request.ParentModuleId == id ? null : request.ParentModuleId;
+        module.OwnerOnly = request.OwnerOnly;
 
         await db.SaveChangesAsync(ct);
         return Ok(ToDto(module));
@@ -104,9 +111,23 @@ public class AdminModulesController(VextaDbContext db) : ControllerBase
         if (string.IsNullOrWhiteSpace(request.Description)) return "La description est obligatoire.";
         if (request.Description.Trim().Length > 300) return "La description ne peut pas dépasser 300 caractères.";
         if (!ModuleIcons.IsAllowed(request.Icon)) return "Choisissez une icône dans la liste proposée.";
+
+        var href = CleanHref(request.NavHref);
+        if (href is not null)
+        {
+            // Relative and internal only. An absolute URL in a sidebar is how a tenant menu
+            // becomes somebody else's landing page.
+            if (!href.StartsWith('/') || href.StartsWith("//")) return "Le lien doit commencer par / et rester interne.";
+            if (href.Length > 100) return "Le lien ne peut pas dépasser 100 caractères.";
+        }
+
         return null;
     }
 
+    private static string? CleanHref(string? href) =>
+        string.IsNullOrWhiteSpace(href) ? null : href.Trim();
+
     private static ModuleDto ToDto(Module m) =>
-        new(m.Id, m.Icon, m.Title, m.Description, m.SortOrder, m.IsPublished);
+        new(m.Id, m.Icon, m.Title, m.Description, m.SortOrder, m.IsPublished,
+            m.NavHref, m.ParentModuleId, m.OwnerOnly);
 }

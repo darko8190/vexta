@@ -851,6 +851,16 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<bool>("IsPublished")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("NavHref")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<bool>("OwnerOnly")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid?>("ParentModuleId")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("SortOrder")
                         .HasColumnType("integer");
 
@@ -859,6 +869,8 @@ namespace Vexta.Api.Data.Migrations
                         .HasColumnType("text");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ParentModuleId");
 
                     b.HasIndex("SortOrder");
 
@@ -1381,6 +1393,16 @@ namespace Vexta.Api.Data.Migrations
                     b.Navigation("Tenant");
                 });
 
+            modelBuilder.Entity("Vexta.Api.Domain.Module", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.Module", "ParentModule")
+                        .WithMany("Children")
+                        .HasForeignKey("ParentModuleId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("ParentModule");
+                });
+
             modelBuilder.Entity("Vexta.Api.Domain.Project", b =>
                 {
                     b.HasOne("Vexta.Api.Domain.Address", "ClientAddress")
@@ -1482,6 +1504,11 @@ namespace Vexta.Api.Data.Migrations
             modelBuilder.Entity("Vexta.Api.Domain.Invoice", b =>
                 {
                     b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.Module", b =>
+                {
+                    b.Navigation("Children");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.Plan", b =>

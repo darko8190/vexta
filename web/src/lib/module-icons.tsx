@@ -1,5 +1,6 @@
 import {
   Bell,
+  Building2,
   Calendar,
   ChartBar,
   Cloud,
@@ -22,6 +23,7 @@ import {
   TrendingUp,
   Truck,
   Users,
+  UsersRound,
   Wrench,
 } from "lucide-react";
 
@@ -54,6 +56,8 @@ export const MODULE_ICONS = {
   Smartphone,
   Truck,
   Wrench,
+  Building2,
+  UsersRound,
 } as const;
 
 export type ModuleIconName = keyof typeof MODULE_ICONS;

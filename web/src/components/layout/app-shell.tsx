@@ -30,7 +30,6 @@ function initials(firstName: string, lastName: string) {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, logout, exitTenant } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
 
   if (!user) return null;
 
@@ -51,24 +50,41 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       )}
 
       <div className="flex min-h-0 flex-1">
-      <aside
-        className={cn(
-          "hidden shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-150 md:flex",
-          desktopSidebarOpen ? "w-64" : "w-16",
-        )}
-      >
-        <div className={cn("flex h-16 items-center", desktopSidebarOpen ? "px-5" : "justify-center px-2")}>
-          <button
-            type="button"
-            aria-label={desktopSidebarOpen ? "Fermer le menu" : "Ouvrir le menu"}
-            onClick={() => setDesktopSidebarOpen((open) => !open)}
-            className="flex items-center rounded-lg transition-opacity hover:opacity-70"
-          >
-            {desktopSidebarOpen ? <VextaLockup iconClassName="size-7" /> : <VextaIcon className="size-7" />}
-          </button>
-        </div>
-        <div className={cn("flex-1 overflow-y-auto py-2", desktopSidebarOpen ? "px-3" : "px-2")}>
-          <NavLinks items={navItems} collapsed={!desktopSidebarOpen} />
+      {/* The rail keeps a fixed 64 px footprint in the layout. The panel inside it is absolute,
+          so opening it draws over the page instead of pushing it: nothing the person was
+          looking at moves, and the icons stay exactly where they were. */}
+      <aside className="relative hidden w-16 shrink-0 md:block">
+        <div
+          className={cn(
+            "group/sidebar absolute inset-y-0 left-0 z-30 flex w-16 flex-col overflow-hidden",
+            "border-r border-sidebar-border bg-sidebar",
+            "transition-[width,box-shadow] duration-200 ease-out motion-reduce:transition-none",
+            // The short delay stops the menu flapping open every time the pointer crosses the
+            // left edge on its way somewhere else. Closing is immediate, and keyboard focus
+            // opens it at once because waiting for a Tab makes no sense.
+            "hover:w-64 hover:shadow-xl hover:delay-100",
+            "focus-within:w-64 focus-within:shadow-xl focus-within:delay-0",
+          )}
+        >
+          <div className="flex h-16 shrink-0 items-center px-4">
+            <Link
+              href="/tableau-de-bord"
+              aria-label="Vexta — tableau de bord"
+              className="flex items-center gap-2 rounded-lg transition-opacity hover:opacity-70"
+            >
+              {/* size-8 at px-4 puts the mark's centre on the same vertical line as every nav
+                  icon below it. */}
+              <VextaIcon className="size-8 shrink-0" />
+              {/* Faded rather than clipped: at 64 px the first letter would otherwise peek out
+                  past the edge of the rail. */}
+              <span className="whitespace-nowrap text-lg font-semibold tracking-tight text-foreground opacity-0 transition-opacity duration-200 group-hover/sidebar:opacity-100 group-focus-within/sidebar:opacity-100 motion-reduce:transition-none">
+                Vexta
+              </span>
+            </Link>
+          </div>
+          <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 pb-2">
+            <NavLinks items={navItems} expandOnHover />
+          </div>
         </div>
       </aside>
 

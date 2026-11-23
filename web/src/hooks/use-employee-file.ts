@@ -287,14 +287,15 @@ export function useDeleteShift() {
 
 // ---- Candidats ----
 
-export function useCandidatesQuery(search: string, status?: string) {
+export function useCandidatesQuery(search: string, status?: string, jobPostingId?: string) {
   const params = new URLSearchParams();
   if (search.trim()) params.set("recherche", search.trim());
   if (status) params.set("statut", status);
+  if (jobPostingId) params.set("offre", jobPostingId);
   const suffix = params.toString();
 
   return useQuery({
-    queryKey: [...RH, "candidats", search, status ?? "tous"],
+    queryKey: [...RH, "candidats", search, status ?? "tous", jobPostingId ?? "toutes"],
     queryFn: () => api.get<Candidate[]>(`candidats${suffix ? `?${suffix}` : ""}`),
   });
 }

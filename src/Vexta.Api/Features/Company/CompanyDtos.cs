@@ -65,8 +65,13 @@ public record SavePublicPageRequest(
     bool ShowProducts,
     bool ShowJobs);
 
-/// <summary>A position, as the owner's table and the public page both read it.</summary>
-public record JobPostingDto(
+/// <summary>
+/// A position on the shop window. Deliberately not the row the company reads: a posting also
+/// carries the company's own notes, how many people it is hiring and how many have applied,
+/// and none of that is a visitor's business. The hiring side of it lives in
+/// Vexta.Api.Features.Hr.JobPostingDto.
+/// </summary>
+public record PublicJobDto(
     Guid Id,
     string Title,
     string? Description,
@@ -74,15 +79,4 @@ public record JobPostingDto(
     EmploymentType EmploymentType,
     string? Compensation,
     string? ApplyTo,
-    bool IsPublished,
-    DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
-
-public record SaveJobPostingRequest(
-    string Title,
-    string? Description,
-    string? Location,
-    EmploymentType EmploymentType,
-    string? Compensation,
-    string? ApplyTo,
-    bool IsPublished);
+    DateTimeOffset CreatedAt);

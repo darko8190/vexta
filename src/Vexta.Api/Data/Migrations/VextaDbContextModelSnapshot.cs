@@ -490,6 +490,9 @@ namespace Vexta.Api.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<Guid?>("JobPostingId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("LastName")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -522,6 +525,8 @@ namespace Vexta.Api.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("EmployeeId");
+
+                    b.HasIndex("JobPostingId");
 
                     b.HasIndex("ResumeMediaAssetId");
 
@@ -1820,6 +1825,9 @@ namespace Vexta.Api.Data.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
 
+                    b.Property<DateOnly?>("ClosesOn")
+                        .HasColumnType("date");
+
                     b.Property<string>("Compensation")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
@@ -1841,6 +1849,19 @@ namespace Vexta.Api.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<string>("Notes")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<int>("Openings")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly?>("PostedOn")
+                        .HasColumnType("date");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
@@ -1855,6 +1876,8 @@ namespace Vexta.Api.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("TenantId", "CreatedAt");
+
+                    b.HasIndex("TenantId", "Status");
 
                     b.ToTable("JobPostings");
                 });
@@ -2130,6 +2153,40 @@ namespace Vexta.Api.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("PricePolicies");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.PricePolicyTier", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("FromAmount")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)");
+
+                    b.Property<decimal>("MarginPercent")
+                        .HasPrecision(6, 3)
+                        .HasColumnType("numeric(6,3)");
+
+                    b.Property<Guid>("PricePolicyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("ToAmount")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PricePolicyId", "FromAmount");
+
+                    b.ToTable("PricePolicyTiers");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.Product", b =>
@@ -3557,12 +3614,19 @@ namespace Vexta.Api.Data.Migrations
                         .HasForeignKey("EmployeeId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("Vexta.Api.Domain.JobPosting", "JobPosting")
+                        .WithMany("Candidates")
+                        .HasForeignKey("JobPostingId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Vexta.Api.Domain.MediaAsset", "ResumeMediaAsset")
                         .WithMany()
                         .HasForeignKey("ResumeMediaAssetId")
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Employee");
+
+                    b.Navigation("JobPosting");
 
                     b.Navigation("ResumeMediaAsset");
                 });
@@ -3927,6 +3991,17 @@ namespace Vexta.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("ParentModule");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.PricePolicyTier", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.PricePolicy", "PricePolicy")
+                        .WithMany("Tiers")
+                        .HasForeignKey("PricePolicyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("PricePolicy");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.Product", b =>
@@ -4385,6 +4460,11 @@ namespace Vexta.Api.Data.Migrations
                     b.Navigation("Lines");
                 });
 
+            modelBuilder.Entity("Vexta.Api.Domain.JobPosting", b =>
+                {
+                    b.Navigation("Candidates");
+                });
+
             modelBuilder.Entity("Vexta.Api.Domain.Module", b =>
                 {
                     b.Navigation("Children");
@@ -4393,6 +4473,11 @@ namespace Vexta.Api.Data.Migrations
             modelBuilder.Entity("Vexta.Api.Domain.Plan", b =>
                 {
                     b.Navigation("Tenants");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.PricePolicy", b =>
+                {
+                    b.Navigation("Tiers");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.Product", b =>

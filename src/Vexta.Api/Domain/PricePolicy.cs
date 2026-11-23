@@ -33,4 +33,43 @@ public class PricePolicy
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+
+    public List<PricePolicyTier> Tiers { get; set; } = [];
+}
+
+/// <summary>
+/// One band of a policy: "de 1 $ a 5 $, 60 %".
+///
+/// A contractor does not charge the same percentage on a 2 $ box of screws as on a 2 000 $
+/// window. The cheap end carries the handling — the trip to the counter costs the same either
+/// way — so the margin there is high, and it comes down as the price goes up.
+///
+/// The band is read against the PURCHASE price, not the selling price. It has to be: the margin
+/// is what turns the cost into the price, so a band on the price would need the answer before it
+/// could pick the rule that produces it.
+///
+/// A cost that falls in no band is priced at the policy's own <see cref="PricePolicy.MarginPercent"/>.
+/// That is what makes a policy with no bands behave exactly as it did before they existed.
+/// </summary>
+public class PricePolicyTier
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid TenantId { get; set; }
+
+    public Guid PricePolicyId { get; set; }
+    public PricePolicy? PricePolicy { get; set; }
+
+    /// <summary>Inclusive. Zero is legitimate — it is where the first band starts.</summary>
+    public decimal FromAmount { get; set; }
+
+    /// <summary>
+    /// Inclusive, and null for the last band, which means "and everything above". Null rather
+    /// than a very large number: a company that writes 999 999 as its ceiling has quietly
+    /// decided that the one item above it has no margin at all.
+    /// </summary>
+    public decimal? ToAmount { get; set; }
+
+    public decimal MarginPercent { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

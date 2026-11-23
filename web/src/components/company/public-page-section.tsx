@@ -5,7 +5,7 @@ import Link from "next/link";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
 import * as z from "zod";
-import { ExternalLink, Globe, Info } from "lucide-react";
+import { BriefcaseBusiness, ExternalLink, Globe, Info } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -16,7 +16,6 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
-import { JobPostingsCard } from "@/components/company/job-postings-card";
 import { ToggleSwitch } from "@/components/company/toggle-switch";
 import { usePublicPageQuery, useSavePublicPage } from "@/hooks/use-public-page";
 import { ApiError } from "@/lib/api";
@@ -327,7 +326,26 @@ export function PublicPageSection() {
         </AlertDescription>
       </Alert>
 
-      <JobPostingsCard />
+      {/* A pointer, not a second table. The postings used to be editable here as well as in
+          Ressources humaines, and the two screens knew different things about the same rows:
+          this one could publish a position it could not see had been filled. One authority,
+          and it is the one that also holds the applications. */}
+      <Alert>
+        <BriefcaseBusiness />
+        <AlertTitle>Les offres d&apos;emplois se gèrent aux ressources humaines</AlertTitle>
+        <AlertDescription>
+          <p>
+            Une offre publiée paraît ici tant que la section est affichée. Son état, ses postes à
+            combler et les candidatures reçues vivent au même endroit.
+          </p>
+          <Link
+            href="/ressources-humaines"
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "mt-1")}
+          >
+            Ouvrir les offres d&apos;emplois
+          </Link>
+        </AlertDescription>
+      </Alert>
     </div>
   );
 }

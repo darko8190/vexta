@@ -1,12 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { PricePolicy } from "@/lib/types";
+import type { PricePolicy, PricePolicyTier } from "@/lib/types";
 
 export interface SavePricePolicyValues {
   name: string;
   marginPercent: number;
   description: string | null;
   isDefault: boolean;
+  /**
+   * The whole table, replacing what was there. A band only means anything beside its
+   * neighbours — moving a ceiling from 5 $ to 10 $ edits two bands at once — so they are sent
+   * together rather than one at a time.
+   */
+  tiers: PricePolicyTier[];
 }
 
 /**

@@ -209,9 +209,10 @@ export function InvoiceForm({
     queryFn: () => api.get<PricePolicy[]>("price-policies"),
   });
 
-  // What the chosen policy charges on catalogue lines. Null means "use the product's own".
-  const policyMargin =
-    policies?.find((policy) => policy.id === pricePolicyId)?.marginPercent ?? null;
+  // The whole policy, not just its percentage: a policy can charge a different margin by
+  // price band, and the rows need the bands to work out which one a line falls into.
+  // Undefined means the invoice names none, and a line falls back to the product's own margin.
+  const policy = policies?.find((candidate) => candidate.id === pricePolicyId);
 
   // Set as soon as the box is touched, so the inheritance below stops overriding a decision
   // someone has just made about this invoice.
@@ -572,7 +573,7 @@ export function InvoiceForm({
               append={append}
               remove={remove}
               marginMode={settings?.marginMode ?? "Multiplication"}
-              policyMarginPercent={policyMargin}
+              policy={policy}
               hourlyRate={settings?.defaultHourlyRate ?? null}
               isTaxExempt={isTaxExempt}
               taxRateLabel={combinedRateLabel}

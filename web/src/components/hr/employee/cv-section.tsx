@@ -233,7 +233,7 @@ export function CvSection({ employeeId }: { employeeId: string }) {
             Le parcours et les compétences, saisis pour pouvoir être cherchés.
           </p>
         </div>
-        {items.length > 0 && addButton}
+        {addButton}
       </div>
 
       {isLoading ? (

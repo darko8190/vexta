@@ -190,7 +190,7 @@ export function WagesSection({ employeeId }: { employeeId: string }) {
               : "Aucun taux en vigueur."}
           </p>
         </div>
-        {items.length > 0 && addButton}
+        {addButton}
       </div>
 
       {isLoading ? (

@@ -10,8 +10,8 @@ import { RequiredMark } from "@/components/ui/required-mark";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ProductPicker } from "@/components/invoices/product-picker";
 import { invoiceLineKindLabels } from "@/lib/labels";
-import { marginPercentFrom, sellingPriceFrom } from "@/lib/pricing";
-import type { InvoiceLineKind, MarginMode, ProductSearchResult } from "@/lib/types";
+import { marginPercentFrom, policyMarginFor, sellingPriceFrom } from "@/lib/pricing";
+import type { InvoiceLineKind, MarginMode, PricePolicy, ProductSearchResult } from "@/lib/types";
 
 const KINDS = Object.keys(invoiceLineKindLabels) as InvoiceLineKind[];
 
@@ -91,7 +91,7 @@ export function InvoiceLineRows({
   append,
   remove,
   marginMode,
-  policyMarginPercent,
+  policy,
   hourlyRate,
   isTaxExempt,
   taxRateLabel,
@@ -103,8 +103,11 @@ export function InvoiceLineRows({
   append: (line: LineValues) => void;
   remove: (index: number) => void;
   marginMode: MarginMode;
-  /** The margin the chosen price policy applies to catalogue lines, if any. */
-  policyMarginPercent: number | null;
+  /**
+   * The chosen price policy, bands included. Undefined when the invoice names none, and a
+   * catalogue line then prices from the product's own margin.
+   */
+  policy: PricePolicy | undefined;
   hourlyRate: number | null;
   isTaxExempt: boolean;
   /** "14,975 %" — shown, never edited: the rates belong to the company. */
@@ -120,6 +123,22 @@ export function InvoiceLineRows({
       if (value === undefined) continue;
       form.setValue(`lines.${index}.${key}`, value, { shouldDirty: true });
     }
+  }
+
+  /**
+   * The cost was typed, so the band it falls into may have changed with it.
+   *
+   * Only when the policy has bands. Without them the margin is the same whatever the cost, and
+   * re-sending it would overwrite a percentage somebody typed by hand on this line for the sake
+   * of no change at all.
+   */
+  function repriceFromCost(index: number, purchasePrice: number | null) {
+    const banded = policy && policy.tiers.length > 0;
+    const margin = banded
+      ? policyMarginFor(policy, purchasePrice)
+      : lines[index]?.marginPercent ?? null;
+
+    repriceFromMargin(index, purchasePrice, margin);
   }
 
   /** Cost or margin moved, so the selling price follows. */
@@ -141,7 +160,9 @@ export function InvoiceLineRows({
 
   function onPickProduct(index: number, product: ProductSearchResult) {
     // The policy wins over the product's own margin: it is what this customer was promised.
-    const margin = policyMarginPercent ?? product.marginPercent ?? null;
+    // Resolved against this product's cost, because a policy can charge a different percentage
+    // by price band — 60 % on a 3 $ fitting, 20 % on a 900 $ door.
+    const margin = policyMarginFor(policy, product.purchasePrice) ?? product.marginPercent ?? null;
     const selling =
       sellingPriceFrom(product.purchasePrice, margin, marginMode) ?? product.sellingPrice ?? 0;
 
@@ -308,13 +329,7 @@ export function InvoiceLineRows({
                         className="text-right"
                         aria-label="Prix d'achat"
                         value={fieldValue(field.value)}
-                        onChange={(event) =>
-                          repriceFromMargin(
-                            index,
-                            numberOrNull(event.target.value),
-                            lines[index]?.marginPercent ?? null,
-                          )
-                        }
+                        onChange={(event) => repriceFromCost(index, numberOrNull(event.target.value))}
                       />
                     </Field>
                   )}
@@ -432,7 +447,9 @@ export function InvoiceLineRows({
             description: "",
             quantity: 1,
             purchasePrice: null,
-            marginPercent: policyMarginPercent,
+            // The flat margin: a blank line has no cost yet, so no band can be read. It
+            // follows the cost as soon as one is typed.
+            marginPercent: policy?.marginPercent ?? null,
             unitPrice: 0,
             isTaxable: !isTaxExempt,
           })

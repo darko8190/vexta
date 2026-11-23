@@ -11,7 +11,7 @@ import { LocationsSection } from "@/components/hr/locations-section";
 import { PublicPageSection } from "@/components/company/public-page-section";
 import { useCompanyProfileQuery } from "@/hooks/use-company";
 import { useLocationsQuery } from "@/hooks/use-hr";
-import { useJobPostingsQuery } from "@/hooks/use-public-page";
+import { useJobPostingsQuery } from "@/hooks/use-job-postings";
 import { useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api";
 
@@ -21,9 +21,9 @@ export default function CompanyPage() {
 
   const canEdit = user?.role === "TenantAdmin" || user?.role === "SuperAdmin";
 
-  // The badge, and nothing else from this list: the section itself asks again and already owns
-  // the table. The query is shared, so this costs one request for the whole screen.
-  const { data: jobs } = useJobPostingsQuery(canEdit);
+  // The badge only. The postings themselves are managed in Ressources humaines, which is also
+  // where the applications are; this counts what is currently on the shop window.
+  const { data: jobs } = useJobPostingsQuery(undefined, canEdit);
   const publishedJobs = jobs?.filter((job) => job.isPublished).length ?? 0;
 
   // The company's own places — head office, yard, warehouse. They used to sit under Ressources

@@ -312,7 +312,7 @@ export function EmergencyContactsSection({ employeeId }: { employeeId?: string }
             Qui appeler quand il arrive quelque chose sur un chantier.
           </p>
         </div>
-        {items.length > 0 && addButton}
+        {addButton}
       </div>
 
       {isLoading ? (

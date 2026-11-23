@@ -70,9 +70,9 @@ public class PublicCompanyController(VextaDbContext db, IR2StorageService storag
             ? await db.JobPostings.AsNoTracking()
                 .Where(j => j.TenantId == tenant.Id && j.IsPublished)
                 .OrderByDescending(j => j.CreatedAt)
-                .Select(j => new JobPostingDto(
+                .Select(j => new PublicJobDto(
                     j.Id, j.Title, j.Description, j.Location, j.EmploymentType,
-                    j.Compensation, j.ApplyTo, j.IsPublished, j.CreatedAt, j.UpdatedAt))
+                    j.Compensation, j.ApplyTo, j.CreatedAt))
                 .ToListAsync(ct)
             : [];
 
@@ -164,7 +164,7 @@ public record PublicCompanyDto(
     string? BrandColor,
     CompanyAddressDto? Address,
     List<PublicProductDto> Products,
-    List<JobPostingDto> Jobs);
+    List<PublicJobDto> Jobs);
 
 /// <summary>A product on the shop window. The selling price is the only figure on it.</summary>
 public record PublicProductDto(

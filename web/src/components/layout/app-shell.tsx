@@ -227,6 +227,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <VextaLockup iconClassName="size-7" />
           </button>
           <div className="flex-1" />
+          {/* First of the four: it says which space everything else in the bar acts on. */}
+          <WorkspaceSwitcher />
           {/* Before the theme toggle on purpose: it is the one control here somebody opens on
               purpose rather than once a year. It draws nothing unless the company has an
               assistant switched on. */}
@@ -235,6 +237,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <UserAvatarMenu />
         </header>
         <header className="hidden h-16 items-center justify-end gap-2 border-b border-border px-6 md:flex">
+          <WorkspaceSwitcher />
           <InstallPrompt />
           <AssistantButton />
           <ThemeToggle />
@@ -287,8 +290,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               Mon profil
             </DropdownMenuItem>
           </DropdownMenuGroup>
-          <DropdownMenuSeparator />
-          <WorkspaceSwitcher />
           <DropdownMenuSeparator />
           {/* Settings live here rather than in the sidebar: they are about the account, not a
               module you work in. */}

@@ -327,7 +327,7 @@ export function EmployeeAddressesSection({ employeeId }: { employeeId?: string }
             Où habitent vos employés. Chaque adresse appartient à quelqu&apos;un.
           </p>
         </div>
-        {items.length > 0 && addButton}
+        {addButton}
       </div>
 
       {isLoading ? (

@@ -2,18 +2,7 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
-import {
-  Mail,
-  MoreHorizontal,
-  Paperclip,
-  Pencil,
-  Phone,
-  Plus,
-  Trash2,
-  Upload,
-  UserPlus,
-  UserSearch,
-} from "lucide-react";
+import { Briefcase, Mail, MoreHorizontal, Paperclip, Pencil, Phone, Plus, Trash2, Upload, UserPlus, UserSearch } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -63,19 +52,26 @@ import { ApiError } from "@/lib/api";
 import { candidateStatusBadgeVariant, candidateStatusLabels } from "@/lib/labels";
 import { formatDateOnly, todayIso } from "@/lib/dates";
 import { ex } from "@/lib/placeholders";
+import { useJobPostingsQuery } from "@/hooks/use-job-postings";
 import type { Candidate, CandidateStatus } from "@/lib/types";
 
 /** Embauché is never chosen: it is what hiring does, and offering it would make it a claim. */
 const choosableStatuses: CandidateStatus[] = ["Nouveau", "Entrevue", "Offre", "Refuse", "Retire"];
 
+/** The value the "no posting" row carries: a Select cannot hold null as an item value. */
+const NO_POSTING = "aucune";
+
 function CandidateFormSheet({
   open,
   onOpenChange,
   candidate,
+  defaultJobPostingId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   candidate?: Candidate;
+  /** Pre-selected when the sheet was opened from one posting's own list. */
+  defaultJobPostingId?: string;
 }) {
   const isEditing = Boolean(candidate);
   const save = useSaveCandidate();
@@ -93,6 +89,19 @@ function CandidateFormSheet({
   const [status, setStatus] = useState<CandidateStatus>(candidate?.status ?? "Nouveau");
   const [appliedOn, setAppliedOn] = useState(candidate?.appliedOn ?? todayIso());
   const [notes, setNotes] = useState(candidate?.notes ?? "");
+  const [jobPostingId, setJobPostingId] = useState(
+    candidate?.jobPostingId ?? defaultJobPostingId ?? NO_POSTING,
+  );
+
+  // Only the postings still worth attaching somebody to. A filled position keeps the
+  // applications it already drew, but a new CV does not belong on it.
+  const { data: postings } = useJobPostingsQuery();
+  const openPostings = (postings ?? []).filter(
+    (posting) =>
+      posting.status === "Publiee" ||
+      posting.status === "Brouillon" ||
+      posting.id === candidate?.jobPostingId,
+  );
 
   async function onSubmit() {
     if (!firstName.trim() || !lastName.trim()) {
@@ -116,6 +125,7 @@ function CandidateFormSheet({
           appliedOn: appliedOn || null,
           resumeMediaAssetId: resumeId,
           notes: notes.trim() || null,
+          jobPostingId: jobPostingId === NO_POSTING ? null : jobPostingId,
         },
       });
 
@@ -212,6 +222,38 @@ function CandidateFormSheet({
                 />
               </Field>
             </div>
+
+            {openPostings.length > 0 && (
+              <Field>
+                <FieldLabel htmlFor="candidate-posting">Offre d&apos;emploi</FieldLabel>
+                <Select
+                  value={jobPostingId}
+                  onValueChange={(value) => setJobPostingId(value ?? NO_POSTING)}
+                >
+                  <SelectTrigger id="candidate-posting" className="w-full">
+                    <SelectValue>
+                      {(value: string) =>
+                        value === NO_POSTING
+                          ? "Candidature spontanée"
+                          : openPostings.find((posting) => posting.id === value)?.title ??
+                            "Candidature spontanée"
+                      }
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_POSTING}>Candidature spontanée</SelectItem>
+                    {openPostings.map((posting) => (
+                      <SelectItem key={posting.id} value={posting.id}>
+                        {posting.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FieldDescription>
+                  Ce qui permet de savoir combien de personnes une offre a vraiment attirées.
+                </FieldDescription>
+              </Field>
+            )}
 
             <div className="grid gap-4 sm:grid-cols-2">
               <Field>
@@ -403,10 +445,21 @@ function ResumeLink({ candidate }: { candidate: Candidate }) {
 }
 
 /** Who applied, newest first. A pile of CVs is worked from the top. */
-export function CandidatesSection() {
+export function CandidatesSection({
+  jobPosting,
+  onClearJobPosting,
+}: {
+  /** Set when the section was opened from one posting's application count. */
+  jobPosting?: { id: string; title: string };
+  onClearJobPosting?: () => void;
+} = {}) {
   const [search, setSearch] = useState("");
   const debounced = useDebouncedValue(search, 300);
-  const { data, isLoading, isError, error, refetch } = useCandidatesQuery(debounced);
+  const { data, isLoading, isError, error, refetch } = useCandidatesQuery(
+    debounced,
+    undefined,
+    jobPosting?.id,
+  );
   const remove = useDeleteCandidate();
 
   const [formOpen, setFormOpen] = useState(false);
@@ -448,11 +501,27 @@ export function CandidatesSection() {
         <div>
           <h2 className="text-base font-semibold text-foreground">Candidats</h2>
           <p className="text-sm text-muted-foreground">
-            Qui a postulé, et où chacun est rendu.
+            {jobPosting
+              ? `Les candidatures reçues pour « ${jobPosting.title} ».`
+              : "Qui a postulé, et où chacun est rendu."}
           </p>
         </div>
-        {items.length > 0 && addButton}
+        {addButton}
       </div>
+
+      {/* Said out loud, with the way out beside it. A filtered list that looks like the whole
+          list is how somebody concludes they have three candidates when they have thirty. */}
+      {jobPosting && onClearJobPosting && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm">
+          <Briefcase className="size-4 shrink-0 text-muted-foreground" />
+          <span className="min-w-0 flex-1 truncate text-muted-foreground">
+            Filtré sur une offre d&apos;emploi
+          </span>
+          <Button variant="outline" size="sm" onClick={onClearJobPosting}>
+            Voir tous les candidats
+          </Button>
+        </div>
+      )}
 
       <div className="mb-3">
         <Field>
@@ -583,7 +652,13 @@ export function CandidatesSection() {
         </ul>
       )}
 
-      <CandidateFormSheet key={formKey} open={formOpen} onOpenChange={setFormOpen} candidate={editing} />
+      <CandidateFormSheet
+        key={formKey}
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        candidate={editing}
+        defaultJobPostingId={jobPosting?.id}
+      />
 
       <HireDialog
         key={hiring?.id ?? "aucun"}

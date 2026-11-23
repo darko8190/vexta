@@ -1,4 +1,4 @@
-import type { MarginMode } from "@/lib/types";
+import type { MarginMode, PricePolicyTier } from "@/lib/types";
 
 /**
  * Turning a purchase price into a selling price, and back.
@@ -29,6 +29,34 @@ export function sellingPriceFrom(
   }
 
   return round(purchasePrice * (1 + margin / 100));
+}
+
+/**
+ * The margin a policy charges on one purchase price.
+ *
+ * The first band the cost falls into wins, read in ascending order of where they start. A cost
+ * that falls in none is priced at the policy's own flat margin — which is the whole behaviour of
+ * a policy with no bands, so bands change nothing until somebody writes one.
+ *
+ * A cost that is not yet known gets the flat margin rather than the first band: pricing an
+ * unknown cost at the cheap-end percentage would make the smallest number in the table the
+ * silent default for every blank line.
+ *
+ * Null policy means the invoice names none, and the caller falls back to the product's own
+ * margin — which is why this returns null rather than zero.
+ */
+export function policyMarginFor(
+  policy: { marginPercent: number; tiers: PricePolicyTier[] } | null | undefined,
+  purchasePrice: number | null | undefined,
+): number | null {
+  if (!policy) return null;
+  if (purchasePrice == null || Number.isNaN(purchasePrice)) return policy.marginPercent;
+
+  const match = [...policy.tiers]
+    .sort((a, b) => a.fromAmount - b.fromAmount)
+    .find((tier) => purchasePrice >= tier.fromAmount && (tier.toAmount == null || purchasePrice <= tier.toAmount));
+
+  return match ? match.marginPercent : policy.marginPercent;
 }
 
 /** The margin a pair of prices implies, so typing a selling price updates the field beside it. */

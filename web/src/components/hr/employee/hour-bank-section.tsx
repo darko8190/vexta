@@ -183,7 +183,7 @@ export function HourBankSection({ employeeId }: { employeeId: string }) {
             Le temps supplémentaire accumulé, et ce qui en a été repris.
           </p>
         </div>
-        {entries.length > 0 && buttons}
+        {buttons}
       </div>
 
       {bank && (

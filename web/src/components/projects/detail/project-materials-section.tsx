@@ -204,7 +204,7 @@ export function ProjectMaterialsSection({
             Ce qui entre dans le projet, pris au catalogue ou saisi à la main.
           </p>
         </div>
-        {rows > 0 && addButton}
+        {addButton}
       </div>
 
       {locked && <BilledNotice />}

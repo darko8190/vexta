@@ -1,11 +1,11 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { Briefcase, FileText, GraduationCap, Home, LifeBuoy, Palmtree, UsersRound, Users, UserSearch } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { SectionNav, type NavSection } from "@/components/layout/section-nav";
-import { SectionPlaceholder } from "@/components/projects/detail/section-placeholder";
 import { CandidatesSection } from "@/components/hr/candidates-section";
+import { JobPostingsSection } from "@/components/hr/job-postings-section";
 import { CredentialsSection } from "@/components/hr/credentials-section";
 import { DocumentsSection } from "@/components/hr/documents-section";
 import { EmergencyContactsSection } from "@/components/hr/emergency-contacts-section";
@@ -14,6 +14,7 @@ import { EmployeesSection } from "@/components/hr/employees-section";
 import { LeavesSection } from "@/components/hr/employee/leaves-section";
 import { TeamsSection } from "@/components/hr/teams-section";
 import { useHrSectionCountsQuery } from "@/hooks/use-employee-file";
+import { useJobPostingsQuery } from "@/hooks/use-job-postings";
 import { useIsOwner } from "@/hooks/use-can-create";
 
 /**
@@ -27,10 +28,23 @@ export default function HumanResourcesPage() {
   const { data: counts } = useHrSectionCountsQuery();
   const isOwner = useIsOwner();
 
+  // The badge counts the positions actually being hired for, not every posting ever written: a
+  // rail that said 14 because the company has advertised fourteen times since 2019 would be
+  // counting its own history at somebody who wants to know what is open today.
+  const { data: postings } = useJobPostingsQuery();
+  const openPostings = postings?.filter((posting) => posting.status === "Publiee").length;
+
   // Always the employees, and not remembered between visits: this is the list the department is
   // worked from, and opening on whichever section was left behind last week means reading the
   // page before you can use it.
   const [section, setSection] = useState("employes");
+
+  // Set when somebody follows a posting's application count. Held here rather than inside the
+  // candidates list because it is the rail that moves: the number is in one section and the
+  // people are in another.
+  const [postingFilter, setPostingFilter] = useState<{ id: string; title: string } | undefined>(
+    undefined,
+  );
 
   // Undefined rather than zero until the counts land: a badge that shows 0 and then jumps to 14
   // has told somebody something false on the way.
@@ -41,7 +55,7 @@ export default function HumanResourcesPage() {
     { key: "contacts", label: "Contacts", count: counts?.emergencyContacts, icon: LifeBuoy },
     // Before Candidats, because that is the order it happens in: a posting goes out, and
     // the applicants arrive against it.
-    { key: "offres-emplois", label: "Offres d'emplois", count: 0, icon: Briefcase },
+    { key: "offres-emplois", label: "Offres d'emplois", count: openPostings, icon: Briefcase },
     { key: "candidats", label: "Candidats", count: counts?.candidates, icon: UserSearch },
     { key: "formations", label: "Formations", count: counts?.credentials, icon: GraduationCap },
     { key: "conges", label: "Congés", count: counts?.pendingLeaves, icon: Palmtree },
@@ -70,13 +84,19 @@ export default function HumanResourcesPage() {
           {section === "adresses" && <EmployeeAddressesSection />}
           {section === "contacts" && <EmergencyContactsSection />}
           {section === "offres-emplois" && (
-            <SectionPlaceholder
-              icon={Briefcase}
-              title="Offres d'emplois"
-              description="Les postes affichés, et les candidatures reçues pour chacun."
+            <JobPostingsSection
+              onShowCandidates={(job) => {
+                setPostingFilter({ id: job.id, title: job.title });
+                setSection("candidats");
+              }}
             />
           )}
-          {section === "candidats" && <CandidatesSection />}
+          {section === "candidats" && (
+            <CandidatesSection
+              jobPosting={postingFilter}
+              onClearJobPosting={() => setPostingFilter(undefined)}
+            />
+          )}
           {section === "formations" && <CredentialsSection />}
           {section === "conges" && <LeavesSection canDecide={isOwner} />}
           {section === "documents" && <DocumentsSection />}

@@ -5,6 +5,7 @@
   CalendarClock,
   ChartBar,
   ClipboardPen,
+  Clock,
   FileText,
   FolderKanban,
   LayoutDashboard,
@@ -46,6 +47,9 @@ const tenantNav: NavItem[] = [
   { href: "/mes-assignations", label: "Mes assignations", icon: ListChecks },
   { href: "/clients", label: "Clients", icon: Users },
   { href: "/projets", label: "Projets", icon: FolderKanban },
+  // Before Facturation, because that is the order the money happens in: a price is given,
+  // then the work is done, then it is billed.
+  { href: "/soumissions", label: "Soumissions", icon: ClipboardPen },
   // Facturation rather than Factures: the tab holds the invoices and what was paid on them,
   // and naming it after only the first half would make the second look like it belongs
   // somewhere else. Paiements is a section inside it, not a second entry here.
@@ -59,6 +63,11 @@ const tenantNav: NavItem[] = [
   // Outils, not "Outils & Formation": the formations went to Ressources humaines, where the
   // people they belong to are. A heading that still named them would send somebody here first.
   { href: "/outils", label: "Outils", icon: ClipboardPen },
+  // The company's whole crew, as against "Mes feuilles de temps" at the top, which is one
+  // person's own. Two entries for what looks like one thing because they answer to two
+  // different people: an employee files, a foreman reads.
+  { href: "/temps", label: "Feuilles de temps et poinçons", icon: Clock },
+  { href: "/taches-horaire", label: "Tâches et horaire", icon: CalendarClock },
   // In the built-in menu too, not only as a module: a company whose plan defines no modules
   // falls back to this list, and it should not be the one company without its figures.
   { href: "/rapports", label: "Rapports", icon: ChartBar },

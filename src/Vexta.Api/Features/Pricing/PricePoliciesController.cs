@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Vexta.Api.Common;
@@ -32,7 +32,10 @@ public class PricePoliciesController(VextaDbContext db, ICurrentUserService curr
     {
         if (currentUser.TenantId is not { } tenantId) return Forbid();
 
-        var policies = await db.PricePolicies.AsNoTracking().OrderBy(p => p.Name).ToListAsync(ct);
+        var policies = await db.PricePolicies.AsNoTracking()
+            .Include(p => p.Tiers)
+            .OrderBy(p => p.Name)
+            .ToListAsync(ct);
         var defaultId = await DefaultIdAsync(tenantId, policies, ct);
 
         return Ok(policies.Select(p => ToDto(p, defaultId)).ToList());
@@ -60,6 +63,8 @@ public class PricePoliciesController(VextaDbContext db, ICurrentUserService curr
             IsDefault = request.IsDefault
         };
 
+        policy.Tiers.AddRange(TiersOf(request, tenantId, policy.Id));
+
         db.PricePolicies.Add(policy);
 
         // Done before the new row exists, so it only touches the policies already saved.
@@ -77,7 +82,7 @@ public class PricePoliciesController(VextaDbContext db, ICurrentUserService curr
     {
         if (currentUser.TenantId is not { } tenantId) return Forbid();
 
-        var policy = await db.PricePolicies.FirstOrDefaultAsync(p => p.Id == id, ct);
+        var policy = await db.PricePolicies.Include(p => p.Tiers).FirstOrDefaultAsync(p => p.Id == id, ct);
         if (policy is null) return NotFound();
 
         var name = Clean(request.Name);
@@ -90,6 +95,24 @@ public class PricePoliciesController(VextaDbContext db, ICurrentUserService curr
         policy.MarginPercent = request.MarginPercent;
         policy.Description = Clean(request.Description);
         policy.UpdatedAt = DateTimeOffset.UtcNow;
+
+        // Replaced wholesale rather than matched up row by row. A band has no identity of its
+        // own — it is a line in a table that is read top to bottom — and matching on ids would
+        // mean deciding whether a moved ceiling is the same band edited or a different one.
+        //
+        // Added through the set, not through the navigation. A tier arrives with its Guid key
+        // already filled in, and EF reads a non-default key on an entity it has never seen as
+        // "this row exists" — so attaching it to the collection produced an UPDATE of a row
+        // that had just been deleted, and the save died on zero rows affected.
+        //
+        // Nothing is put back into policy.Tiers afterwards either: EF fixes the collection up
+        // from the foreign key, so adding them again by hand returned every band twice in the
+        // answer while the table itself was right.
+        var tiers = TiersOf(request, policy.TenantId, policy.Id);
+
+        db.PricePolicyTiers.RemoveRange(policy.Tiers);
+        policy.Tiers.Clear();
+        db.PricePolicyTiers.AddRange(tiers);
 
         var wasDefault = await DefaultIdAsync(tenantId, null, ct) == id;
 
@@ -200,6 +223,8 @@ public class PricePoliciesController(VextaDbContext db, ICurrentUserService curr
             return "En mode Division, la marge doit rester sous 100 %.";
         }
 
+        if (TiersProblem(request, mode) is { } tiersProblem) return tiersProblem;
+
         var lowered = name.ToLower();
         if (await db.PricePolicies.AnyAsync(p => p.Id != id && p.Name.ToLower() == lowered, ct))
         {
@@ -232,6 +257,71 @@ public class PricePoliciesController(VextaDbContext db, ICurrentUserService curr
     private static string Count(int value, string noun) =>
         value == 1 ? $"1 {noun}" : $"{value} {noun}s";
 
+    /// <summary>
+    /// What the bands have to satisfy to be readable as a table.
+    ///
+    /// Gaps are allowed: a company can price 0–5 $ and 50 $ and up, and leave everything between
+    /// at the policy's flat margin. Overlaps are not — two bands covering 4 $ means the price of
+    /// a 4 $ item depends on which row happens to be read first, and the answer would change the
+    /// day somebody renames a policy.
+    /// </summary>
+    private static string? TiersProblem(SavePricePolicyRequest request, MarginMode mode)
+    {
+        var tiers = request.Tiers;
+        if (tiers is null || tiers.Count == 0) return null;
+
+        if (tiers.Count > 20) return "Vingt paliers au maximum.";
+
+        var ordered = tiers.OrderBy(t => t.FromAmount).ToList();
+
+        for (var i = 0; i < ordered.Count; i++)
+        {
+            var tier = ordered[i];
+
+            if (tier.FromAmount < 0) return "Un palier ne peut pas commencer sous zéro.";
+            if (tier.ToAmount is { } to && to < tier.FromAmount)
+            {
+                return "La fin d'un palier ne peut pas précéder son début.";
+            }
+
+            if (tier.MarginPercent is < 0 or >= 1000) return "La marge d'un palier doit être entre 0 et 999 %.";
+            if (mode == MarginMode.Division && tier.MarginPercent >= 100m)
+            {
+                return "En mode Division, la marge d'un palier doit rester sous 100 %.";
+            }
+
+            if (i == ordered.Count - 1) continue;
+
+            // Only the last band may be open-ended: one in the middle would swallow every band
+            // above it, and the table would stop meaning what it says.
+            if (tier.ToAmount is not { } ceiling)
+            {
+                return "Seul le dernier palier peut rester ouvert vers le haut.";
+            }
+
+            if (ordered[i + 1].FromAmount <= ceiling)
+            {
+                return "Deux paliers se chevauchent. Faites commencer le suivant au-dessus du précédent.";
+            }
+        }
+
+        return null;
+    }
+
+    private static List<PricePolicyTier> TiersOf(
+        SavePricePolicyRequest request, Guid tenantId, Guid policyId) =>
+        (request.Tiers ?? [])
+            .OrderBy(t => t.FromAmount)
+            .Select(t => new PricePolicyTier
+            {
+                TenantId = tenantId,
+                PricePolicyId = policyId,
+                FromAmount = t.FromAmount,
+                ToAmount = t.ToAmount,
+                MarginPercent = t.MarginPercent
+            })
+            .ToList();
+
     private static string? Clean(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
@@ -241,6 +331,10 @@ public class PricePoliciesController(VextaDbContext db, ICurrentUserService curr
             policy.MarginPercent,
             policy.Description,
             defaultId == policy.Id,
+            policy.Tiers
+                .OrderBy(t => t.FromAmount)
+                .Select(t => new PricePolicyTierDto(t.FromAmount, t.ToAmount, t.MarginPercent))
+                .ToList(),
             policy.CreatedAt,
             policy.UpdatedAt);
 }

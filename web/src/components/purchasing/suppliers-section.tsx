@@ -79,7 +79,7 @@ export function SuppliersSection() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <WorkbookMenu entity="fournisseurs" label="fournisseurs" />
-          {items.length > 0 && addButton}
+          {addButton}
         </div>
       </div>
 

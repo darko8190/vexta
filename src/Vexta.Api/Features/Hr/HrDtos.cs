@@ -197,7 +197,10 @@ public record CandidateDto(
     Guid? ResumeMediaAssetId,
     string? ResumeFileName,
     string? Notes,
-    Guid? EmployeeId);
+    Guid? EmployeeId,
+    /// <summary>The posting they answered, and its title, when they answered one.</summary>
+    Guid? JobPostingId,
+    string? JobPostingTitle);
 
 public record SaveCandidateRequest(
     string FirstName,
@@ -209,7 +212,47 @@ public record SaveCandidateRequest(
     CandidateStatus Status,
     DateOnly? AppliedOn,
     Guid? ResumeMediaAssetId,
-    string? Notes);
+    string? Notes,
+    Guid? JobPostingId);
+
+// ---- Offres d'emplois ----
+
+/// <summary>
+/// A posting as the hiring table reads it: the advertisement, plus what the company keeps to
+/// itself. <see cref="Applications"/> is counted from the candidates rather than stored — a
+/// tally in a column is wrong the moment an application is deleted.
+/// </summary>
+public record JobPostingDto(
+    Guid Id,
+    string Title,
+    string? Description,
+    string? Location,
+    EmploymentType EmploymentType,
+    string? Compensation,
+    string? ApplyTo,
+    string? Notes,
+    int Openings,
+    JobPostingStatus Status,
+    DateOnly? PostedOn,
+    DateOnly? ClosesOn,
+    int Applications,
+    /// <summary>Whether it is on the public page. Follows the status; never set on its own.</summary>
+    bool IsPublished,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt);
+
+public record SaveJobPostingRequest(
+    string Title,
+    string? Description,
+    string? Location,
+    EmploymentType EmploymentType,
+    string? Compensation,
+    string? ApplyTo,
+    string? Notes,
+    int Openings,
+    JobPostingStatus Status,
+    DateOnly? PostedOn,
+    DateOnly? ClosesOn);
 
 /// <summary>What the new employee record gets. The candidate keeps everything it already had.</summary>
 public record HireCandidateRequest(string Email, string? JobTitle);

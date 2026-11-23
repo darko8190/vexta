@@ -11,6 +11,7 @@ import type {
   FormFieldType,
   InvoiceLineKind,
   InvoiceStatus,
+  JobPostingStatus,
   LeaveKind,
   LeaveStatus,
   MarginMode,
@@ -233,6 +234,24 @@ export const invoiceLineKindLabels: Record<InvoiceLineKind, string> = {
 export const marginModeLabels: Record<MarginMode, string> = {
   Multiplication: "Multiplication",
   Division: "Division",
+};
+
+export const jobPostingStatusLabels: Record<JobPostingStatus, string> = {
+  Brouillon: "Brouillon",
+  Publiee: "Publiée",
+  Pourvue: "Pourvue",
+  Fermee: "Fermée",
+};
+
+/**
+ * Pourvue is not a success colour and not a warning: a filled position is simply closed, and
+ * the only one worth drawing attention to is the one that is out and collecting applications.
+ */
+export const jobPostingStatusBadgeVariant: Record<JobPostingStatus, "default" | "secondary" | "outline"> = {
+  Brouillon: "outline",
+  Publiee: "default",
+  Pourvue: "secondary",
+  Fermee: "secondary",
 };
 
 export const employmentTypeLabels: Record<EmploymentType, string> = {

@@ -216,6 +216,11 @@ public class TenantsController(
             await Wipe(db.ClientAssetTypes.Where(x => x.TenantId == id));
             await Wipe(db.Addresses.Where(x => x.TenantId == id));
             await Wipe(db.HrDocuments.Where(x => x.TenantId == id));
+            // Before the postings they answered. A candidate carries a name, a telephone number
+            // and a link to a CV, and nothing in the model takes them with the tenant — so a
+            // company deleted on request was leaving its applicants' details behind, invisible
+            // to every filter but still in the database.
+            await Wipe(db.Candidates.Where(x => x.TenantId == id));
             await Wipe(db.JobPostings.Where(x => x.TenantId == id));
             await Wipe(db.CompanyLocations.Where(x => x.TenantId == id));
             await Wipe(db.Teams.Where(x => x.TenantId == id));

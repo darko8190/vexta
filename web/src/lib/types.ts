@@ -992,12 +992,147 @@ export interface ProjectExpenseDetail {
   photos: ExpensePhoto[];
 }
 
+// ---- The company's own screen ----
+
+/**
+ * The figures the dashboard opens on, in one request.
+ *
+ * Money is in dollars, taxes in, the way an invoice reads. `billedLastMonth` is here so the
+ * month's figure can be read against something — a number with nothing beside it says only
+ * that money came in.
+ */
+export interface DashboardSummary {
+  billedThisMonth: number;
+  billedLastMonth: number;
+  outstanding: number;
+  overdue: number;
+  overdueInvoiceCount: number;
+  spentThisMonth: number;
+  activeProjects: number;
+  toInvoice: number;
+  hoursThisWeek: number;
+  attention: DashboardAttention;
+  recentInvoices: DashboardInvoice[];
+  upcomingTasks: DashboardTask[];
+}
+
+/** Each of these is a count and somewhere to go. A zero is not shown at all. */
+export interface DashboardAttention {
+  overdueInvoices: number;
+  lateTasks: number;
+  pendingLeaves: number;
+  expiringCredentials: number;
+  lowStockProducts: number;
+  newCandidates: number;
+}
+
+export interface DashboardInvoice {
+  id: string;
+  number: string;
+  clientName: string;
+  issueDate: string;
+  dueDate: string;
+  total: number;
+  paid: number;
+  status: InvoiceStatus;
+}
+
+export interface DashboardTask {
+  id: string;
+  projectId: string;
+  projectNumber: number;
+  title: string;
+  dueDate: string | null;
+  isLate: boolean;
+}
+
+/**
+ * What the platform is, in counts.
+ *
+ * Money is deliberately absent: what a company pays lives in Stripe, and a figure added up here
+ * would be a second answer that disagrees with the invoices Stripe actually issued.
+ */
+export interface AdminDashboardSummary {
+  businessTenants: number;
+  active: number;
+  /** On trial with days left. */
+  trialing: number;
+  /** Still marked as trialing, but the date has passed — nobody chased them. */
+  trialExpired: number;
+  pastDue: number;
+  /** Signed up and never finished paying. */
+  incomplete: number;
+  newThisMonth: number;
+  personalSpaces: number;
+  publishedPlans: number;
+  modules: number;
+  users: number;
+}
+
+// ---- Work read across the projects ----
+
+/** A task as the company-wide list shows it: which job it is on, and who has it. */
+export interface WorkTask {
+  id: string;
+  projectId: string;
+  projectNumber: number;
+  clientName: string;
+  title: string;
+  status: ProjectTaskStatus;
+  priority: ProjectTaskPriority;
+  dueDate: string | null;
+  isLate: boolean;
+  assignedTeamName: string | null;
+  assigneeNames: string[];
+}
+
+export interface WorkTimesheet {
+  id: string;
+  projectId: string;
+  projectNumber: number;
+  clientName: string;
+  employeeId: string | null;
+  /** Null when the employee has since been removed. The hours stay. */
+  employeeName: string | null;
+  startDate: string;
+  endDate: string;
+  startTime: string;
+  endTime: string;
+  hours: number;
+  note: string | null;
+}
+
+/**
+ * The period the server decided on, and the rows in it. `totalHours` covers the whole period
+ * even when the table was cut short at 200 rows, and `shownCount` says how many came back.
+ */
+export interface WorkTimesheets {
+  from: string;
+  to: string;
+  totalHours: number;
+  shownCount: number;
+  rows: WorkTimesheet[];
+}
+
 // ---- Catalogue, pricing and the company's public page ----
 
 /** How a purchase price becomes a selling price. See MarginMode on the API. */
 export type MarginMode = "Multiplication" | "Division";
 
 export type EmploymentType = "TempsPlein" | "TempsPartiel" | "Contrat" | "Saisonnier" | "Stage";
+
+/**
+ * One band of a policy: from this purchase price to that one, this margin.
+ *
+ * The band is read against the PURCHASE price. It has to be: the margin is what turns a cost
+ * into a price, so a band on the price would need the answer before it could pick the rule that
+ * produces it. `toAmount` is null on the last band, meaning "and everything above".
+ */
+export interface PricePolicyTier {
+  fromAmount: number;
+  toAmount: number | null;
+  marginPercent: number;
+}
 
 /** A named margin, chosen on a project or an invoice. */
 export interface PricePolicy {
@@ -1006,6 +1141,8 @@ export interface PricePolicy {
   marginPercent: number;
   description: string | null;
   isDefault: boolean;
+  /** In ascending order of where they start. Empty means the flat margin applies to everything. */
+  tiers: PricePolicyTier[];
   createdAt: string;
   updatedAt: string;
 }
@@ -1099,7 +1236,14 @@ export interface ProductSectionCounts {
   purchases: number;
 }
 
-/** A position shown on the company's public page. */
+export type JobPostingStatus = "Brouillon" | "Publiee" | "Pourvue" | "Fermee";
+
+/**
+ * A position the company is hiring for, as Ressources humaines reads it.
+ *
+ * `isPublished` is not a switch of its own: it follows the status, written by the API. A filled
+ * position comes off the public page by being marked filled.
+ */
 export interface JobPosting {
   id: string;
   title: string;
@@ -1108,9 +1252,42 @@ export interface JobPosting {
   employmentType: EmploymentType;
   compensation: string | null;
   applyTo: string | null;
+  notes: string | null;
+  openings: number;
+  status: JobPostingStatus;
+  postedOn: string | null;
+  closesOn: string | null;
+  /** How many people answered it. Counted from the candidates, never stored. */
+  applications: number;
   isPublished: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface SaveJobPostingValues {
+  title: string;
+  description: string | null;
+  location: string | null;
+  employmentType: EmploymentType;
+  compensation: string | null;
+  applyTo: string | null;
+  notes: string | null;
+  openings: number;
+  status: JobPostingStatus;
+  postedOn: string | null;
+  closesOn: string | null;
+}
+
+/** The same position as a visitor reads it: the advertisement, and nothing the company keeps. */
+export interface PublicJob {
+  id: string;
+  title: string;
+  description: string | null;
+  location: string | null;
+  employmentType: EmploymentType;
+  compensation: string | null;
+  applyTo: string | null;
+  createdAt: string;
 }
 
 /** What the company writes on its public page, as its owner edits it. */
@@ -1140,7 +1317,7 @@ export interface PublicCompany {
   brandColor: string | null;
   address: CompanyAddress | null;
   products: PublicProduct[];
-  jobs: JobPosting[];
+  jobs: PublicJob[];
 }
 
 export interface PublicProduct {
@@ -1704,6 +1881,9 @@ export interface Candidate {
   notes: string | null;
   /** Set once they are hired. The card then points at a real employee. */
   employeeId: string | null;
+  /** The posting they answered, when they answered one. Most CVs arrive on their own. */
+  jobPostingId: string | null;
+  jobPostingTitle: string | null;
 }
 
 export interface SaveCandidateValues {
@@ -1717,6 +1897,7 @@ export interface SaveCandidateValues {
   appliedOn: string | null;
   resumeMediaAssetId: string | null;
   notes: string | null;
+  jobPostingId: string | null;
 }
 
 export interface HireCandidateValues {

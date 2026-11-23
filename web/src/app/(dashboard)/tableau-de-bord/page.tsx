@@ -1,15 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, FileText, FolderKanban, UserRound, Users } from "lucide-react";
+import { FileText, FolderKanban, UserRound } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AdminDashboardStats } from "@/components/dashboard/admin-dashboard-stats";
+import { DashboardStats } from "@/components/dashboard/dashboard-stats";
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { UpgradeCta } from "@/components/layout/upgrade-cta";
-import { useClientsQuery } from "@/hooks/use-clients";
 import { useProjectsQuery } from "@/hooks/use-projects";
 import { useInvoicesQuery } from "@/hooks/use-invoices";
-import { useTenantsQuery } from "@/hooks/use-tenants";
 import { useAuth } from "@/lib/auth-context";
 import { tenantStatusLabels } from "@/lib/labels";
 
@@ -39,18 +39,17 @@ function StatCard({
   );
 }
 
+/**
+ * The company's own screen.
+ *
+ * It used to be three tiles counting rows: how many clients, how many projects, how many
+ * invoices. Those are numbers that only ever go up, and none of them answers a question anybody
+ * opens the application with. What was billed this month, what is still owed, what is late and
+ * what needs deciding are questions — so that is what is here now, answered in one request
+ * instead of three list endpoints paging their first twenty-five rows.
+ */
 function TenantDashboard() {
-  const { data: clients } = useClientsQuery(1, "");
-  const { data: projects } = useProjectsQuery(1, "");
-  const { data: invoices } = useInvoicesQuery(1, "");
-
-  return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <StatCard href="/clients" label="Clients" value={clients?.totalCount ?? "—"} icon={Users} />
-      <StatCard href="/projets" label="Projets" value={projects?.totalCount ?? "—"} icon={FolderKanban} />
-      <StatCard href="/factures" label="Factures" value={invoices?.totalCount ?? "—"} icon={FileText} />
-    </div>
-  );
+  return <DashboardStats />;
 }
 
 /**
@@ -85,14 +84,13 @@ function ClientDashboard() {
   );
 }
 
+/**
+ * One tile counting tenants was all this screen had. What the platform actually needs to know
+ * is how many companies are paying, how many are on trial, and which of them somebody has to
+ * chase — an expired trial nobody followed up, an account past due, a signup that never paid.
+ */
 function SuperAdminDashboard() {
-  const { data: tenants } = useTenantsQuery(1, "");
-
-  return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <StatCard href="/admin/tenants" label="Locataires" value={tenants?.totalCount ?? "—"} icon={Building2} />
-    </div>
-  );
+  return <AdminDashboardStats />;
 }
 
 export default function DashboardPage() {

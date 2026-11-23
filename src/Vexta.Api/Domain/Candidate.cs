@@ -35,6 +35,14 @@ public class Candidate
     public string? Email { get; set; }
     public string? Phone { get; set; }
 
+    /// <summary>
+    /// The posting they answered, when they answered one. Null for a CV that arrived on its own
+    /// — which is most of them in a trade, and a posting invented to hold such a candidate would
+    /// inflate the only number a posting is judged on.
+    /// </summary>
+    public Guid? JobPostingId { get; set; }
+    public JobPosting? JobPosting { get; set; }
+
     /// <summary>The job they are after — "Charpentier", "Journalier", "Chargé de projet".</summary>
     public string? DesiredJobTitle { get; set; }
 

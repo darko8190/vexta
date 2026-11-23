@@ -68,6 +68,7 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
     public DbSet<ProductPriceEntry> ProductPriceEntries => Set<ProductPriceEntry>();
     public DbSet<ProductStockEntry> ProductStockEntries => Set<ProductStockEntry>();
     public DbSet<PricePolicy> PricePolicies => Set<PricePolicy>();
+    public DbSet<PricePolicyTier> PricePolicyTiers => Set<PricePolicyTier>();
     public DbSet<PublicPage> PublicPages => Set<PublicPage>();
     public DbSet<JobPosting> JobPostings => Set<JobPosting>();
     public DbSet<ProjectTask> ProjectTasks => Set<ProjectTask>();
@@ -534,6 +535,11 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.HasOne(c => c.Employee).WithMany()
                 .HasForeignKey(c => c.EmployeeId).OnDelete(DeleteBehavior.SetNull);
 
+            // SetNull as well: deleting a posting after a season is housekeeping, and it must
+            // not delete the applications it drew — they are the record of who applied here.
+            e.HasOne(c => c.JobPosting).WithMany(j => j.Candidates)
+                .HasForeignKey(c => c.JobPostingId).OnDelete(DeleteBehavior.SetNull);
+
             e.Property(c => c.FirstName).HasMaxLength(100);
             e.Property(c => c.LastName).HasMaxLength(100);
             e.Property(c => c.Email).HasMaxLength(256);
@@ -890,6 +896,22 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.HasQueryFilter(p => p.TenantId == CurrentTenantId);
         });
 
+        builder.Entity<PricePolicyTier>(e =>
+        {
+            // Cascade: a band is part of its policy and means nothing without it. Deleting the
+            // policy is already refused while a project or an invoice names it, so this cannot
+            // take bands out from under something that still prices from them.
+            e.HasOne(t => t.PricePolicy).WithMany(p => p.Tiers)
+                .HasForeignKey(t => t.PricePolicyId).OnDelete(DeleteBehavior.Cascade);
+
+            e.Property(t => t.FromAmount).HasPrecision(14, 2);
+            e.Property(t => t.ToAmount).HasPrecision(14, 2);
+            e.Property(t => t.MarginPercent).HasPrecision(6, 3);
+
+            e.HasIndex(t => new { t.PricePolicyId, t.FromAmount });
+            e.HasQueryFilter(t => t.TenantId == CurrentTenantId);
+        });
+
         builder.Entity<ProductCategory>(e =>
         {
             e.Property(c => c.Name).HasMaxLength(100);
@@ -994,7 +1016,9 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.Property(j => j.Location).HasMaxLength(200);
             e.Property(j => j.Compensation).HasMaxLength(200);
             e.Property(j => j.ApplyTo).HasMaxLength(300);
+            e.Property(j => j.Notes).HasMaxLength(4000);
             e.HasIndex(j => new { j.TenantId, j.CreatedAt });
+            e.HasIndex(j => new { j.TenantId, j.Status });
 
             // No query filter, for the same reason as the page it appears on. Every staff query
             // scopes by tenant explicitly.

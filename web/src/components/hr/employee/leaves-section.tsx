@@ -243,7 +243,7 @@ export function LeavesSection({ employeeId, canDecide }: { employeeId?: string; 
             Les demandes en attente d&apos;abord, puis celles qui ont été répondues.
           </p>
         </div>
-        {items.length > 0 && addButton}
+        {addButton}
       </div>
 
       {isLoading ? (

@@ -339,7 +339,7 @@ export function CredentialsSection({ employeeId }: { employeeId?: string }) {
             Les cartes de compétence et les formations, celles qui expirent le plus tôt en premier.
           </p>
         </div>
-        {items.length > 0 && addButton}
+        {addButton}
       </div>
 
       {isLoading ? (

@@ -115,7 +115,7 @@ export function PurchaseOrdersSection() {
             Ce qui a été commandé chez vos fournisseurs, et ce qui est encore attendu.
           </p>
         </div>
-        {items.length > 0 && addButton}
+        {addButton}
       </div>
 
       <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

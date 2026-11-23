@@ -419,6 +419,12 @@ Chaque module peut aussi être :
 Le tableau de bord est toujours là, en premier, et n'est pas un module : une entreprise doit
 avoir un endroit où atterrir.
 
+Les onglets ajoutés après coup — **Soumissions**, **Feuilles de temps et poinçons**, **Tâches et
+horaire** — sont semés au démarrage comme les autres, à la fin de la liste et cochés sur aucun
+forfait. Un onglet ajouté au menu intégré sans ligne correspondante ici serait un onglet qui
+disparaît dès qu'un forfait définit un seul module : pensez à les cocher sur les forfaits
+concernés.
+
 Les cinq modules standards (Clients, Projets, Factures, Ressources humaines, Entreprise) sont
 créés par la migration avec leurs liens, mais **rattachés à aucun forfait** : rien de ce que vous
 voyez aujourd'hui ne change tant que vous ne les cochez pas dans un forfait. Si vous aviez déjà
@@ -1088,6 +1094,163 @@ demi-fonction.
 
 Un état « aucun résultat » après un filtre n'offre pas de bouton, lui : la liste n'est pas vide,
 c'est la recherche qui ne trouve rien, et proposer d'en créer un répondrait à côté.
+
+### Les deux boutons : le reste des carrés
+
+La règle ci-dessus existait, mais douze carrés ne la suivaient pas : leur bouton d'en haut à
+droite n'apparaissait **que** lorsqu'il y avait déjà des lignes. Matériaux d'un projet, candidats,
+formations, contacts d'urgence, CV, banque d'heures, congés, salaires, adresses d'employés, bons
+de commande, fournisseurs et politiques de prix. Ils sont tous corrigés : le bouton d'en haut est
+là en permanence.
+
+Quatre carrés n'ont volontairement **aucun** bouton et gardent leur état vide tel quel : les
+feuilles de temps d'un employé, les paiements, l'historique de prix d'un produit et les
+réceptions. Ces lignes ne se créent pas là — elles arrivent depuis le projet, la facture, un
+changement de prix ou un bon de commande — et leur état vide dit où aller.
+
+### Les sous-onglets sont alignés
+
+Le rail des sous-onglets était large de 208 pixels. « Historique de réceptions » n'y entrait pas,
+poussait sa pastille hors du cadre, et une ligne plus large sur huit suffit à faire paraître toute
+la colonne de travers.
+
+Le rail fait maintenant 256 pixels, c'est-à-dire la largeur du plus long libellé que l'application
+possède réellement, pastille comprise. Un libellé encore plus long se coupe avec « … » et son
+texte complet apparaît au survol : c'est le filet, pas le plan — un ajout futur se dégrade en
+points de suspension au lieu de recasser la colonne.
+
+### L'espace de travail est dans la barre
+
+Le changement d'espace était caché dans le menu du portrait, deux clics plus loin, juste à côté de
+« Se déconnecter ». C'était le contrôle le plus lourd de conséquences de toute l'application —
+**chaque liste de chaque écran change** quand il change — et rien à l'écran ne disait dans quel
+espace on se trouvait : quelqu'un qui tient deux entreprises devait ouvrir un menu pour savoir de
+qui il lisait les factures.
+
+Il est maintenant dans la barre du haut et répond sans qu'on l'ouvre. Sur téléphone, seul le
+pictogramme reste : la barre y tient déjà le menu, l'assistant, le thème et le portrait.
+
+Il ne s'affiche pas du tout quand il n'y a qu'un seul espace. Un sélecteur qui ne peut rien
+sélectionner est un meuble, et afficher « Acme Construction » à quelqu'un qui n'a jamais eu autre
+chose qu'Acme Construction est une étiquette, pas un bouton.
+
+### Le tableau de bord
+
+Il comptait trois choses : combien de clients, combien de projets, combien de factures. Ce sont
+des nombres qui ne font que monter, et aucun des trois ne répond à une question qu'on se pose en
+ouvrant l'application.
+
+Il répond maintenant à : **combien j'ai facturé ce mois-ci** (avec le mois précédent à côté, parce
+qu'un chiffre seul ne dit que « de l'argent est rentré »), **combien on me doit**, **combien est
+en retard**, **combien j'ai dépensé**, combien de projets sont actifs et combien d'heures ont été
+faites cette semaine.
+
+En dessous, **À surveiller** : les factures en retard, les tâches en retard, les congés à décider,
+les cartes qui expirent, les produits sous leur minimum, les nouvelles candidatures. Chaque ligne
+est un nombre et un endroit où aller. **Un zéro ne s'affiche pas** — « 0 facture en retard » est
+une ligne qu'il faut lire pour apprendre qu'il n'y a rien à lire, et six comme celle-là
+apprennent à sauter le carré.
+
+La tuile **En retard** ne paraît que lorsqu'il y a vraiment du retard. Une tuile rouge affichant
+0 $ tous les jours d'un mois bien tenu est un voyant que plus personne ne regarde.
+
+Tout vient d'une seule requête. Six appels auraient rempli la page en six vagues, et surtout : une
+liste répond par pages, donc demander « le mois » à la liste des factures aurait donné le total
+des vingt-cinq dernières factures en l'appelant un mois.
+
+Le super admin a le sien : combien d'entreprises, combien d'abonnées, combien en essai, combien
+créées ce mois-ci, plus la liste de ce qu'il faut relancer — un essai terminé sans abonnement, un
+compte en souffrance, une inscription jamais payée. **Aucun montant** : ce qu'une entreprise paie
+vit chez Stripe, et un total calculé ici serait une deuxième réponse qui contredirait les factures
+que Stripe a réellement émises.
+
+### Paliers de marge
+
+Une politique de prix peut maintenant facturer une marge **différente selon le prix d'achat**.
+L'exemple type : de 1 $ à 5 $, 60 %. Un entrepreneur ne charge pas le même pourcentage sur une
+boîte de vis à 2 $ que sur une fenêtre à 2 000 $ — le bas de gamme porte la manutention, le voyage
+au comptoir coûte le même prix dans les deux cas.
+
+Le palier se lit sur le **prix d'achat**, pas sur le prix de vente. C'est obligé : la marge est ce
+qui transforme un coût en prix, donc un palier sur le prix de vente aurait besoin de la réponse
+avant de pouvoir choisir la règle qui la produit.
+
+Un prix qui ne tombe dans **aucun** palier prend la marge ordinaire de la politique. C'est ce qui
+fait qu'une politique sans palier se comporte exactement comme avant.
+
+Les **trous sont permis** : on peut tarifer 0–5 $ et 50 $ et plus, et laisser tout le milieu à la
+marge ordinaire. Les **chevauchements sont refusés** : deux paliers qui couvrent 4 $ voudraient
+dire que le prix d'un article à 4 $ dépend de la ligne lue en premier. Seul le dernier palier peut
+rester ouvert vers le haut.
+
+Sur une facture, choisir la politique puis écrire un prix d'achat fait basculer la marge toute
+seule : 3 $ donne 60 %, 50 $ donne 25 %. Taper une marge à la main reste possible — la bascule
+automatique ne se déclenche que si la politique a des paliers, pour ne pas écraser un pourcentage
+que quelqu'un vient d'écrire.
+
+### Offres d'emplois
+
+Elles existaient déjà, mais sous **Entreprise → Page publique**, comme des annonces. Une offre
+d'emploi est une décision d'embauche qui se trouve être annoncée, pas un paragraphe de publicité
+qui se trouve à attirer du monde : on pouvait réécrire le texte d'un poste sans jamais voir
+combien de personnes y avaient répondu.
+
+Elles sont maintenant dans **Ressources humaines → Offres d'emplois**, avec leur état
+(brouillon, publiée, pourvue, fermée), le nombre de postes à combler, la date d'affichage, la
+fermeture, des notes internes jamais publiées, et surtout le **nombre de candidatures reçues**.
+Ce nombre est cliquable : il ouvre les candidats filtrés sur cette offre.
+
+Pourvue et fermée sont deux états distincts exprès. Les deux veulent dire « ce n'est plus ouvert »,
+mais une entreprise qui ne peut pas les distinguer ne peut pas dire après coup si son affichage a
+fonctionné.
+
+**Une seule autorité.** La page publique n'édite plus les offres, elle y renvoie. Les deux écrans
+savaient des choses différentes sur les mêmes lignes : celui de la page publique pouvait publier
+un poste sans voir qu'il était comblé. Une offre publiée paraît sur la page tant que la section
+est affichée ; la marquer pourvue l'en retire sans qu'il y ait un deuxième interrupteur à penser.
+
+Un candidat peut nommer l'offre à laquelle il répond. La plupart des CV arrivent d'eux-mêmes —
+c'est pourquoi « candidature spontanée » reste le choix par défaut, et inventer une offre pour y
+ranger ces gens-là gonflerait le seul chiffre sur lequel une offre se juge.
+
+**Supprimer une offre ne supprime pas les candidatures.** Les gens qui ont répondu gardent leur
+fiche et perdent seulement le lien : une entreprise qui fait le ménage du printemps dernier ne
+doit pas perdre la trace de qui a postulé.
+
+### Supprimer un locataire emportait tout sauf les candidats
+
+Trouvé en nettoyant la base de test. La suppression d'un locataire balaie explicitement une
+trentaine de tables, mais **pas** les candidats — rien dans le modèle ne les rattache au locataire.
+Une entreprise supprimée à sa demande laissait donc derrière elle les noms, les téléphones et les
+liens vers les CV des gens qui lui avaient écrit, invisibles pour tous les filtres mais bien
+présents dans la base. Corrigé.
+
+### Trois nouveaux onglets
+
+**Soumissions** — les prix donnés aux clients avant les travaux. L'écran derrière reste à bâtir.
+L'onglet existe parce que c'est là qu'on ira le chercher, et qu'une page vide honnête vaut mieux
+qu'une soumission écrite comme une facture en brouillon : c'est le contournement qu'on ne peut
+plus défaire une fois le mois fermé.
+
+**Feuilles de temps et poinçons** — les heures de toute l'équipe, toutes les feuilles ensemble,
+semaine par semaine, avec le total calculé par le serveur et non par le tableau (qui s'arrête à
+200 lignes). C'est un onglet à part de « Mes feuilles de temps » parce que les deux répondent à
+des gens différents : un employé saisit sa semaine, un contremaître lit celle de tout le monde.
+En lecture seule : les heures se saisissent sur le projet où elles ont été travaillées, sinon une
+semaine finit par être entrée deux fois. **Poinçons** reste à bâtir.
+
+**Tâches et horaire** — l'horaire de toute l'équipe (le même écran que sur la fiche d'un employé,
+sans filtre sur une personne) et toutes les tâches ouvertes, tous chantiers confondus, les
+retards en premier. Les tâches sont en lecture seule ici aussi : une tâche se modifie sur son
+projet, où son équipe et son échéance sont à l'écran.
+
+### Crédits et remboursements
+
+Deux nouveaux sous-onglets dans **Facturation**, encore vides. Ils sont dans le rail parce que le
+rail est le plan : quelqu'un qui réconcilie un mois voit où ira une note de crédit au lieu
+d'inventer une facture négative pour la loger. Un remboursement n'est pas un paiement négatif —
+c'est son propre événement avec sa propre date, sinon les recettes d'une journée ne s'additionnent
+plus.
 
 ### Le menu ne clignote plus
 

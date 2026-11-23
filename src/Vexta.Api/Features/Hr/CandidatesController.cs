@@ -25,13 +25,16 @@ public class CandidatesController(VextaDbContext db, ICurrentUserService current
 {
     /// <param name="statut">Only candidates in this state.</param>
     /// <param name="recherche">Matches a name, the job they want, or where they came from.</param>
+    /// <param name="offre">Only the people who answered this posting.</param>
     [HttpGet]
     public async Task<ActionResult<List<CandidateDto>>> List(
-        [FromQuery] CandidateStatus? statut, [FromQuery] string? recherche, CancellationToken ct)
+        [FromQuery] CandidateStatus? statut, [FromQuery] string? recherche,
+        [FromQuery] Guid? offre, CancellationToken ct)
     {
         var query = db.Candidates.AsNoTracking().AsQueryable();
 
         if (statut is { } status) query = query.Where(c => c.Status == status);
+        if (offre is { } posting) query = query.Where(c => c.JobPostingId == posting);
 
         if (!string.IsNullOrWhiteSpace(recherche))
         {
@@ -72,6 +75,7 @@ public class CandidatesController(VextaDbContext db, ICurrentUserService current
             // Today when nobody said: a CV handed over at the counter was handed over today.
             AppliedOn = request.AppliedOn ?? BusinessDay.Today,
             ResumeMediaAssetId = request.ResumeMediaAssetId,
+            JobPostingId = request.JobPostingId,
             Notes = Clean(request.Notes)
         };
 
@@ -104,6 +108,7 @@ public class CandidatesController(VextaDbContext db, ICurrentUserService current
         candidate.Status = candidate.EmployeeId is not null ? CandidateStatus.Embauche : request.Status;
         candidate.AppliedOn = request.AppliedOn ?? candidate.AppliedOn;
         candidate.ResumeMediaAssetId = request.ResumeMediaAssetId;
+        candidate.JobPostingId = request.JobPostingId;
         candidate.Notes = Clean(request.Notes);
         candidate.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -194,12 +199,24 @@ public class CandidatesController(VextaDbContext db, ICurrentUserService current
             c.ResumeMediaAssetId,
             c.ResumeMediaAsset != null ? c.ResumeMediaAsset.FileName : null,
             c.Notes,
-            c.EmployeeId);
+            c.EmployeeId,
+            c.JobPostingId,
+            c.JobPosting != null ? c.JobPosting.Title : null);
 
     private async Task<string?> ValidateAsync(SaveCandidateRequest r, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(r.FirstName)) return "Le prénom est obligatoire.";
         if (string.IsNullOrWhiteSpace(r.LastName)) return "Le nom est obligatoire.";
+        // Checked by hand against the tenant: JobPosting carries no query filter, because the
+        // public page reads it without a session, so nothing else would catch an id from
+        // another company.
+        if (r.JobPostingId is { } postingId
+            && !await db.JobPostings.AnyAsync(
+                j => j.Id == postingId && j.TenantId == currentUser.TenantId, ct))
+        {
+            return "Cette offre d'emploi n'existe plus.";
+        }
+
         if (r.ResumeMediaAssetId is { } assetId && !await db.MediaAssets.AnyAsync(m => m.Id == assetId, ct))
         {
             return "Ce fichier n'existe plus.";

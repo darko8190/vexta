@@ -22,6 +22,10 @@ function invalidate(queryClient: ReturnType<typeof useQueryClient>, projectId: s
   queryClient.invalidateQueries({ queryKey: ["projects", projectId, "expenses"] });
   queryClient.invalidateQueries({ queryKey: ["projects", projectId, "summary"] });
   queryClient.invalidateQueries({ queryKey: ["expense-types"] });
+  // The company-wide list in Achats reads the same rows under its own key. Without this, an
+  // expense filed on a project is missing from the list that is meant to show every one of
+  // them, and the only way to see it is to reload the page.
+  queryClient.invalidateQueries({ queryKey: ["depenses"] });
 }
 
 export function useExpensesQuery(projectId: string | undefined, enabled = true) {

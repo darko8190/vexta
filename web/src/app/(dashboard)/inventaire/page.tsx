@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Blocks, ClipboardList, Package, Warehouse, Wrench } from "lucide-react";
+import { Blocks, ClipboardList, Package, PackageCheck, ShoppingCart, Warehouse, Wrench } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { SectionNav, type NavSection } from "@/components/layout/section-nav";
 import { ProductsSection } from "@/components/products/products-section";
@@ -25,6 +25,10 @@ export default function InventoryPage() {
     { key: "entrepot", label: "Entrepôt", count: 0, icon: Warehouse },
     { key: "assemblages", label: "Assemblages", count: 0, icon: Blocks },
     { key: "suivis", label: "Suivis d'inventaires", count: 0, icon: ClipboardList },
+    // The two histories sit last and in this order on purpose: an order is placed before
+    // the delivery that answers it, so reading down the rail follows what happened.
+    { key: "historique-commandes", label: "Historique de commandes", count: 0, icon: ShoppingCart },
+    { key: "historique-receptions", label: "Historique de réceptions", count: 0, icon: PackageCheck },
   ];
 
   return (
@@ -70,6 +74,20 @@ export default function InventoryPage() {
               icon={ClipboardList}
               title="Suivis d'inventaires"
               description="Les entrées, les sorties et les décomptes."
+            />
+          )}
+          {section === "historique-commandes" && (
+            <SectionPlaceholder
+              icon={ShoppingCart}
+              title="Historique de commandes"
+              description="Chaque ligne commandée, toutes commandes confondues : le produit, la quantité et la commande dont elle vient."
+            />
+          )}
+          {section === "historique-receptions" && (
+            <SectionPlaceholder
+              icon={PackageCheck}
+              title="Historique de réceptions"
+              description="Chaque ligne reçue, toutes réceptions confondues : ce qui est entré, quand, et sur quelle commande."
             />
           )}
         </div>

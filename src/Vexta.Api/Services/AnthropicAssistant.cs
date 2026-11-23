@@ -19,7 +19,7 @@ public static class AnthropicAssistant
     /// </summary>
     private const int MaxTokens = 8192;
 
-    public static async Task<string> RunAsync(
+    public static async Task<AssistantRun> RunAsync(
         string apiKey,
         string model,
         string systemPrompt,
@@ -30,6 +30,11 @@ public static class AnthropicAssistant
     {
         var client = new AnthropicClient { ApiKey = apiKey };
 
+        // Across every turn, not just the last: a question answered through three tool calls is
+        // billed for all four exchanges, and reporting only the final one would understate it.
+        long inputTokens = 0;
+        long outputTokens = 0;
+
         var messages = history
             .Where(m => !string.IsNullOrWhiteSpace(m.Text))
             .Select(m => m.Role == "assistant"
@@ -39,7 +44,7 @@ public static class AnthropicAssistant
 
         if (messages.Count == 0)
         {
-            return "Pose-moi une question.";
+            return new AssistantRun("Pose-moi une question.", 0, 0);
         }
 
         var tools = new List<ToolUnion>
@@ -66,6 +71,9 @@ public static class AnthropicAssistant
                 Tools = tools,
                 Messages = messages,
             }, cancellationToken: ct);
+
+            inputTokens += response.Usage.InputTokens;
+            outputTokens += response.Usage.OutputTokens;
 
             List<ContentBlockParam> assistantContent = [];
             List<ContentBlockParam> toolResults = [];
@@ -112,15 +120,21 @@ public static class AnthropicAssistant
             if (toolResults.Count == 0)
             {
                 var final = answer.ToString().Trim();
-                return final.Length > 0 ? final : "Je n'ai rien à répondre à cela.";
+                return new AssistantRun(
+                    final.Length > 0 ? final : "Je n'ai rien à répondre à cela.",
+                    inputTokens,
+                    outputTokens);
             }
 
             messages.Add(new AssistantMessageParam { Content = assistantContent });
             messages.Add(new UserMessageParam { Content = toolResults });
         }
 
-        return "Je me suis arrêté après plusieurs essais sans arriver au bout. Reformule la "
-             + "demande, ou découpe-la en deux.";
+        return new AssistantRun(
+            "Je me suis arrêté après plusieurs essais sans arriver au bout. Reformule la "
+            + "demande, ou découpe-la en deux.",
+            inputTokens,
+            outputTokens);
     }
 
     /// <summary>

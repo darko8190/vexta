@@ -34,7 +34,17 @@ public enum TenantSubscriptionStatus
     Incomplete = 0,
     Active = 1,
     PastDue = 2,
-    Canceled = 3
+    Canceled = 3,
+
+    /// <summary>
+    /// Inside a free trial the plan granted, with no card on file and no Stripe subscription at
+    /// all. Vexta's own state, not one of Stripe's: the company has not been asked to pay yet,
+    /// so there is nothing at Stripe to have a status.
+    ///
+    /// Distinct from Active because the two end differently — an active subscription renews, a
+    /// trial runs out. See <see cref="Tenant.TrialEndsAt"/>.
+    /// </summary>
+    Trialing = 4
 }
 
 /// <summary>

@@ -86,6 +86,15 @@ public class TenantSignupService(
         // SubscriptionStatus is left alone: it describes a Stripe subscription, and a personal
         // space has none. Access is granted on Kind, not by pretending it pays.
         var tenant = new Tenant { Name = spaceName.Trim(), Slug = slug, Kind = kind, PlanId = plan?.Id };
+
+        // A plan that grants a trial opens the space on it: no Stripe customer, no checkout, no
+        // card. The banner in the header counts the days down and sends them to Paramètres to
+        // subscribe when they are ready.
+        if (plan is { TrialDays: > 0 })
+        {
+            tenant.SubscriptionStatus = TenantSubscriptionStatus.Trialing;
+            tenant.TrialEndsAt = DateTimeOffset.UtcNow.AddDays(plan.TrialDays);
+        }
         db.Tenants.Add(tenant);
 
         var user = new ApplicationUser
@@ -149,6 +158,12 @@ public class TenantSignupService(
 
         user.Tenant = tenant;
 
+        // Already inside a trial: nothing to pay today, so nothing to send them to Stripe for.
+        if (tenant.SubscriptionStatus == TenantSubscriptionStatus.Trialing)
+        {
+            return TenantSignupResult.Free(user);
+        }
+
         var frontendUrl = configuration["Frontend:BaseUrl"] ?? "http://localhost:3000";
         try
         {
@@ -158,6 +173,7 @@ public class TenantSignupService(
                 plan!.StripePriceId!,
                 successUrl: $"{frontendUrl}/inscription/succes?session_id={{CHECKOUT_SESSION_ID}}",
                 cancelUrl: $"{frontendUrl}/inscription/annule",
+                couponId: plan!.StripeCouponId,
                 ct: ct);
 
             return TenantSignupResult.Paid(user, checkoutUrl);

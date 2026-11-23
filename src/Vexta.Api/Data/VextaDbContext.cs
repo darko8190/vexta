@@ -54,6 +54,7 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
     public DbSet<TenantMembership> TenantMemberships => Set<TenantMembership>();
     public DbSet<BillingSettings> BillingSettings => Set<BillingSettings>();
     public DbSet<ProjectExpense> ProjectExpenses => Set<ProjectExpense>();
+    public DbSet<ProjectExtraCharge> ProjectExtraCharges => Set<ProjectExtraCharge>();
     public DbSet<ProjectMaterial> ProjectMaterials => Set<ProjectMaterial>();
     public DbSet<TimesheetEntry> TimesheetEntries => Set<TimesheetEntry>();
     public DbSet<ProjectDocument> ProjectDocuments => Set<ProjectDocument>();
@@ -155,6 +156,8 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
         builder.Entity<TenantAiSettings>(e =>
         {
             e.HasKey(s => s.TenantId);
+            e.Property(s => s.InputPricePerMillion).HasPrecision(12, 4);
+            e.Property(s => s.OutputPricePerMillion).HasPrecision(12, 4);
             e.HasOne(s => s.Tenant).WithOne()
                 .HasForeignKey<TenantAiSettings>(s => s.TenantId).OnDelete(DeleteBehavior.Cascade);
             e.Property(s => s.Model).HasMaxLength(100);
@@ -726,6 +729,24 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
 
             // A customer reads their own project's record, so the expense filter follows the
             // project's: tenant, and the client's own rows when a client is signed in.
+            e.HasQueryFilter(x => x.TenantId == CurrentTenantId
+                && (CurrentClientId == null || x.Project!.ClientId == CurrentClientId));
+        });
+
+        builder.Entity<ProjectExtraCharge>(e =>
+        {
+            e.HasOne(x => x.Project).WithMany(p => p.ExtraCharges)
+                .HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
+
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.Description).HasMaxLength(2000);
+            e.Property(x => x.Cost).HasPrecision(14, 2);
+            e.Property(x => x.SellingPrice).HasPrecision(14, 2);
+
+            e.HasIndex(x => new { x.ProjectId, x.CreatedAt });
+
+            // The same filter an expense carries, and for the same reason: a customer reads
+            // their own project, so the rows follow the project's client as well as the tenant.
             e.HasQueryFilter(x => x.TenantId == CurrentTenantId
                 && (CurrentClientId == null || x.Project!.ClientId == CurrentClientId));
         });

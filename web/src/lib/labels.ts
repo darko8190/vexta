@@ -192,6 +192,7 @@ export const tenantStatusLabels: Record<TenantSubscriptionStatus, string> = {
   Active: "Actif",
   PastDue: "Paiement en retard",
   Canceled: "Annulé",
+  Trialing: "Essai gratuit",
 };
 
 export const projectStatusBadgeVariant: Record<ProjectStatus, "default" | "secondary" | "destructive" | "outline"> = {
@@ -216,6 +217,9 @@ export const tenantStatusBadgeVariant: Record<TenantSubscriptionStatus, "default
   Active: "default",
   PastDue: "destructive",
   Canceled: "destructive",
+  // Not "default": a trial is working but temporary, and a badge that reads the same as a paid
+  // subscription hides the one fact about it that matters.
+  Trialing: "secondary",
 };
 
 export const invoiceLineKindLabels: Record<InvoiceLineKind, string> = {

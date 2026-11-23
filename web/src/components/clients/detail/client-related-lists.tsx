@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LoadErrorState } from "@/components/layout/load-error-state";
 import { EmptyState } from "@/components/layout/empty-state";
+import { AddressFormSheet } from "@/components/addresses/address-form-sheet";
 import { ProjectFormSheet } from "@/components/projects/project-form-sheet";
 import { useCanCreate } from "@/hooks/use-can-create";
 import { useAddressesQuery } from "@/hooks/use-addresses";
@@ -17,6 +18,7 @@ import { formatDateOnly } from "@/lib/dates";
 import { formatCents } from "@/lib/money";
 import { formatProjectNumber } from "@/lib/types";
 import { invoiceStatusLabels, projectStatusLabels } from "@/lib/labels";
+import type { AddressRecord } from "@/lib/types";
 
 function Loading({ rows = 3 }: { rows?: number }) {
   return (
@@ -51,13 +53,37 @@ function SectionHeading({
 
 export function ClientAddressesSection({ clientId }: { clientId: string }) {
   const { data, isLoading, isError, isPlaceholderData, error: loadError, refetch } = useAddressesQuery(1, "", clientId);
+  const canCreate = useCanCreate();
+  const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<AddressRecord | undefined>(undefined);
   const items = data?.items ?? [];
+
+  function openCreate() {
+    setEditing(undefined);
+    setFormOpen(true);
+  }
+
+  // An address added with no way to correct it is half a feature, and the sheet already knows
+  // how to edit one. A row opens it on the record it shows.
+  function openEdit(address: AddressRecord) {
+    if (!canCreate) return;
+    setEditing(address);
+    setFormOpen(true);
+  }
+
+  const addButton = canCreate ? (
+    <Button onClick={openCreate}>
+      <Plus />
+      Ajouter une adresse
+    </Button>
+  ) : undefined;
 
   return (
     <div>
       <SectionHeading
         title="Adresses"
         description="Celle du formulaire est marquée principale. Les autres servent à la livraison ou au chantier."
+        action={addButton}
       />
       {isLoading ? (
         <Loading />
@@ -77,25 +103,53 @@ export function ClientAddressesSection({ clientId }: { clientId: string }) {
         <EmptyState
           icon={MapPin}
           title="Aucune adresse"
-          description="Ajoutez une adresse depuis la fiche du client pour qu'elle apparaisse sur ses factures."
+          description="Une adresse de chantier, une adresse de livraison, ou celle qui paraîtra sur ses factures."
+          action={addButton}
         />
       ) : (
         <ul className="space-y-2">
-          {items.map((address) => (
-            <li key={address.id} className="rounded-lg border border-border bg-card p-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-medium text-foreground">{address.line1}</span>
-                {address.isPrimary && <Badge variant="default">Principale</Badge>}
-                <Badge variant="secondary">{address.type}</Badge>
-              </div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {[address.line2, address.city, address.province, address.postalCode, address.country]
-                  .filter(Boolean)
-                  .join(", ")}
-              </p>
-            </li>
-          ))}
+          {items.map((address) => {
+            const body = (
+              <>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium text-foreground">{address.line1}</span>
+                  {address.isPrimary && <Badge variant="default">Principale</Badge>}
+                  <Badge variant="secondary">{address.type}</Badge>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {[address.line2, address.city, address.province, address.postalCode, address.country]
+                    .filter(Boolean)
+                    .join(", ")}
+                </p>
+              </>
+            );
+
+            return (
+              <li key={address.id}>
+                {canCreate ? (
+                  <button
+                    type="button"
+                    onClick={() => openEdit(address)}
+                    className="w-full rounded-lg border border-border bg-card p-3 text-left transition-colors hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                  >
+                    {body}
+                  </button>
+                ) : (
+                  <div className="rounded-lg border border-border bg-card p-3">{body}</div>
+                )}
+              </li>
+            );
+          })}
         </ul>
+      )}
+
+      {formOpen && (
+        <AddressFormSheet
+          open={formOpen}
+          onOpenChange={setFormOpen}
+          address={editing}
+          defaultClientId={clientId}
+        />
       )}
     </div>
   );
@@ -126,7 +180,7 @@ export function ClientProjectsSection({ clientId }: { clientId: string }) {
       <SectionHeading
         title="Projets"
         description="Les mandats en cours et passés pour ce client."
-        action={items.length > 0 ? addButton : undefined}
+        action={addButton}
       />
       {isLoading ? (
         <Loading />

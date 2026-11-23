@@ -10,6 +10,13 @@ export interface AiSettings {
   canWrite: boolean;
   /** False when the plan does not include the assistant. */
   featureIncluded: boolean;
+  /**
+   * What the company pays per million tokens, as their provider bills them. Null until they
+   * fill it in: nothing is guessed on their behalf, because an invented rate would turn the
+   * figure in the header into a number that looks like a statement of account and is not one.
+   */
+  inputPricePerMillion: number | null;
+  outputPricePerMillion: number | null;
 }
 
 export interface SaveAiSettingsValues {
@@ -19,6 +26,15 @@ export interface SaveAiSettingsValues {
   apiKey: string | null;
   isEnabled: boolean;
   canWrite: boolean;
+  inputPricePerMillion: number | null;
+  outputPricePerMillion: number | null;
+}
+
+/** This month's spend. The cost is null until the company has entered its own prices. */
+export interface AssistantUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cost: number | null;
 }
 
 export interface AssistantAvailability {
@@ -27,6 +43,8 @@ export interface AssistantAvailability {
   provider: string;
   model: string | null;
   canWrite: boolean;
+  /** Null when no assistant is set up. */
+  usage: AssistantUsage | null;
 }
 
 export interface AssistantAction {
@@ -129,6 +147,10 @@ export function useAskAssistant() {
         (action) => action.method !== "GET" && action.status >= 200 && action.status < 300,
       );
       if (wrote) queryClient.invalidateQueries();
+      // The header's figure just moved, whether or not anything was written. Without this it
+      // only catches up five minutes later, which makes the number look broken rather than
+      // stale to whoever is watching what a question costs them.
+      queryClient.invalidateQueries({ queryKey: ["assistant", "availability"] });
     },
   });
 }

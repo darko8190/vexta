@@ -27,6 +27,7 @@ import { ProjectFormSheet } from "@/components/projects/project-form-sheet";
 import { ProjectCostTable } from "@/components/projects/detail/project-cost-table";
 import { ProjectDocumentsSection } from "@/components/projects/detail/project-documents-section";
 import { ProjectExpensesSection } from "@/components/projects/detail/project-expenses-section";
+import { ProjectExtraChargesSection } from "@/components/projects/detail/project-extra-charges-section";
 import { ProjectMaterialsSection } from "@/components/projects/detail/project-materials-section";
 import { ProjectTasksSection } from "@/components/projects/detail/project-tasks-section";
 import { ProjectTimesheetsSection } from "@/components/projects/detail/project-timesheets-section";
@@ -288,11 +289,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           {section === "depenses" && <ProjectExpensesSection projectId={project.id} locked={locked} />}
 
           {section === "frais" && (
-            <SectionPlaceholder
-              icon={Plus}
-              title="Frais supplémentaires"
-              description="Ce qui s'ajoute au mandat en cours de route."
-            />
+            <ProjectExtraChargesSection projectId={project.id} locked={locked} />
           )}
 
           {section === "documents" && <ProjectDocumentsSection projectId={project.id} />}

@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { FileText, GraduationCap, Home, LifeBuoy, Palmtree, UsersRound, Users, UserSearch } from "lucide-react";
+import { Briefcase, FileText, GraduationCap, Home, LifeBuoy, Palmtree, UsersRound, Users, UserSearch } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { SectionNav, type NavSection } from "@/components/layout/section-nav";
+import { SectionPlaceholder } from "@/components/projects/detail/section-placeholder";
 import { CandidatesSection } from "@/components/hr/candidates-section";
 import { CredentialsSection } from "@/components/hr/credentials-section";
 import { DocumentsSection } from "@/components/hr/documents-section";
@@ -38,6 +39,9 @@ export default function HumanResourcesPage() {
     { key: "equipes", label: "Équipes", count: counts?.teams, icon: UsersRound },
     { key: "adresses", label: "Adresses", count: counts?.addresses, icon: Home },
     { key: "contacts", label: "Contacts", count: counts?.emergencyContacts, icon: LifeBuoy },
+    // Before Candidats, because that is the order it happens in: a posting goes out, and
+    // the applicants arrive against it.
+    { key: "offres-emplois", label: "Offres d'emplois", count: 0, icon: Briefcase },
     { key: "candidats", label: "Candidats", count: counts?.candidates, icon: UserSearch },
     { key: "formations", label: "Formations", count: counts?.credentials, icon: GraduationCap },
     { key: "conges", label: "Congés", count: counts?.pendingLeaves, icon: Palmtree },
@@ -65,6 +69,13 @@ export default function HumanResourcesPage() {
           {section === "equipes" && <TeamsSection />}
           {section === "adresses" && <EmployeeAddressesSection />}
           {section === "contacts" && <EmergencyContactsSection />}
+          {section === "offres-emplois" && (
+            <SectionPlaceholder
+              icon={Briefcase}
+              title="Offres d'emplois"
+              description="Les postes affichés, et les candidatures reçues pour chacun."
+            />
+          )}
           {section === "candidats" && <CandidatesSection />}
           {section === "formations" && <CredentialsSection />}
           {section === "conges" && <LeavesSection canDecide={isOwner} />}

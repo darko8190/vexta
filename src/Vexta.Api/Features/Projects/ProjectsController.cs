@@ -100,6 +100,11 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
             .Select(x => new { x.Cost, x.SellingPrice })
             .ToListAsync();
 
+        var extraCharges = await db.ProjectExtraCharges.AsNoTracking()
+            .Where(x => x.ProjectId == id)
+            .Select(x => new { x.Cost, x.SellingPrice })
+            .ToListAsync();
+
         var materials = await db.ProjectMaterials.AsNoTracking()
             .Where(m => m.ProjectId == id)
             .Select(m => new { m.Quantity, m.PurchasePrice, m.UnitPrice })
@@ -119,7 +124,7 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
             Assemblies: 0,
             Timesheets: project.Timesheets,
             Expenses: project.Expenses,
-            ExtraCharges: 0,
+            ExtraCharges: extraCharges.Count,
             DocumentsAndNotes: project.Documents + project.Notes,
             Invoices: project.Invoices);
 
@@ -142,7 +147,9 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
             new("depenses", "Dépenses",
                 expenses.Sum(x => x.Cost ?? 0m),
                 expenses.Sum(x => x.SellingPrice ?? 0m)),
-            new("frais-supplementaires", "Frais supplémentaires", 0m, 0m)
+            new("frais-supplementaires", "Frais supplémentaires",
+                extraCharges.Sum(x => x.Cost ?? 0m),
+                extraCharges.Sum(x => x.SellingPrice ?? 0m))
         };
 
         var totalCost = Round(lines.Sum(l => l.Cost));

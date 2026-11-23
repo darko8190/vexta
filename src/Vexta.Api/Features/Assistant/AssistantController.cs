@@ -17,7 +17,13 @@ public record AiSettingsDto(
     bool IsEnabled,
     bool CanWrite,
     /// <summary>False when the plan does not include the assistant: the form then says so.</summary>
-    bool FeatureIncluded);
+    bool FeatureIncluded,
+    /// <summary>
+    /// What the company pays per million tokens. Null until they fill it in — nothing is guessed
+    /// on their behalf, because a list price we invented would read like a statement of account.
+    /// </summary>
+    decimal? InputPricePerMillion,
+    decimal? OutputPricePerMillion);
 
 /// <param name="ApiKey">Left blank to keep the key already on file.</param>
 public record SaveAiSettingsRequest(
@@ -25,7 +31,9 @@ public record SaveAiSettingsRequest(
     string Model,
     string? ApiKey,
     bool IsEnabled,
-    bool CanWrite);
+    bool CanWrite,
+    decimal? InputPricePerMillion,
+    decimal? OutputPricePerMillion);
 
 public record AssistantMessageDto(string Role, string Text);
 
@@ -63,14 +71,17 @@ public class AssistantController(
         var settings = await db.TenantAiSettings.AsNoTracking().FirstOrDefaultAsync(s => s.TenantId == tenantId, ct);
 
         return Ok(settings is null
-            ? new AiSettingsDto(nameof(AiProvider.Anthropic), "claude-opus-5-5", false, false, false, included)
+            ? new AiSettingsDto(
+                nameof(AiProvider.Anthropic), "claude-opus-5-5", false, false, false, included, null, null)
             : new AiSettingsDto(
                 settings.Provider.ToString(),
                 settings.Model,
                 !string.IsNullOrWhiteSpace(settings.EncryptedApiKey),
                 settings.IsEnabled,
                 settings.CanWrite,
-                included));
+                included,
+                settings.InputPricePerMillion,
+                settings.OutputPricePerMillion));
     }
 
     [HttpPut("parametres")]
@@ -97,9 +108,16 @@ public class AssistantController(
             db.TenantAiSettings.Add(settings);
         }
 
+        if (request.InputPricePerMillion is < 0 || request.OutputPricePerMillion is < 0)
+        {
+            return BadRequest(new { message = "Un prix ne peut pas être négatif." });
+        }
+
         settings.Provider = provider;
         settings.Model = model;
         settings.CanWrite = request.CanWrite;
+        settings.InputPricePerMillion = request.InputPricePerMillion;
+        settings.OutputPricePerMillion = request.OutputPricePerMillion;
         settings.UpdatedAt = DateTimeOffset.UtcNow;
 
         // Blank means "leave the key alone", so the form can show a masked field without ever
@@ -120,7 +138,9 @@ public class AssistantController(
             !string.IsNullOrWhiteSpace(settings.EncryptedApiKey),
             settings.IsEnabled,
             settings.CanWrite,
-            await features.IsEnabledAsync(FeatureKeys.Ai, ct)));
+            await features.IsEnabledAsync(FeatureKeys.Ai, ct),
+            settings.InputPricePerMillion,
+            settings.OutputPricePerMillion));
     }
 
     /// <summary>Forgets the key, which is the only way to take one back.</summary>

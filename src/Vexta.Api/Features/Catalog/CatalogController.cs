@@ -42,6 +42,9 @@ public class CatalogController(VextaDbContext db) : ControllerBase
                 p.Currency,
                 p.MinUsers,
                 p.MaxUsers,
+                p.TrialDays,
+                p.DiscountPercent,
+                p.DiscountMonths,
                 p.Modules
                     .Where(m => m.IsPublished)
                     .OrderBy(m => m.SortOrder).ThenBy(m => m.Title)

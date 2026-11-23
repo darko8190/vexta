@@ -558,6 +558,59 @@ marché. Un refus est plus utile visible qu'avalé.
 Rien de ce qui lui est écrit n'est conservé par Vexta : la conversation vit dans l'onglet du
 navigateur et part avec lui.
 
+#### Ce qu'il coûte
+
+À côté du bouton, en haut de l'écran, une petite étiquette dit ce que l'assistant a consommé
+**depuis le début du mois**. Le compteur repart tout seul au changement de mois : la question que
+se pose quelqu'un qui surveille une facture est « combien ce mois-ci », pas « combien depuis
+toujours ».
+
+Pour qu'elle affiche des dollars, l'entreprise inscrit dans **Paramètres → Assistant IA** ses
+deux prix par million de jetons — entrée et sortie — tels que son fournisseur les lui facture.
+Tant qu'ils sont vides, l'étiquette affiche les jetons.
+
+**Nous n'inscrivons aucun prix à sa place, et c'est voulu.** Un tarif gravé dans le code serait
+faux pour quiconque a négocié son taux, et faux pour tout le monde le jour où un fournisseur
+change sa liste — faux d'une manière qui ressemble à un relevé de compte. Les jetons, eux, sont
+vrais sans prétendre être une facture.
+
+Le compte inclut tous les allers-retours d'une même question, pas seulement le dernier : une
+demande réglée en trois appels d'outil est facturée pour les quatre échanges.
+
+### Essai gratuit et rabais de départ
+
+Deux champs de plus sur chaque forfait, dans **Admin → Forfaits**.
+
+**Jours d'essai gratuit.** Au-dessus de zéro, s'inscrire à ce forfait **ne demande aucune carte
+de crédit** : l'entreprise entre tout de suite, et une bande en haut de l'écran compte les jours
+qui restent avec un bouton **Payer l'abonnement** qui mène à Paramètres. À zéro, rien ne change :
+le paiement est demandé à l'inscription comme avant.
+
+L'essai est tenu par Vexta, pas par Stripe. Il n'y a ni client, ni abonnement, ni carte chez
+Stripe pendant ce temps-là — faire passer l'essai par Stripe aurait voulu dire ramasser une carte
+pour commencer quelque chose de gratuit, ce qui est précisément ce qu'on évite ici.
+
+Quand l'essai est écoulé, les onglets se referment avec un message qui dit quoi faire, et non une
+page vide. L'entreprise, ses données et son dossier restent intacts : c'est l'accès aux modules
+qui s'arrête, jamais le contenu.
+
+**Rabais de départ.** Un pourcentage et une durée — 15 % pendant les 3 premiers mois, par
+exemple. Les deux vont ensemble : un pourcentage sans durée ne s'applique jamais, une durée sans
+pourcentage ne retire rien, et le formulaire refuse les deux cas plutôt que d'enregistrer un
+rabais qui ne fait rien.
+
+Celui-là, c'est Stripe qui l'applique, sur les vraies factures. C'est ce qui fait que le reçu que
+le client reçoit et ce que Vexta affiche disent la même chose — un rabais calculé de notre côté
+aurait à être refait à chaque prorata, chaque remboursement et chaque changement de forfait, et
+finirait par contredire la facture.
+
+Changer le rabais d'un forfait crée un nouveau coupon chez Stripe : le pourcentage et la durée
+d'un coupon ne se modifient pas une fois créés. Les entreprises déjà abonnées gardent le coupon
+qu'elles avaient, parce que leur supprimer le leur couperait leur rabais avant la fin.
+
+L'essai et le rabais s'affichent tous les deux sur la carte du forfait au moment de s'inscrire.
+Un essai dont l'acheteur n'est pas informé est un essai que personne ne prend.
+
 ### Se désabonner
 
 **Paramètres → Abonnement → Se désabonner.** Rien ne ferme le jour du clic : Stripe laisse
@@ -807,10 +860,9 @@ page qui le dit, et non une erreur.
 
 ### Achats et dépenses
 
-**Achats** est un onglet de menu avec pour l'instant un seul sous-onglet : **Dépenses**. Il
-existe pour que les bons de commande et les fournisseurs aient un endroit où aller plus tard,
-plutôt que d'avoir à déplacer Dépenses du premier niveau le jour où ils arrivent. Cliquer
-« Achats » mène directement à Dépenses tant que c'est la seule chose qui s'y trouve.
+**Achats** porte deux sous-onglets : **Dépenses** et **Factures fournisseurs**. Le second est en
+place et vide pour l'instant — le rail est le plan, et une page qui gagne un rail plus tard
+déplace tout ce que les gens avaient appris à trouver.
 
 La page liste **toutes** les dépenses de l'entreprise, tous projets confondus, avec recherche,
 type et période. « Combien on a dépensé en novembre » est une question d'achats, et y répondre en
@@ -821,13 +873,25 @@ lignes affichées : un total d'une page aurait l'air d'une réponse et serait la
 dépense sans date est écartée d'une recherche datée plutôt que ramassée dedans — on n'a pas dit
 quand l'argent est sorti, donc aucune période ne peut honnêtement la réclamer.
 
-En lecture seule, pour la même raison que les feuilles de temps : une dépense se saisit contre
-son projet, avec la photo du reçu.
+Le bouton **Nouvelle dépense** est maintenant ici aussi. Comme une dépense appartient toujours à
+un projet — c'est ce qui la rend facturable — il demande d'abord lequel, puis ouvre le même
+formulaire que sur le projet, photo du reçu comprise. Deux étapes plutôt qu'un champ « projet »
+caché dans le formulaire : la question n'est pas optionnelle, et un formulaire dont le premier
+champ décide du sens de tout le reste se remplit à l'envers.
 
 ### Formulaires
 
 Sous **Outils & Formation → Formulaires**, une entreprise monte ses propres formulaires : les
 questions, le type de réponse attendu, et **ce que la réponse déclenche**.
+
+**La ligne s'ouvre.** Il n'y a plus de menu à trois points sur la liste : presser la carte d'un
+formulaire mène à sa page. On y trouve **Détails** en premier sous-onglet — ce qui a été saisi à
+sa création : le titre, l'état, la description, le message de confirmation — puis les questions,
+les actions et les réponses. Supprimer se fait depuis cette page, là où on voit ce qu'on
+s'apprête à retirer.
+
+Un employé qui n'administre pas l'entreprise garde sa carte ordinaire et son bouton
+**Remplir** : ce qu'il vient faire, c'est répondre.
 
 #### Les questions
 
@@ -978,6 +1042,63 @@ Trois choses valent la peine d'être sues :
 - **Formations** a quitté Outils pour venir ici. La liste se trie par date d'expiration la plus
   proche : c'est la seule question qu'on ouvre cet écran pour poser — qui va se faire refuser à
   la barrière.
+- **Offres d'emplois** est en place et vide, juste **avant** Candidats, parce que c'est l'ordre
+  dans lequel ça arrive : une offre sort, et les candidatures entrent contre elle.
+
+### Frais supplémentaires sur un projet
+
+Le sous-onglet **Frais supplémentaires** d'un projet enregistre maintenant de vraies lignes : ce
+qui s'ajoute à la facture et qui n'était pas dans la soumission — un déplacement de plus, une
+heure de temps supplémentaire, un supplément de fin de semaine.
+
+C'est le formulaire d'une dépense **sans la photo**. Une dépense se prouve par son reçu — le reçu
+*est* la dépense. Un frais supplémentaire est une décision que l'entreprise a prise : il n'y a
+rien à photographier, et un bouton d'appareil photo ici n'inviterait qu'à classer des reçus là où
+le tableau des coûts ne les voit pas.
+
+Il n'y a pas de catégorie non plus. Les types de dépenses d'une entreprise répondent à « quelle
+sorte de dépense était-ce » pour la comptabilité ; un frais se décrit par sa propre ligne, et
+inventer une deuxième liste à entretenir, c'est se donner un champ obligatoire qui finit toujours
+par dire « Autre ».
+
+Le coût et le vendant alimentent la ligne **Frais supplémentaires** du tableau des coûts du
+projet, qui attendait à zéro depuis le début. Un projet facturé n'en accepte plus : ce serait de
+l'argent que personne n'a mis sur la facture.
+
+### Sous-onglets d'inventaire
+
+**Inventaire** gagne deux sous-onglets en place et vides, dans cet ordre : **Historique de
+commandes**, puis **Historique de réceptions**. Chacun montrera toutes les lignes, toutes
+commandes ou réceptions confondues. L'ordre suit ce qui se passe : une commande est passée avant
+la livraison qui lui répond.
+
+### Les deux boutons d'un carré vide
+
+Une règle maintenant uniforme partout. Quand un carré est **vide**, le bouton pour ajouter est à
+**deux endroits** : en haut à droite du carré, et au milieu du carré. Quand il contient des
+lignes, il n'est plus qu'en haut à droite.
+
+C'est là qu'on cherche quand il n'y a rien : au milieu de l'espace vide, pas dans un coin. Et une
+fois qu'il y a des lignes, le deuxième bouton n'ajouterait que du bruit.
+
+Les adresses d'un client suivent la règle, avec un **Ajouter une adresse** qui manquait : l'écran
+disait d'ajouter une adresse « depuis la fiche du client » alors qu'on y était déjà. Presser une
+adresse l'ouvre pour la corriger — en ajouter une sans pouvoir réparer une coquille n'est qu'une
+demi-fonction.
+
+Un état « aucun résultat » après un filtre n'offre pas de bouton, lui : la liste n'est pas vide,
+c'est la recherche qui ne trouve rien, et proposer d'en créer un répondrait à côté.
+
+### Le menu ne clignote plus
+
+Au chargement d'une page, le menu de gauche affichait un instant **tous** les onglets de
+l'application, puis retirait ceux qui ne sont pas au forfait. Il devinait pendant que la réponse
+du serveur était en route.
+
+Il attend maintenant. « Inconnu » et « vide » ne sont pas la même chose : le menu bâti d'office
+ne sert que pour une entreprise dont le forfait ne définit aucun module, et ça, seule la réponse
+peut l'établir. **Tableau de bord** s'affiche tout de suite — il n'est jamais un module et jamais
+retiré, donc l'afficher tôt ne peut pas se révéler faux.
 
 ### Fournisseurs, commandes et réceptions
 

@@ -44,7 +44,7 @@ public class RequireActiveSubscriptionFilter(ICurrentUserService currentUser, Ve
 
         var tenant = await db.Tenants
             .Where(t => t.Id == currentUser.TenantId)
-            .Select(t => new { t.Kind, t.SubscriptionStatus })
+            .Select(t => new { t.Kind, t.SubscriptionStatus, t.TrialEndsAt })
             .FirstOrDefaultAsync();
 
         // A personal space is free and never carries a Stripe subscription, so there is nothing
@@ -55,9 +55,21 @@ public class RequireActiveSubscriptionFilter(ICurrentUserService currentUser, Ve
             return;
         }
 
-        if (tenant?.SubscriptionStatus != TenantSubscriptionStatus.Active)
+        // A trial is as good as a subscription until the day it is not. Checked against the
+        // date rather than trusting the status, because nothing sweeps expired trials: the row
+        // still says Trialing the morning after, and a status nobody re-reads would hand out a
+        // free space forever.
+        var trialing = tenant?.SubscriptionStatus == TenantSubscriptionStatus.Trialing
+            && tenant.TrialEndsAt > DateTimeOffset.UtcNow;
+
+        if (tenant?.SubscriptionStatus != TenantSubscriptionStatus.Active && !trialing)
         {
-            context.Result = new ObjectResult(new { message = "Abonnement requis pour accéder à ce module." })
+            context.Result = new ObjectResult(new
+            {
+                message = tenant?.SubscriptionStatus == TenantSubscriptionStatus.Trialing
+                    ? "Votre essai gratuit est terminé. Abonnez-vous depuis Paramètres pour continuer."
+                    : "Abonnement requis pour accéder à ce module."
+            })
             {
                 StatusCode = StatusCodes.Status402PaymentRequired
             };

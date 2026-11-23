@@ -11,7 +11,13 @@ export const assignableRoles = ["TenantAdmin", "ProjectManager", "TenantUser"] a
 
 export type AssignableRole = (typeof assignableRoles)[number];
 
-export type TenantSubscriptionStatus = "Incomplete" | "Active" | "PastDue" | "Canceled";
+/** Trialing is Vexta's own: a free trial with no card on file and no Stripe subscription. */
+export type TenantSubscriptionStatus =
+  | "Incomplete"
+  | "Active"
+  | "PastDue"
+  | "Canceled"
+  | "Trialing";
 
 export interface User {
   id: string;
@@ -532,6 +538,11 @@ export interface PlanRecord {
   maxUsers: number;
   /** Receipts a month this plan may have read by a model. Zero turns the feature off. */
   monthlyReceiptScans: number;
+  /** Days of free trial. Zero asks for the card at signup. */
+  trialDays: number;
+  /** A percentage off the first months. Both zero means no discount. */
+  discountPercent: number;
+  discountMonths: number;
   isPublished: boolean;
   sortOrder: number;
   /** Null when Stripe could not be reached: such a plan cannot be published. */
@@ -557,6 +568,11 @@ export interface PublicPlan {
   minUsers: number;
   /** Seats the plan allows, the owner included. */
   maxUsers: number;
+  /** Days of free trial. Above zero, signing up asks for no card. */
+  trialDays: number;
+  /** A percentage off the first months. Both zero means no discount. */
+  discountPercent: number;
+  discountMonths: number;
   modules: PublicModule[];
   features: PublicFeature[];
 }
@@ -1929,4 +1945,22 @@ export interface EmployeeFileCounts {
   pendingLeaves: number;
   hourBankEntries: number;
   documents: number;
+}
+
+/**
+ * An extra charge on a project: what was added to the bill that was not in the quote.
+ *
+ * Shaped like a ProjectExpense minus the photographs and the category. An expense is proved by
+ * its receipt; an extra charge is a decision, so there is nothing to photograph.
+ */
+export interface ProjectExtraCharge {
+  id: string;
+  projectId: string;
+  name: string;
+  description: string | null;
+  cost: number | null;
+  sellingPrice: number | null;
+  chargedOn: string | null;
+  createdAt: string;
+  updatedAt: string;
 }

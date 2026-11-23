@@ -33,6 +33,10 @@ export interface SavePlanValues {
   maxUsers: number;
   /** Receipts a month this plan may have read by a model. Zero turns the feature off. */
   monthlyReceiptScans: number;
+  /** Days of free trial. Zero asks for the card at signup. */
+  trialDays: number;
+  discountPercent: number;
+  discountMonths: number;
   sortOrder: number;
   isPublished: boolean;
   moduleIds: string[];

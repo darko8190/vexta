@@ -20,7 +20,7 @@ public static class OpenAiAssistant
 {
     public const string DefaultEndpoint = "https://api.openai.com/v1/chat/completions";
 
-    public static async Task<string> RunAsync(
+    public static async Task<AssistantRun> RunAsync(
         string apiKey,
         string model,
         string systemPrompt,
@@ -31,6 +31,9 @@ public static class OpenAiAssistant
         string endpoint,
         CancellationToken ct)
     {
+        long inputTokens = 0;
+        long outputTokens = 0;
+
         var messages = new JsonArray
         {
             new JsonObject { ["role"] = "system", ["content"] = systemPrompt },
@@ -45,7 +48,7 @@ public static class OpenAiAssistant
             });
         }
 
-        if (messages.Count == 1) return "Pose-moi une question.";
+        if (messages.Count == 1) return new AssistantRun("Pose-moi une question.", 0, 0);
 
         var schema = JsonNode.Parse(AssistantApiTool.Schema().GetRawText())!;
 
@@ -91,14 +94,26 @@ public static class OpenAiAssistant
             }
 
             var root = JsonNode.Parse(text)?.AsObject();
+
+            // Across every turn, for the same reason as on the Anthropic side: a question
+            // answered through tool calls is billed for each exchange it took.
+            inputTokens += root?["usage"]?["prompt_tokens"]?.GetValue<long>() ?? 0;
+            outputTokens += root?["usage"]?["completion_tokens"]?.GetValue<long>() ?? 0;
+
             var message = root?["choices"]?.AsArray().FirstOrDefault()?["message"]?.AsObject();
-            if (message is null) return "Je n'ai rien reçu du modèle.";
+            if (message is null)
+            {
+                return new AssistantRun("Je n'ai rien reçu du modèle.", inputTokens, outputTokens);
+            }
 
             var toolCalls = message["tool_calls"]?.AsArray();
             if (toolCalls is null || toolCalls.Count == 0)
             {
                 var content = message["content"]?.GetValue<string>()?.Trim();
-                return string.IsNullOrWhiteSpace(content) ? "Je n'ai rien à répondre à cela." : content;
+                return new AssistantRun(
+                    string.IsNullOrWhiteSpace(content) ? "Je n'ai rien à répondre à cela." : content,
+                    inputTokens,
+                    outputTokens);
             }
 
             // The assistant turn goes back exactly as it came, tool calls included: the API
@@ -124,8 +139,11 @@ public static class OpenAiAssistant
             }
         }
 
-        return "Je me suis arrêté après plusieurs essais sans arriver au bout. Reformule la "
-             + "demande, ou découpe-la en deux.";
+        return new AssistantRun(
+            "Je me suis arrêté après plusieurs essais sans arriver au bout. Reformule la "
+            + "demande, ou découpe-la en deux.",
+            inputTokens,
+            outputTokens);
     }
 
     /// <summary>The same short exchange, for a company on ChatGPT.</summary>

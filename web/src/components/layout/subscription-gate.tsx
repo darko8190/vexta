@@ -24,7 +24,9 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isTenantMember = Boolean(user) && (user!.role !== "SuperAdmin" || user!.isImpersonating);
 
-  const { data } = useBillingStateQuery();
+  // Nothing to ask for when there is no company to bill. A super admin outside a tenant got a
+  // 404 on every page load, and `exempt` is already true for them, so the answer was unused.
+  const { data } = useBillingStateQuery(isTenantMember);
 
   // Settings is where the payment is made, so it is never behind the wall. Nor is the super
   // admin's own area, which has no tenant to bill.
@@ -34,7 +36,13 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
 
   // While the state is unknown, the app stays as it is: a wall that flashes on every page load
   // would be worse than the one page of skeleton it replaces.
-  if (exempt || !data || data.kind === "Personal" || data.subscriptionStatus === "Active") {
+  // A trial passes, and it has to: the API lets it through, so a wall here would lock a
+  // company out of a space the server is perfectly willing to serve — with no way to tell from
+  // the screen that the two disagree. Checked against the days left rather than the status
+  // alone, because nothing sweeps expired trials and the row still reads Trialing afterwards.
+  const trialing = data?.subscriptionStatus === "Trialing" && (data.trialDaysLeft ?? 0) > 0;
+
+  if (exempt || !data || data.kind === "Personal" || data.subscriptionStatus === "Active" || trialing) {
     return children;
   }
 

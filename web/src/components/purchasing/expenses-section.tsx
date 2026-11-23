@@ -2,8 +2,18 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Paperclip, Receipt } from "lucide-react";
+import { Paperclip, Plus, Receipt } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -13,6 +23,9 @@ import { Field, FieldLabel } from "@/components/ui/field";
 import { LoadErrorState } from "@/components/layout/load-error-state";
 import { PaginationBar } from "@/components/layout/pagination-bar";
 import { SearchInput } from "@/components/layout/search-input";
+import { ProjectPicker } from "@/components/invoices/project-picker";
+import { ExpenseFormSheet } from "@/components/projects/detail/expense-form-sheet";
+import { useCanCreate } from "@/hooks/use-can-create";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useExpenseTypesQuery } from "@/hooks/use-expenses";
 import { useAllExpensesQuery } from "@/hooks/use-purchasing";
@@ -41,6 +54,16 @@ export function ExpensesSection() {
   const [to, setTo] = useState("");
   const debouncedSearch = useDebouncedValue(search);
 
+  const canCreate = useCanCreate();
+
+  // An expense belongs to a job — that is what makes it chargeable — so filing one from the
+  // company-wide list has to ask which one first. Two steps rather than a project field buried
+  // in the expense form: the question is not optional, and a form that opens without it would
+  // be a form whose first field decides what the rest of it means.
+  const [pickOpen, setPickOpen] = useState(false);
+  const [pickedProject, setPickedProject] = useState("");
+  const [formProject, setFormProject] = useState<string | null>(null);
+
   const { data: types } = useExpenseTypesQuery();
   const { data, isLoading, isError, error, refetch, isPlaceholderData } = useAllExpensesQuery(page, {
     search: debouncedSearch,
@@ -59,13 +82,28 @@ export function ExpensesSection() {
     setPage(1);
   }
 
+  const createButton = canCreate ? (
+    <Button
+      onClick={() => {
+        setPickedProject("");
+        setPickOpen(true);
+      }}
+    >
+      <Plus />
+      Nouvelle dépense
+    </Button>
+  ) : undefined;
+
   return (
     <div>
-      <div className="mb-4">
-        <h2 className="text-base font-semibold text-foreground">Dépenses</h2>
-        <p className="text-sm text-muted-foreground">
-          Tout ce qui a été acheté ou payé sur vos chantiers, tous projets confondus.
-        </p>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold text-foreground">Dépenses</h2>
+          <p className="text-sm text-muted-foreground">
+            Tout ce qui a été acheté ou payé sur vos chantiers, tous projets confondus.
+          </p>
+        </div>
+        {createButton}
       </div>
 
       {/* Every filter carries a visible label, including the search: two labelled fields beside
@@ -174,8 +212,9 @@ export function ExpensesSection() {
           description={
             filtered
               ? "Essayez une autre période ou un autre type."
-              : "Les dépenses se saisissent dans l'onglet Dépenses d'un projet, avec la photo du reçu."
+              : "Une dépense se rattache toujours à un projet, avec la photo du reçu."
           }
+          action={filtered ? undefined : createButton}
         />
       ) : (
         <>
@@ -244,6 +283,42 @@ export function ExpensesSection() {
 
           <PaginationBar result={data?.page} onPageChange={setPage} />
         </>
+      )}
+
+      <Dialog open={pickOpen} onOpenChange={setPickOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Sur quel projet ?</DialogTitle>
+            <DialogDescription>
+              Une dépense se facture au client du projet, alors il faut savoir lequel.
+            </DialogDescription>
+          </DialogHeader>
+
+          <ProjectPicker id="expense-project" value={pickedProject} onChange={setPickedProject} />
+
+          <DialogFooter>
+            <Button
+              disabled={!pickedProject}
+              onClick={() => {
+                setFormProject(pickedProject);
+                setPickOpen(false);
+              }}
+            >
+              Continuer
+            </Button>
+            <DialogClose render={<Button type="button" variant="outline" />}>Annuler</DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mounted only once a project is known, and dropped when it closes, so the next expense
+          starts from an empty form rather than the last one abandoned. */}
+      {formProject && (
+        <ExpenseFormSheet
+          open
+          onOpenChange={(next) => !next && setFormProject(null)}
+          projectId={formProject}
+        />
       )}
     </div>
   );

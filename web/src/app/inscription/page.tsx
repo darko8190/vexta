@@ -93,6 +93,14 @@ function RegisterForm({ initialPlanId }: { initialPlanId: string }) {
   const accountType = useWatch({ control: form.control, name: "accountType" });
   const isPersonal = accountType === "personal";
 
+  // Which plan is selected decides what happens when the button is pressed, so it decides what
+  // the button says. Promising a payment page to somebody starting a free trial is a small lie
+  // that costs a signup: the people most likely to abandon here are the ones who were told to
+  // get their card out.
+  const planId = useWatch({ control: form.control, name: "planId" });
+  const chosenPlan = plans?.find((plan) => plan.id === planId);
+  const freeTrial = !isPersonal && (chosenPlan?.trialDays ?? 0) > 0;
+
   async function onSubmit(values: FormValues) {
     setServerError(null);
     try {
@@ -134,7 +142,9 @@ function RegisterForm({ initialPlanId }: { initialPlanId: string }) {
         <p className="mt-1 text-center text-sm text-muted-foreground">
           {isPersonal
             ? "Gratuit pour les travailleurs autonomes — aucune carte demandée."
-            : "Abonnement mensuel — paiement sécurisé par Stripe à l'étape suivante."}
+            : freeTrial
+              ? `${chosenPlan!.trialDays} jours d'essai gratuit — aucune carte demandée maintenant.`
+              : "Abonnement mensuel — paiement sécurisé par Stripe à l'étape suivante."}
         </p>
 
         <Controller
@@ -217,6 +227,22 @@ function RegisterForm({ initialPlanId }: { initialPlanId: string }) {
                                 {plan.description && (
                                   <span className="block truncate text-xs text-muted-foreground">
                                     {plan.description}
+                                  </span>
+                                )}
+                                {/* Said where the choice is made. A trial the buyer is not told
+                                    about is a trial nobody takes, and "sans carte de crédit" is
+                                    the part that decides it. */}
+                                {plan.trialDays > 0 && (
+                                  <span className="mt-0.5 block text-xs font-medium text-primary">
+                                    {plan.trialDays} jours gratuits, sans carte de crédit
+                                  </span>
+                                )}
+                                {plan.discountPercent > 0 && plan.discountMonths > 0 && (
+                                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                                    Puis {plan.discountPercent} % de rabais pendant{" "}
+                                    {plan.discountMonths === 1
+                                      ? "le premier mois"
+                                      : `les ${plan.discountMonths} premiers mois`}
                                   </span>
                                 )}
                               </span>
@@ -313,7 +339,7 @@ function RegisterForm({ initialPlanId }: { initialPlanId: string }) {
 
             <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
               {form.formState.isSubmitting && <Spinner />}
-              {isPersonal ? "Créer mon espace" : "Continuer vers le paiement"}
+              {isPersonal || freeTrial ? "Créer mon espace" : "Continuer vers le paiement"}
             </Button>
           </FieldGroup>
         </form>

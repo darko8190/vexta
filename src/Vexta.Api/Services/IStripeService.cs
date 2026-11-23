@@ -17,6 +17,16 @@ public interface IStripeService
     /// old one until they are migrated in Stripe.
     /// </summary>
     Task<string> CreateRecurringPriceAsync(long amountCents, CancellationToken ct = default);
+
+    /// <summary>
+    /// Creates the coupon that carries a plan's introductory discount — 15% off the first three
+    /// invoices — and hands back its id to store on the plan.
+    ///
+    /// A new coupon every time the discount changes, because a coupon's percentage and duration
+    /// are fixed once it exists. The old one is left alone rather than deleted: subscriptions
+    /// already running have it applied, and deleting it would end their discount early.
+    /// </summary>
+    Task<string> CreateCouponAsync(int percentOff, int durationInMonths, CancellationToken ct = default);
     /// <summary>
     /// <paramref name="sessionMetadata"/> rides along to the webhook, which is the only place we
     /// learn the payment actually went through.
@@ -28,6 +38,7 @@ public interface IStripeService
         string successUrl,
         string cancelUrl,
         IDictionary<string, string>? sessionMetadata = null,
+        string? couponId = null,
         CancellationToken ct = default);
     Task<Event> ConstructEventAsync(string payload, string signatureHeader, CancellationToken ct = default);
 
@@ -125,6 +136,27 @@ public class StripeService(IPlatformSettingsService settings, ILogger<StripeServ
             Recurring = new PriceRecurringOptions { Interval = "month" }
         }, cancellationToken: ct);
 
+    public async Task<string> CreateCouponAsync(
+        int percentOff, int durationInMonths, CancellationToken ct = default)
+    {
+        var secretKey = await GetSecretKeyAsync(ct);
+        if (string.IsNullOrWhiteSpace(secretKey))
+        {
+            throw new InvalidOperationException(
+                "Stripe n'est pas configuré. Contactez l'administrateur de la plateforme.");
+        }
+
+        var coupon = await new CouponService(new StripeClient(secretKey)).CreateAsync(new CouponCreateOptions
+        {
+            PercentOff = percentOff,
+            Duration = "repeating",
+            DurationInMonths = durationInMonths,
+            Name = $"{percentOff} % pendant {durationInMonths} mois"
+        }, cancellationToken: ct);
+
+        return coupon.Id;
+    }
+
     public async Task<string> CreateCheckoutSessionAsync(
         Tenant tenant,
         string customerEmail,
@@ -132,6 +164,7 @@ public class StripeService(IPlatformSettingsService settings, ILogger<StripeServ
         string successUrl,
         string cancelUrl,
         IDictionary<string, string>? sessionMetadata = null,
+        string? couponId = null,
         CancellationToken ct = default)
     {
         var secretKey = await GetSecretKeyAsync(ct);
@@ -151,6 +184,12 @@ public class StripeService(IPlatformSettingsService settings, ILogger<StripeServ
             SuccessUrl = successUrl,
             CancelUrl = cancelUrl,
             Metadata = sessionMetadata is null ? null : new Dictionary<string, string>(sessionMetadata),
+            // Null rather than an empty list when there is no discount: Stripe refuses a session
+            // that carries both `discounts` and an allow-promotion-codes field, and an empty
+            // array still counts as carrying it.
+            Discounts = string.IsNullOrWhiteSpace(couponId)
+                ? null
+                : [new SessionDiscountOptions { Coupon = couponId }],
             SubscriptionData = new SessionSubscriptionDataOptions
             {
                 Metadata = new Dictionary<string, string> { ["tenant_id"] = tenant.Id.ToString() }

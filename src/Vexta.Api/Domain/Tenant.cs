@@ -18,6 +18,13 @@ public class Tenant
     public DateTimeOffset? CurrentPeriodEnd { get; set; }
 
     /// <summary>
+    /// When the free trial runs out, for a space that opened on a plan offering one. Null for
+    /// everyone else, including a company that has since subscribed — paying ends the trial, and
+    /// a date left behind would make a paid-up space look like it is about to expire.
+    /// </summary>
+    public DateTimeOffset? TrialEndsAt { get; set; }
+
+    /// <summary>
     /// The company asked to stop. Stripe keeps the subscription running to the end of the
     /// period already paid for, so the space stays open until <see cref="CurrentPeriodEnd"/>
     /// and then lapses on its own.

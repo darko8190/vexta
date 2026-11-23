@@ -45,6 +45,22 @@ const PROVIDERS = [
   },
 ] as const;
 
+/** "15,75" and "15.75" both, because a price is typed with a comma here. */
+function parsePrice(value: string): number | null | "invalid" {
+  const trimmed = value.trim();
+  if (trimmed === "") return null;
+
+  const normalized = trimmed.replace(/\s/g, "").replace(",", ".");
+  if (!/^\d+([.]\d{1,4})?$/.test(normalized)) return "invalid";
+
+  return Number(normalized);
+}
+
+function priceField(value: number | null): string {
+  if (value == null) return "";
+  return value % 1 === 0 ? String(value) : String(value).replace(".", ",");
+}
+
 function message(error: unknown, fallback: string) {
   return error instanceof ApiError ? error.message : fallback;
 }
@@ -62,6 +78,9 @@ export function AiAssistantCard() {
   const [apiKey, setApiKey] = useState("");
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [canWrite, setCanWrite] = useState<boolean | null>(null);
+  // Typed as text so a half-entered "1," is not thrown away mid-keystroke, and parsed on save.
+  const [inPrice, setInPrice] = useState<string | null>(null);
+  const [outPrice, setOutPrice] = useState<string | null>(null);
 
   if (isLoading || !data) {
     return <Skeleton className="h-96 max-w-lg" />;
@@ -71,11 +90,21 @@ export function AiAssistantCard() {
   const currentModel = model ?? data.model;
   const currentEnabled = enabled ?? data.isEnabled;
   const currentCanWrite = canWrite ?? data.canWrite;
+  const currentInPrice = inPrice ?? priceField(data.inputPricePerMillion);
+  const currentOutPrice = outPrice ?? priceField(data.outputPricePerMillion);
 
   const chosen = PROVIDERS.find((p) => p.value === currentProvider) ?? PROVIDERS[0];
   const canEnable = data.hasApiKey || apiKey.trim().length > 0;
 
   async function onSave() {
+    const parsedIn = parsePrice(currentInPrice);
+    const parsedOut = parsePrice(currentOutPrice);
+
+    if (parsedIn === "invalid" || parsedOut === "invalid") {
+      toast.error("Un prix doit s'écrire comme 3 ou 15,75.");
+      return;
+    }
+
     try {
       await save.mutateAsync({
         provider: currentProvider,
@@ -83,6 +112,8 @@ export function AiAssistantCard() {
         apiKey: apiKey.trim() || null,
         isEnabled: currentEnabled,
         canWrite: currentCanWrite,
+        inputPricePerMillion: parsedIn,
+        outputPricePerMillion: parsedOut,
       });
       setApiKey("");
       toast.success("Assistant enregistré.");
@@ -209,6 +240,40 @@ export function AiAssistantCard() {
             </a>
           </FieldDescription>
         </Field>
+
+        {/* Optional, and nothing is filled in on anybody's behalf. The prices are the
+            provider's to set and the company's to know — often a negotiated rate — and a list
+            price we hardcoded would be wrong for somebody on day one and wrong for everybody
+            the day it changes. Left empty, the header shows jetons instead of dollars, which is
+            true without pretending to be an invoice. */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field>
+            <FieldLabel htmlFor="ai-price-in">Prix par million de jetons — entrée</FieldLabel>
+            <Input
+              id="ai-price-in"
+              inputMode="decimal"
+              value={currentInPrice}
+              onChange={(event) => setInPrice(event.target.value)}
+              placeholder={ex("3")}
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="ai-price-out">Prix par million de jetons — sortie</FieldLabel>
+            <Input
+              id="ai-price-out"
+              inputMode="decimal"
+              value={currentOutPrice}
+              onChange={(event) => setOutPrice(event.target.value)}
+              placeholder={ex("15")}
+            />
+          </Field>
+        </div>
+        <FieldDescription>
+          Facultatif, et en dollars US comme {chosen.vendor} les facture. Remplis, la barre du
+          haut affiche ce que l&apos;assistant vous a coûté ce mois-ci ; laissés vides, elle
+          affiche les jetons consommés. Nous n&apos;inscrivons aucun prix à votre place : c&apos;est
+          votre entente avec {chosen.vendor}, pas la nôtre.
+        </FieldDescription>
 
         <Field orientation="horizontal">
           <Checkbox

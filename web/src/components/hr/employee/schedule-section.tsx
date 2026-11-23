@@ -274,6 +274,19 @@ export function ScheduleSection({ employeeId, canEdit }: { employeeId?: string; 
           icon={CalendarRange}
           title="Rien de prévu cette semaine"
           description="Ajoutez un quart, ou passez à une autre semaine avec les flèches."
+          action={
+            canEdit ? (
+              <Button
+                onClick={() => {
+                  setEditing(undefined);
+                  setSheetOpen(true);
+                }}
+              >
+                <Plus />
+                Ajouter un quart
+              </Button>
+            ) : undefined
+          }
         />
       ) : (
         <div className="space-y-4">

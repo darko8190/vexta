@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,6 +23,7 @@ import { VextaIcon, VextaLockup } from "@/components/brand/vexta-logo";
 import { dashboardNavItem, getNavItems, type NavItem } from "@/components/layout/nav-config";
 import { NavLinks } from "@/components/layout/nav-links";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { TrialBanner } from "@/components/layout/trial-banner";
 import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { useNavigationQuery, type NavigationItem } from "@/hooks/use-navigation";
@@ -47,7 +49,7 @@ function flatten(items: NavigationItem[], depth = 0): NavItem[] {
  * The fallback is not a nicety. A company with no plan — every tenant created by hand — would
  * otherwise open to a sidebar with nothing in it and no way to reach anything.
  */
-function useTenantNavItems(): NavItem[] {
+function useTenantNavItems(): { items: NavItem[]; pending: boolean } {
   const { user } = useAuth();
 
   // Only a company's own menu comes from modules. A super admin outside a tenant, a customer and
@@ -58,12 +60,42 @@ function useTenantNavItems(): NavItem[] {
     user!.tenantKind !== "Personal" &&
     (user!.role !== "SuperAdmin" || user!.isImpersonating);
 
-  const { data } = useNavigationQuery(fromModules);
+  const { data, isPending } = useNavigationQuery(fromModules);
   const builtIn = getNavItems(user?.role, user?.isImpersonating, user?.tenantKind);
 
-  if (!fromModules || !data || data.length === 0) return builtIn;
+  // A fixed menu has nothing in flight, so it draws at once.
+  if (!fromModules) return { items: builtIn, pending: false };
 
-  return [dashboardNavItem, ...flatten(data)];
+  // Unknown is not empty, and this is the difference that made tabs flash. Falling back to the
+  // built-in menu while the plan's own list was still in the air drew every tab the application
+  // has, for as long as the request took, and then took most of them away. The fallback is for a
+  // company whose plan defines no modules — a fact only the answer can establish.
+  //
+  // Tableau de bord draws immediately regardless: it is never a module and never withheld, so
+  // showing it early cannot turn out to have been wrong.
+  if (isPending) return { items: [dashboardNavItem], pending: true };
+
+  if (!data || data.length === 0) return { items: builtIn, pending: false };
+
+  return { items: [dashboardNavItem, ...flatten(data)], pending: false };
+}
+
+/**
+ * The rail while the menu is still unknown.
+ *
+ * Rows rather than nothing: an empty rail for a moment reads as an application that failed to
+ * load. These occupy the same h-10 the links will, so nothing shifts when they are replaced.
+ */
+function NavPending({ collapsed = false }: { collapsed?: boolean }) {
+  return (
+    <div className="flex flex-col gap-1" aria-hidden>
+      {Array.from({ length: 7 }).map((_, index) => (
+        <div key={index} className="flex h-10 items-center px-3">
+          <Skeleton className={cn("h-4 rounded", collapsed ? "w-4" : "w-full")} />
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -77,7 +109,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   // Before the early return: a hook cannot be called conditionally, and the shell renders
   // nothing until the session is known.
-  const navItems = useTenantNavItems();
+  const { items: navItems, pending: navPending } = useTenantNavItems();
 
   if (!user) return null;
 
@@ -94,6 +126,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Button>
         </div>
       )}
+
+      {/* Under the impersonation bar and above everything else: it is about the whole space,
+          not about the page, and it must not be something a scroll can hide. */}
+      <TrialBanner />
 
       <div className="flex min-h-0 flex-1">
       {/* The rail keeps a fixed 64 px footprint in the layout. The panel inside it is absolute,
@@ -149,6 +185,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 setDismissed(true);
               }}
             />
+            {navPending && <NavPending collapsed />}
           </div>
         </div>
       </aside>
@@ -168,6 +205,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           <div className="flex-1 overflow-y-auto px-3 py-2">
             <NavLinks items={navItems} onNavigate={() => setMobileOpen(false)} />
+            {navPending && <NavPending />}
           </div>
           {/* The invitation lives at the foot of the menu rather than in the header: the header
               has room for two controls on a phone, and installing is something you do once.

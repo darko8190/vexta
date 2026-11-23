@@ -2032,6 +2032,12 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("text");
 
+                    b.Property<int>("DiscountMonths")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("DiscountPercent")
+                        .HasColumnType("integer");
+
                     b.Property<bool>("IsPublished")
                         .HasColumnType("boolean");
 
@@ -2051,8 +2057,14 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<int>("SortOrder")
                         .HasColumnType("integer");
 
+                    b.Property<string>("StripeCouponId")
+                        .HasColumnType("text");
+
                     b.Property<string>("StripePriceId")
                         .HasColumnType("text");
+
+                    b.Property<int>("TrialDays")
+                        .HasColumnType("integer");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -2572,6 +2584,51 @@ namespace Vexta.Api.Data.Migrations
                     b.HasIndex("ExpenseId", "SortOrder");
 
                     b.ToTable("ProjectExpensePhotos");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.ProjectExtraCharge", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly?>("ChargedOn")
+                        .HasColumnType("date");
+
+                    b.Property<decimal?>("Cost")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("SellingPrice")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId", "CreatedAt");
+
+                    b.ToTable("ProjectExtraCharges");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.ProjectMaterial", b =>
@@ -3164,6 +3221,9 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<int>("SubscriptionStatus")
                         .HasColumnType("integer");
 
+                    b.Property<DateTimeOffset?>("TrialEndsAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.HasKey("Id");
 
                     b.HasIndex("PlanId");
@@ -3188,6 +3248,13 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<string>("EncryptedApiKey")
                         .HasColumnType("text");
 
+                    b.Property<decimal?>("InputPricePerMillion")
+                        .HasPrecision(12, 4)
+                        .HasColumnType("numeric(12,4)");
+
+                    b.Property<long>("InputTokens")
+                        .HasColumnType("bigint");
+
                     b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
 
@@ -3196,11 +3263,21 @@ namespace Vexta.Api.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<decimal?>("OutputPricePerMillion")
+                        .HasPrecision(12, 4)
+                        .HasColumnType("numeric(12,4)");
+
+                    b.Property<long>("OutputTokens")
+                        .HasColumnType("bigint");
+
                     b.Property<int>("Provider")
                         .HasColumnType("integer");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly?>("UsagePeriod")
+                        .HasColumnType("date");
 
                     b.HasKey("TenantId");
 
@@ -4024,6 +4101,17 @@ namespace Vexta.Api.Data.Migrations
                     b.Navigation("MediaAsset");
                 });
 
+            modelBuilder.Entity("Vexta.Api.Domain.ProjectExtraCharge", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.Project", "Project")
+                        .WithMany("ExtraCharges")
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Project");
+                });
+
             modelBuilder.Entity("Vexta.Api.Domain.ProjectMaterial", b =>
                 {
                     b.HasOne("Vexta.Api.Domain.Product", "Product")
@@ -4335,6 +4423,8 @@ namespace Vexta.Api.Data.Migrations
                     b.Navigation("Documents");
 
                     b.Navigation("Expenses");
+
+                    b.Navigation("ExtraCharges");
 
                     b.Navigation("Invoices");
 

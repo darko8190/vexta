@@ -50,6 +50,37 @@ public class Plan
     /// </summary>
     public int MonthlyReceiptScans { get; set; } = 100;
 
+    /// <summary>
+    /// Days of free trial this plan grants. Zero means the card is asked for at signup, which is
+    /// how every plan behaved before this existed.
+    ///
+    /// Above zero, signup creates the company without going to Stripe at all: no customer, no
+    /// subscription, no card. The trial is Vexta's own, counted from the day the space was made,
+    /// and the company subscribes later from Paramètres. Running a Stripe trial instead would
+    /// mean collecting a card to start something free, which is the thing this is for avoiding.
+    /// </summary>
+    public int TrialDays { get; set; }
+
+    /// <summary>
+    /// A percentage off the first <see cref="DiscountMonths"/> invoices — 15% for 3 months. Zero
+    /// on either field means no discount.
+    ///
+    /// Unlike the trial, this one is Stripe's business: it comes off real invoices, so it is a
+    /// coupon on the subscription rather than arithmetic of ours. Ours would have to be redone
+    /// on every proration, refund and plan change, and would disagree with the receipt the
+    /// customer actually gets.
+    /// </summary>
+    public int DiscountPercent { get; set; }
+
+    public int DiscountMonths { get; set; }
+
+    /// <summary>
+    /// The coupon at Stripe that carries the two fields above. Created when a discount is first
+    /// set and replaced when it changes, the same way <see cref="StripePriceId"/> is: a coupon's
+    /// percentage and duration cannot be edited once it exists.
+    /// </summary>
+    public string? StripeCouponId { get; set; }
+
     public bool IsPublished { get; set; }
     public int SortOrder { get; set; }
 

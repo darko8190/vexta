@@ -2,20 +2,25 @@
 
 import { use, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ClipboardPen, Inbox, ListPlus, Pencil, PenLine, Zap } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, ClipboardPen, IdCard, Inbox, ListPlus, Pencil, PenLine, Trash2, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
+import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { SectionNav, type NavSection } from "@/components/layout/section-nav";
 import { FillFormSheet } from "@/components/forms/fill-form-sheet";
 import { FormActionsSection } from "@/components/forms/form-actions-section";
+import { FormDetailsSection } from "@/components/forms/form-details-section";
 import { FormQuestionsSection } from "@/components/forms/form-questions-section";
 import { FormSubmissionsSection } from "@/components/forms/form-submissions-section";
 import { FormTemplateSheet } from "@/components/forms/form-template-sheet";
 import { useCanManage } from "@/hooks/use-can-create";
-import { useFormQuery } from "@/hooks/use-forms";
+import { ApiError } from "@/lib/api";
+import { useDeleteForm, useFormQuery } from "@/hooks/use-forms";
 
 /**
  * Pattern 2 — Detail / Record: one form, with its questions, its actions and its replies in the
@@ -28,10 +33,27 @@ export default function FormBuilderPage({ params }: { params: Promise<{ id: stri
   const { id } = use(params);
   const canManage = useCanManage();
   const { data, isLoading } = useFormQuery(id);
+  const router = useRouter();
+  const remove = useDeleteForm();
 
-  const [section, setSection] = useState("questions");
+  const [section, setSection] = useState("details");
   const [editOpen, setEditOpen] = useState(false);
   const [fillOpen, setFillOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
+  async function confirmDelete() {
+    try {
+      await remove.mutateAsync(id);
+      toast.success("Formulaire supprimé.");
+      router.push("/outils");
+    } catch (error) {
+      // The API refuses a form that has been filled and says so with the count: the answers are
+      // a record of what a crew reported, and the way to retire a form is to unpublish it.
+      toast.error(
+        error instanceof ApiError ? error.message : "Impossible de supprimer ce formulaire.",
+      );
+    }
+  }
 
   if (isLoading) {
     return (
@@ -61,6 +83,9 @@ export default function FormBuilderPage({ params }: { params: Promise<{ id: stri
   const { form, fields, actions } = data;
 
   const sections: NavSection[] = [
+    // First and the one the page opens on: somebody arriving from the list came to see what this
+    // form is, not necessarily to rewrite a question.
+    { key: "details", label: "Détails", icon: IdCard },
     { key: "questions", label: "Questions", count: fields.length, icon: ListPlus },
     { key: "actions", label: "Actions", count: actions.length, icon: Zap },
     { key: "reponses", label: "Réponses", count: form.submissionCount, icon: Inbox },
@@ -94,6 +119,14 @@ export default function FormBuilderPage({ params }: { params: Promise<{ id: stri
                 Modifier la fiche
               </Button>
             )}
+            {/* Here rather than on the list: deleting a record belongs on the record, where the
+                person can see what they are about to remove. */}
+            {canManage && (
+              <Button variant="outline" onClick={() => setDeleteOpen(true)}>
+                <Trash2 />
+                Supprimer
+              </Button>
+            )}
           </div>
         }
       />
@@ -123,6 +156,8 @@ export default function FormBuilderPage({ params }: { params: Promise<{ id: stri
         />
 
         <div className="min-w-0 flex-1">
+          {section === "details" && <FormDetailsSection form={form} />}
+
           {/* Keyed on the moment the form was last saved: a save remounts the editor on the
               list that came back, and a background refetch that changes nothing leaves whatever
               is being typed exactly where it is. */}
@@ -147,6 +182,15 @@ export default function FormBuilderPage({ params }: { params: Promise<{ id: stri
       </div>
 
       <FormTemplateSheet open={editOpen} onOpenChange={setEditOpen} template={form} />
+
+      <ConfirmDeleteDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Supprimer ce formulaire ?"
+        description={`« ${form.title} » et ses questions seront supprimés. Si des réponses y sont rattachées, dépubliez-le plutôt : les réponses sont le compte rendu de ce qui a été observé.`}
+        onConfirm={confirmDelete}
+        pending={remove.isPending}
+      />
       <FillFormSheet open={fillOpen} onOpenChange={setFillOpen} formId={form.id} />
     </div>
   );

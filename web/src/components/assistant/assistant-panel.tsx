@@ -9,6 +9,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  type AssistantUsage,
   useAskAssistant,
   useAssistantAvailabilityQuery,
   type AssistantAction,
@@ -263,6 +264,7 @@ export function AssistantButton() {
 
   return (
     <>
+      <AssistantSpend usage={data.usage} />
       <Button
         variant="ghost"
         size="icon"
@@ -273,5 +275,41 @@ export function AssistantButton() {
       </Button>
       <AssistantPanel open={open} onOpenChange={setOpen} />
     </>
+  );
+}
+
+/**
+ * What the assistant has cost this month, beside the button that spends it.
+ *
+ * In dollars once the company has entered what its provider charges per million tokens, and in
+ * tokens until then. Tokens are not the question anybody asked, but they are true, and they are
+ * better than a dollar figure worked out from a price nobody gave us — the company is billed by
+ * Anthropic or OpenAI directly, on a rate we never see.
+ *
+ * Hidden below sm: a phone header has room for two controls, and this is a figure you consult
+ * rather than one you watch.
+ */
+function AssistantSpend({ usage }: { usage: AssistantUsage | null }) {
+  if (!usage) return null;
+
+  const tokens = usage.inputTokens + usage.outputTokens;
+  if (tokens === 0) return null;
+
+  const label =
+    usage.cost != null
+      ? usage.cost.toLocaleString("fr-CA", { style: "currency", currency: "USD" })
+      : `${Math.round(tokens / 1000).toLocaleString("fr-CA")} k jetons`;
+
+  return (
+    <span
+      className="hidden items-center rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground tabular-nums sm:inline-flex"
+      title={
+        usage.cost != null
+          ? "Ce que l'assistant a coûté ce mois-ci, selon les prix que vous avez inscrits."
+          : "Jetons consommés ce mois-ci. Inscrivez vos prix dans Paramètres → Assistant IA pour voir un montant."
+      }
+    >
+      {label}
+    </span>
   );
 }

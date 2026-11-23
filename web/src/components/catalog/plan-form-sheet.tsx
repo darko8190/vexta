@@ -59,6 +59,21 @@ const formSchema = z.object({
     .trim()
     .regex(/^\d{1,5}$/, "Entrez un nombre entre 0 et 10 000.")
     .refine((v) => Number(v) <= 10_000, "Dix mille lectures par mois, c'est déjà beaucoup."),
+  trialDays: z
+    .string()
+    .trim()
+    .regex(/^\d{1,3}$/, "Entrez un nombre entre 0 et 365.")
+    .refine((v) => Number(v) <= 365, "Un an d'essai n'est plus un essai."),
+  discountPercent: z
+    .string()
+    .trim()
+    .regex(/^\d{1,3}$/, "Entrez un pourcentage entre 0 et 100.")
+    .refine((v) => Number(v) <= 100, "Un rabais ne peut pas dépasser 100 %."),
+  discountMonths: z
+    .string()
+    .trim()
+    .regex(/^\d{1,2}$/, "Entrez un nombre de mois entre 0 et 36.")
+    .refine((v) => Number(v) <= 36, "Trente-six mois, c'est le maximum."),
   // A string for the same reason as the amount: coercion breaks the resolver's typing.
   sortOrder: z.string().trim().regex(/^\d{1,3}$/, "Entrez un nombre entre 0 et 999."),
   isPublished: z.boolean(),
@@ -68,10 +83,22 @@ const formSchema = z.object({
 
 // On the object rather than on either field: a range is only wrong as a pair, and the message
 // belongs on the maximum, which is the one the super admin just typed.
-const planSchema = formSchema.refine(
-  (values) => Number(values.minUsers) <= Number(values.maxUsers),
-  { message: "Le maximum doit être au moins égal au minimum.", path: ["maxUsers"] },
-);
+const planSchema = formSchema
+  .refine(
+    (values) => Number(values.minUsers) <= Number(values.maxUsers),
+    { message: "Le maximum doit être au moins égal au minimum.", path: ["maxUsers"] },
+  )
+  // Each half of the discount is meaningless alone: a percentage with no duration never
+  // applies, and a duration with no percentage takes nothing off. Caught here rather than left
+  // to the server, so the message lands on the field that is missing.
+  .refine(
+    (values) => !(Number(values.discountPercent) > 0 && Number(values.discountMonths) === 0),
+    { message: "Pendant combien de mois ?", path: ["discountMonths"] },
+  )
+  .refine(
+    (values) => !(Number(values.discountMonths) > 0 && Number(values.discountPercent) === 0),
+    { message: "Quel pourcentage ?", path: ["discountPercent"] },
+  );
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -85,6 +112,9 @@ function toFormValues(plan?: PlanRecord): FormValues {
     // 100 on a new plan, and whatever the plan says on an existing one — including the zero
     // every plan was given when the column arrived.
     monthlyReceiptScans: String(plan?.monthlyReceiptScans ?? 100),
+    trialDays: String(plan?.trialDays ?? 0),
+    discountPercent: String(plan?.discountPercent ?? 0),
+    discountMonths: String(plan?.discountMonths ?? 0),
     sortOrder: String(plan?.sortOrder ?? 0),
     isPublished: plan?.isPublished ?? false,
     moduleIds: plan?.modules.map((m) => m.id) ?? [],
@@ -129,6 +159,9 @@ export function PlanFormSheet({
           minUsers: Number(values.minUsers),
           maxUsers: Number(values.maxUsers),
           monthlyReceiptScans: Number(values.monthlyReceiptScans),
+          trialDays: Number(values.trialDays),
+          discountPercent: Number(values.discountPercent),
+          discountMonths: Number(values.discountMonths),
           sortOrder: Number(values.sortOrder),
           isPublished: values.isPublished,
           moduleIds: values.moduleIds,
@@ -294,6 +327,77 @@ export function PlanFormSheet({
                 </Field>
               )}
             />
+
+            <Controller
+              name="trialDays"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor="plan-trial">Jours d&apos;essai gratuit</FieldLabel>
+                  <Input
+                    {...field}
+                    id="plan-trial"
+                    inputMode="numeric"
+                    placeholder={ex("14")}
+                    aria-invalid={fieldState.invalid}
+                  />
+                  {fieldState.invalid ? (
+                    <FieldError errors={[fieldState.error]} />
+                  ) : (
+                    <FieldDescription>
+                      Au-dessus de zéro, l&apos;inscription à ce forfait <strong>ne demande pas
+                      de carte de crédit</strong> : l&apos;entreprise entre tout de suite, et une
+                      bande en haut de l&apos;écran compte les jours qui restent avec un bouton
+                      pour s&apos;abonner. <strong>0</strong> garde le comportement habituel, le
+                      paiement à l&apos;inscription.
+                    </FieldDescription>
+                  )}
+                </Field>
+              )}
+            />
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Controller
+                name="discountPercent"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="plan-discount">Rabais de départ (%)</FieldLabel>
+                    <Input
+                      {...field}
+                      id="plan-discount"
+                      inputMode="numeric"
+                      placeholder={ex("15")}
+                      aria-invalid={fieldState.invalid}
+                    />
+                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  </Field>
+                )}
+              />
+              <Controller
+                name="discountMonths"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="plan-discount-months">Pendant (mois)</FieldLabel>
+                    <Input
+                      {...field}
+                      id="plan-discount-months"
+                      inputMode="numeric"
+                      placeholder={ex("3")}
+                      aria-invalid={fieldState.invalid}
+                    />
+                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  </Field>
+                )}
+              />
+            </div>
+            <FieldDescription>
+              15 % pendant les 3 premiers mois, par exemple. Le rabais est appliqué par Stripe
+              sur les vraies factures, pas calculé ici — c&apos;est ce qui fait que le reçu du
+              client et notre affichage disent la même chose. Changer le rabais crée un nouveau
+              coupon : les entreprises déjà abonnées gardent celui qu&apos;elles ont.
+            </FieldDescription>
 
             <Controller
               name="moduleIds"

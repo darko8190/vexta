@@ -71,6 +71,7 @@ public class Project
 
     public List<Invoice> Invoices { get; set; } = [];
     public List<ProjectExpense> Expenses { get; set; } = [];
+    public List<ProjectExtraCharge> ExtraCharges { get; set; } = [];
     public List<ProjectMaterial> Materials { get; set; } = [];
     public List<TimesheetEntry> Timesheets { get; set; } = [];
     public List<ProjectDocument> Documents { get; set; } = [];

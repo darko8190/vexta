@@ -56,5 +56,28 @@ public class TenantAiSettings
     public bool CanWrite { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    /// <summary>
+    /// The month the counters below belong to, as its first day. When a reply arrives in a
+    /// later month the counters start again from zero: the figure in the header answers "what
+    /// is this costing me this month", which is the question somebody watching a bill asks.
+    /// Keeping a running total since the key was added answers a question nobody asks, and
+    /// grows a number that only ever looks worse.
+    /// </summary>
+    public DateOnly? UsagePeriod { get; set; }
+
+    public long InputTokens { get; set; }
+    public long OutputTokens { get; set; }
+
+    /// <summary>
+    /// What the company pays per million tokens, as their provider bills them. Null until they
+    /// fill it in, and nothing is guessed on their behalf: a list price baked in here would be
+    /// wrong for anybody on a negotiated rate, wrong for everybody the day a provider changes
+    /// it, and wrong in a way that reads like a statement of account.
+    ///
+    /// Without them the header shows tokens, which is true and needs no price list.
+    /// </summary>
+    public decimal? InputPricePerMillion { get; set; }
+    public decimal? OutputPricePerMillion { get; set; }
+
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

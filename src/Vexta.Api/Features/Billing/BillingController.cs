@@ -22,7 +22,13 @@ public record BillingStateDto(
     /// The company asked to stop and is seeing out the period it has paid for. Distinct from a
     /// cancelled subscription: the space still works and the button says "reprendre".
     /// </summary>
-    bool CancelAtPeriodEnd);
+    bool CancelAtPeriodEnd,
+    /// <summary>
+    /// When the free trial runs out, and how many days are left. Both null outside a trial, so
+    /// the banner has one thing to test rather than a status string to interpret.
+    /// </summary>
+    DateTimeOffset? TrialEndsAt,
+    int? TrialDaysLeft);
 
 public record UpgradeToBusinessRequest(string CompanyName, Guid PlanId);
 
@@ -60,7 +66,25 @@ public class BillingController(
             plan?.Name,
             plan?.AmountCents,
             plan?.Currency,
-            tenant.CancelAtPeriodEnd));
+            tenant.CancelAtPeriodEnd,
+            tenant.TrialEndsAt,
+            TrialDaysLeft(tenant)));
+    }
+
+    /// <summary>
+    /// Days left in the trial, counted up rather than down: a trial ending in six hours has one
+    /// day left, not zero. Zero would read as "it is over" on the last morning, which is the
+    /// morning it matters most that it does not.
+    ///
+    /// Null once it has actually run out, and null for a space that is not on a trial at all.
+    /// </summary>
+    private static int? TrialDaysLeft(Tenant tenant)
+    {
+        if (tenant.SubscriptionStatus != TenantSubscriptionStatus.Trialing) return null;
+        if (tenant.TrialEndsAt is not { } ends) return null;
+
+        var remaining = ends - DateTimeOffset.UtcNow;
+        return remaining <= TimeSpan.Zero ? 0 : (int)Math.Ceiling(remaining.TotalDays);
     }
 
     [HttpPost("checkout-session")]
@@ -94,7 +118,7 @@ public class BillingController(
             return BadRequest(new { message = $"Le forfait « {plan.Name} » n'a pas de tarif Stripe. L'administrateur de la plateforme doit l'enregistrer avant qu'il puisse être payé." });
         }
 
-        return await StartCheckoutAsync(tenant, plan.StripePriceId, null);
+        return await StartCheckoutAsync(tenant, plan.StripePriceId, null, plan.StripeCouponId);
     }
 
     /// <summary>
@@ -132,7 +156,7 @@ public class BillingController(
         {
             [StripeService.UpgradeNameKey] = request.CompanyName.Trim(),
             [StripeService.UpgradePlanKey] = plan.Id.ToString()
-        });
+        }, plan.StripeCouponId);
     }
 
     /// <summary>
@@ -142,7 +166,8 @@ public class BillingController(
     private async Task<ActionResult<object>> StartCheckoutAsync(
         Tenant tenant,
         string priceId,
-        IDictionary<string, string>? metadata)
+        IDictionary<string, string>? metadata,
+        string? couponId = null)
     {
         try
         {
@@ -152,7 +177,8 @@ public class BillingController(
                 priceId,
                 successUrl: $"{FrontendUrl}/parametres?abonnement=succes&session_id={{CHECKOUT_SESSION_ID}}",
                 cancelUrl: $"{FrontendUrl}/parametres",
-                sessionMetadata: metadata);
+                sessionMetadata: metadata,
+                couponId: couponId);
 
             return Ok(new { checkoutUrl });
         }

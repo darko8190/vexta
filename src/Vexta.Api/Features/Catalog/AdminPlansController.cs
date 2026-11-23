@@ -55,6 +55,9 @@ public class AdminPlansController(VextaDbContext db, IStripeService stripe) : Co
             MinUsers = request.MinUsers,
             MaxUsers = request.MaxUsers,
             MonthlyReceiptScans = request.MonthlyReceiptScans,
+            TrialDays = request.TrialDays,
+            DiscountPercent = request.DiscountPercent,
+            DiscountMonths = request.DiscountMonths,
             SortOrder = request.SortOrder
         };
 
@@ -65,6 +68,11 @@ public class AdminPlansController(VextaDbContext db, IStripeService stripe) : Co
         if (priceError is not null && request.IsPublished)
         {
             return BadRequest(new { message = priceError });
+        }
+
+        if (await AttachCouponAsync(plan, ct) is { } couponError && request.IsPublished)
+        {
+            return BadRequest(new { message = couponError });
         }
 
         plan.IsPublished = request.IsPublished && plan.StripePriceId is not null;
@@ -98,6 +106,19 @@ public class AdminPlansController(VextaDbContext db, IStripeService stripe) : Co
         plan.MinUsers = request.MinUsers;
         plan.MaxUsers = request.MaxUsers;
         plan.MonthlyReceiptScans = request.MonthlyReceiptScans;
+        plan.TrialDays = request.TrialDays;
+
+        // A coupon's percentage and duration are fixed once it exists, so a changed discount
+        // needs a new one. The old coupon is left at Stripe rather than deleted: subscriptions
+        // already running have it applied, and deleting it would cut their discount short.
+        var discountChanged = plan.DiscountPercent != request.DiscountPercent
+            || plan.DiscountMonths != request.DiscountMonths;
+        if (discountChanged)
+        {
+            plan.DiscountPercent = request.DiscountPercent;
+            plan.DiscountMonths = request.DiscountMonths;
+            plan.StripeCouponId = null;
+        }
         plan.Modules = await LoadModulesAsync(request.ModuleIds, ct);
         if (await LoadFeaturesAsync(request.FeatureIds, ct) is { } features) plan.Features = features;
         plan.UpdatedAt = DateTimeOffset.UtcNow;
@@ -120,6 +141,11 @@ public class AdminPlansController(VextaDbContext db, IStripeService stripe) : Co
         if (priceError is not null && request.IsPublished)
         {
             return BadRequest(new { message = priceError });
+        }
+
+        if (await AttachCouponAsync(plan, ct) is { } couponError && request.IsPublished)
+        {
+            return BadRequest(new { message = couponError });
         }
 
         plan.IsPublished = request.IsPublished && plan.StripePriceId is not null;
@@ -198,6 +224,39 @@ public class AdminPlansController(VextaDbContext db, IStripeService stripe) : Co
         return await db.Features.Where(f => ids.Contains(f.Id)).ToListAsync(ct);
     }
 
+    /// <summary>
+    /// Gives the plan the coupon its discount needs, or explains why it has none.
+    ///
+    /// Clears the id when the discount is switched off, so a plan that used to have one stops
+    /// applying it. A missing coupon is reported the same way a missing price is: not fatal
+    /// while the plan is unpublished, refused the moment somebody tries to sell it.
+    /// </summary>
+    private async Task<string?> AttachCouponAsync(Plan plan, CancellationToken ct)
+    {
+        if (plan.DiscountPercent <= 0 || plan.DiscountMonths <= 0)
+        {
+            plan.StripeCouponId = null;
+            return null;
+        }
+
+        if (plan.StripeCouponId is not null) return null;
+
+        try
+        {
+            plan.StripeCouponId = await stripe.CreateCouponAsync(
+                plan.DiscountPercent, plan.DiscountMonths, ct);
+            return null;
+        }
+        catch (InvalidOperationException ex)
+        {
+            return ex.Message;
+        }
+        catch (StripeException ex)
+        {
+            return $"Stripe a refusé la création du rabais : {ex.StripeError?.Message ?? ex.Message}";
+        }
+    }
+
     private static string? Validate(SavePlanRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Name)) return "Le nom du forfait est obligatoire.";
@@ -216,6 +275,20 @@ public class AdminPlansController(VextaDbContext db, IStripeService stripe) : Co
         // a month's worth of somebody else's money.
         if (request.MonthlyReceiptScans is < 0 or > 10_000)
             return "Les lectures de reçus par mois doivent être entre 0 et 10 000.";
+        // A year of free is not a trial, it is a gift nobody meant to make.
+        if (request.TrialDays is < 0 or > 365)
+            return "Les jours d'essai doivent être entre 0 et 365.";
+        if (request.DiscountPercent is < 0 or > 100)
+            return "Le rabais doit être entre 0 et 100 %.";
+        if (request.DiscountMonths is < 0 or > 36)
+            return "La durée du rabais doit être entre 0 et 36 mois.";
+        // Each half is meaningless alone: a percentage with no duration never applies, and a
+        // duration with no percentage takes nothing off. Saying so beats saving a discount that
+        // silently does nothing.
+        if (request.DiscountPercent > 0 && request.DiscountMonths == 0)
+            return "Indiquez pendant combien de mois le rabais s'applique.";
+        if (request.DiscountMonths > 0 && request.DiscountPercent == 0)
+            return "Indiquez le pourcentage du rabais.";
         return null;
     }
 
@@ -228,6 +301,9 @@ public class AdminPlansController(VextaDbContext db, IStripeService stripe) : Co
             p.MinUsers,
             p.MaxUsers,
             p.MonthlyReceiptScans,
+            p.TrialDays,
+            p.DiscountPercent,
+            p.DiscountMonths,
             p.IsPublished,
             p.SortOrder,
             p.StripePriceId,

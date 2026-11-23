@@ -48,6 +48,11 @@ public record PlanDto(
     /// is the honest way to keep it out of a cheap tier.
     /// </summary>
     int MonthlyReceiptScans,
+    /// <summary>Days of free trial. Zero asks for the card at signup.</summary>
+    int TrialDays,
+    /// <summary>A percentage off the first months. Both zero means no discount.</summary>
+    int DiscountPercent,
+    int DiscountMonths,
     bool IsPublished,
     int SortOrder,
     /// <summary>Null when Stripe could not be reached: such a plan cannot be published.</summary>
@@ -70,6 +75,13 @@ public record PublicPlanDto(
     string Currency,
     int MinUsers,
     int MaxUsers,
+    /// <summary>
+    /// Days of free trial, so the card can say so. A trial nobody is told about is a trial
+    /// nobody takes, and the pricing page is the one place the decision is made.
+    /// </summary>
+    int TrialDays,
+    int DiscountPercent,
+    int DiscountMonths,
     IReadOnlyList<PublicModuleDto> Modules,
     IReadOnlyList<PublicFeatureDto> Features);
 
@@ -94,6 +106,10 @@ public record SavePlanRequest(
     IReadOnlyList<Guid> ModuleIds,
     /// <summary>Defaults to 100 when a caller says nothing, like the column itself.</summary>
     int MonthlyReceiptScans = 100,
+    /// <summary>Zero keeps the old behaviour: the card is asked for at signup.</summary>
+    int TrialDays = 0,
+    int DiscountPercent = 0,
+    int DiscountMonths = 0,
     /// <summary>
     /// Optional so a caller written before features existed keeps working: null leaves the
     /// plan's features alone rather than silently emptying them.

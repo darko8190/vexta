@@ -1,22 +1,26 @@
 "use client";
 
 import { useState } from "react";
-import { Receipt } from "lucide-react";
+import { FileText, Receipt } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { SectionNav, type NavSection } from "@/components/layout/section-nav";
 import { ExpensesSection } from "@/components/purchasing/expenses-section";
+import { SectionPlaceholder } from "@/components/projects/detail/section-placeholder";
 
 /**
- * Money already spent.
+ * Money already spent, and money being asked for.
  *
- * One section today, and the rail is here anyway. It is the same reason a half-built record
- * shows its empty sections: the rail is the plan, and a page that grows a rail later moves
- * everything somebody had learned the position of.
+ * Dépenses holds real records; Factures fournisseurs is in place and empty. It is the same
+ * reason a half-built record shows its empty sections: the rail is the plan, and a page that
+ * grows a rail later moves everything somebody had learned the position of.
  */
 export default function PurchasingPage() {
   const [section, setSection] = useState("depenses");
 
-  const sections: NavSection[] = [{ key: "depenses", label: "Dépenses", icon: Receipt }];
+  const sections: NavSection[] = [
+    { key: "depenses", label: "Dépenses", icon: Receipt },
+    { key: "factures-fournisseurs", label: "Factures fournisseurs", icon: FileText },
+  ];
 
   return (
     <div>
@@ -34,7 +38,16 @@ export default function PurchasingPage() {
           label="Sections des achats"
         />
 
-        <div className="min-w-0 flex-1">{section === "depenses" && <ExpensesSection />}</div>
+        <div className="min-w-0 flex-1">
+          {section === "depenses" && <ExpensesSection />}
+          {section === "factures-fournisseurs" && (
+            <SectionPlaceholder
+              icon={FileText}
+              title="Factures fournisseurs"
+              description="Ce que vos fournisseurs vous facturent, et ce qui reste à payer."
+            />
+          )}
+        </div>
       </div>
     </div>
   );

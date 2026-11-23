@@ -16,13 +16,29 @@ public record AssistantMessage(string Role, string Text);
 /// <param name="Actions">What it did on the way, in order. Shown under the answer.</param>
 public record AssistantReply(string Text, IReadOnlyList<AssistantAction> Actions);
 
+/// <summary>What one provider round trip produced, and what it was billed for.</summary>
+public record AssistantRun(string Text, long InputTokens, long OutputTokens);
+
+/// <summary>
+/// What the assistant has spent this month, for the header.
+///
+/// The cost is null until the company has entered its own per-million prices. A figure in
+/// dollars that nobody supplied the rate for would be a guess printed beside a currency sign.
+/// </summary>
+public record AssistantUsageDto(
+    long InputTokens,
+    long OutputTokens,
+    decimal? Cost);
+
 /// <param name="Reason">Why not, in French, for the one case where the button was drawn anyway.</param>
 public record AssistantAvailability(
     bool Available,
     string? Reason,
     string Provider,
     string? Model,
-    bool CanWrite);
+    bool CanWrite,
+    /// <summary>This month's spend. Null when no assistant is set up.</summary>
+    AssistantUsageDto? Usage);
 
 /// <param name="ApiReachable">The application answered its own call. False is a deployment fault.</param>
 /// <param name="ModelReachable">The provider accepted the key and the model name.</param>
@@ -89,29 +105,98 @@ public class AssistantService(
 
         if (currentUser.TenantId is null)
         {
-            return new AssistantAvailability(false, "Aucun espace actif.", provider, settings?.Model, false);
+            return new AssistantAvailability(false, "Aucun espace actif.", provider, settings?.Model, false, null);
         }
 
         if (!await features.IsEnabledAsync(FeatureKeys.Ai, ct))
         {
             return new AssistantAvailability(
-                false, "L'assistant n'est pas inclus dans votre forfait.", provider, settings?.Model, false);
+                false, "L'assistant n'est pas inclus dans votre forfait.", provider, settings?.Model, false, null);
         }
 
         if (settings is null || string.IsNullOrWhiteSpace(settings.EncryptedApiKey))
         {
             return new AssistantAvailability(
                 false, "Aucune clé n'est enregistrée. Branchez un compte dans Paramètres → Assistant IA.",
-                provider, settings?.Model, false);
+                provider, settings?.Model, false, null);
         }
 
         if (!settings.IsEnabled)
         {
             return new AssistantAvailability(
-                false, "L'assistant est éteint pour cette entreprise.", provider, settings.Model, settings.CanWrite);
+                false, "L'assistant est éteint pour cette entreprise.", provider, settings.Model,
+                settings.CanWrite, UsageOf(settings));
         }
 
-        return new AssistantAvailability(true, null, provider, settings.Model, settings.CanWrite);
+        return new AssistantAvailability(
+            true, null, provider, settings.Model, settings.CanWrite, UsageOf(settings));
+    }
+
+    /// <summary>
+    /// This month's tokens, and what they cost when the company has told us its rate.
+    ///
+    /// A counter belonging to an earlier month reads as zero rather than being carried forward:
+    /// the reset happens on the next reply, and until then the stored figure is last month's.
+    /// Showing it under this month's heading would be the one kind of wrong a money figure must
+    /// not be.
+    /// </summary>
+    private static AssistantUsageDto UsageOf(TenantAiSettings settings)
+    {
+        var current = settings.UsagePeriod == FirstOfThisMonth();
+        var input = current ? settings.InputTokens : 0;
+        var output = current ? settings.OutputTokens : 0;
+
+        decimal? cost = settings.InputPricePerMillion is { } inPrice
+            && settings.OutputPricePerMillion is { } outPrice
+                ? decimal.Round(
+                    (input * inPrice + output * outPrice) / 1_000_000m,
+                    2,
+                    MidpointRounding.AwayFromZero)
+                : null;
+
+        return new AssistantUsageDto(input, output, cost);
+    }
+
+    private static DateOnly FirstOfThisMonth()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        return new DateOnly(today.Year, today.Month, 1);
+    }
+
+    /// <summary>
+    /// Adds what the exchange was billed for to this month's running total.
+    ///
+    /// Its own save, and deliberately forgiving: the person already has their answer, and losing
+    /// the tally is a worse outcome to force on them than it is to swallow. A failure here must
+    /// never turn a successful reply into an error on screen.
+    /// </summary>
+    private async Task RecordUsageAsync(long inputTokens, long outputTokens, CancellationToken ct)
+    {
+        if (inputTokens <= 0 && outputTokens <= 0) return;
+        if (currentUser.TenantId is not { } tenantId) return;
+
+        try
+        {
+            var settings = await db.TenantAiSettings.FirstOrDefaultAsync(s => s.TenantId == tenantId, ct);
+            if (settings is null) return;
+
+            var period = FirstOfThisMonth();
+            if (settings.UsagePeriod != period)
+            {
+                settings.UsagePeriod = period;
+                settings.InputTokens = 0;
+                settings.OutputTokens = 0;
+            }
+
+            settings.InputTokens += inputTokens;
+            settings.OutputTokens += outputTokens;
+
+            await db.SaveChangesAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "La consommation de l'assistant n'a pas pu être enregistrée.");
+        }
     }
 
     public async Task<AssistantTestResult> TestAsync(CancellationToken ct = default)
@@ -200,7 +285,7 @@ public class AssistantService(
 
         try
         {
-            var text = settings.Provider switch
+            var run = settings.Provider switch
             {
                 AiProvider.OpenAi => await OpenAiAssistant.RunAsync(
                     apiKey, settings.Model, prompt, history, tool, MaxTurns, http, OpenAiEndpoint, ct),
@@ -208,7 +293,9 @@ public class AssistantService(
                     apiKey, settings.Model, prompt, history, tool, MaxTurns, ct),
             };
 
-            return new AssistantReply(text, tool.Actions);
+            await RecordUsageAsync(run.InputTokens, run.OutputTokens, ct);
+
+            return new AssistantReply(run.Text, tool.Actions);
         }
         catch (OperationCanceledException)
         {

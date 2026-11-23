@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type {
+  FormResponsesSummary,
   FormSubmission,
   FormSubmissionDetail,
   FormTemplate,
@@ -122,5 +123,18 @@ export function useDeleteFormSubmission(formId: string) {
   return useMutation({
     mutationFn: (id: string) => api.delete(`formulaires/${formId}/reponses/${id}`),
     onSuccess: () => invalidate(queryClient),
+  });
+}
+
+/**
+ * The forms that have been filled, newest activity first.
+ *
+ * Its own query rather than a field on the forms list: this is read on a screen the builder
+ * never opens, and the builder's list is read on every page that offers a form.
+ */
+export function useFormResponsesQuery() {
+  return useQuery({
+    queryKey: ["formulaires", "reponses"],
+    queryFn: () => api.get<FormResponsesSummary[]>("formulaires/reponses"),
   });
 }

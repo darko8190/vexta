@@ -114,3 +114,14 @@ public record SubmitFormRequest(IReadOnlyList<SubmitFormAnswer> Answers);
 /// on the spot, or the person walks away believing the office has been told.
 /// </summary>
 public record SubmitFormResultDto(FormSubmissionDetailDto Submission, string SuccessMessage, string? ActionLog);
+
+/// <summary>
+/// One form on the Réponses list: what it is called, and what has come back.
+/// </summary>
+/// <param name="LastSubmissionAt">Null when nobody has filled it yet.</param>
+public record FormResponsesSummaryDto(
+    Guid Id,
+    string Title,
+    bool IsPublished,
+    int SubmissionCount,
+    DateTimeOffset? LastSubmissionAt);

@@ -33,6 +33,38 @@ public class FormsController(VextaDbContext db, ICurrentUserService currentUser)
         return Ok(forms);
     }
 
+    /// <summary>
+    /// The forms that have been filled, with how many times and how recently.
+    ///
+    /// The answers are grouped by the form they answer rather than listed flat, because an
+    /// answer means nothing without the question: "Oui" is not information until you know it
+    /// answered "Le chantier était-il propre au départ ?".
+    ///
+    /// Forms nobody has filled are returned too, at the bottom, showing zero. A list that hides
+    /// them looks like the form was never published when in fact it was never used.
+    /// </summary>
+    [HttpGet("reponses")]
+    public async Task<ActionResult<List<FormResponsesSummaryDto>>> Responses(CancellationToken ct)
+    {
+        var items = await db.FormTemplates.AsNoTracking()
+            .Select(f => new FormResponsesSummaryDto(
+                f.Id,
+                f.Title,
+                f.IsPublished,
+                f.Submissions.Count,
+                f.Submissions.Max(s => (DateTimeOffset?)s.CreatedAt)))
+            .ToListAsync(ct);
+
+        // Ordered here rather than in SQL. Sorting on a projected record is not something EF
+        // can translate — it tried to build the whole DTO inside the ORDER BY and gave up — and
+        // the list is one row per form, which is a handful even for a company that lives on them.
+        return Ok(items
+            .OrderByDescending(f => f.LastSubmissionAt.HasValue)
+            .ThenByDescending(f => f.LastSubmissionAt)
+            .ThenBy(f => f.Title, StringComparer.CurrentCultureIgnoreCase)
+            .ToList());
+    }
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<FormTemplateDetailDto>> Get(Guid id, CancellationToken ct)
     {

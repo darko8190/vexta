@@ -197,7 +197,7 @@ function UploadSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (ope
   );
 }
 
-export function DocumentsSection() {
+export function DocumentsSection({ employeeId }: { employeeId?: string } = {}) {
   const { data, isLoading, isError, isPlaceholderData, error: loadError, refetch } = useDocumentsQuery();
   const remove = useDeleteDocument();
   const link = useMediaLink();
@@ -232,13 +232,21 @@ export function DocumentsSection() {
     </Button>
   );
 
+  // Narrowed here rather than by the API: HR documents are a short list for any one company,
+  // and a second endpoint that answers the same question differently is a second thing to keep
+  // right. On an employee's own card the company-wide policies are left out — they are not
+  // facts about this person, and repeating them on sixty cards says nothing.
+  const documents = employeeId ? (data ?? []).filter((item) => item.employeeId === employeeId) : data;
+
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-foreground">Documents</h2>
           <p className="text-sm text-muted-foreground">
-            Contrats, politiques, certifications — rattachés à une personne ou à toute l&apos;entreprise.
+            {employeeId
+              ? "Les documents au dossier de cette personne."
+              : "Contrats, politiques, certifications — rattachés à une personne ou à toute l'entreprise."}
           </p>
         </div>
         {addButton}
@@ -262,16 +270,20 @@ export function DocumentsSection() {
           fallback="Vos documents n'ont pas pu être chargés."
           onRetry={() => refetch()}
         />
-      ) : !data || data.length === 0 ? (
+      ) : !documents || documents.length === 0 ? (
         <EmptyState
           icon={FileText}
           title="Aucun document"
-          description="Déposez vos contrats et vos politiques ici. Le stockage Cloudflare R2 doit être configuré par l'administrateur de la plateforme."
+          description={
+            employeeId
+              ? "Rien au dossier de cette personne. Son contrat et ses relevés se déposent ici."
+              : "Déposez vos contrats et vos politiques ici. Le stockage Cloudflare R2 doit être configuré par l'administrateur de la plateforme."
+          }
           action={addButton}
         />
       ) : (
         <ul className="space-y-2">
-          {data.map((document) => (
+          {documents.map((document) => (
             <li key={document.id} className="flex items-start gap-3 rounded-lg border border-border bg-card p-3">
               <FileText className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
               <div className="min-w-0 flex-1">

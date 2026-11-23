@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -79,6 +79,20 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
     public DbSet<FormSubmission> FormSubmissions => Set<FormSubmission>();
     public DbSet<FormAnswer> FormAnswers => Set<FormAnswer>();
     public DbSet<ReceiptScan> ReceiptScans => Set<ReceiptScan>();
+    public DbSet<EmployeeAddress> EmployeeAddresses => Set<EmployeeAddress>();
+    public DbSet<EmergencyContact> EmergencyContacts => Set<EmergencyContact>();
+    public DbSet<EmployeeWage> EmployeeWages => Set<EmployeeWage>();
+    public DbSet<HourBankEntry> HourBankEntries => Set<HourBankEntry>();
+    public DbSet<LeaveRequest> LeaveRequests => Set<LeaveRequest>();
+    public DbSet<ScheduleShift> ScheduleShifts => Set<ScheduleShift>();
+    public DbSet<EmployeeCredential> EmployeeCredentials => Set<EmployeeCredential>();
+    public DbSet<EmployeeCvEntry> EmployeeCvEntries => Set<EmployeeCvEntry>();
+    public DbSet<Candidate> Candidates => Set<Candidate>();
+    public DbSet<Supplier> Suppliers => Set<Supplier>();
+    public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
+    public DbSet<PurchaseOrderLine> PurchaseOrderLines => Set<PurchaseOrderLine>();
+    public DbSet<GoodsReceipt> GoodsReceipts => Set<GoodsReceipt>();
+    public DbSet<GoodsReceiptLine> GoodsReceiptLines => Set<GoodsReceiptLine>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -355,6 +369,239 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.HasIndex(s => new { s.TenantId, s.CreatedAt });
 
             e.HasQueryFilter(s => s.TenantId == CurrentTenantId);
+        });
+
+        // ---- The employee's own file ----
+
+        builder.Entity<EmployeeAddress>(e =>
+        {
+            // Cascade: an address is part of the person's file and means nothing without them.
+            e.HasOne(a => a.Employee).WithMany()
+                .HasForeignKey(a => a.EmployeeId).OnDelete(DeleteBehavior.Cascade);
+
+            e.Property(a => a.Label).HasMaxLength(60);
+            e.Property(a => a.Line1).HasMaxLength(200);
+            e.Property(a => a.Line2).HasMaxLength(200);
+            e.Property(a => a.City).HasMaxLength(100);
+            e.Property(a => a.Province).HasMaxLength(60);
+            e.Property(a => a.PostalCode).HasMaxLength(20);
+            e.Property(a => a.Country).HasMaxLength(60);
+
+            e.HasIndex(a => new { a.TenantId, a.EmployeeId });
+            e.HasQueryFilter(a => a.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<EmergencyContact>(e =>
+        {
+            e.HasOne(c => c.Employee).WithMany()
+                .HasForeignKey(c => c.EmployeeId).OnDelete(DeleteBehavior.Cascade);
+
+            e.Property(c => c.Name).HasMaxLength(150);
+            e.Property(c => c.Relationship).HasMaxLength(60);
+            e.Property(c => c.Phone).HasMaxLength(40);
+            e.Property(c => c.AltPhone).HasMaxLength(40);
+            e.Property(c => c.Email).HasMaxLength(256);
+            e.Property(c => c.Note).HasMaxLength(1000);
+
+            e.HasIndex(c => new { c.TenantId, c.EmployeeId });
+            e.HasQueryFilter(c => c.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<EmployeeWage>(e =>
+        {
+            e.HasOne(w => w.Employee).WithMany()
+                .HasForeignKey(w => w.EmployeeId).OnDelete(DeleteBehavior.Cascade);
+
+            e.Property(w => w.Amount).HasPrecision(14, 2);
+            e.Property(w => w.Note).HasMaxLength(300);
+
+            // Read as "the rate in force on this day", which is a descending scan by date.
+            e.HasIndex(w => new { w.TenantId, w.EmployeeId, w.EffectiveOn });
+            e.HasQueryFilter(w => w.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<HourBankEntry>(e =>
+        {
+            e.HasOne(h => h.Employee).WithMany()
+                .HasForeignKey(h => h.EmployeeId).OnDelete(DeleteBehavior.Cascade);
+
+            e.Property(h => h.Hours).HasPrecision(8, 2);
+            e.Property(h => h.Reason).HasMaxLength(300);
+
+            e.HasIndex(h => new { h.TenantId, h.EmployeeId, h.Date });
+            e.HasQueryFilter(h => h.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<LeaveRequest>(e =>
+        {
+            e.HasOne(l => l.Employee).WithMany()
+                .HasForeignKey(l => l.EmployeeId).OnDelete(DeleteBehavior.Cascade);
+
+            e.Property(l => l.Hours).HasPrecision(8, 2);
+            e.Property(l => l.Note).HasMaxLength(1000);
+            e.Property(l => l.DecisionNote).HasMaxLength(1000);
+
+            // The two lists this table is read as: one person's requests, and everything still
+            // waiting for an answer.
+            e.HasIndex(l => new { l.TenantId, l.EmployeeId, l.StartDate });
+            e.HasIndex(l => new { l.TenantId, l.Status });
+            e.HasQueryFilter(l => l.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<ScheduleShift>(e =>
+        {
+            e.HasOne(s => s.Employee).WithMany()
+                .HasForeignKey(s => s.EmployeeId).OnDelete(DeleteBehavior.Cascade);
+
+            // SetNull: deleting a job must not wipe the week somebody already worked to.
+            e.HasOne(s => s.Project).WithMany()
+                .HasForeignKey(s => s.ProjectId).OnDelete(DeleteBehavior.SetNull);
+
+            e.Property(s => s.Note).HasMaxLength(500);
+
+            e.HasIndex(s => new { s.TenantId, s.Date });
+            e.HasIndex(s => new { s.TenantId, s.EmployeeId, s.Date });
+            e.HasQueryFilter(s => s.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<EmployeeCredential>(e =>
+        {
+            e.HasOne(c => c.Employee).WithMany()
+                .HasForeignKey(c => c.EmployeeId).OnDelete(DeleteBehavior.Cascade);
+
+            // SetNull: losing the scan must not lose the card. The dates are the part that
+            // keeps somebody off a site, and they are typed in, not read off the image.
+            e.HasOne(c => c.MediaAsset).WithMany()
+                .HasForeignKey(c => c.MediaAssetId).OnDelete(DeleteBehavior.SetNull);
+
+            e.Property(c => c.Name).HasMaxLength(200);
+            e.Property(c => c.Issuer).HasMaxLength(150);
+            e.Property(c => c.Reference).HasMaxLength(100);
+            e.Property(c => c.Note).HasMaxLength(1000);
+
+            // What expires next, across the whole company: the one question this table answers
+            // that a per-employee list cannot.
+            e.HasIndex(c => new { c.TenantId, c.ExpiresOn });
+            e.HasIndex(c => new { c.TenantId, c.EmployeeId });
+            e.HasQueryFilter(c => c.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<EmployeeCvEntry>(e =>
+        {
+            e.HasOne(c => c.Employee).WithMany()
+                .HasForeignKey(c => c.EmployeeId).OnDelete(DeleteBehavior.Cascade);
+
+            e.Property(c => c.Title).HasMaxLength(200);
+            e.Property(c => c.Organization).HasMaxLength(200);
+            e.Property(c => c.Description).HasMaxLength(2000);
+
+            e.HasIndex(c => new { c.TenantId, c.EmployeeId });
+            e.HasQueryFilter(c => c.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<Candidate>(e =>
+        {
+            // SetNull on both: a résumé deleted from the library, or an employee record removed
+            // years later, must not take the application with it.
+            e.HasOne(c => c.ResumeMediaAsset).WithMany()
+                .HasForeignKey(c => c.ResumeMediaAssetId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(c => c.Employee).WithMany()
+                .HasForeignKey(c => c.EmployeeId).OnDelete(DeleteBehavior.SetNull);
+
+            e.Property(c => c.FirstName).HasMaxLength(100);
+            e.Property(c => c.LastName).HasMaxLength(100);
+            e.Property(c => c.Email).HasMaxLength(256);
+            e.Property(c => c.Phone).HasMaxLength(40);
+            e.Property(c => c.DesiredJobTitle).HasMaxLength(150);
+            e.Property(c => c.Source).HasMaxLength(150);
+            e.Property(c => c.Notes).HasMaxLength(4000);
+
+            e.HasIndex(c => new { c.TenantId, c.Status });
+            e.HasQueryFilter(c => c.TenantId == CurrentTenantId);
+        });
+
+        // ---- Suppliers, orders and what arrived ----
+
+        builder.Entity<Supplier>(e =>
+        {
+            e.Property(s => s.Name).HasMaxLength(200);
+            e.Property(s => s.ContactName).HasMaxLength(150);
+            e.Property(s => s.Email).HasMaxLength(256);
+            e.Property(s => s.Phone).HasMaxLength(40);
+            e.Property(s => s.Website).HasMaxLength(300);
+            e.Property(s => s.AccountNumber).HasMaxLength(100);
+            e.Property(s => s.Line1).HasMaxLength(200);
+            e.Property(s => s.City).HasMaxLength(100);
+            e.Property(s => s.Province).HasMaxLength(60);
+            e.Property(s => s.PostalCode).HasMaxLength(20);
+            e.Property(s => s.Notes).HasMaxLength(4000);
+
+            e.HasIndex(s => new { s.TenantId, s.Name });
+            e.HasQueryFilter(s => s.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<PurchaseOrder>(e =>
+        {
+            // Restrict: a supplier with orders against them cannot be deleted, because the
+            // order is the record of money that left and it has to say where it went.
+            e.HasOne(o => o.Supplier).WithMany(s => s.Orders)
+                .HasForeignKey(o => o.SupplierId).OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne(o => o.Project).WithMany()
+                .HasForeignKey(o => o.ProjectId).OnDelete(DeleteBehavior.SetNull);
+
+            e.Property(o => o.Reference).HasMaxLength(100);
+            e.Property(o => o.Note).HasMaxLength(2000);
+
+            // The supplier has this number written down too, so two orders must never share it.
+            e.HasIndex(o => new { o.TenantId, o.Number }).IsUnique();
+            e.HasIndex(o => new { o.TenantId, o.Status });
+            e.HasQueryFilter(o => o.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<PurchaseOrderLine>(e =>
+        {
+            e.HasOne(l => l.PurchaseOrder).WithMany(o => o.Lines)
+                .HasForeignKey(l => l.PurchaseOrderId).OnDelete(DeleteBehavior.Cascade);
+
+            // SetNull: a product taken out of the catalogue leaves the line it was ordered on
+            // standing, with the description that was written when it was ordered.
+            e.HasOne(l => l.Product).WithMany()
+                .HasForeignKey(l => l.ProductId).OnDelete(DeleteBehavior.SetNull);
+
+            e.Property(l => l.Description).HasMaxLength(500);
+            e.Property(l => l.Unit).HasMaxLength(20);
+            e.Property(l => l.Quantity).HasPrecision(14, 3);
+            e.Property(l => l.UnitCost).HasPrecision(14, 2);
+
+            e.HasQueryFilter(l => l.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<GoodsReceipt>(e =>
+        {
+            e.HasOne(r => r.PurchaseOrder).WithMany(o => o.Receipts)
+                .HasForeignKey(r => r.PurchaseOrderId).OnDelete(DeleteBehavior.Cascade);
+
+            e.Property(r => r.SlipNumber).HasMaxLength(100);
+            e.Property(r => r.Note).HasMaxLength(1000);
+
+            e.HasIndex(r => new { r.TenantId, r.ReceivedOn });
+            e.HasQueryFilter(r => r.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<GoodsReceiptLine>(e =>
+        {
+            e.HasOne(l => l.GoodsReceipt).WithMany(r => r.Lines)
+                .HasForeignKey(l => l.GoodsReceiptId).OnDelete(DeleteBehavior.Cascade);
+
+            // Restrict: deleting an ordered line while a delivery still points at it would
+            // leave a quantity received against nothing. The order has to drop the receipt first.
+            e.HasOne(l => l.PurchaseOrderLine).WithMany(ol => ol.ReceiptLines)
+                .HasForeignKey(l => l.PurchaseOrderLineId).OnDelete(DeleteBehavior.Restrict);
+
+            e.Property(l => l.Quantity).HasPrecision(14, 3);
+
+            e.HasQueryFilter(l => l.TenantId == CurrentTenantId);
         });
 
         builder.Entity<ClientAssetType>(e =>

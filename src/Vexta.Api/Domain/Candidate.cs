@@ -1,0 +1,65 @@
+namespace Vexta.Api.Domain;
+
+/// <summary>Where somebody is in the hiring.</summary>
+public enum CandidateStatus
+{
+    Nouveau = 0,
+    Entrevue = 1,
+    Offre = 2,
+
+    /// <summary>Hired. The employee record made from them is on <see cref="Candidate.EmployeeId"/>.</summary>
+    Embauche = 3,
+
+    Refuse = 4,
+
+    /// <summary>They withdrew, or stopped answering.</summary>
+    Retire = 5
+}
+
+/// <summary>
+/// Somebody who applied. Not an employee — a name, a trade and a phone number, kept until
+/// either they are hired or the season ends.
+///
+/// Separate from <see cref="Employee"/> on purpose, even though hiring one copies most of the
+/// fields across: an employee row is what the payroll, the seat count and the timesheets hang
+/// off, and a pile of applicants sitting in it would be counted as staff by every one of them.
+/// </summary>
+public class Candidate
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid TenantId { get; set; }
+
+    public required string FirstName { get; set; }
+    public required string LastName { get; set; }
+
+    public string? Email { get; set; }
+    public string? Phone { get; set; }
+
+    /// <summary>The job they are after — "Charpentier", "Journalier", "Chargé de projet".</summary>
+    public string? DesiredJobTitle { get; set; }
+
+    /// <summary>Where they came from — "Indeed", "Référé par Marc", "Page publique".</summary>
+    public string? Source { get; set; }
+
+    public CandidateStatus Status { get; set; } = CandidateStatus.Nouveau;
+
+    public DateOnly AppliedOn { get; set; }
+
+    /// <summary>Their résumé, as uploaded. Null when they applied by phone.</summary>
+    public Guid? ResumeMediaAssetId { get; set; }
+    public MediaAsset? ResumeMediaAsset { get; set; }
+
+    public string? Notes { get; set; }
+
+    /// <summary>
+    /// The employee created when they were hired. Set once, and what stops the same person
+    /// being hired twice from the same card.
+    /// </summary>
+    public Guid? EmployeeId { get; set; }
+    public Employee? Employee { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+
+    public string FullName => $"{FirstName} {LastName}".Trim();
+}

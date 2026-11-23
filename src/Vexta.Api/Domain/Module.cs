@@ -58,7 +58,11 @@ public static class ModuleIcons
         "Images", "HardDrive", "CreditCard", "Receipt", "Calendar", "Clock",
         "Mail", "Phone", "Bell", "Search", "ChartBar", "TrendingUp",
         "Settings", "Lock", "Cloud", "Smartphone", "Truck", "Wrench",
-        "Building2", "UsersRound", "Boxes", "Package", "Warehouse", "Layers", "ClipboardList"
+        "Building2", "UsersRound", "Boxes", "Package", "Warehouse", "Layers", "ClipboardList",
+        // The tabs added after the first batch of modules. Without these a company could not
+        // give Achats a basket or Outils a mortarboard, and would have to settle for a cog.
+        "ShoppingCart", "GraduationCap", "ClipboardPen", "ListChecks", "CalendarClock",
+        "FolderOpen", "Wallet", "HandCoins", "UserPlus", "BookUser"
     };
 
     public static bool IsAllowed(string? icon) => icon is not null && Allowed.Contains(icon);

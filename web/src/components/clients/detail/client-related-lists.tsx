@@ -1,11 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { FileText, FolderKanban, MapPin } from "lucide-react";
+import { FileText, FolderKanban, MapPin, Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LoadErrorState } from "@/components/layout/load-error-state";
 import { EmptyState } from "@/components/layout/empty-state";
+import { ProjectFormSheet } from "@/components/projects/project-form-sheet";
+import { useCanCreate } from "@/hooks/use-can-create";
 import { useAddressesQuery } from "@/hooks/use-addresses";
 import { useInvoicesQuery } from "@/hooks/use-invoices";
 import { useProjectsQuery } from "@/hooks/use-projects";
@@ -24,11 +28,23 @@ function Loading({ rows = 3 }: { rows?: number }) {
   );
 }
 
-function SectionHeading({ title, description }: { title: string; description: string }) {
+function SectionHeading({
+  title,
+  description,
+  action,
+}: {
+  title: string;
+  description: string;
+  /** The button that starts a record of this kind, when the section offers one. */
+  action?: React.ReactNode;
+}) {
   return (
-    <div className="mb-4">
-      <h2 className="text-base font-semibold text-foreground">{title}</h2>
-      <p className="text-sm text-muted-foreground">{description}</p>
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h2 className="text-base font-semibold text-foreground">{title}</h2>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </div>
+      {action}
     </div>
   );
 }
@@ -85,13 +101,33 @@ export function ClientAddressesSection({ clientId }: { clientId: string }) {
   );
 }
 
+/**
+ * This client's jobs, and the way to start another one.
+ *
+ * The button is here rather than only on the projects page because this is where somebody is
+ * standing when a client calls for more work: the client is already chosen, so the form opens
+ * with them filled in and nobody has to go and find them again in a list.
+ */
 export function ClientProjectsSection({ clientId }: { clientId: string }) {
   const { data, isLoading, isError, isPlaceholderData, error: loadError, refetch } = useProjectsQuery(1, "", clientId);
+  const canCreate = useCanCreate();
+  const [formOpen, setFormOpen] = useState(false);
   const items = data?.items ?? [];
+
+  const addButton = canCreate ? (
+    <Button onClick={() => setFormOpen(true)}>
+      <Plus />
+      Nouveau projet
+    </Button>
+  ) : undefined;
 
   return (
     <div>
-      <SectionHeading title="Projets" description="Les mandats en cours et passés pour ce client." />
+      <SectionHeading
+        title="Projets"
+        description="Les mandats en cours et passés pour ce client."
+        action={items.length > 0 ? addButton : undefined}
+      />
       {isLoading ? (
         <Loading />
       ) : isError && (!data || isPlaceholderData) ? (
@@ -105,7 +141,8 @@ export function ClientProjectsSection({ clientId }: { clientId: string }) {
         <EmptyState
           icon={FolderKanban}
           title="Aucun projet"
-          description="Les projets créés pour ce client apparaîtront ici."
+          description="Créez-en un : le client est déjà choisi, il ne reste qu'à décrire le mandat."
+          action={addButton}
         />
       ) : (
         <ul className="space-y-2">
@@ -132,6 +169,15 @@ export function ClientProjectsSection({ clientId }: { clientId: string }) {
           ))}
         </ul>
       )}
+
+      {/* Remounted each time it opens, so a form abandoned halfway does not come back
+          half-filled the next time somebody presses the button. */}
+      <ProjectFormSheet
+        key={String(formOpen)}
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        defaultClientId={clientId}
+      />
     </div>
   );
 }

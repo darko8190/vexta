@@ -1436,3 +1436,470 @@ export interface ReceiptScanAvailability {
   remaining: number;
   allowance: number;
 }
+
+// ---- La fiche de l'employé ----
+
+export type WageKind = "Horaire" | "Annuel";
+
+export type LeaveKind = "Vacances" | "Maladie" | "SansSolde" | "Parental" | "BanqueHeures" | "Autre";
+
+export type LeaveStatus = "EnAttente" | "Approuve" | "Refuse" | "Annule";
+
+export type CredentialKind = "Formation" | "Permis" | "Carte";
+
+export type CvEntryKind = "Experience" | "Formation" | "Competence";
+
+export type CandidateStatus = "Nouveau" | "Entrevue" | "Offre" | "Embauche" | "Refuse" | "Retire";
+
+export interface EmployeeAddress {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  label: string | null;
+  isPrimary: boolean;
+  line1: string;
+  line2: string | null;
+  city: string;
+  province: string | null;
+  postalCode: string;
+  country: string;
+}
+
+export interface SaveEmployeeAddressValues {
+  employeeId: string;
+  label: string | null;
+  isPrimary: boolean;
+  line1: string;
+  line2: string | null;
+  city: string;
+  province: string | null;
+  postalCode: string;
+  country: string | null;
+}
+
+export interface EmergencyContact {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  name: string;
+  relationship: string | null;
+  phone: string;
+  altPhone: string | null;
+  email: string | null;
+  isPrimary: boolean;
+  note: string | null;
+}
+
+export interface SaveEmergencyContactValues {
+  employeeId: string;
+  name: string;
+  relationship: string | null;
+  phone: string;
+  altPhone: string | null;
+  email: string | null;
+  isPrimary: boolean;
+  note: string | null;
+}
+
+/** One rate, and whether it is the one in force today. */
+export interface EmployeeWage {
+  id: string;
+  effectiveOn: string;
+  kind: WageKind;
+  amount: number;
+  note: string | null;
+  isCurrent: boolean;
+}
+
+export interface SaveEmployeeWageValues {
+  effectiveOn: string;
+  kind: WageKind;
+  amount: number;
+  note: string | null;
+}
+
+export interface HourBankEntry {
+  id: string;
+  date: string;
+  /** Positive when banked, negative when taken. */
+  hours: number;
+  reason: string;
+  createdAt: string;
+}
+
+export interface HourBank {
+  balance: number;
+  banked: number;
+  taken: number;
+  entries: HourBankEntry[];
+}
+
+export interface SaveHourBankEntryValues {
+  date: string;
+  hours: number;
+  reason: string;
+}
+
+export interface LeaveRequest {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  kind: LeaveKind;
+  startDate: string;
+  endDate: string;
+  hours: number | null;
+  note: string | null;
+  status: LeaveStatus;
+  decidedAt: string | null;
+  decisionNote: string | null;
+  /** Both ends included, so a single-day leave reads 1. */
+  days: number;
+  createdAt: string;
+}
+
+export interface SaveLeaveValues {
+  employeeId: string | null;
+  kind: LeaveKind;
+  startDate: string;
+  endDate: string;
+  hours: number | null;
+  note: string | null;
+}
+
+export interface ScheduleShift {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  projectId: string | null;
+  projectNumber: number | null;
+  projectDescription: string | null;
+  date: string;
+  startTime: string;
+  endTime: string;
+  hours: number;
+  note: string | null;
+}
+
+export interface ScheduleWeek {
+  start: string;
+  end: string;
+  totalHours: number;
+  shifts: ScheduleShift[];
+}
+
+export interface SaveScheduleShiftValues {
+  employeeId: string | null;
+  projectId: string | null;
+  date: string;
+  startTime: string;
+  endTime: string;
+  note: string | null;
+}
+
+export interface EmployeeCredential {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  kind: CredentialKind;
+  name: string;
+  issuer: string | null;
+  reference: string | null;
+  issuedOn: string | null;
+  expiresOn: string | null;
+  mediaAssetId: string | null;
+  fileName: string | null;
+  note: string | null;
+  /** Null when it does not expire; negative once it has. */
+  daysUntilExpiry: number | null;
+}
+
+export interface SaveEmployeeCredentialValues {
+  employeeId: string;
+  kind: CredentialKind;
+  name: string;
+  issuer: string | null;
+  reference: string | null;
+  issuedOn: string | null;
+  expiresOn: string | null;
+  mediaAssetId: string | null;
+  note: string | null;
+}
+
+export interface EmployeeCvEntry {
+  id: string;
+  kind: CvEntryKind;
+  title: string;
+  organization: string | null;
+  startOn: string | null;
+  endOn: string | null;
+  description: string | null;
+  sortOrder: number;
+}
+
+export interface SaveEmployeeCvEntryValues {
+  kind: CvEntryKind;
+  title: string;
+  organization: string | null;
+  startOn: string | null;
+  endOn: string | null;
+  description: string | null;
+  sortOrder: number;
+}
+
+export interface Candidate {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string | null;
+  phone: string | null;
+  desiredJobTitle: string | null;
+  source: string | null;
+  status: CandidateStatus;
+  appliedOn: string;
+  resumeMediaAssetId: string | null;
+  resumeFileName: string | null;
+  notes: string | null;
+  /** Set once they are hired. The card then points at a real employee. */
+  employeeId: string | null;
+}
+
+export interface SaveCandidateValues {
+  firstName: string;
+  lastName: string;
+  email: string | null;
+  phone: string | null;
+  desiredJobTitle: string | null;
+  source: string | null;
+  status: CandidateStatus;
+  appliedOn: string | null;
+  resumeMediaAssetId: string | null;
+  notes: string | null;
+}
+
+export interface HireCandidateValues {
+  email: string;
+  jobTitle: string | null;
+}
+
+/** The badges on the HR rail, in one call. */
+export interface HrSectionCounts {
+  employees: number;
+  teams: number;
+  addresses: number;
+  emergencyContacts: number;
+  candidates: number;
+  credentials: number;
+  pendingLeaves: number;
+  documents: number;
+}
+
+// ---- Fournisseurs, commandes et réceptions ----
+
+export type PurchaseOrderStatus = "Brouillon" | "Envoyee" | "PartiellementRecue" | "Recue" | "Annulee";
+
+export interface Supplier {
+  id: string;
+  name: string;
+  contactName: string | null;
+  email: string | null;
+  phone: string | null;
+  website: string | null;
+  accountNumber: string | null;
+  line1: string | null;
+  city: string | null;
+  province: string | null;
+  postalCode: string | null;
+  notes: string | null;
+  isActive: boolean;
+  orderCount: number;
+  /** Placed but not fully received. What somebody is chasing. */
+  openOrderCount: number;
+}
+
+export interface SaveSupplierValues {
+  name: string;
+  contactName: string | null;
+  email: string | null;
+  phone: string | null;
+  website: string | null;
+  accountNumber: string | null;
+  line1: string | null;
+  city: string | null;
+  province: string | null;
+  postalCode: string | null;
+  notes: string | null;
+  isActive: boolean;
+}
+
+export interface PurchaseOrderLine {
+  id: string;
+  productId: string | null;
+  description: string;
+  unit: string | null;
+  quantity: number;
+  unitCost: number;
+  total: number;
+  quantityReceived: number;
+  sortOrder: number;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  number: number;
+  supplierId: string;
+  supplierName: string;
+  projectId: string | null;
+  projectNumber: number | null;
+  projectDescription: string | null;
+  status: PurchaseOrderStatus;
+  orderedOn: string;
+  expectedOn: string | null;
+  reference: string | null;
+  note: string | null;
+  /** Before tax. What the supplier's invoice should come to. */
+  total: number;
+  lineCount: number;
+  receiptCount: number;
+  createdAt: string;
+}
+
+export interface PurchaseOrderDetail {
+  order: PurchaseOrder;
+  lines: PurchaseOrderLine[];
+}
+
+export interface SavePurchaseOrderLineValues {
+  id: string | null;
+  productId: string | null;
+  description: string;
+  unit: string | null;
+  quantity: number;
+  unitCost: number;
+}
+
+export interface SavePurchaseOrderValues {
+  supplierId: string;
+  projectId: string | null;
+  orderedOn: string | null;
+  expectedOn: string | null;
+  reference: string | null;
+  note: string | null;
+  lines: SavePurchaseOrderLineValues[] | null;
+}
+
+export interface GoodsReceiptLine {
+  id: string;
+  purchaseOrderLineId: string;
+  description: string;
+  unit: string | null;
+  quantity: number;
+}
+
+export interface GoodsReceipt {
+  id: string;
+  purchaseOrderId: string;
+  orderNumber: number;
+  supplierId: string;
+  supplierName: string;
+  receivedOn: string;
+  slipNumber: string | null;
+  note: string | null;
+  lineCount: number;
+  createdAt: string;
+}
+
+export interface GoodsReceiptDetail {
+  receipt: GoodsReceipt;
+  lines: GoodsReceiptLine[];
+}
+
+export interface SaveGoodsReceiptValues {
+  purchaseOrderId: string;
+  receivedOn: string | null;
+  slipNumber: string | null;
+  note: string | null;
+  lines: { purchaseOrderLineId: string; quantity: number }[];
+}
+
+/** What is still owed on an order, so the delivery form opens with the right numbers. */
+export interface OutstandingLine {
+  purchaseOrderLineId: string;
+  description: string;
+  unit: string | null;
+  ordered: number;
+  received: number;
+  outstanding: number;
+}
+
+// ---- Paiements, vus de la facturation ----
+
+export interface PaymentListItem {
+  id: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  clientId: string | null;
+  clientName: string;
+  date: string;
+  amount: number;
+  method: PaymentMethod;
+  reference: string | null;
+  note: string | null;
+  createdAt: string;
+}
+
+/** `onAccount` is held apart: it is the invoice moved onto the client's account, not money in. */
+export interface PaymentTotals {
+  count: number;
+  received: number;
+  onAccount: number;
+}
+
+export interface PaymentList {
+  page: PagedResult<PaymentListItem>;
+  totals: PaymentTotals;
+}
+
+// ---- Réponses aux formulaires ----
+
+export interface FormResponsesSummary {
+  id: string;
+  title: string;
+  isPublished: boolean;
+  submissionCount: number;
+  /** Null when nobody has filled it yet. */
+  lastSubmissionAt: string | null;
+}
+
+/** One shift this person worked, as their file lists it. */
+export interface EmployeeTimesheet {
+  id: string;
+  projectId: string;
+  projectNumber: number;
+  clientName: string;
+  projectDescription: string | null;
+  startDate: string;
+  endDate: string;
+  startTime: string;
+  endTime: string;
+  hours: number;
+  note: string | null;
+}
+
+export interface EmployeeWeek {
+  weekStart: string;
+  weekEnd: string;
+  totalHours: number;
+  entries: EmployeeTimesheet[];
+}
+
+/** The badges on one employee's rail. Leaves counts only what is still waiting. */
+export interface EmployeeFileCounts {
+  emergencyContacts: number;
+  addresses: number;
+  cvEntries: number;
+  wages: number;
+  credentials: number;
+  pendingLeaves: number;
+  hourBankEntries: number;
+  documents: number;
+}

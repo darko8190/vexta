@@ -35,3 +35,18 @@ export function dayIso(offsetInDays: number): string {
   const day = String(date.getDate()).padStart(2, "0");
   return `${date.getFullYear()}-${month}-${day}`;
 }
+
+/**
+ * A day and a clock time, the way somebody says it out loud: "22 novembre 2026 à 14 h 05".
+ *
+ * For a timestamp, not a date — the two are different fields and reading one as the other is
+ * how a form filled at 23 h ends up dated tomorrow.
+ */
+export function formatMoment(iso: string | null | undefined): string {
+  if (!iso) return "—";
+
+  const date = new Date(iso);
+  const day = date.toLocaleDateString("fr-CA", { day: "numeric", month: "long", year: "numeric" });
+  const time = date.toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit" });
+  return `${day} à ${time.replace(":", " h ")}`;
+}

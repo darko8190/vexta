@@ -1,15 +1,22 @@
 import type {
   AccountEntryKind,
   AddressType,
+  CandidateStatus,
   ClientStatus,
+  CredentialKind,
+  CvEntryKind,
   EmploymentType,
   FormActionKind,
   FormFieldTarget,
   FormFieldType,
   InvoiceLineKind,
   InvoiceStatus,
+  LeaveKind,
+  LeaveStatus,
   MarginMode,
   PaymentMethod,
+  PurchaseOrderStatus,
+  WageKind,
   ProjectStatus,
   ProjectTaskPriority,
   ProjectTaskStatus,
@@ -230,4 +237,107 @@ export const employmentTypeLabels: Record<EmploymentType, string> = {
   Contrat: "Contrat",
   Saisonnier: "Saisonnier",
   Stage: "Stage",
+};
+
+// ---- La fiche de l'employé ----
+
+export const wageKindLabels: Record<WageKind, string> = {
+  Horaire: "Taux horaire",
+  Annuel: "Salaire annuel",
+};
+
+export const leaveKindLabels: Record<LeaveKind, string> = {
+  Vacances: "Vacances",
+  Maladie: "Maladie",
+  SansSolde: "Sans solde",
+  Parental: "Parental",
+  BanqueHeures: "Banque d'heures",
+  Autre: "Autre",
+};
+
+export const leaveStatusLabels: Record<LeaveStatus, string> = {
+  EnAttente: "En attente",
+  Approuve: "Approuvé",
+  Refuse: "Refusé",
+  Annule: "Annulé",
+};
+
+export const leaveStatusBadgeVariant: Record<LeaveStatus, "default" | "secondary" | "destructive" | "outline"> = {
+  EnAttente: "outline",
+  Approuve: "default",
+  Refuse: "destructive",
+  Annule: "secondary",
+};
+
+export const credentialKindLabels: Record<CredentialKind, string> = {
+  Formation: "Formation",
+  Permis: "Permis",
+  Carte: "Carte de compétence",
+};
+
+export const cvEntryKindLabels: Record<CvEntryKind, string> = {
+  Experience: "Expérience",
+  Formation: "Formation",
+  Competence: "Compétence",
+};
+
+export const candidateStatusLabels: Record<CandidateStatus, string> = {
+  Nouveau: "Nouveau",
+  Entrevue: "Entrevue",
+  Offre: "Offre",
+  Embauche: "Embauché",
+  Refuse: "Refusé",
+  Retire: "Retiré",
+};
+
+export const candidateStatusBadgeVariant: Record<CandidateStatus, "default" | "secondary" | "destructive" | "outline"> = {
+  Nouveau: "outline",
+  Entrevue: "secondary",
+  Offre: "secondary",
+  Embauche: "default",
+  Refuse: "destructive",
+  Retire: "secondary",
+};
+
+/**
+ * How long is left on a card, said in words rather than in days.
+ *
+ * Expired and "expires this week" are the two the department acts on, so they are the two that
+ * read differently at a glance. Everything beyond a month is simply a date.
+ */
+export function credentialExpiryLabel(daysUntilExpiry: number | null): {
+  text: string;
+  variant: "default" | "secondary" | "destructive" | "outline";
+} {
+  if (daysUntilExpiry === null) return { text: "N'expire pas", variant: "secondary" };
+  if (daysUntilExpiry < 0) {
+    const days = Math.abs(daysUntilExpiry);
+    return { text: days === 1 ? "Expirée hier" : `Expirée depuis ${days} jours`, variant: "destructive" };
+  }
+  if (daysUntilExpiry === 0) return { text: "Expire aujourd'hui", variant: "destructive" };
+  if (daysUntilExpiry <= 30) {
+    return {
+      text: daysUntilExpiry === 1 ? "Expire demain" : `Expire dans ${daysUntilExpiry} jours`,
+      variant: "outline",
+    };
+  }
+  return { text: `Expire dans ${Math.round(daysUntilExpiry / 30)} mois`, variant: "secondary" };
+}
+
+// ---- Fournisseurs et commandes ----
+
+export const purchaseOrderStatusLabels: Record<PurchaseOrderStatus, string> = {
+  Brouillon: "Brouillon",
+  Envoyee: "Envoyée",
+  PartiellementRecue: "Partiellement reçue",
+  Recue: "Reçue",
+  Annulee: "Annulée",
+};
+
+export const purchaseOrderStatusBadgeVariant: Record<PurchaseOrderStatus, "default" | "secondary" | "destructive" | "outline"> = {
+  Brouillon: "outline",
+  Envoyee: "secondary",
+  PartiellementRecue: "secondary",
+  Recue: "default",
+  Annulee: "destructive",
 };

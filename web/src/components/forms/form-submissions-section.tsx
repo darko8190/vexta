@@ -17,15 +17,8 @@ import {
 } from "@/hooks/use-forms";
 import { useIsOwner } from "@/hooks/use-can-create";
 import { ApiError } from "@/lib/api";
+import { formatMoment } from "@/lib/dates";
 import type { FormSubmission } from "@/lib/types";
-
-/** The moment, in the words a person uses: 22 novembre 2026 à 14 h 05. */
-function moment(iso: string): string {
-  const date = new Date(iso);
-  const day = date.toLocaleDateString("fr-CA", { day: "numeric", month: "long", year: "numeric" });
-  const time = date.toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit" });
-  return `${day} à ${time.replace(":", " h ")}`;
-}
 
 /**
  * The filled copies, newest first, each one openable.
@@ -100,7 +93,7 @@ export function FormSubmissionsSection({ formId }: { formId: string }) {
                       {submission.submittedByName ?? "Anonyme"}
                     </span>
                     <span className="text-xs text-muted-foreground tabular-nums">
-                      {moment(submission.createdAt)}
+                      {formatMoment(submission.createdAt)}
                     </span>
                     <Badge variant="secondary">
                       {submission.answerCount === 1

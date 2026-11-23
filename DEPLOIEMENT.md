@@ -436,19 +436,43 @@ les liens à y mettre.
 | `/tableau-de-bord` | — | Toujours là, jamais un module. |
 | `/clients` | Clients | |
 | `/projets` | Projets | |
-| `/factures` | Factures | |
+| `/factures` | Facturation | Les factures. Les paiements sont son sous-onglet. |
+| `/factures/paiements` | Paiements | Sous-onglet de Facturation. |
 | `/achats` | Achats | Parent. Mène à Dépenses tant que c'est son seul enfant. |
 | `/achats/depenses` | Dépenses | Sous-onglet d'Achats. |
+| `/approvisionnement` | Fournisseurs & Commandes | Parent. Mène aux fournisseurs. |
+| `/approvisionnement/fournisseurs` | Fournisseurs | Sous-onglet. |
+| `/approvisionnement/commandes` | Commandes | Sous-onglet. |
+| `/approvisionnement/receptions` | Réceptions | Sous-onglet. |
 | `/inventaire` | Inventaire | |
 | `/mes-feuilles-de-temps` | Mes feuilles de temps | Les heures de la personne connectée. |
 | `/mes-assignations` | Mes assignations | Ses tâches. |
-| `/outils` | Outils & Formation | Les formulaires sont là. |
+| `/outils` | Outils | Les formulaires et leurs réponses. |
 | `/rapports` | Rapports | |
 | `/ressources-humaines` | Ressources humaines | Cochez **réservé au propriétaire**. |
 | `/entreprise` | Entreprise | Cochez **réservé au propriétaire**. |
 
 Les deux « Mes… » ne se réservent à personne : ce sont les seuls écrans qui parlent de la
 personne plutôt que de l'entreprise, et un administrateur saisit ses heures comme les autres.
+
+#### « Mes entreprises n'ont pas l'onglet Rapports / Achats »
+
+C'est le cas le plus fréquent, et ce n'est pas un bogue. Le forfait de ces entreprises contient
+déjà au moins un module, donc leur menu vient **entièrement** des modules — un écran sans module
+n'existe pas pour elles, même s'il répond parfaitement quand on tape son adresse.
+
+Pour l'ajouter :
+
+1. **Admin → Modules → Ajouter un module.** Titre « Rapports », lien `/rapports`, icône `ChartBar`.
+2. Recommencez pour « Achats » (lien `/achats`, icône `ShoppingCart`), puis pour « Dépenses »
+   (lien `/achats/depenses`) en choisissant **Achats** dans « Sous-onglet de ».
+3. **Admin → Forfaits**, ouvrez chaque forfait, cochez les nouveaux modules.
+4. L'entreprise recharge sa page : le menu se rebâtit tout seul.
+
+> **Le piège** : si un forfait est aujourd'hui à **zéro** module, ses entreprises voient le menu
+> intégré au complet. Lui ajouter un seul module fait basculer tout le menu sur les modules —
+> **tous** les onglets qu'elles doivent garder (Clients, Projets, Facturation, Inventaire…)
+> doivent exister comme modules **avant** que vous cochiez le premier, sinon elles les perdent.
 
 ### Actifs, comptes clients et paiements
 
@@ -750,6 +774,98 @@ fournisseur propre et perdra davantage de reçus chiffonnés.
 L'image du reçu et les consignes de lecture. Rien d'autre : ni le nom du client, ni celui du
 projet, ni le nom de l'entreprise, ni l'adresse de qui que ce soit. La requête est une image et
 une phrase.
+
+### Le dossier d'un employé
+
+La fiche d'un employé a maintenant la même forme que celle d'un client : un rail de sections à
+gauche, le contenu à droite. Treize sections, dont six annoncent honnêtement qu'elles ne
+contiennent encore rien plutôt que d'être cachées — le rail est le plan, et une pastille à zéro
+dit la vérité sur ce qui s'en vient.
+
+| Section | Ce qu'elle contient |
+| ------- | ------------------- |
+| Détails | Ses équipes, son accès, ses coordonnées. |
+| Contacts | Ses contacts d'urgence : qui appeler s'il arrive quelque chose sur un chantier. |
+| Adresses | Où il habite. Plusieurs sont permises ; une seule est la principale. |
+| CV | Expériences, formations, compétences — saisies pour pouvoir être cherchées. |
+| Salaires | L'historique des taux. **Réservé à l'administrateur.** |
+| Dépenses | *À venir.* Une dépense appartient aujourd'hui au projet où elle a été faite. |
+| Formations/Permis | Cartes de compétence, permis, formations, avec leur date d'expiration. |
+| Horaire | Ce qui est prévu, semaine par semaine. |
+| Demandes de congés | Déposées par l'employé, répondues par l'entreprise. |
+| Feuilles de temps | Ses heures, semaine par semaine. En lecture seule. |
+| Banque d'heures | Le temps supplémentaire accumulé et repris. **Réservé à l'administrateur.** |
+| Avantages et allocations | *À venir.* |
+| Documents/Notes | Les fichiers à son dossier. |
+
+Trois choses valent la peine d'être sues :
+
+- **Un taux ne se corrige pas, il se remplace par un nouveau.** Écraser un taux ferait coûter
+  aux heures du printemps dernier ce que coûtent celles d'aujourd'hui, et la facture sur
+  laquelle elles ont été portées cesserait de s'additionner. Un taux daté dans le futur attend
+  sa date avant de devenir « en vigueur ».
+- **La banque d'heures est une suite de mouvements, pas un solde.** Un nombre dans une colonne
+  est quelque chose que personne ne peut contester et que personne ne peut expliquer.
+- **Un congé « banque d'heures » approuvé sort les heures de la banque tout seul**, dans la même
+  écriture que la décision. L'annuler les remet.
+
+### Ressources humaines : ce qui a bougé
+
+- **Adresses** veut maintenant dire *les adresses des employés*, pas celles de l'entreprise.
+  Chaque adresse appartient à quelqu'un, obligatoirement.
+- **Les lieux de l'entreprise** — siège social, entrepôt, cour — ont déménagé dans
+  **Entreprise → Lieux**. Un entrepôt n'est pas un fait au sujet d'une personne.
+- **Contacts** est nouveau : les contacts d'urgence, visibles aussi bien par personne que pour
+  toute l'entreprise.
+- **Candidats** est nouveau. Embaucher quelqu'un crée sa fiche d'employé **au dossier
+  seulement** : aucun accès, aucune licence consommée. Donner l'accès reste une décision
+  séparée, prise sur sa fiche.
+- **Formations** a quitté Outils pour venir ici. La liste se trie par date d'expiration la plus
+  proche : c'est la seule question qu'on ouvre cet écran pour poser — qui va se faire refuser à
+  la barrière.
+
+### Fournisseurs, commandes et réceptions
+
+Un nouvel onglet avec trois sous-onglets. Le cycle est volontairement simple :
+
+1. **Fournisseurs** — une cour, un grossiste. Un fournisseur avec des commandes ne se supprime
+   pas ; on le rend inactif, parce que ses commandes doivent continuer de dire chez qui elles
+   ont été passées.
+2. **Commandes** — numérotées par entreprise. Elles naissent en brouillon, s'envoient, puis
+   suivent ce que les livraisons disent.
+3. **Réceptions** — notées depuis la commande, parce que c'est là qu'on sait ce qui reste à
+   recevoir.
+
+> **Le statut d'une commande n'est jamais tapé à la main** pour « reçue » ou « partiellement
+> reçue » : il est lu à partir des livraisons. Un statut qu'on peut cocher est un statut qui dit
+> qu'un camion est arrivé alors qu'il n'est pas arrivé. Retirer une réception fait reculer le
+> statut tout seul.
+
+Recevoir **plus** que ce qui a été commandé est permis : un fournisseur envoie une boîte pleine
+plutôt que les onze morceaux demandés, et refuser de le noter mettrait l'entrepôt et l'écran en
+désaccord dès la première livraison.
+
+### Facturation et paiements
+
+L'onglet **Factures** s'appelle maintenant **Facturation**, et il a un sous-onglet
+**Paiements** : tout ce qui est rentré, toutes factures confondues.
+
+L'écran est en **lecture seule**. Un paiement se prend sur la facture qu'il règle — c'est là
+qu'on calcule ce qui reste dû et qu'on écrit au compte du client. Un formulaire ici ne serait
+qu'une deuxième façon de faire la même chose, qui finirait par diverger de la première.
+
+Le total « porté au compte » est tenu à part de l'encaissé : ce n'est pas de l'argent, c'est la
+facture déplacée sur le compte du client. L'ajouter aux recettes du jour ferait paraître la
+caisse plus pleine que la banque.
+
+### Réponses aux formulaires
+
+**Outils → Réponses** regroupe les formulaires remplis **par formulaire**, pas à plat. Une
+réponse ne veut rien dire sans sa question : « Oui » n'est pas une information tant qu'on ne
+sait pas qu'il répondait à « Le chantier était-il propre au départ ? ».
+
+Les formulaires que personne n'a remplis sont montrés aussi, en bas, à zéro. Les cacher ferait
+passer un formulaire publié et jamais utilisé pour un formulaire jamais publié.
 
 ### Fuseau horaire et langue
 

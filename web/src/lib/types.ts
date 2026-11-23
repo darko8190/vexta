@@ -68,6 +68,11 @@ export interface ClientRecord {
   lastName: string | null;
   /** The company for an entreprise, the person for a particulier. */
   name: string;
+  /**
+   * Where they stand with the company. Never "Banni": a barred client is one whose lock is
+   * closed (see isBlocked), and the screen reads the two together so they cannot disagree.
+   */
+  status: ClientStatus;
   email: string | null;
   phone: string | null;
   taxId: string | null;
@@ -94,6 +99,14 @@ export interface ClientRecord {
   updatedAt: string;
 }
 
+/**
+ * Prospect, client, ancien client.
+ *
+ * None of the three refuses anything — a prospect is quoted, and an ancien client who calls
+ * back is a client again. What refuses is the lock on the record.
+ */
+export type ClientStatus = "Prospect" | "Client" | "Ancien";
+
 // ---- Actifs : what a client owns that work gets done on ----
 
 /**
@@ -107,7 +120,10 @@ export interface ClientAsset {
   label: string;
   /** "Toyota Corolla 2018", or the label when the make and model were never filled. */
   designation: string;
-  category: string | null;
+  /** One of the company's kinds of asset. Null for one filed before a kind was chosen. */
+  assetTypeId: string | null;
+  assetTypeName: string | null;
+  assetTypeIcon: string | null;
   make: string | null;
   model: string | null;
   year: number | null;
@@ -125,7 +141,7 @@ export interface ClientAsset {
 
 export interface SaveClientAssetValues {
   label: string;
-  category: string | null;
+  assetTypeId: string | null;
   make: string | null;
   model: string | null;
   year: number | null;
@@ -136,6 +152,24 @@ export interface SaveClientAssetValues {
   addressId: string | null;
   notes: string | null;
   isActive: boolean;
+}
+
+/**
+ * One of the company's kinds of asset: Véhicule, Maison, Bloc appartements, Machinerie.
+ *
+ * Added to from the dropdown that uses it, like an expense category: stopping to go and
+ * configure a list is what makes people pick the wrong kind instead.
+ */
+export interface ClientAssetType {
+  id: string;
+  name: string;
+  icon: string | null;
+  assetCount: number;
+}
+
+export interface SaveClientAssetTypeValues {
+  name: string;
+  icon: string | null;
 }
 
 // ---- Compte client ----
@@ -288,6 +322,9 @@ export interface ProjectRecord {
   /** The margin applied to catalogue lines on this job, if one was chosen. */
   pricePolicyId: string | null;
   pricePolicyName: string | null;
+  /** The client's asset the work is on: the car in the bay, the building being reroofed. */
+  clientAssetId: string | null;
+  clientAssetLabel: string | null;
   clientAddress: ProjectAddress | null;
   sameAddressAsClient: boolean;
   /** Null when the work happens at the billing address. */
@@ -1146,4 +1183,220 @@ export interface SaveReportValues {
   icon: string;
   sortOrder: number;
   isPublished: boolean;
+}
+
+// ---- Mon espace : what the signed-in employee has to do, and has done ----
+
+export interface MyTimesheet {
+  id: string;
+  projectId: string;
+  /** Shown as P-0001, which is how the job is named on paper. */
+  projectNumber: number;
+  clientName: string;
+  projectDescription: string | null;
+  startDate: string;
+  endDate: string;
+  startTime: string;
+  endTime: string;
+  hours: number;
+  note: string | null;
+}
+
+export interface MyWeek {
+  /** Monday. Decided by the server so the browser and the payroll cannot disagree. */
+  weekStart: string;
+  weekEnd: string;
+  totalHours: number;
+  /** False for an account with no employee record behind it. Not an error — a state. */
+  hasEmployeeRecord: boolean;
+  entries: MyTimesheet[];
+}
+
+export interface MyAssignment {
+  id: string;
+  projectId: string;
+  projectNumber: number;
+  clientName: string;
+  title: string;
+  description: string | null;
+  status: ProjectTaskStatus;
+  priority: ProjectTaskPriority;
+  startDate: string | null;
+  dueDate: string | null;
+  isLate: boolean;
+  /** The crew's name when the task came through a crew, null when it came by name. */
+  viaTeam: string | null;
+}
+
+export interface MyAssignments {
+  hasEmployeeRecord: boolean;
+  assignments: MyAssignment[];
+}
+
+// ---- Achats : every expense the company has filed, across its jobs ----
+
+export interface ExpenseListItem {
+  id: string;
+  projectId: string;
+  projectNumber: number;
+  clientName: string;
+  name: string;
+  description: string | null;
+  expenseTypeId: string;
+  expenseTypeName: string;
+  cost: number | null;
+  sellingPrice: number | null;
+  spentOn: string | null;
+  photoCount: number;
+  createdAt: string;
+}
+
+/** Over everything the filters match, not only the page on screen. */
+export interface ExpenseTotals {
+  count: number;
+  cost: number;
+  sellingPrice: number;
+}
+
+export interface ExpenseList {
+  page: PagedResult<ExpenseListItem>;
+  totals: ExpenseTotals;
+}
+
+export interface ExpenseFilters {
+  search?: string;
+  type?: string;
+  du?: string;
+  au?: string;
+  projet?: string;
+}
+
+// ---- Formulaires : what a company asks, and what the answers set off ----
+
+/** What a question accepts. Short on purpose: a type nobody can explain comes back empty. */
+export type FormFieldType =
+  | "Texte"
+  | "TexteLong"
+  | "Nombre"
+  | "Date"
+  | "Choix"
+  | "MultiChoix"
+  | "OuiNon"
+  | "Courriel"
+  | "Telephone";
+
+/** Which field of a new client an answer fills, when the form is set to create one. */
+export type FormFieldTarget =
+  | "Aucun"
+  | "Prenom"
+  | "Nom"
+  | "NomEntreprise"
+  | "Courriel"
+  | "Telephone"
+  | "Notes";
+
+export type FormActionKind = "EnvoyerCourriel" | "CreerClient";
+
+export interface FormTemplate {
+  id: string;
+  title: string;
+  description: string | null;
+  successMessage: string | null;
+  /** False while it is being written: a draft is not offered to be filled. */
+  isPublished: boolean;
+  sortOrder: number;
+  fieldCount: number;
+  actionCount: number;
+  submissionCount: number;
+  updatedAt: string;
+}
+
+export interface FormField {
+  id: string;
+  label: string;
+  helpText: string | null;
+  type: FormFieldType;
+  isRequired: boolean;
+  /** Already split. Empty for the types that offer no choices. */
+  options: string[];
+  target: FormFieldTarget;
+  sortOrder: number;
+}
+
+export interface FormAction {
+  id: string;
+  kind: FormActionKind;
+  recipients: string | null;
+  subject: string | null;
+  newClientStatus: ClientStatus;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+export interface FormTemplateDetail {
+  form: FormTemplate;
+  fields: FormField[];
+  actions: FormAction[];
+}
+
+export interface SaveFormTemplateValues {
+  title: string;
+  description: string | null;
+  successMessage: string | null;
+  isPublished: boolean;
+  sortOrder: number;
+}
+
+/** Null id for a new question. One left out of the list is deleted. */
+export interface SaveFormFieldValues {
+  id: string | null;
+  label: string;
+  type: FormFieldType;
+  isRequired: boolean;
+  helpText: string | null;
+  options: string[];
+  target: FormFieldTarget;
+}
+
+export interface SaveFormActionValues {
+  id: string | null;
+  kind: FormActionKind;
+  recipients: string | null;
+  subject: string | null;
+  newClientStatus: ClientStatus;
+  isActive: boolean;
+}
+
+export interface FormAnswer {
+  id: string;
+  formFieldId: string | null;
+  /** A copy taken when it was answered: renaming the question must not rewrite the answer. */
+  label: string;
+  type: FormFieldType;
+  value: string | null;
+  sortOrder: number;
+}
+
+export interface FormSubmission {
+  id: string;
+  formTemplateId: string;
+  formTitle: string;
+  submittedByName: string | null;
+  createdClientId: string | null;
+  createdClientName: string | null;
+  /** What the actions did, failures included. Null when the form sets nothing off. */
+  actionLog: string | null;
+  answerCount: number;
+  createdAt: string;
+}
+
+export interface FormSubmissionDetail {
+  submission: FormSubmission;
+  answers: FormAnswer[];
+}
+
+export interface SubmitFormResult {
+  submission: FormSubmissionDetail;
+  successMessage: string;
+  actionLog: string | null;
 }

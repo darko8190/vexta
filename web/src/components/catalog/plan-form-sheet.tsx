@@ -25,6 +25,7 @@ import { ApiError } from "@/lib/api";
 import { centsToFieldValue, parseAmountToCents } from "@/lib/money";
 import { moduleIcon } from "@/lib/module-icons";
 import type { PlanRecord } from "@/lib/types";
+import { ex } from "@/lib/placeholders";
 
 const MIN_CENTS = 100;
 const MAX_CENTS = 10_000_000;
@@ -153,7 +154,7 @@ export function PlanFormSheet({
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor="plan-name">Nom du forfait</FieldLabel>
-                  <Input {...field} id="plan-name" placeholder="Essentiel" aria-invalid={fieldState.invalid} />
+                  <Input {...field} id="plan-name" placeholder={ex("Essentiel")} aria-invalid={fieldState.invalid} />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                 </Field>
               )}
@@ -169,7 +170,7 @@ export function PlanFormSheet({
                     {...field}
                     id="plan-description"
                     rows={2}
-                    placeholder="Pour une petite équipe qui démarre."
+                    placeholder={ex("Pour une petite équipe qui démarre.")}
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -187,7 +188,7 @@ export function PlanFormSheet({
                     {...field}
                     id="plan-amount"
                     inputMode="decimal"
-                    placeholder="49"
+                    placeholder={ex("49")}
                     aria-invalid={fieldState.invalid}
                   />
                   <FieldDescription>
@@ -215,7 +216,7 @@ export function PlanFormSheet({
                         {...field}
                         id="plan-min-users"
                         inputMode="numeric"
-                        placeholder="1"
+                        placeholder={ex("1")}
                         aria-invalid={fieldState.invalid}
                       />
                       {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -234,7 +235,7 @@ export function PlanFormSheet({
                         {...field}
                         id="plan-max-users"
                         inputMode="numeric"
-                        placeholder="5"
+                        placeholder={ex("5")}
                         aria-invalid={fieldState.invalid}
                       />
                       {fieldState.invalid && <FieldError errors={[fieldState.error]} />}

@@ -195,6 +195,7 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
         if (client.WorkRefusal() is { } refusal) return BadRequest(new { message = refusal });
 
         if (await InvalidAddressesAsync(request) is { } addressError) return BadRequest(new { message = addressError });
+        if (await InvalidAssetAsync(request) is { } assetError) return BadRequest(new { message = assetError });
 
         var tenantId = currentUser.TenantId!.Value;
         var project = new Project
@@ -211,7 +212,8 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
             // The client's answer is the starting point, not the rule: a tax-exempt client can
             // still have a job that does not qualify, so the project owns the flag from here on.
             IsTaxExempt = request.IsTaxExempt ?? client.IsTaxExempt,
-            PricePolicyId = request.PricePolicyId
+            PricePolicyId = request.PricePolicyId,
+            ClientAssetId = request.ClientAssetId
         };
 
         ApplyAddresses(project, request);
@@ -239,8 +241,10 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
         }
 
         if (await InvalidAddressesAsync(request) is { } addressError) return BadRequest(new { message = addressError });
+        if (await InvalidAssetAsync(request) is { } assetError) return BadRequest(new { message = assetError });
 
         project.ClientId = request.ClientId;
+        project.ClientAssetId = request.ClientAssetId;
         project.PoNumber = Clean(request.PoNumber);
         project.Description = request.Description;
         project.Status = request.Status;
@@ -324,6 +328,20 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
     }
 
     /// <summary>
+    /// The asset has to be one of this client's own, for the same reason the addresses do: the
+    /// id comes from the browser, and one pointing at another client's car would put somebody
+    /// else's vehicle on this job's paperwork.
+    /// </summary>
+    private async Task<string?> InvalidAssetAsync(UpsertProjectRequest request)
+    {
+        if (request.ClientAssetId is not { } id) return null;
+
+        return await db.ClientAssets.AnyAsync(a => a.Id == id && a.ClientId == request.ClientId)
+            ? null
+            : "Cet actif n'appartient pas à ce client.";
+    }
+
+    /// <summary>
     /// When the site is the billing address, the site address is cleared rather than copied.
     /// A copy would go stale the moment the client's address changes, and nothing would say so.
     /// </summary>
@@ -354,6 +372,8 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
         p.IsTaxExempt,
         p.PricePolicyId,
         p.PricePolicy!.Name,
+        p.ClientAssetId,
+        p.ClientAsset == null ? null : p.ClientAsset.Label,
         p.ClientAddress == null
             ? null
             : new ProjectAddressDto(p.ClientAddress.Id, p.ClientAddress.Line1, p.ClientAddress.Line2,

@@ -26,6 +26,7 @@ import { ApiError } from "@/lib/api";
 import { MODULE_ICON_NAMES, moduleIcon } from "@/lib/module-icons";
 import { cn } from "@/lib/utils";
 import type { ModuleRecord } from "@/lib/types";
+import { ex } from "@/lib/placeholders";
 
 const formSchema = z.object({
   icon: z.string().min(1, "Choisissez une icône."),
@@ -171,7 +172,7 @@ export function ModuleFormSheet({
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor="module-title">Titre</FieldLabel>
-                  <Input {...field} id="module-title" placeholder="Clients" aria-invalid={fieldState.invalid} />
+                  <Input {...field} id="module-title" placeholder={ex("Clients")} aria-invalid={fieldState.invalid} />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                 </Field>
               )}
@@ -187,7 +188,7 @@ export function ModuleFormSheet({
                     {...field}
                     id="module-description"
                     rows={3}
-                    placeholder="Une fiche par client, trouvable en une recherche."
+                    placeholder={ex("Une fiche par client, trouvable en une recherche.")}
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -237,7 +238,7 @@ export function ModuleFormSheet({
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor="module-href">Lien</FieldLabel>
-                  <Input {...field} id="module-href" placeholder="/clients" aria-invalid={fieldState.invalid} />
+                  <Input {...field} id="module-href" placeholder={ex("/clients")} aria-invalid={fieldState.invalid} />
                   {fieldState.invalid ? (
                     <FieldError errors={[fieldState.error]} />
                   ) : (

@@ -34,6 +34,7 @@ import { EmptyState } from "@/components/layout/empty-state";
 import { useDeleteLocation, useLocationsQuery, useSaveLocation } from "@/hooks/use-hr";
 import { ApiError } from "@/lib/api";
 import type { CompanyLocation } from "@/lib/types";
+import { ex } from "@/lib/placeholders";
 
 const formSchema = z.object({
   label: z.string().trim().min(1, "Le nom du lieu est requis.").max(100, "100 caractères maximum."),
@@ -134,7 +135,7 @@ function LocationFormSheet({
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor="location-label">Nom du lieu</FieldLabel>
-                  <Input {...field} id="location-label" placeholder="Siège social" aria-invalid={fieldState.invalid} />
+                  <Input {...field} id="location-label" placeholder={ex("Siège social")} aria-invalid={fieldState.invalid} />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                 </Field>
               )}
@@ -146,7 +147,7 @@ function LocationFormSheet({
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor="location-line1">Adresse</FieldLabel>
-                  <Input {...field} id="location-line1" placeholder="1200 rue Principale" aria-invalid={fieldState.invalid} />
+                  <Input {...field} id="location-line1" placeholder={ex("1200 rue Principale")} aria-invalid={fieldState.invalid} />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                 </Field>
               )}
@@ -159,7 +160,7 @@ function LocationFormSheet({
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="location-city">Ville</FieldLabel>
-                    <Input {...field} id="location-city" placeholder="Québec" aria-invalid={fieldState.invalid} />
+                    <Input {...field} id="location-city" placeholder={ex("Québec")} aria-invalid={fieldState.invalid} />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}
@@ -170,7 +171,7 @@ function LocationFormSheet({
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="location-line2">Suite</FieldLabel>
-                    <Input {...field} id="location-line2" placeholder="200" aria-invalid={fieldState.invalid} />
+                    <Input {...field} id="location-line2" placeholder={ex("200")} aria-invalid={fieldState.invalid} />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}
@@ -184,7 +185,7 @@ function LocationFormSheet({
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="location-postal">Code postal</FieldLabel>
-                    <Input {...field} id="location-postal" placeholder="G1R 2B5" aria-invalid={fieldState.invalid} />
+                    <Input {...field} id="location-postal" placeholder={ex("G1R 2B5")} aria-invalid={fieldState.invalid} />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}
@@ -195,7 +196,7 @@ function LocationFormSheet({
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="location-province">Province</FieldLabel>
-                    <Input {...field} id="location-province" placeholder="Québec" aria-invalid={fieldState.invalid} />
+                    <Input {...field} id="location-province" placeholder={ex("Québec")} aria-invalid={fieldState.invalid} />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}
@@ -209,7 +210,7 @@ function LocationFormSheet({
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="location-country">Pays</FieldLabel>
-                    <Input {...field} id="location-country" placeholder="Canada" aria-invalid={fieldState.invalid} />
+                    <Input {...field} id="location-country" placeholder={ex("Canada")} aria-invalid={fieldState.invalid} />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}
@@ -220,7 +221,7 @@ function LocationFormSheet({
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="location-phone">Téléphone</FieldLabel>
-                    <Input {...field} id="location-phone" type="tel" placeholder="418 555-0100" aria-invalid={fieldState.invalid} />
+                    <Input {...field} id="location-phone" type="tel" placeholder={ex("418 555-0100")} aria-invalid={fieldState.invalid} />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}

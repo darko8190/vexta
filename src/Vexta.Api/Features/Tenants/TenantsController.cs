@@ -199,9 +199,18 @@ public class TenantsController(
             await Wipe(db.ProductSubCategories.Where(x => x.TenantId == id));
             await Wipe(db.ProductCategories.Where(x => x.TenantId == id));
 
+            // A submission points at the client it created, and an answer at its question, so
+            // the four tables come down innermost first.
+            await Wipe(db.FormAnswers.Where(x => x.TenantId == id));
+            await Wipe(db.FormSubmissions.Where(x => x.TenantId == id));
+            await Wipe(db.FormActions.Where(x => x.TenantId == id));
+            await Wipe(db.FormFields.Where(x => x.TenantId == id));
+            await Wipe(db.FormTemplates.Where(x => x.TenantId == id));
+
             await Wipe(db.ClientContacts.Where(x => x.TenantId == id));
-            // Before the addresses some of them point at.
+            // Before the addresses some of them point at, and before the types they name.
             await Wipe(db.ClientAssets.Where(x => x.TenantId == id));
+            await Wipe(db.ClientAssetTypes.Where(x => x.TenantId == id));
             await Wipe(db.Addresses.Where(x => x.TenantId == id));
             await Wipe(db.HrDocuments.Where(x => x.TenantId == id));
             await Wipe(db.JobPostings.Where(x => x.TenantId == id));

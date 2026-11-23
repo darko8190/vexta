@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+﻿import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, buildQuery } from "@/lib/api";
 import type {
   PagedResult,
@@ -23,6 +23,8 @@ export interface ProjectFormValues {
   sameAddressAsClient: boolean;
   /** Ignored by the server when sameAddressAsClient is true. */
   siteAddressId?: string | null;
+  /** Which of the client's assets the job is on. Has to be one of theirs — the server checks. */
+  clientAssetId?: string | null;
 }
 
 export function useProjectsQuery(page: number, search: string, clientId?: string, status?: ProjectStatus) {

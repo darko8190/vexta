@@ -153,7 +153,7 @@ export function ClientAssetsSection({ clientId }: { clientId: string }) {
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium text-foreground">{asset.designation}</span>
-                  {asset.category && <Badge variant="secondary">{asset.category}</Badge>}
+                  {asset.assetTypeName && <Badge variant="secondary">{asset.assetTypeName}</Badge>}
                   {!asset.isActive && <Badge variant="outline">Hors service</Badge>}
                 </div>
 

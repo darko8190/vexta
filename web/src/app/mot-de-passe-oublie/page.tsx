@@ -11,6 +11,7 @@ import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { AuthCard } from "@/components/auth/auth-card";
+import { ex } from "@/lib/placeholders";
 
 const formSchema = z.object({
   email: z.string().min(1, "Le courriel est requis.").email("Courriel invalide."),
@@ -97,7 +98,7 @@ export default function ForgotPasswordPage() {
                   id="forgot-email"
                   type="email"
                   autoComplete="email"
-                  placeholder="vous@entreprise.com"
+                  placeholder={ex("vous@entreprise.com")}
                   aria-invalid={fieldState.invalid}
                 />
                 {fieldState.invalid && <FieldError errors={[fieldState.error]} />}

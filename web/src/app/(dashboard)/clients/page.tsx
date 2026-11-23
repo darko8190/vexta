@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -26,16 +26,34 @@ import { PaginationBar } from "@/components/layout/pagination-bar";
 import { SearchInput } from "@/components/layout/search-input";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useClientsQuery, useDeleteClient } from "@/hooks/use-clients";
-import { formatClientNumber, type ClientRecord } from "@/lib/types";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { clientStatusBadge } from "@/lib/labels";
+import { formatClientNumber, type ClientRecord, type ClientStatus } from "@/lib/types";
+
+/** The filter's own values: the three states, the lock, and everybody. */
+type StatusFilter = ClientStatus | "Bloques" | "Tous";
+
+const statusFilterLabels: Record<StatusFilter, string> = {
+  Tous: "Tous les clients",
+  Prospect: "Prospects",
+  Client: "Clients",
+  Ancien: "Anciens clients",
+  Bloques: "Bloqués",
+};
 
 export default function ClientsPage() {
   const router = useRouter();
   const canCreate = useCanCreate();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("Tous");
   const debouncedSearch = useDebouncedValue(search);
 
-  const { data, isLoading } = useClientsQuery(page, debouncedSearch);
+  const { data, isLoading } = useClientsQuery(
+    page,
+    debouncedSearch,
+    statusFilter === "Tous" ? undefined : statusFilter,
+  );
   const deleteClient = useDeleteClient();
 
   const [formOpen, setFormOpen] = useState(false);
@@ -80,8 +98,28 @@ export default function ClientsPage() {
         }
       />
 
-      <div className="mb-4">
-        <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Rechercher un client…" />
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row">
+        <div className="min-w-0 flex-1">
+          <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Rechercher un client…" />
+        </div>
+        <Select
+          value={statusFilter}
+          onValueChange={(value) => {
+            setStatusFilter((value ?? "Tous") as StatusFilter);
+            setPage(1);
+          }}
+        >
+          <SelectTrigger className="sm:w-56" aria-label="Filtrer par état">
+            <SelectValue>{(value: StatusFilter) => statusFilterLabels[value]}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {(Object.keys(statusFilterLabels) as StatusFilter[]).map((value) => (
+              <SelectItem key={value} value={value}>
+                {statusFilterLabels[value]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {isLoading ? (
@@ -147,8 +185,15 @@ export default function ClientsPage() {
                       {clientItem.name}
                       <ExternalLink className="size-3 opacity-0 transition-opacity group-hover/name:opacity-60" />
                     </Link>
-                    <div className="text-xs text-muted-foreground">
-                      {clientItem.type === "Entreprise" ? "Entreprise" : "Particulier"}
+                    <div className="mt-0.5 flex items-center gap-1.5">
+                      <span className="text-xs text-muted-foreground">
+                        {clientItem.type === "Entreprise" ? "Entreprise" : "Particulier"}
+                      </span>
+                      {/* One badge, never two: the lock wins over the state, because it is what
+                          changes whether anything can be opened for them. */}
+                      <Badge variant={clientStatusBadge(clientItem).variant} className="text-[10px]">
+                        {clientStatusBadge(clientItem).label}
+                      </Badge>
                     </div>
                   </TableCell>
                   <TableCell className="hidden text-muted-foreground md:table-cell">{clientItem.email ?? "—"}</TableCell>

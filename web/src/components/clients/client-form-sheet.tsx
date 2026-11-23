@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -24,7 +24,9 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { useCreateClient, useUpdateClient } from "@/hooks/use-clients";
 import { ApiError } from "@/lib/api";
-import { formatClientNumber, type ClientRecord } from "@/lib/types";
+import { clientStatusLabels } from "@/lib/labels";
+import { formatClientNumber, type ClientRecord, type ClientStatus } from "@/lib/types";
+import { ex } from "@/lib/placeholders";
 
 const PROVINCES = [
   "Québec",
@@ -57,6 +59,7 @@ const formSchema = z
     province: z.string().trim(),
     country: z.string().trim().max(80, "80 caractères maximum."),
     isTaxExempt: z.boolean(),
+    status: z.enum(["Prospect", "Client", "Ancien"]),
   })
   // A company has to be named; a person does not.
   .refine((v) => v.type !== "Entreprise" || v.companyName.length > 0, {
@@ -100,6 +103,9 @@ function toFormValues(client?: ClientRecord): FormValues {
     province: client?.primaryAddress?.province ?? "Québec",
     country: client?.primaryAddress?.country ?? "Canada",
     isTaxExempt: client?.isTaxExempt ?? false,
+    // Client, not Prospect: most records are typed in because work is about to start, and a
+    // default that has to be corrected on nine files out of ten is the wrong default.
+    status: client?.status ?? "Client",
   };
 }
 
@@ -140,6 +146,7 @@ export function ClientFormSheet({
       email: values.email || null,
       phone: values.phone || null,
       isTaxExempt: values.isTaxExempt,
+      status: values.status,
       primaryAddress: values.line1
         ? {
             line1: values.line1,
@@ -210,6 +217,38 @@ export function ClientFormSheet({
               )}
             />
 
+            <Controller
+              name="status"
+              control={form.control}
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel htmlFor="client-status">État</FieldLabel>
+                  <Select
+                    value={field.value}
+                    onValueChange={(value) => field.onChange((value ?? "Client") as ClientStatus)}
+                  >
+                    <SelectTrigger id="client-status" className="w-full">
+                      {/* The stored value is the enum name, which happens to read well for two
+                          of the three. Formatted anyway, so "Ancien" shows as "Ancien client". */}
+                      <SelectValue>
+                        {(value: ClientStatus) => clientStatusLabels[value]}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Prospect">Prospect</SelectItem>
+                      <SelectItem value="Client">Client</SelectItem>
+                      <SelectItem value="Ancien">Ancien client</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FieldDescription>
+                    Aucun des trois ne bloque quoi que ce soit : un prospect se soumissionne, et
+                    un ancien client qui rappelle redevient client. Pour fermer la porte, c&apos;est
+                    le cadenas sur sa fiche.
+                  </FieldDescription>
+                </Field>
+              )}
+            />
+
             {type === "Entreprise" && (
               <Controller
                 name="companyName"
@@ -220,7 +259,7 @@ export function ClientFormSheet({
                     Nom d&apos;entreprise
                     <RequiredMark />
                   </FieldLabel>
-                    <Input {...field} id="client-company" placeholder="Constructions ABC" aria-invalid={fieldState.invalid} />
+                    <Input {...field} id="client-company" placeholder={ex("Constructions ABC")} aria-invalid={fieldState.invalid} />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}
@@ -237,7 +276,7 @@ export function ClientFormSheet({
                     Prénom
                     <RequiredMark />
                   </FieldLabel>
-                    <Input {...field} id="client-firstname" placeholder="Marie" aria-invalid={fieldState.invalid} />
+                    <Input {...field} id="client-firstname" placeholder={ex("Marie")} aria-invalid={fieldState.invalid} />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}
@@ -251,7 +290,7 @@ export function ClientFormSheet({
                     Nom
                     <RequiredMark />
                   </FieldLabel>
-                    <Input {...field} id="client-lastname" placeholder="Roy" aria-invalid={fieldState.invalid} />
+                    <Input {...field} id="client-lastname" placeholder={ex("Roy")} aria-invalid={fieldState.invalid} />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}
@@ -271,7 +310,7 @@ export function ClientFormSheet({
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="client-phone">Téléphone</FieldLabel>
-                    <Input {...field} id="client-phone" type="tel" placeholder="514 555-0199" aria-invalid={fieldState.invalid} />
+                    <Input {...field} id="client-phone" type="tel" placeholder={ex("514 555-0199")} aria-invalid={fieldState.invalid} />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}
@@ -282,7 +321,7 @@ export function ClientFormSheet({
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="client-email">Courriel</FieldLabel>
-                    <Input {...field} id="client-email" type="email" placeholder="marie@abc.ca" aria-invalid={fieldState.invalid} />
+                    <Input {...field} id="client-email" type="email" placeholder={ex("marie@abc.ca")} aria-invalid={fieldState.invalid} />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}
@@ -297,7 +336,7 @@ export function ClientFormSheet({
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor="client-line1">Adresse</FieldLabel>
-                  <Input {...field} id="client-line1" placeholder="1200 rue Principale" aria-invalid={fieldState.invalid} />
+                  <Input {...field} id="client-line1" placeholder={ex("1200 rue Principale")} aria-invalid={fieldState.invalid} />
                   {fieldState.invalid ? (
                     <FieldError errors={[fieldState.error]} />
                   ) : (
@@ -314,7 +353,7 @@ export function ClientFormSheet({
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="client-city">Ville</FieldLabel>
-                    <Input {...field} id="client-city" placeholder="Québec" aria-invalid={fieldState.invalid} />
+                    <Input {...field} id="client-city" placeholder={ex("Québec")} aria-invalid={fieldState.invalid} />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}
@@ -325,7 +364,7 @@ export function ClientFormSheet({
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="client-apartment">Appart.</FieldLabel>
-                    <Input {...field} id="client-apartment" placeholder="4B" aria-invalid={fieldState.invalid} />
+                    <Input {...field} id="client-apartment" placeholder={ex("4B")} aria-invalid={fieldState.invalid} />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}
@@ -339,7 +378,7 @@ export function ClientFormSheet({
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="client-postal">Code postal</FieldLabel>
-                    <Input {...field} id="client-postal" placeholder="G1R 2B5" aria-invalid={fieldState.invalid} />
+                    <Input {...field} id="client-postal" placeholder={ex("G1R 2B5")} aria-invalid={fieldState.invalid} />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}
@@ -373,7 +412,7 @@ export function ClientFormSheet({
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor="client-country">Pays</FieldLabel>
-                  <Input {...field} id="client-country" placeholder="Canada" aria-invalid={fieldState.invalid} />
+                  <Input {...field} id="client-country" placeholder={ex("Canada")} aria-invalid={fieldState.invalid} />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                 </Field>
               )}

@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { useBlockClient, useBlockClientAccount } from "@/hooks/use-client-account";
 import { ApiError } from "@/lib/api";
 import type { ClientRecord } from "@/lib/types";
+import { ex } from "@/lib/placeholders";
 
 /**
  * Barring a client, or barring only their account — and letting either back in.
@@ -104,7 +105,7 @@ export function BlockClientDialog({
               id="block-reason"
               value={reason}
               onChange={(event) => setReason(event.target.value)}
-              placeholder="Comptes impayés depuis mars"
+              placeholder={ex("Comptes impayés depuis mars")}
               maxLength={300}
             />
             <FieldDescription>

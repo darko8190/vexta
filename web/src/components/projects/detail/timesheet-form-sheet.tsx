@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { RequiredMark } from "@/components/ui/required-mark";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Sheet,
   SheetClose,
@@ -21,11 +20,13 @@ import {
 } from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { EmployeePicker } from "@/components/team/employee-picker";
 import { useSaveTimesheet } from "@/hooks/use-timesheets";
 import { useTeamQuery } from "@/hooks/use-team";
 import { ApiError } from "@/lib/api";
 import { formatDateOnly } from "@/lib/dates";
-import type { Employee, TimesheetEntry } from "@/lib/types";
+import type { TimesheetEntry } from "@/lib/types";
+import { ex } from "@/lib/placeholders";
 
 export const ROUNDING_MINUTES = 15;
 
@@ -61,12 +62,6 @@ export function quarterHoursBetween(
 /** 8.25 as the sheet writes it: « 8,25 h ». A whole number keeps no decimals. */
 export function formatHours(hours: number): string {
   return `${new Intl.NumberFormat("fr-CA", { maximumFractionDigits: 2 }).format(hours)} h`;
-}
-
-/** The name behind the id the select holds, or null while the payroll is still loading. */
-function employeeName(employees: Employee[], id: string): string | null {
-  const match = employees.find((employee) => employee.id === id);
-  return match ? `${match.firstName} ${match.lastName}`.trim() : null;
 }
 
 /** "07:52" said the way the trade says it: 7 h 52. */
@@ -226,39 +221,15 @@ export function TimesheetFormSheet({
                     Employé
                     <RequiredMark />
                   </FieldLabel>
-                  <Select
-                    // null, not undefined: Base UI reads undefined as an uncontrolled select
-                    // and warns when a value later makes it controlled.
-                    value={field.value || null}
-                    onValueChange={(value) => field.onChange(value ?? "")}
-                  >
-                    <SelectTrigger
-                      id="timesheet-employee"
-                      className="w-full"
-                      aria-invalid={fieldState.invalid}
-                    >
-                      {/* The stored value is a GUID, so the name is looked up rather than shown
-                          as itself. The empty case is handled here too: these children render
-                          even when nothing is selected, which means the placeholder prop never
-                          gets a turn. */}
-                      <SelectValue>
-                        {(id: string) =>
-                          !id
-                            ? teamLoading
-                              ? "Chargement…"
-                              : "Choisir un employé"
-                            : (employeeName(employees, id) ?? "Chargement…")
-                        }
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {employees.map((employee) => (
-                        <SelectItem key={employee.id} value={employee.id}>
-                          {employeeName(employees, employee.id)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {/* A searchable field rather than a dropdown: a crew of six fits in a list
+                      and a crew of sixty does not, and the person filing the hours knows the
+                      name they are looking for. */}
+                  <EmployeePicker
+                    id="timesheet-employee"
+                    value={field.value}
+                    onChange={field.onChange}
+                    invalid={fieldState.invalid}
+                  />
                   {fieldState.invalid ? (
                     <FieldError errors={[fieldState.error]} />
                   ) : (
@@ -399,7 +370,7 @@ export function TimesheetFormSheet({
                     {...field}
                     id="timesheet-note"
                     rows={3}
-                    placeholder="Coffrage du mur est"
+                    placeholder={ex("Coffrage du mur est")}
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}

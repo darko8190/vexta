@@ -37,6 +37,7 @@ import type {
   ProjectTaskStatus,
   SaveProjectTaskValues,
 } from "@/lib/types";
+import { ex } from "@/lib/placeholders";
 
 const formSchema = z
   .object({
@@ -179,7 +180,7 @@ export function TaskFormSheet({
                   <Input
                     {...field}
                     id="task-title"
-                    placeholder="Poser les solives"
+                    placeholder={ex("Poser les solives")}
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}

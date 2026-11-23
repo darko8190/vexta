@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { use, useState } from "react";
 import Link from "next/link";
@@ -230,6 +230,22 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                   <dt className="text-muted-foreground">Budget</dt>
                   <dd className="text-foreground tabular-nums">{money(project.budget)}</dd>
                 </div>
+
+                {/* Only when there is one. An empty row saying "—" on every job of every trade
+                    that does not work on things would be a column of nothing. */}
+                {project.clientAssetLabel && (
+                  <div>
+                    <dt className="text-muted-foreground">Actif</dt>
+                    <dd className="text-foreground">
+                      <Link
+                        href={`/clients/${project.clientId}`}
+                        className="underline-offset-4 hover:underline"
+                      >
+                        {project.clientAssetLabel}
+                      </Link>
+                    </dd>
+                  </div>
+                )}
 
                 <AddressBlock label="Adresse de facturation" lines={billing} />
                 <AddressBlock

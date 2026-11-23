@@ -25,6 +25,7 @@ import { MAX_UPLOAD_BYTES, useUploadMedia } from "@/hooks/use-media";
 import { ApiError } from "@/lib/api";
 import type { ProjectDocument } from "@/lib/types";
 import { formatFileSize } from "@/components/projects/detail/document-file-size";
+import { ex } from "@/lib/placeholders";
 
 const formSchema = z.object({
   title: z.string().trim().min(1, "Le titre est requis.").max(200, "200 caractères maximum."),
@@ -185,7 +186,7 @@ export function DocumentFormSheet({
                   <Input
                     {...field}
                     id="project-document-title"
-                    placeholder="Plan de la terrasse"
+                    placeholder={ex("Plan de la terrasse")}
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid ? (
@@ -208,7 +209,7 @@ export function DocumentFormSheet({
                   <Input
                     {...field}
                     id="project-document-category"
-                    placeholder="Permis"
+                    placeholder={ex("Permis")}
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid ? (

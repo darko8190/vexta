@@ -15,6 +15,7 @@ import { normalizeHex } from "@/lib/brand-color";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
 import type { CompanyProfile } from "@/lib/types";
+import { ex } from "@/lib/placeholders";
 
 /**
  * A starting point, not a restriction: the picker beside them takes any colour. They exist
@@ -143,7 +144,7 @@ export function BrandColorCard({ profile }: { profile: CompanyProfile }) {
                 if (normalized) setColor(normalized);
               }}
               onBlur={() => setTyped(null)}
-              placeholder="#0982CE"
+              placeholder={ex("#0982CE")}
               className="font-mono"
               aria-invalid={typed !== null && normalizeHex(typed) === null}
             />

@@ -20,6 +20,7 @@ import { useAuth } from "@/lib/auth-context";
 import { usePublicPlansQuery } from "@/hooks/use-catalog";
 import { formatCents } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { ex } from "@/lib/placeholders";
 
 const formSchema = z
   .object({
@@ -170,7 +171,7 @@ function RegisterForm({ initialPlanId }: { initialPlanId: string }) {
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="reg-company">Nom de l&apos;entreprise</FieldLabel>
-                    <Input {...field} id="reg-company" placeholder="Acme inc." aria-invalid={fieldState.invalid} />
+                    <Input {...field} id="reg-company" placeholder={ex("Acme inc.")} aria-invalid={fieldState.invalid} />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}
@@ -278,7 +279,7 @@ function RegisterForm({ initialPlanId }: { initialPlanId: string }) {
                     id="reg-email"
                     type="email"
                     autoComplete="email"
-                    placeholder="vous@entreprise.com"
+                    placeholder={ex("vous@entreprise.com")}
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}

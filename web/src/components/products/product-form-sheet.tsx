@@ -34,6 +34,7 @@ import {
 import { ApiError } from "@/lib/api";
 import { marginPercentFrom, sellingPriceFrom } from "@/lib/pricing";
 import type { ProductRecord } from "@/lib/types";
+import { ex } from "@/lib/placeholders";
 
 const formSchema = z.object({
   code: z.string().trim().max(60, "60 caractères maximum."),
@@ -321,7 +322,7 @@ export function ProductFormSheet({
                   <Input
                     {...field}
                     id="product-title"
-                    placeholder="Coude cuivre 1/2 po"
+                    placeholder={ex("Coude cuivre 1/2 po")}
                     aria-invalid={fieldState.invalid}
                     aria-required="true"
                   />
@@ -337,7 +338,7 @@ export function ProductFormSheet({
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="product-code">Code</FieldLabel>
-                    <Input {...field} id="product-code" placeholder="CU-COUDE-12" aria-invalid={fieldState.invalid} />
+                    <Input {...field} id="product-code" placeholder={ex("CU-COUDE-12")} aria-invalid={fieldState.invalid} />
                     {fieldState.invalid ? (
                       <FieldError errors={[fieldState.error]} />
                     ) : (
@@ -431,7 +432,7 @@ export function ProductFormSheet({
                       <Input
                         value={newCategory}
                         onChange={(event) => setNewCategory(event.target.value)}
-                        placeholder="Plomberie"
+                        placeholder={ex("Plomberie")}
                         aria-label="Nom de la nouvelle catégorie"
                         onKeyDown={(event) => {
                           // Enter adds the category instead of submitting the product, which
@@ -505,7 +506,7 @@ export function ProductFormSheet({
                       <Input
                         value={newSubCategory}
                         onChange={(event) => setNewSubCategory(event.target.value)}
-                        placeholder="Cuivre"
+                        placeholder={ex("Cuivre")}
                         aria-label="Nom de la nouvelle sous-catégorie"
                         onKeyDown={(event) => {
                           if (event.key === "Enter") {
@@ -567,7 +568,7 @@ export function ProductFormSheet({
                     <Input
                       {...field}
                       id="product-unit"
-                      placeholder="un, pi, pi², m, kg, h, sac"
+                      placeholder={ex("un, pi, pi², m, kg, h, sac")}
                       aria-invalid={fieldState.invalid}
                     />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -592,7 +593,7 @@ export function ProductFormSheet({
                       {...field}
                       id="product-quantity"
                       inputMode="decimal"
-                      placeholder="0"
+                      placeholder={ex("0")}
                       disabled={!tracksInventory}
                     />
                   </Field>
@@ -608,7 +609,7 @@ export function ProductFormSheet({
                       {...field}
                       id="product-minimum"
                       inputMode="decimal"
-                      placeholder="0"
+                      placeholder={ex("0")}
                       disabled={!tracksInventory}
                     />
                   </Field>
@@ -624,7 +625,7 @@ export function ProductFormSheet({
                       {...field}
                       id="product-maximum"
                       inputMode="decimal"
-                      placeholder="0"
+                      placeholder={ex("0")}
                       disabled={!tracksInventory}
                     />
                   </Field>
@@ -649,7 +650,7 @@ export function ProductFormSheet({
                       {...field}
                       id="product-purchase"
                       inputMode="decimal"
-                      placeholder="0,00"
+                      placeholder={ex("0,00")}
                       onChange={(event) => {
                         field.onChange(event);
                         repriceSelling(event.target.value, form.getValues("marginPercent"));
@@ -668,7 +669,7 @@ export function ProductFormSheet({
                       {...field}
                       id="product-margin"
                       inputMode="decimal"
-                      placeholder="0"
+                      placeholder={ex("0")}
                       onChange={(event) => {
                         field.onChange(event);
                         repriceSelling(form.getValues("purchasePrice"), event.target.value);
@@ -687,7 +688,7 @@ export function ProductFormSheet({
                       {...field}
                       id="product-selling"
                       inputMode="decimal"
-                      placeholder="0,00"
+                      placeholder={ex("0,00")}
                       onChange={(event) => {
                         field.onChange(event);
                         repriceMargin(event.target.value);
@@ -710,7 +711,7 @@ export function ProductFormSheet({
               render={({ field }) => (
                 <Field>
                   <FieldLabel htmlFor="product-installation">Temps d&apos;installation</FieldLabel>
-                  <Input {...field} id="product-installation" inputMode="numeric" placeholder="30" />
+                  <Input {...field} id="product-installation" inputMode="numeric" placeholder={ex("30")} />
                   <FieldDescription>En minutes. C&apos;est ce qui bâtit une estimation.</FieldDescription>
                 </Field>
               )}

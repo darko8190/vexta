@@ -26,6 +26,7 @@ import { ApiError, api } from "@/lib/api";
 import { tenantStatusBadgeVariant, tenantStatusLabels } from "@/lib/labels";
 import { formatCents } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { ex } from "@/lib/placeholders";
 
 /**
  * Confirms the payment rather than telling the person to reload until something happens. The
@@ -189,7 +190,7 @@ function PersonalSpace({ state }: { state: BillingState }) {
                 id="upgrade-company"
                 value={companyName}
                 onChange={(event) => setCompanyName(event.target.value)}
-                placeholder="Acme inc."
+                placeholder={ex("Acme inc.")}
               />
             </Field>
 

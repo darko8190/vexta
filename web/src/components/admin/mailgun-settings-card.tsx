@@ -16,6 +16,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useSendTestEmail, useUpdatePlatformSettings } from "@/hooks/use-platform-settings";
 import { ApiError } from "@/lib/api";
 import type { PlatformSettings } from "@/lib/types";
+import { ex } from "@/lib/placeholders";
 
 const formSchema = z.object({
   mailgunApiKey: z.string().optional(),
@@ -96,7 +97,7 @@ export function MailgunSettingsCard({ settings }: { settings: PlatformSettings }
               render={({ field }) => (
                 <Field>
                   <FieldLabel htmlFor="mailgun-domain">Domaine</FieldLabel>
-                  <Input {...field} id="mailgun-domain" placeholder="mg.vexta.app" />
+                  <Input {...field} id="mailgun-domain" placeholder={ex("mg.vexta.app")} />
                 </Field>
               )}
             />
@@ -124,7 +125,7 @@ export function MailgunSettingsCard({ settings }: { settings: PlatformSettings }
                 render={({ field }) => (
                   <Field>
                     <FieldLabel htmlFor="mailgun-from-email">Courriel d&apos;envoi</FieldLabel>
-                    <Input {...field} id="mailgun-from-email" type="email" placeholder="no-reply@vexta.app" />
+                    <Input {...field} id="mailgun-from-email" type="email" placeholder={ex("no-reply@vexta.app")} />
                   </Field>
                 )}
               />
@@ -134,7 +135,7 @@ export function MailgunSettingsCard({ settings }: { settings: PlatformSettings }
                 render={({ field }) => (
                   <Field>
                     <FieldLabel htmlFor="mailgun-from-name">Nom d&apos;envoi</FieldLabel>
-                    <Input {...field} id="mailgun-from-name" placeholder="Vexta" />
+                    <Input {...field} id="mailgun-from-name" placeholder={ex("Vexta")} />
                   </Field>
                 )}
               />

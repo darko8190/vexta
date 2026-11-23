@@ -18,6 +18,7 @@ import { useDeleteCompanyLogo, useSaveCompanyProfile, useUploadCompanyLogo } fro
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { CompanyProfile } from "@/lib/types";
+import { ex } from "@/lib/placeholders";
 
 const MAX_BYTES = 2 * 1024 * 1024;
 
@@ -243,7 +244,7 @@ export function CompanyInfoSection({ profile, canEdit }: { profile: CompanyProfi
                       id="company-description"
                       rows={4}
                       disabled={!canEdit}
-                      placeholder="Entrepreneur général en rénovation résidentielle depuis 2008."
+                      placeholder={ex("Entrepreneur général en rénovation résidentielle depuis 2008.")}
                       aria-invalid={fieldState.invalid}
                     />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -263,7 +264,7 @@ export function CompanyInfoSection({ profile, canEdit }: { profile: CompanyProfi
                         id="company-email"
                         type="email"
                         disabled={!canEdit}
-                        placeholder="info@entreprise.ca"
+                        placeholder={ex("info@entreprise.ca")}
                         aria-invalid={fieldState.invalid}
                       />
                       {fieldState.invalid ? (
@@ -285,7 +286,7 @@ export function CompanyInfoSection({ profile, canEdit }: { profile: CompanyProfi
                         id="company-phone"
                         type="tel"
                         disabled={!canEdit}
-                        placeholder="418 555-0100"
+                        placeholder={ex("418 555-0100")}
                         aria-invalid={fieldState.invalid}
                       />
                       {fieldState.invalid && <FieldError errors={[fieldState.error]} />}

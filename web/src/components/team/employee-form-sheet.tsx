@@ -30,6 +30,7 @@ import { useSaveEmployee } from "@/hooks/use-team";
 import { ApiError } from "@/lib/api";
 import { userRoleHints, userRoleLabels } from "@/lib/labels";
 import { assignableRoles, type AssignableRole, type Employee } from "@/lib/types";
+import { ex } from "@/lib/placeholders";
 
 const formSchema = z.object({
   firstName: z.string().trim().min(1, "Le prénom est requis.").max(100, "100 caractères maximum."),
@@ -131,7 +132,7 @@ export function EmployeeFormSheet({
                     Prénom
                     <RequiredMark />
                   </FieldLabel>
-                  <Input {...field} id="employee-firstname" placeholder="Marie" aria-invalid={fieldState.invalid} />
+                  <Input {...field} id="employee-firstname" placeholder={ex("Marie")} aria-invalid={fieldState.invalid} />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                 </Field>
               )}
@@ -146,7 +147,7 @@ export function EmployeeFormSheet({
                     Nom
                     <RequiredMark />
                   </FieldLabel>
-                  <Input {...field} id="employee-lastname" placeholder="Tremblay" aria-invalid={fieldState.invalid} />
+                  <Input {...field} id="employee-lastname" placeholder={ex("Tremblay")} aria-invalid={fieldState.invalid} />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                 </Field>
               )}
@@ -166,7 +167,7 @@ export function EmployeeFormSheet({
                     id="employee-email"
                     type="email"
                     autoComplete="off"
-                    placeholder="marie@entreprise.com"
+                    placeholder={ex("marie@entreprise.com")}
                     disabled={emailLocked}
                     aria-invalid={fieldState.invalid}
                   />
@@ -189,7 +190,7 @@ export function EmployeeFormSheet({
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor="employee-jobtitle">Titre</FieldLabel>
-                  <Input {...field} id="employee-jobtitle" placeholder="Chargée de projet" aria-invalid={fieldState.invalid} />
+                  <Input {...field} id="employee-jobtitle" placeholder={ex("Chargée de projet")} aria-invalid={fieldState.invalid} />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                 </Field>
               )}
@@ -201,7 +202,7 @@ export function EmployeeFormSheet({
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor="employee-phone">Téléphone</FieldLabel>
-                  <Input {...field} id="employee-phone" type="tel" placeholder="514 555-0199" aria-invalid={fieldState.invalid} />
+                  <Input {...field} id="employee-phone" type="tel" placeholder={ex("514 555-0199")} aria-invalid={fieldState.invalid} />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                 </Field>
               )}

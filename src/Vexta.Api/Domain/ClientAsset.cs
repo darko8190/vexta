@@ -27,11 +27,15 @@ public class ClientAsset
     public required string Label { get; set; }
 
     /// <summary>
-    /// What kind of thing it is — Véhicule, Bâtiment, Appareil, Machinerie. Free text rather
-    /// than an enum: the list is different in every trade, and a fixed one would be a list of
-    /// somebody else's categories.
+    /// What kind of thing it is, chosen from the company's own list: Véhicule, Maison, Bloc
+    /// appartements, Machinerie. A row rather than an enum, and for the same reason expenses
+    /// have one — the list is different in every trade and grows as the trade meets new work.
+    ///
+    /// Nullable because a type is a convenience and not a condition: somebody filing a car at
+    /// the counter must not be stopped to go and define a category first.
     /// </summary>
-    public string? Category { get; set; }
+    public Guid? AssetTypeId { get; set; }
+    public ClientAssetType? AssetType { get; set; }
 
     public string? Make { get; set; }
     public string? Model { get; set; }
@@ -85,4 +89,29 @@ public class ClientAsset
             return parts.Length == 0 ? Label : string.Join(" ", parts);
         }
     }
+}
+
+/// <summary>
+/// One of the company's kinds of asset: Véhicule, Maison, Bloc appartements, Machinerie.
+///
+/// Created from the dropdown that uses it, like an expense category. A garage will end up with
+/// one entry and a property manager with four, and neither should have had to visit a settings
+/// screen to get there.
+/// </summary>
+public class ClientAssetType
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid TenantId { get; set; }
+
+    public required string Name { get; set; }
+
+    /// <summary>
+    /// A lucide icon name, so a list of types reads as a list of things rather than of words.
+    /// Null falls back to the generic one the web app uses for an asset.
+    /// </summary>
+    public string? Icon { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+
+    public List<ClientAsset> Assets { get; set; } = [];
 }

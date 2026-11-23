@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { useUpdatePlatformSettings } from "@/hooks/use-platform-settings";
 import type { PlatformSettings } from "@/lib/types";
+import { ex } from "@/lib/placeholders";
 
 const formSchema = z.object({
   stripePublishableKey: z.string().optional(),
@@ -77,7 +78,7 @@ export function StripeSettingsCard({ settings }: { settings: PlatformSettings })
               render={({ field }) => (
                 <Field>
                   <FieldLabel htmlFor="stripe-pk">Clé publique</FieldLabel>
-                  <Input {...field} id="stripe-pk" placeholder="pk_live_…" />
+                  <Input {...field} id="stripe-pk" placeholder={ex("pk_live_…")} />
                 </Field>
               )}
             />

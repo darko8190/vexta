@@ -18,6 +18,7 @@ import {
   type BillingSettings,
 } from "@/hooks/use-billing-settings";
 import { ApiError } from "@/lib/api";
+import { ex } from "@/lib/placeholders";
 
 /** "85", "85,50" and "85.50" all, because a rate is written with a comma here. */
 const AMOUNT = /^\d+([.,]\d{1,2})?$/;
@@ -109,7 +110,7 @@ export function HourlyRateCard() {
                       {...field}
                       id="default-hourly-rate"
                       inputMode="decimal"
-                      placeholder="85,00"
+                      placeholder={ex("85,00")}
                       aria-invalid={fieldState.invalid}
                     />
                     <InputGroupAddon align="inline-end">

@@ -72,6 +72,12 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
     public DbSet<ClientAsset> ClientAssets => Set<ClientAsset>();
     public DbSet<ClientAccountEntry> ClientAccountEntries => Set<ClientAccountEntry>();
     public DbSet<InvoicePayment> InvoicePayments => Set<InvoicePayment>();
+    public DbSet<ClientAssetType> ClientAssetTypes => Set<ClientAssetType>();
+    public DbSet<FormTemplate> FormTemplates => Set<FormTemplate>();
+    public DbSet<FormField> FormFields => Set<FormField>();
+    public DbSet<FormAction> FormActions => Set<FormAction>();
+    public DbSet<FormSubmission> FormSubmissions => Set<FormSubmission>();
+    public DbSet<FormAnswer> FormAnswers => Set<FormAnswer>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -155,6 +161,20 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             // an access is impossible.
             e.HasOne(c => c.User).WithMany().HasForeignKey(c => c.UserId).OnDelete(DeleteBehavior.SetNull);
 
+            // Client, not Prospect: every record that existed before this column is one the
+            // company already serves, and a migration that turned them all into leads would be
+            // a lie about the whole file.
+            //
+            // The sentinel has to be moved off zero, and this is not a detail. EF omits a column
+            // from an INSERT when the value equals the sentinel — which defaults to default(T),
+            // and default(ClientStatus) is Prospect. Left alone, every client created as a
+            // prospect would be written as a client instead, silently, and the form would look
+            // like it had worked. A value no member has means "really unset", so Prospect is
+            // sent like any other.
+            e.Property(c => c.Status)
+                .HasDefaultValue(ClientStatus.Client)
+                .HasSentinel((ClientStatus)(-1));
+
             e.HasQueryFilter(c => c.TenantId == CurrentTenantId
                 && (CurrentClientId == null || c.Id == CurrentClientId));
         });
@@ -168,8 +188,13 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.HasOne(a => a.Address).WithMany()
                 .HasForeignKey(a => a.AddressId).OnDelete(DeleteBehavior.SetNull);
 
+            // Restrict: a type still in use cannot be deleted out from under its assets, which
+            // would leave rows claiming a kind that no longer exists. The endpoint refuses it
+            // with the count, so the message names what is in the way.
+            e.HasOne(a => a.AssetType).WithMany(t => t.Assets)
+                .HasForeignKey(a => a.AssetTypeId).OnDelete(DeleteBehavior.Restrict);
+
             e.Property(a => a.Label).HasMaxLength(200);
-            e.Property(a => a.Category).HasMaxLength(60);
             e.Property(a => a.Make).HasMaxLength(80);
             e.Property(a => a.Model).HasMaxLength(80);
             e.Property(a => a.SerialNumber).HasMaxLength(80);
@@ -269,6 +294,10 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
                 .HasForeignKey(p => p.SiteAddressId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne(p => p.PricePolicy).WithMany()
                 .HasForeignKey(p => p.PricePolicyId).OnDelete(DeleteBehavior.SetNull);
+
+            // SetNull: selling the car must not delete the jobs done on it.
+            e.HasOne(p => p.ClientAsset).WithMany()
+                .HasForeignKey(p => p.ClientAssetId).OnDelete(DeleteBehavior.SetNull);
             e.HasQueryFilter(p => p.TenantId == CurrentTenantId
                 && (CurrentClientId == null || p.ClientId == CurrentClientId));
         });
@@ -309,6 +338,86 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             // two people filing the same thing in two places.
             e.HasIndex(t => new { t.TenantId, t.Name }).IsUnique();
             e.HasQueryFilter(t => t.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<ClientAssetType>(e =>
+        {
+            e.Property(t => t.Name).HasMaxLength(100);
+            e.Property(t => t.Icon).HasMaxLength(40);
+
+            // One list per company, no duplicates in it — the same rule as an expense category,
+            // for the same reason: two names for one kind is two people filing in two places.
+            e.HasIndex(t => new { t.TenantId, t.Name }).IsUnique();
+            e.HasQueryFilter(t => t.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<FormTemplate>(e =>
+        {
+            e.Property(f => f.Title).HasMaxLength(200);
+            e.Property(f => f.Description).HasMaxLength(1000);
+            e.Property(f => f.SuccessMessage).HasMaxLength(500);
+
+            e.HasIndex(f => new { f.TenantId, f.SortOrder });
+            e.HasQueryFilter(f => f.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<FormField>(e =>
+        {
+            e.HasOne(f => f.FormTemplate).WithMany(t => t.Fields)
+                .HasForeignKey(f => f.FormTemplateId).OnDelete(DeleteBehavior.Cascade);
+
+            e.Property(f => f.Label).HasMaxLength(300);
+            e.Property(f => f.HelpText).HasMaxLength(300);
+            e.Property(f => f.Options).HasMaxLength(2000);
+
+            e.HasIndex(f => new { f.FormTemplateId, f.SortOrder });
+            e.HasQueryFilter(f => f.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<FormAction>(e =>
+        {
+            e.HasOne(a => a.FormTemplate).WithMany(t => t.Actions)
+                .HasForeignKey(a => a.FormTemplateId).OnDelete(DeleteBehavior.Cascade);
+
+            e.Property(a => a.Recipients).HasMaxLength(500);
+            e.Property(a => a.Subject).HasMaxLength(200);
+
+            e.HasIndex(a => new { a.FormTemplateId, a.SortOrder });
+            e.HasQueryFilter(a => a.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<FormSubmission>(e =>
+        {
+            e.HasOne(s => s.FormTemplate).WithMany(t => t.Submissions)
+                .HasForeignKey(s => s.FormTemplateId).OnDelete(DeleteBehavior.Cascade);
+
+            // SetNull: deleting the client a form brought in must not delete the form that
+            // brought them in, which is often the only record of where they came from.
+            e.HasOne(s => s.CreatedClient).WithMany()
+                .HasForeignKey(s => s.CreatedClientId).OnDelete(DeleteBehavior.SetNull);
+
+            e.Property(s => s.SubmittedByName).HasMaxLength(200);
+            e.Property(s => s.ActionLog).HasMaxLength(1000);
+
+            e.HasIndex(s => new { s.FormTemplateId, s.CreatedAt });
+            e.HasQueryFilter(s => s.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<FormAnswer>(e =>
+        {
+            e.HasOne(a => a.Submission).WithMany(s => s.Answers)
+                .HasForeignKey(a => a.SubmissionId).OnDelete(DeleteBehavior.Cascade);
+
+            // SetNull: deleting a question must not delete the answers already given to it.
+            // They carry their own copy of the label, so they stay readable without it.
+            e.HasOne(a => a.FormField).WithMany()
+                .HasForeignKey(a => a.FormFieldId).OnDelete(DeleteBehavior.SetNull);
+
+            e.Property(a => a.Label).HasMaxLength(300);
+            e.Property(a => a.Value).HasMaxLength(4000);
+
+            e.HasIndex(a => new { a.SubmissionId, a.SortOrder });
+            e.HasQueryFilter(a => a.TenantId == CurrentTenantId);
         });
 
         builder.Entity<ProjectExpense>(e =>

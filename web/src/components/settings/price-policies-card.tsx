@@ -44,6 +44,7 @@ import {
 } from "@/hooks/use-price-policies";
 import { ApiError } from "@/lib/api";
 import type { PricePolicy } from "@/lib/types";
+import { ex } from "@/lib/placeholders";
 
 /** "35", "35,5" and "35.5" all: a margin is written with a comma here, to three decimals. */
 const PERCENT = /^\d+([.,]\d{1,3})?$/;
@@ -150,7 +151,7 @@ function PolicyFormSheet({
                     {...field}
                     id="policy-name"
                     required
-                    placeholder="Résidentiel"
+                    placeholder={ex("Résidentiel")}
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -173,7 +174,7 @@ function PolicyFormSheet({
                       id="policy-margin"
                       required
                       inputMode="decimal"
-                      placeholder="35"
+                      placeholder={ex("35")}
                       aria-invalid={fieldState.invalid}
                     />
                     <InputGroupAddon align="inline-end">
@@ -199,7 +200,7 @@ function PolicyFormSheet({
                     {...field}
                     id="policy-description"
                     rows={2}
-                    placeholder="Travaux résidentiels, clients particuliers."
+                    placeholder={ex("Travaux résidentiels, clients particuliers.")}
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}

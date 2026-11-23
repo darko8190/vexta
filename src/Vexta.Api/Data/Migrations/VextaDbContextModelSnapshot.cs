@@ -508,6 +508,11 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<string>("Phone")
                         .HasColumnType("text");
 
+                    b.Property<int>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
                     b.Property<string>("TaxId")
                         .HasColumnType("text");
 
@@ -590,9 +595,8 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<Guid?>("AddressId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Category")
-                        .HasMaxLength(60)
-                        .HasColumnType("character varying(60)");
+                    b.Property<Guid?>("AssetTypeId")
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("ClientId")
                         .HasColumnType("uuid");
@@ -649,6 +653,8 @@ namespace Vexta.Api.Data.Migrations
 
                     b.HasIndex("AddressId");
 
+                    b.HasIndex("AssetTypeId");
+
                     b.HasIndex("ClientId");
 
                     b.HasIndex("TenantId", "Reference");
@@ -656,6 +662,35 @@ namespace Vexta.Api.Data.Migrations
                     b.HasIndex("TenantId", "SerialNumber");
 
                     b.ToTable("ClientAssets");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.ClientAssetType", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Icon")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("ClientAssetTypes");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.ClientContact", b =>
@@ -873,6 +908,207 @@ namespace Vexta.Api.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("ExpenseTypes");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.FormAction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("FormTemplateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("NewClientStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Recipients")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Subject")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FormTemplateId", "SortOrder");
+
+                    b.ToTable("FormActions");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.FormAnswer", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("FormFieldId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("SubmissionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Value")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FormFieldId");
+
+                    b.HasIndex("SubmissionId", "SortOrder");
+
+                    b.ToTable("FormAnswers");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.FormField", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("FormTemplateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("HelpText")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("Options")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Target")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FormTemplateId", "SortOrder");
+
+                    b.ToTable("FormFields");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.FormSubmission", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ActionLog")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedClientId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("FormTemplateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SubmittedByName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid?>("SubmittedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedClientId");
+
+                    b.HasIndex("FormTemplateId", "CreatedAt");
+
+                    b.ToTable("FormSubmissions");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.FormTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<bool>("IsPublished")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SuccessMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "SortOrder");
+
+                    b.ToTable("FormTemplates");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.HrDocument", b =>
@@ -1586,6 +1822,9 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<Guid?>("ClientAddressId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("ClientAssetId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("ClientId")
                         .HasColumnType("uuid");
 
@@ -1632,6 +1871,8 @@ namespace Vexta.Api.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ClientAddressId");
+
+                    b.HasIndex("ClientAssetId");
 
                     b.HasIndex("ClientId");
 
@@ -2395,6 +2636,11 @@ namespace Vexta.Api.Data.Migrations
                         .HasForeignKey("AddressId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("Vexta.Api.Domain.ClientAssetType", "AssetType")
+                        .WithMany("Assets")
+                        .HasForeignKey("AssetTypeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Vexta.Api.Domain.Client", "Client")
                         .WithMany("Assets")
                         .HasForeignKey("ClientId")
@@ -2402,6 +2648,8 @@ namespace Vexta.Api.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Address");
+
+                    b.Navigation("AssetType");
 
                     b.Navigation("Client");
                 });
@@ -2440,6 +2688,64 @@ namespace Vexta.Api.Data.Migrations
                     b.Navigation("Tenant");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.FormAction", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.FormTemplate", "FormTemplate")
+                        .WithMany("Actions")
+                        .HasForeignKey("FormTemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FormTemplate");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.FormAnswer", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.FormField", "FormField")
+                        .WithMany()
+                        .HasForeignKey("FormFieldId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Vexta.Api.Domain.FormSubmission", "Submission")
+                        .WithMany("Answers")
+                        .HasForeignKey("SubmissionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FormField");
+
+                    b.Navigation("Submission");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.FormField", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.FormTemplate", "FormTemplate")
+                        .WithMany("Fields")
+                        .HasForeignKey("FormTemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FormTemplate");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.FormSubmission", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.Client", "CreatedClient")
+                        .WithMany()
+                        .HasForeignKey("CreatedClientId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Vexta.Api.Domain.FormTemplate", "FormTemplate")
+                        .WithMany("Submissions")
+                        .HasForeignKey("FormTemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CreatedClient");
+
+                    b.Navigation("FormTemplate");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.HrDocument", b =>
@@ -2618,6 +2924,11 @@ namespace Vexta.Api.Data.Migrations
                         .HasForeignKey("ClientAddressId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("Vexta.Api.Domain.ClientAsset", "ClientAsset")
+                        .WithMany()
+                        .HasForeignKey("ClientAssetId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Vexta.Api.Domain.Client", "Client")
                         .WithMany("Projects")
                         .HasForeignKey("ClientId")
@@ -2637,6 +2948,8 @@ namespace Vexta.Api.Data.Migrations
                     b.Navigation("Client");
 
                     b.Navigation("ClientAddress");
+
+                    b.Navigation("ClientAsset");
 
                     b.Navigation("PricePolicy");
 
@@ -2864,9 +3177,28 @@ namespace Vexta.Api.Data.Migrations
                     b.Navigation("Projects");
                 });
 
+            modelBuilder.Entity("Vexta.Api.Domain.ClientAssetType", b =>
+                {
+                    b.Navigation("Assets");
+                });
+
             modelBuilder.Entity("Vexta.Api.Domain.ExpenseType", b =>
                 {
                     b.Navigation("Expenses");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.FormSubmission", b =>
+                {
+                    b.Navigation("Answers");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.FormTemplate", b =>
+                {
+                    b.Navigation("Actions");
+
+                    b.Navigation("Fields");
+
+                    b.Navigation("Submissions");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.Invoice", b =>

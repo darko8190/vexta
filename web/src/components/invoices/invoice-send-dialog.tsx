@@ -29,6 +29,7 @@ import { useInvoiceSendDefaultsQuery, useSendInvoice } from "@/hooks/use-invoice
 import { MAX_UPLOAD_BYTES, useUploadMedia } from "@/hooks/use-media";
 import { ApiError } from "@/lib/api";
 import type { InvoiceRecord } from "@/lib/types";
+import { ex } from "@/lib/placeholders";
 
 /** A file picked in this form and already in the library, waiting to ride along. */
 interface Upload {
@@ -344,7 +345,7 @@ export function InvoiceSendDialog({
                         <FieldLabel htmlFor="send-contact-role">Rôle</FieldLabel>
                         <Input
                           id="send-contact-role"
-                          placeholder="Comptabilité"
+                          placeholder={ex("Comptabilité")}
                           value={contact.role}
                           onChange={(event) =>
                             setContact((current) => ({ ...current, role: event.target.value }))

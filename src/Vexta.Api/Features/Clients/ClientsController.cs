@@ -20,9 +20,18 @@ public class ClientsController(
     IClientAccessService access) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<PagedResult<ClientDto>>> List([FromQuery] PagingQuery query)
+    public async Task<ActionResult<PagedResult<ClientDto>>> List(
+        [FromQuery] PagingQuery query, [FromQuery] ClientStatus? statut, [FromQuery] bool? bloques)
     {
         var clients = db.Clients.AsNoTracking().AsQueryable();
+
+        // A status nobody can filter on is a status nobody uses: the point of marking somebody a
+        // prospect is to be able to ask for the prospects.
+        if (statut is { } status) clients = clients.Where(c => c.Status == status);
+
+        // Barred is asked for separately, because it is not one of the three — it is the lock,
+        // and it can be closed on a client of any status.
+        if (bloques is { } blocked) clients = clients.Where(c => c.IsBlocked == blocked);
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
@@ -91,7 +100,8 @@ public class ClientsController(
             Phone = Clean(request.Phone),
             TaxId = Clean(request.TaxId),
             Notes = Clean(request.Notes),
-            IsTaxExempt = request.IsTaxExempt
+            IsTaxExempt = request.IsTaxExempt,
+            Status = request.Status
         };
 
         db.Clients.Add(client);
@@ -136,6 +146,7 @@ public class ClientsController(
         client.TaxId = Clean(request.TaxId);
         client.Notes = Clean(request.Notes);
         client.IsTaxExempt = request.IsTaxExempt;
+        client.Status = request.Status;
         client.UpdatedAt = DateTimeOffset.UtcNow;
 
         ApplyPrimaryAddress(client, request.PrimaryAddress, client.TenantId);
@@ -478,6 +489,7 @@ public class ClientsController(
         c.FirstName,
         c.LastName,
         c.Name,
+        c.Status.ToString(),
         c.Email,
         c.Phone,
         c.TaxId,

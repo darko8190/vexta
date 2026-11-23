@@ -14,6 +14,13 @@ public class Client : IInvitable
 
     public ClientType Type { get; set; } = ClientType.Particulier;
 
+    /// <summary>
+    /// Prospect, client or ancien client. A label on the relationship and nothing more:
+    /// none of the three refuses anything, because a prospect is quoted and an ancien client
+    /// who calls back is a client again. What refuses is the lock below.
+    /// </summary>
+    public ClientStatus Status { get; set; } = ClientStatus.Client;
+
     /// <summary>Required for an entreprise, null for a particulier.</summary>
     public string? CompanyName { get; set; }
 

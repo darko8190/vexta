@@ -39,6 +39,7 @@ import { accountEntryKindLabels } from "@/lib/labels";
 import { formatAmount } from "@/lib/money";
 import type { AccountEntryKind, ClientAccountEntry } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { ex } from "@/lib/placeholders";
 
 const kinds: AccountEntryKind[] = ["Paiement", "Charge", "Ajustement"];
 
@@ -384,7 +385,7 @@ function AccountEntrySheet({
                     {...field}
                     id="entry-amount"
                     inputMode="decimal"
-                    placeholder="250,00"
+                    placeholder={ex("250,00")}
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid ? (
@@ -424,7 +425,7 @@ function AccountEntrySheet({
                   <Input
                     {...field}
                     id="entry-description"
-                    placeholder="Chèque 1042"
+                    placeholder={ex("Chèque 1042")}
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}

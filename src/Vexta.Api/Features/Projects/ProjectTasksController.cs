@@ -246,7 +246,9 @@ public class ProjectTasksController(VextaDbContext db, ICurrentUserService curre
                 .Select(a => new TaskAssigneeDto(a.Id, a.FullName, a.JobTitle))
                 .ToList(),
             t.CompletedAt,
-            t.IsLate(DateOnly.FromDateTime(DateTime.Now)),
+            // The company's own day, not the container's: in UTC a task due today reads
+            // as late from 19 h every evening. See Common.BusinessDay.
+            t.IsLate(BusinessDay.Today),
             t.SortOrder);
 
     private static string? Clean(string? value) =>

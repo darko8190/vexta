@@ -301,7 +301,9 @@ public class BillingSettingsController(VextaDbContext db, ICurrentUserService cu
         var gst = Math.Round(subtotal * model.GstRate / 100m, 2);
         var qst = Math.Round(subtotal * model.QstRate / 100m, 2);
 
-        var issued = DateOnly.FromDateTime(DateTime.Today);
+        // The day the company is in, not the container's. An invoice dated tomorrow is a
+        // document somebody has to explain. See Common.BusinessDay.
+        var issued = BusinessDay.Today;
         var due = issued.AddDays(model.PaymentTermsDays);
 
         // Dates written the way the invoice itself prints them, so the email and the attachment

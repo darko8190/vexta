@@ -1,4 +1,4 @@
-# Déploiement de Vexta sur Dokploy
+﻿# Déploiement de Vexta sur Dokploy
 
 Deux environnements, deux branches, deux fichiers compose :
 
@@ -425,6 +425,31 @@ voyez aujourd'hui ne change tant que vous ne les cochez pas dans un forfait. Si 
 des modules marketing portant les mêmes titres, ils sont conservés tels quels — vous verrez donc
 deux lignes « Clients », celle sans écran et celle avec.
 
+#### Les écrans qui existent et que vous pouvez rattacher à un module
+
+Les nouveaux écrans n'ont **pas** de module créé pour eux : un forfait dont le menu vient des
+modules ne les verra pas tant que vous n'en aurez pas ajouté un dans **Admin → Modules**. Voici
+les liens à y mettre.
+
+| Lien | Titre suggéré | Remarque |
+| ---- | ------------- | -------- |
+| `/tableau-de-bord` | — | Toujours là, jamais un module. |
+| `/clients` | Clients | |
+| `/projets` | Projets | |
+| `/factures` | Factures | |
+| `/achats` | Achats | Parent. Mène à Dépenses tant que c'est son seul enfant. |
+| `/achats/depenses` | Dépenses | Sous-onglet d'Achats. |
+| `/inventaire` | Inventaire | |
+| `/mes-feuilles-de-temps` | Mes feuilles de temps | Les heures de la personne connectée. |
+| `/mes-assignations` | Mes assignations | Ses tâches. |
+| `/outils` | Outils & Formation | Les formulaires sont là. |
+| `/rapports` | Rapports | |
+| `/ressources-humaines` | Ressources humaines | Cochez **réservé au propriétaire**. |
+| `/entreprise` | Entreprise | Cochez **réservé au propriétaire**. |
+
+Les deux « Mes… » ne se réservent à personne : ce sont les seuls écrans qui parlent de la
+personne plutôt que de l'entreprise, et un administrateur saisit ses heures comme les autres.
+
 ### Actifs, comptes clients et paiements
 
 #### Actifs
@@ -437,8 +462,8 @@ Volontairement pas appelé « véhicule » : dès qu'un métier obtient sa propr
 veut une aussi. Et pas « équipement » non plus — ce mot désigne déjà l'outillage de
 l'entreprise dans l'inventaire, et l'auto d'un client n'est pas l'équipement du garage.
 
-Les champs sont ceux que tous les métiers remplissent vraiment : un nom, une catégorie libre,
-marque, modèle, année, un numéro de série (NIV, plaque signalétique), une référence (plaque
+Les champs sont ceux que tous les métiers remplissent vraiment : un nom, un **type**, marque,
+modèle, année, un numéro de série (NIV, plaque signalétique), une référence (plaque
 d'immatriculation, numéro d'unité), un relevé d'usage avec son unité, et une adresse pour ce qui
 ne se déplace pas. Les deux numéros sont indexés : on retrouve une auto avec une plaque, pas
 seulement avec un nom.
@@ -447,8 +472,32 @@ Un actif vendu ou mis au rebut se décoche — **Toujours en service** — plut�
 supprimer. Le travail fait dessus reste de l'histoire, et l'histoire ne cesse pas d'être vraie
 parce qu'une auto a changé de mains.
 
-> Pas encore relié aux projets. Un bon de travail ne dit donc pas sur quel actif il porte ; c'est
-> l'étape suivante évidente et elle n'est pas faite.
+#### Types d'actifs
+
+Le type est une ligne dans la liste de l'entreprise — Véhicule, Maison, Bloc appartements,
+Machinerie — et non une valeur figée dans le code. La liste est différente dans chaque métier et
+s'allonge à mesure qu'un métier rencontre du nouveau travail.
+
+Elle se complète **depuis le menu déroulant qui en a besoin**, avec le bouton `+` à côté du
+champ Type, comme les catégories de dépenses. S'arrêter pour aller configurer une liste ailleurs,
+c'est ce qui fait choisir le mauvais type.
+
+Un type déjà utilisé ne se supprime pas : le refus dit combien d'actifs s'en servent. Les actifs
+perdraient le seul champ qui dit ce qu'ils sont, et personne ne pourrait le remettre.
+
+#### L'actif d'un projet
+
+Un projet peut porter sur un des actifs de son client : le champ **Actif** du formulaire de
+projet cherche parmi les actifs en service de ce client, et permet d'en ajouter un sans quitter
+le formulaire. Il est facultatif — beaucoup de mandats ne portent sur aucune chose en
+particulier.
+
+L'API refuse l'actif d'un autre client, comme elle refuse déjà l'adresse d'un autre client : les
+identifiants viennent du navigateur, et un bon de travail qui nomme le camion de quelqu'un
+d'autre est une erreur qu'on ne rattrape pas.
+
+Changer le client d'un projet vide le champ. Supprimer un actif ne supprime pas les projets faits
+dessus — vendre l'auto n'efface pas la réparation.
 
 #### Compte client
 
@@ -538,6 +587,136 @@ l'inventaire, dépenses par type) apparaissent dans la liste suivies de « à ve
 peut être défini et placé dès maintenant, et la page le dit franchement au lieu d'afficher un
 tableau vide. Ils demandent le calcul des totaux de facture, qui n'est pas encore partagé entre
 le PDF et le reste de l'API.
+
+### États des clients
+
+Un client est **Prospect**, **Client** ou **Ancien client**. Aucun des trois ne bloque quoi que
+ce soit : on soumissionne un prospect, et un ancien client qui rappelle redevient client. La
+liste des clients se filtre là-dessus — un état sur lequel personne ne peut filtrer est un état
+dont personne ne se sert.
+
+**« Banni » n'est pas un quatrième état.** C'est le cadenas de la fiche (voir *Actifs, comptes
+clients et paiements*), et un client bloqué garde l'état qu'il avait. L'écran affiche « Banni » à
+la place de son état quand le cadenas est fermé. Deux interrupteurs pour une même porte, c'est
+deux interrupteurs qui finissent par se contredire — et il faudrait alors expliquer à quelqu'un
+un dossier qui dit « Client » en refusant tout.
+
+Les dossiers qui existaient avant cette colonne sont tous des **clients** : ce sont des gens que
+l'entreprise sert déjà, et une migration qui les aurait transformés en prospects aurait menti sur
+tout le fichier.
+
+### Mon espace : feuilles de temps et assignations
+
+Deux onglets du menu qui ne parlent pas de l'entreprise mais de la personne connectée. Pour la
+plus grande partie de la paie, ce sont eux, l'application.
+
+**Mes feuilles de temps** montre ses heures une semaine à la fois, tous chantiers confondus, avec
+le total de la semaine. C'est la question qu'on se pose un jeudi soir — « est-ce que mes heures
+sont rentrées » — et y répondre en ouvrant cinq projets, c'est ne jamais vérifier. En lecture
+seule : des heures se saisissent contre le projet où elles ont été travaillées, et une saisie
+sans projet serait un coût que personne ne peut facturer.
+
+La semaine va du **lundi au dimanche** et c'est le serveur qui décide où tombe le lundi. Un quart
+qui commence dimanche 22 h et finit lundi 2 h appartient aux deux semaines et apparaît dans les
+deux : l'écarter de l'une perdrait des heures payées.
+
+**Mes assignations** montre les tâches qui lui ont été confiées, par son nom **ou par une équipe
+dont il fait partie** — et dit laquelle des deux, parce que « ce n'est pas à moi, c'est à
+l'équipe » est la première chose que pense quelqu'un devant une tâche qu'il ne reconnaît pas. Le
+statut se change sur le projet, pas ici : deux endroits pour changer la même chose sont deux
+endroits qui divergent.
+
+Un compte sans dossier d'employé — un fondateur qui ne s'est jamais mis sur la paie — voit une
+page qui le dit, et non une erreur.
+
+### Achats et dépenses
+
+**Achats** est un onglet de menu avec pour l'instant un seul sous-onglet : **Dépenses**. Il
+existe pour que les bons de commande et les fournisseurs aient un endroit où aller plus tard,
+plutôt que d'avoir à déplacer Dépenses du premier niveau le jour où ils arrivent. Cliquer
+« Achats » mène directement à Dépenses tant que c'est la seule chose qui s'y trouve.
+
+La page liste **toutes** les dépenses de l'entreprise, tous projets confondus, avec recherche,
+type et période. « Combien on a dépensé en novembre » est une question d'achats, et y répondre en
+ouvrant quarante projets, c'est ne jamais y répondre.
+
+Les trois totaux en haut portent sur **tout ce que les filtres attrapent**, pas sur les vingt
+lignes affichées : un total d'une page aurait l'air d'une réponse et serait la mauvaise. Une
+dépense sans date est écartée d'une recherche datée plutôt que ramassée dedans — on n'a pas dit
+quand l'argent est sorti, donc aucune période ne peut honnêtement la réclamer.
+
+En lecture seule, pour la même raison que les feuilles de temps : une dépense se saisit contre
+son projet, avec la photo du reçu.
+
+### Formulaires
+
+Sous **Outils & Formation → Formulaires**, une entreprise monte ses propres formulaires : les
+questions, le type de réponse attendu, et **ce que la réponse déclenche**.
+
+#### Les questions
+
+Neuf types : Texte, Paragraphe, Nombre, Date, Choix, Choix multiples, Oui/Non, Courriel,
+Téléphone. Un Choix exige au moins deux choix — une question à une seule réponse n'est pas une
+question.
+
+Les questions se montent et s'enregistrent **en un seul coup**, pas une requête par ligne.
+Monter un formulaire, c'est réordonner, renommer et supprimer dans la même séance ; un écran qui
+sauvegardait chaque frappe serait un écran où la moitié d'un renommage est une question que
+personne n'a posée. Le bouton dit quand il reste des modifications à enregistrer.
+
+#### Les actions
+
+C'est la moitié qui donne sa valeur au formulaire. La plupart des outils s'arrêtent à recueillir
+des réponses, et les réponses dorment ensuite dans une liste que personne n'ouvre.
+
+- **Envoyer les réponses par courriel** — jusqu'à dix destinataires ; le premier reçoit le
+  message, les autres sont en copie. Le nom de l'entreprise apparaît comme expéditeur, l'adresse
+  reste la nôtre (Mailgun ne peut pas envoyer au nom d'un domaine qu'il ne détient pas).
+  Les destinataires sont configurés par l'entreprise, jamais saisis par celui qui remplit : un
+  formulaire qui envoie où on lui dit est un relais à pourriel.
+- **Créer un client** — construit avec les questions dont la colonne « Remplit » pointe vers un
+  champ du client. Il faut au moins un nom, et l'API refuse l'action tant qu'aucune question n'en
+  donne un : un formulaire qui classerait des réponses sans rien créer en ayant l'air de
+  fonctionner est pire qu'une erreur. Le client créé est un **prospect** par défaut, et sa fiche
+  porte une note disant de quel formulaire il vient — six mois plus tard, « d'où sort ce client »
+  est la question que quelqu'un pose toujours.
+
+Une action qui échoue **n'annule pas les réponses**. Elles sont déjà enregistrées quand les
+actions partent : une équipe qui vient de remplir douze questions sur un toit ne les remplit pas
+une deuxième fois. L'échec est écrit dans le journal de la réponse et dit à l'écran sur le
+champ — un formulaire dont le courriel n'est pas parti doit le dire, sinon la personne s'en va en
+croyant que le bureau est au courant.
+
+#### Les réponses
+
+Chaque réponse garde **sa propre copie** du libellé et du type de la question. Renommer une
+question au printemps ne réécrit pas ce qu'une équipe a répondu à l'automne, et supprimer une
+question n'emporte pas les réponses déjà données.
+
+Un formulaire qui a été rempli ne se supprime pas : le refus dit combien de réponses y pendent et
+propose de le **dépublier** à la place. Tant qu'il n'est pas publié, les employés ne le voient
+pas — le temps de le finir.
+
+Qui fait quoi : tout le monde lit et remplit (c'est fait sur le chantier) ; l'administrateur et
+le chargé de projet montent les formulaires ; seul l'administrateur supprime une réponse ou un
+formulaire.
+
+### Fuseau horaire et langue
+
+L'API décide de « aujourd'hui » dans le fuseau de l'entreprise (`America/Toronto`), jamais dans
+celui du conteneur. Un conteneur tourne en UTC : sans cela, de 19 h à minuit **chaque soir**, une
+tâche due aujourd'hui s'afficherait en retard et « cette semaine » voudrait dire la semaine
+prochaine. Quelqu'un qui consulte ses heures un dimanche soir se verrait offrir une semaine vide.
+
+La culture de l'application est fixée à `fr-CA` au démarrage. Un conteneur n'a pas de culture, et
+sans cela l'application écrirait « 23 November 2026 » au milieu d'une phrase française — dans un
+courriel d'invitation, dans la note qu'un formulaire laisse sur un client. Elle est fixée et non
+négociée par requête : il y a une seule langue ici, et l'en-tête `Accept-Language` d'un navigateur
+ne doit pas pouvoir changer ce qui est écrit en base.
+
+Rien à configurer dans Dokploy pour l'un ni pour l'autre. Les images `dotnet/aspnet` embarquent
+les données de fuseaux et ICU ; si elles manquaient, l'API retomberait sur UTC plutôt que de
+planter.
 
 ### Rôles des employés
 

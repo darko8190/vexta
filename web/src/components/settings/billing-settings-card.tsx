@@ -21,6 +21,7 @@ import {
   type BillingSettings,
 } from "@/hooks/use-billing-settings";
 import { ApiError } from "@/lib/api";
+import { ex } from "@/lib/placeholders";
 
 const formSchema = z.object({
   gstNumber: z.string().trim().max(40, "40 caractères maximum."),
@@ -133,7 +134,7 @@ export function BillingSettingsCard() {
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="billing-gst">Numéro de TPS</FieldLabel>
-                    <Input {...field} id="billing-gst" placeholder="123456789 RT0001" aria-invalid={fieldState.invalid} />
+                    <Input {...field} id="billing-gst" placeholder={ex("123456789 RT0001")} aria-invalid={fieldState.invalid} />
                     {fieldState.invalid ? (
                       <FieldError errors={[fieldState.error]} />
                     ) : (
@@ -148,7 +149,7 @@ export function BillingSettingsCard() {
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="billing-qst">Numéro de TVQ</FieldLabel>
-                    <Input {...field} id="billing-qst" placeholder="1234567890 TQ0001" aria-invalid={fieldState.invalid} />
+                    <Input {...field} id="billing-qst" placeholder={ex("1234567890 TQ0001")} aria-invalid={fieldState.invalid} />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}
@@ -161,7 +162,7 @@ export function BillingSettingsCard() {
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor="billing-rbq">Numéro de licence RBQ</FieldLabel>
-                  <Input {...field} id="billing-rbq" placeholder="1234-5678-01" aria-invalid={fieldState.invalid} />
+                  <Input {...field} id="billing-rbq" placeholder={ex("1234-5678-01")} aria-invalid={fieldState.invalid} />
                   {fieldState.invalid ? (
                     <FieldError errors={[fieldState.error]} />
                   ) : (
@@ -203,7 +204,7 @@ export function BillingSettingsCard() {
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="billing-prefix">Préfixe</FieldLabel>
-                    <Input {...field} id="billing-prefix" placeholder="F" aria-invalid={fieldState.invalid} />
+                    <Input {...field} id="billing-prefix" placeholder={ex("F")} aria-invalid={fieldState.invalid} />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}
@@ -245,7 +246,7 @@ export function BillingSettingsCard() {
                       maxLength={3}
                       autoComplete="off"
                       spellCheck={false}
-                      placeholder="CAD"
+                      placeholder={ex("CAD")}
                       aria-invalid={fieldState.invalid}
                     />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -269,7 +270,7 @@ export function BillingSettingsCard() {
                     {...field}
                     id="billing-conditions"
                     rows={2}
-                    placeholder="Payable à réception. Intérêts de 1,5 % par mois sur tout solde en retard."
+                    placeholder={ex("Payable à réception. Intérêts de 1,5 % par mois sur tout solde en retard.")}
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -287,7 +288,7 @@ export function BillingSettingsCard() {
                     {...field}
                     id="billing-footer"
                     rows={2}
-                    placeholder="Merci de votre confiance. Virement : Desjardins, transit 12345, compte 6789012."
+                    placeholder={ex("Merci de votre confiance. Virement : Desjardins, transit 12345, compte 6789012.")}
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}

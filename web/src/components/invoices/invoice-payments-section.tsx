@@ -38,6 +38,7 @@ import { paymentMethodLabels } from "@/lib/labels";
 import { formatAmount } from "@/lib/money";
 import type { InvoicePayment, PaymentMethod } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { ex } from "@/lib/placeholders";
 
 const methods: PaymentMethod[] = [
   "Comptant",
@@ -410,7 +411,7 @@ function PaymentSheet({
                   <Input
                     {...field}
                     id="payment-reference"
-                    placeholder="Numéro de chèque, code d'autorisation"
+                    placeholder={ex("Numéro de chèque, code d'autorisation")}
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}

@@ -9,7 +9,10 @@ public record ClientAssetDto(
     string Label,
     /// <summary>"Toyota Corolla 2018", or the label when the make and model were never filled.</summary>
     string Designation,
-    string? Category,
+    Guid? AssetTypeId,
+    /// <summary>The type's name, so a list does not have to resolve the id itself.</summary>
+    string? AssetTypeName,
+    string? AssetTypeIcon,
     string? Make,
     string? Model,
     int? Year,
@@ -26,7 +29,7 @@ public record ClientAssetDto(
 
 public record SaveClientAssetRequest(
     string Label,
-    string? Category = null,
+    Guid? AssetTypeId = null,
     string? Make = null,
     string? Model = null,
     int? Year = null,
@@ -37,6 +40,11 @@ public record SaveClientAssetRequest(
     Guid? AddressId = null,
     string? Notes = null,
     bool IsActive = true);
+
+/// <summary>One of the company's kinds of asset, as the dropdown lists it.</summary>
+public record ClientAssetTypeDto(Guid Id, string Name, string? Icon, int AssetCount);
+
+public record SaveClientAssetTypeRequest(string Name, string? Icon = null);
 
 // ---- Compte ----
 

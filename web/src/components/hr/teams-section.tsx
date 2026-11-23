@@ -37,6 +37,7 @@ import { useDeleteTeam, useSaveTeam, useTeamsQuery } from "@/hooks/use-hr";
 import { useTeamQuery } from "@/hooks/use-team";
 import { ApiError } from "@/lib/api";
 import type { TeamRecord } from "@/lib/types";
+import { ex } from "@/lib/placeholders";
 
 const NO_LEAD = "aucun";
 
@@ -126,7 +127,7 @@ function TeamFormSheet({
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor="team-name">Nom</FieldLabel>
-                  <Input {...field} id="team-name" placeholder="Toiture" aria-invalid={fieldState.invalid} />
+                  <Input {...field} id="team-name" placeholder={ex("Toiture")} aria-invalid={fieldState.invalid} />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                 </Field>
               )}

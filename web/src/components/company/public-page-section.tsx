@@ -22,6 +22,7 @@ import { usePublicPageQuery, useSavePublicPage } from "@/hooks/use-public-page";
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { PublicPageSettings } from "@/lib/types";
+import { ex } from "@/lib/placeholders";
 
 const formSchema = z.object({
   headline: z.string().trim().max(200, "200 caractères maximum."),
@@ -184,7 +185,7 @@ function ContentCard({ settings }: { settings: PublicPageSettings }) {
                   <Input
                     {...field}
                     id="public-headline"
-                    placeholder="Rénovation résidentielle à Québec depuis 2008"
+                    placeholder={ex("Rénovation résidentielle à Québec depuis 2008")}
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid ? (
@@ -209,7 +210,7 @@ function ContentCard({ settings }: { settings: PublicPageSettings }) {
                     {...field}
                     id="public-about"
                     rows={6}
-                    placeholder="Ce que vous faites, pour qui, et depuis combien de temps."
+                    placeholder={ex("Ce que vous faites, pour qui, et depuis combien de temps.")}
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -227,7 +228,7 @@ function ContentCard({ settings }: { settings: PublicPageSettings }) {
                     {...field}
                     id="public-contact-note"
                     rows={3}
-                    placeholder="Appelez-nous du lundi au vendredi, de 7 h à 17 h."
+                    placeholder={ex("Appelez-nous du lundi au vendredi, de 7 h à 17 h.")}
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid ? (

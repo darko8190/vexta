@@ -31,6 +31,7 @@ import {
 import { useUploadMedia, MAX_UPLOAD_BYTES } from "@/hooks/use-media";
 import { ApiError } from "@/lib/api";
 import type { ProjectExpense } from "@/lib/types";
+import { ex } from "@/lib/placeholders";
 
 const formSchema = z.object({
   name: z.string().trim().min(1, "Le nom est requis.").max(200, "200 caractères maximum."),
@@ -261,7 +262,7 @@ export function ExpenseFormSheet({
                   <Input
                     {...field}
                     id="expense-name"
-                    placeholder="Permis de construction"
+                    placeholder={ex("Permis de construction")}
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -323,7 +324,7 @@ export function ExpenseFormSheet({
                       <Input
                         value={newType}
                         onChange={(event) => setNewType(event.target.value)}
-                        placeholder="Hébergement"
+                        placeholder={ex("Hébergement")}
                         aria-label="Nom du nouveau type"
                         onKeyDown={(event) => {
                           // Enter adds the type instead of submitting the expense, which would
@@ -371,7 +372,7 @@ export function ExpenseFormSheet({
                 render={({ field }) => (
                   <Field>
                     <FieldLabel htmlFor="expense-cost">Coût</FieldLabel>
-                    <Input {...field} id="expense-cost" inputMode="decimal" placeholder="0,00" />
+                    <Input {...field} id="expense-cost" inputMode="decimal" placeholder={ex("0,00")} />
                     <FieldDescription>Ce que vous avez payé.</FieldDescription>
                   </Field>
                 )}
@@ -382,7 +383,7 @@ export function ExpenseFormSheet({
                 render={({ field }) => (
                   <Field>
                     <FieldLabel htmlFor="expense-selling">Vendant</FieldLabel>
-                    <Input {...field} id="expense-selling" inputMode="decimal" placeholder="0,00" />
+                    <Input {...field} id="expense-selling" inputMode="decimal" placeholder={ex("0,00")} />
                     <FieldDescription>Ce que le client paie.</FieldDescription>
                   </Field>
                 )}

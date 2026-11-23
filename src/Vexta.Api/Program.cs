@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -14,6 +15,16 @@ using Vexta.Api.Data.Seed;
 using Vexta.Api.Domain;
 using Vexta.Api.Features.Invoices;
 using Vexta.Api.Services;
+
+// Everything this API writes for a person to read is in French: the date on an invitation, the
+// note a form leaves on a client it created, the month in a report's title. A container has no
+// culture of its own, so without this the application would say "23 November 2026" to a Québec
+// contractor — in the middle of a French sentence. Fixed rather than negotiated per request:
+// there is one language here, and a browser's Accept-Language must not be able to change what
+// is written into the database.
+var quebec = CultureInfo.GetCultureInfo("fr-CA");
+CultureInfo.DefaultThreadCurrentCulture = quebec;
+CultureInfo.DefaultThreadCurrentUICulture = quebec;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -69,6 +80,7 @@ builder.Services.AddScoped<IWorkspaceService, WorkspaceService>();
 builder.Services.AddScoped<IInvoicePdfService, InvoicePdfService>();
 builder.Services.AddScoped<IPasswordResetService, PasswordResetService>();
 builder.Services.AddScoped<IReportService, ReportService>();
+builder.Services.AddScoped<IFormActionRunner, FormActionRunner>();
 
 builder.Services
     .AddIdentityCore<ApplicationUser>(options =>

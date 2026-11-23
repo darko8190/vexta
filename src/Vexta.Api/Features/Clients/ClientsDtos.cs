@@ -12,6 +12,11 @@ public record ClientDto(
     string? LastName,
     /// <summary>The company for an entreprise, the person for a particulier.</summary>
     string Name,
+    /// <summary>
+    /// Prospect, Client or Ancien. Never "Banni" — a barred client is one the lock below says
+    /// is barred, and the screen reads the two together so they cannot contradict each other.
+    /// </summary>
+    string Status,
     string? Email,
     string? Phone,
     string? TaxId,
@@ -85,7 +90,12 @@ public record UpsertClientRequest(
     string? Notes,
     bool IsTaxExempt,
     /// <summary>Omitted or blank leaves the primary address untouched.</summary>
-    ClientAddressDto? PrimaryAddress);
+    ClientAddressDto? PrimaryAddress,
+    /// <summary>
+    /// Defaults to Client when a caller says nothing, which is what the form does for a record
+    /// typed in because work is about to start — the common case.
+    /// </summary>
+    ClientStatus Status = ClientStatus.Client);
 
 // ---- Contacts attached to a client ----
 

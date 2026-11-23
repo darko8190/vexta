@@ -16,6 +16,7 @@ import { SocialButtons } from "@/components/auth/social-buttons";
 import { VextaLogo } from "@/components/brand/vexta-logo";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { useAuth } from "@/lib/auth-context";
+import { ex } from "@/lib/placeholders";
 
 const formSchema = z.object({
   email: z.string().min(1, "Le courriel est requis.").email("Courriel invalide."),
@@ -113,7 +114,7 @@ export default function LoginPage() {
                     id="login-email"
                     type="email"
                     autoComplete="email"
-                    placeholder="vous@entreprise.com"
+                    placeholder={ex("vous@entreprise.com")}
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}

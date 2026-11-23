@@ -22,13 +22,15 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { AddressPicker } from "@/components/addresses/address-picker";
+import { AssetTypeField } from "@/components/assets/asset-type-field";
 import { useCreateClientAsset, useUpdateClientAsset } from "@/hooks/use-client-assets";
 import { ApiError } from "@/lib/api";
 import type { ClientAsset, SaveClientAssetValues } from "@/lib/types";
+import { ex } from "@/lib/placeholders";
 
 const formSchema = z.object({
   label: z.string().trim().min(1, "Le nom est obligatoire.").max(200, "200 caractères maximum."),
-  category: z.string().trim().max(60, "60 caractères maximum."),
+  assetTypeId: z.string(),
   make: z.string().trim().max(80, "80 caractères maximum."),
   model: z.string().trim().max(80, "80 caractères maximum."),
   year: z.string().trim(),
@@ -46,7 +48,7 @@ type FormValues = z.infer<typeof formSchema>;
 function toFormValues(asset?: ClientAsset): FormValues {
   return {
     label: asset?.label ?? "",
-    category: asset?.category ?? "",
+    assetTypeId: asset?.assetTypeId ?? "",
     make: asset?.make ?? "",
     model: asset?.model ?? "",
     year: asset?.year != null ? String(asset.year) : "",
@@ -73,11 +75,17 @@ export function AssetFormSheet({
   onOpenChange,
   clientId,
   asset,
+  onCreated,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   clientId: string;
   asset?: ClientAsset;
+  /**
+   * Handed the asset that was just created, so a picker that opened this sheet can select it.
+   * Not called on an edit: nothing was added to choose.
+   */
+  onCreated?: (asset: ClientAsset) => void;
 }) {
   const isEditing = Boolean(asset);
   const create = useCreateClientAsset(clientId);
@@ -97,7 +105,7 @@ export function AssetFormSheet({
   async function onSubmit(values: FormValues) {
     const payload: SaveClientAssetValues = {
       label: values.label,
-      category: values.category || null,
+      assetTypeId: values.assetTypeId || null,
       make: values.make || null,
       model: values.model || null,
       year: values.year ? Number(values.year) : null,
@@ -115,8 +123,9 @@ export function AssetFormSheet({
         await update.mutateAsync({ id: asset.id, values: payload });
         toast.success("Actif enregistré.");
       } else {
-        await create.mutateAsync(payload);
+        const created = await create.mutateAsync(payload);
         toast.success("Actif ajouté.");
+        onCreated?.(created);
       }
       onOpenChange(false);
     } catch (error) {
@@ -153,7 +162,7 @@ export function AssetFormSheet({
                   <Input
                     {...field}
                     id="asset-label"
-                    placeholder="Corolla bleue de Monsieur Roy"
+                    placeholder={ex("Corolla bleue de Monsieur Roy")}
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid ? (
@@ -166,18 +175,16 @@ export function AssetFormSheet({
             />
 
             <Controller
-              name="category"
+              name="assetTypeId"
               control={form.control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="asset-category">Catégorie</FieldLabel>
-                  <Input
-                    {...field}
-                    id="asset-category"
-                    placeholder="Véhicule"
-                    aria-invalid={fieldState.invalid}
-                  />
-                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel htmlFor="asset-type">Type</FieldLabel>
+                  <AssetTypeField id="asset-type" value={field.value} onChange={field.onChange} />
+                  <FieldDescription>
+                    Véhicule, maison, bloc appartements, machinerie — votre liste, que vous
+                    complétez au fur et à mesure.
+                  </FieldDescription>
                 </Field>
               )}
             />
@@ -189,7 +196,7 @@ export function AssetFormSheet({
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="asset-make">Marque</FieldLabel>
-                    <Input {...field} id="asset-make" placeholder="Toyota" aria-invalid={fieldState.invalid} />
+                    <Input {...field} id="asset-make" placeholder={ex("Toyota")} aria-invalid={fieldState.invalid} />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}
@@ -200,7 +207,7 @@ export function AssetFormSheet({
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="asset-model">Modèle</FieldLabel>
-                    <Input {...field} id="asset-model" placeholder="Corolla" aria-invalid={fieldState.invalid} />
+                    <Input {...field} id="asset-model" placeholder={ex("Corolla")} aria-invalid={fieldState.invalid} />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}
@@ -218,7 +225,7 @@ export function AssetFormSheet({
                     id="asset-year"
                     type="number"
                     min="1900"
-                    placeholder="2018"
+                    placeholder={ex("2018")}
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -235,7 +242,7 @@ export function AssetFormSheet({
                   <Input
                     {...field}
                     id="asset-serial"
-                    placeholder="NIV, numéro de série"
+                    placeholder={ex("NIV, numéro de série")}
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -252,7 +259,7 @@ export function AssetFormSheet({
                   <Input
                     {...field}
                     id="asset-reference"
-                    placeholder="Plaque, numéro d'unité"
+                    placeholder={ex("Plaque, numéro d'unité")}
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid ? (
@@ -279,7 +286,7 @@ export function AssetFormSheet({
                       type="number"
                       step="1"
                       min="0"
-                      placeholder="142000"
+                      placeholder={ex("142000")}
                       aria-invalid={fieldState.invalid}
                     />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -292,7 +299,7 @@ export function AssetFormSheet({
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="asset-usage-unit">Unité</FieldLabel>
-                    <Input {...field} id="asset-usage-unit" placeholder="km" aria-invalid={fieldState.invalid} />
+                    <Input {...field} id="asset-usage-unit" placeholder={ex("km")} aria-invalid={fieldState.invalid} />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}

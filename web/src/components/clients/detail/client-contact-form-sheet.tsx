@@ -22,6 +22,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useSaveClientContact } from "@/hooks/use-clients";
 import { ApiError } from "@/lib/api";
 import type { ClientContact } from "@/lib/types";
+import { ex } from "@/lib/placeholders";
 
 const formSchema = z.object({
   firstName: z.string().trim().min(1, "Le prénom est requis.").max(100, "100 caractères maximum."),
@@ -114,7 +115,7 @@ export function ClientContactFormSheet({
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="contact-firstname">Prénom</FieldLabel>
-                    <Input {...field} id="contact-firstname" placeholder="Jean" aria-invalid={fieldState.invalid} />
+                    <Input {...field} id="contact-firstname" placeholder={ex("Jean")} aria-invalid={fieldState.invalid} />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}
@@ -125,7 +126,7 @@ export function ClientContactFormSheet({
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="contact-lastname">Nom</FieldLabel>
-                    <Input {...field} id="contact-lastname" placeholder="Lavoie" aria-invalid={fieldState.invalid} />
+                    <Input {...field} id="contact-lastname" placeholder={ex("Lavoie")} aria-invalid={fieldState.invalid} />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}
@@ -138,7 +139,7 @@ export function ClientContactFormSheet({
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor="contact-role">Rôle</FieldLabel>
-                  <Input {...field} id="contact-role" placeholder="Comptabilité" aria-invalid={fieldState.invalid} />
+                  <Input {...field} id="contact-role" placeholder={ex("Comptabilité")} aria-invalid={fieldState.invalid} />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                 </Field>
               )}
@@ -151,7 +152,7 @@ export function ClientContactFormSheet({
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="contact-phone">Téléphone</FieldLabel>
-                    <Input {...field} id="contact-phone" type="tel" placeholder="514 555-0188" aria-invalid={fieldState.invalid} />
+                    <Input {...field} id="contact-phone" type="tel" placeholder={ex("514 555-0188")} aria-invalid={fieldState.invalid} />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}
@@ -162,7 +163,7 @@ export function ClientContactFormSheet({
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="contact-email">Courriel</FieldLabel>
-                    <Input {...field} id="contact-email" type="email" placeholder="jean@abc.ca" aria-invalid={fieldState.invalid} />
+                    <Input {...field} id="contact-email" type="email" placeholder={ex("jean@abc.ca")} aria-invalid={fieldState.invalid} />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}

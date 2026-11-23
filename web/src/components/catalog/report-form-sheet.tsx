@@ -28,6 +28,7 @@ import { ApiError } from "@/lib/api";
 import { MODULE_ICON_NAMES, moduleIcon } from "@/lib/module-icons";
 import type { AdminReport } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { ex } from "@/lib/placeholders";
 
 const formSchema = z.object({
   moduleId: z.string().min(1, "Choisissez le module auquel ce rapport appartient."),
@@ -211,7 +212,7 @@ export function ReportFormSheet({
                   <Input
                     {...field}
                     id="report-title"
-                    placeholder="Heures par employé"
+                    placeholder={ex("Heures par employé")}
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -232,7 +233,7 @@ export function ReportFormSheet({
                     {...field}
                     id="report-description"
                     rows={3}
-                    placeholder="Les heures inscrites par chacun, et sur combien de chantiers."
+                    placeholder={ex("Les heures inscrites par chacun, et sur combien de chantiers.")}
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}

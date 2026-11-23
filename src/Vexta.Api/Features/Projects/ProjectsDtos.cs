@@ -22,6 +22,12 @@ public record ProjectDto(
     /// <summary>The margin applied to catalogue lines on this job, if one was chosen.</summary>
     Guid? PricePolicyId,
     string? PricePolicyName,
+    /// <summary>
+    /// The client's asset the work is on — the car, the building, the furnace. Carried as the
+    /// id and the one line that names it, so a list never has to resolve it.
+    /// </summary>
+    Guid? ClientAssetId,
+    string? ClientAssetLabel,
     ProjectAddressDto? ClientAddress,
     bool SameAddressAsClient,
     /// <summary>Null when the work happens at the billing address — see SameAddressAsClient.</summary>
@@ -45,7 +51,9 @@ public record UpsertProjectRequest(
     Guid? ClientAddressId,
     bool SameAddressAsClient,
     /// <summary>Ignored when SameAddressAsClient is true.</summary>
-    Guid? SiteAddressId);
+    Guid? SiteAddressId,
+    /// <summary>Which of the client's assets this job is on. Has to be one of theirs.</summary>
+    Guid? ClientAssetId = null);
 
 // ---- What the project's own page needs beyond the record itself ----
 

@@ -15,6 +15,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useTestR2, useUpdatePlatformSettings } from "@/hooks/use-platform-settings";
 import { ApiError } from "@/lib/api";
 import type { PlatformSettings } from "@/lib/types";
+import { ex } from "@/lib/placeholders";
 
 const formSchema = z.object({
   r2AccountId: z.string().optional(),
@@ -111,7 +112,7 @@ export function R2SettingsCard({ settings }: { settings: PlatformSettings }) {
               render={({ field }) => (
                 <Field>
                   <FieldLabel htmlFor="r2-account">Identifiant de compte Cloudflare</FieldLabel>
-                  <Input {...field} id="r2-account" autoComplete="off" placeholder="a1b2c3…" />
+                  <Input {...field} id="r2-account" autoComplete="off" placeholder={ex("a1b2c3…")} />
                 </Field>
               )}
             />
@@ -121,7 +122,7 @@ export function R2SettingsCard({ settings }: { settings: PlatformSettings }) {
               render={({ field }) => (
                 <Field>
                   <FieldLabel htmlFor="r2-bucket">Nom du seau</FieldLabel>
-                  <Input {...field} id="r2-bucket" autoComplete="off" placeholder="vexta-medias" />
+                  <Input {...field} id="r2-bucket" autoComplete="off" placeholder={ex("vexta-medias")} />
                 </Field>
               )}
             />
@@ -169,7 +170,7 @@ export function R2SettingsCard({ settings }: { settings: PlatformSettings }) {
                     {...field}
                     id="r2-public"
                     autoComplete="off"
-                    placeholder="https://medias.votre-domaine.ca"
+                    placeholder={ex("https://medias.votre-domaine.ca")}
                     aria-invalid={fieldState.error ? true : undefined}
                   />
                   <FieldDescription>

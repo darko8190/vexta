@@ -1,9 +1,10 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+﻿import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, buildQuery } from "@/lib/api";
 import type {
   ClientAddress,
   ClientContact,
   ClientRecord,
+  ClientStatus,
   ClientSummary,
   ClientType,
   InvitationGrant,
@@ -21,6 +22,8 @@ export interface ClientFormValues {
   notes?: string | null;
   /** No tax charged to this client. Their projects and invoices start from this. */
   isTaxExempt: boolean;
+  /** Prospect, client or ancien client. Never "Banni" — that is the lock on the record. */
+  status: ClientStatus;
   primaryAddress: Omit<ClientAddress, "id"> | null;
 }
 
@@ -33,10 +36,20 @@ export interface ClientContactFormValues {
   notes: string | null;
 }
 
-export function useClientsQuery(page: number, search: string) {
+/**
+ * The client list.
+ *
+ * <paramref name="statut"/> is one of the three states, or "Bloques" — which is not a state but
+ * the lock, and is asked for separately because it can be closed on a client of any state.
+ */
+export function useClientsQuery(page: number, search: string, statut?: ClientStatus | "Bloques") {
+  const filter =
+    statut === "Bloques" ? { bloques: true } : statut ? { statut } : {};
+
   return useQuery({
-    queryKey: ["clients", page, search],
-    queryFn: () => api.get<PagedResult<ClientRecord>>(`clients${buildQuery({ page, search })}`),
+    queryKey: ["clients", page, search, statut ?? "tous"],
+    queryFn: () =>
+      api.get<PagedResult<ClientRecord>>(`clients${buildQuery({ page, search, ...filter })}`),
     placeholderData: (previous) => previous,
   });
 }

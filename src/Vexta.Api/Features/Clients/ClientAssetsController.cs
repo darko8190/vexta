@@ -30,14 +30,18 @@ public class ClientAssetsController(VextaDbContext db, ICurrentUserService curre
 
         var query = db.ClientAssets.AsNoTracking()
             .Include(a => a.Address)
+            .Include(a => a.AssetType)
             .Where(a => a.ClientId == clientId);
 
         // Retired assets are kept but hidden: a shop that has serviced the same client for ten
         // years would otherwise open on a list of cars they no longer own.
         if (!inactifs) query = query.Where(a => a.IsActive);
 
+        // Grouped by kind before anything else: a property manager with nine buildings and two
+        // trucks reads the list by kind, and a garage with only vehicles sees no difference.
         var assets = await query
             .OrderByDescending(a => a.IsActive)
+            .ThenBy(a => a.AssetType!.Name)
             .ThenBy(a => a.Label)
             .ToListAsync(ct);
 
@@ -70,13 +74,14 @@ public class ClientAssetsController(VextaDbContext db, ICurrentUserService curre
         {
             return BadRequest(new { message = AddressMissing });
         }
+        if (await UnknownTypeAsync(request.AssetTypeId, ct)) return BadRequest(new { message = TypeMissing });
 
         var asset = new ClientAsset
         {
             TenantId = tenantId,
             ClientId = clientId,
             Label = request.Label.Trim(),
-            Category = Clean(request.Category),
+            AssetTypeId = request.AssetTypeId,
             Make = Clean(request.Make),
             Model = Clean(request.Model),
             Year = request.Year,
@@ -111,9 +116,10 @@ public class ClientAssetsController(VextaDbContext db, ICurrentUserService curre
         {
             return BadRequest(new { message = AddressMissing });
         }
+        if (await UnknownTypeAsync(request.AssetTypeId, ct)) return BadRequest(new { message = TypeMissing });
 
         asset.Label = request.Label.Trim();
-        asset.Category = Clean(request.Category);
+        asset.AssetTypeId = request.AssetTypeId;
         asset.Make = Clean(request.Make);
         asset.Model = Clean(request.Model);
         asset.Year = request.Year;
@@ -145,10 +151,12 @@ public class ClientAssetsController(VextaDbContext db, ICurrentUserService curre
     }
 
     private const string AddressMissing = "Cette adresse n'appartient pas à ce client.";
+    private const string TypeMissing = "Ce type d'actif n'existe pas.";
 
     private Task<ClientAsset?> LoadAsync(Guid clientId, Guid id, CancellationToken ct) =>
         db.ClientAssets
             .Include(a => a.Address)
+            .Include(a => a.AssetType)
             .FirstOrDefaultAsync(a => a.Id == id && a.ClientId == clientId, ct);
 
     /// <summary>
@@ -158,12 +166,18 @@ public class ClientAssetsController(VextaDbContext db, ICurrentUserService curre
     private async Task<bool> UnknownAddressAsync(Guid clientId, Guid? addressId, CancellationToken ct) =>
         addressId is { } id && !await db.Addresses.AnyAsync(a => a.Id == id && a.ClientId == clientId, ct);
 
+    /// <summary>The query filter keeps this to the company's own list, so existence is enough.</summary>
+    private async Task<bool> UnknownTypeAsync(Guid? typeId, CancellationToken ct) =>
+        typeId is { } id && !await db.ClientAssetTypes.AnyAsync(t => t.Id == id, ct);
+
     private static ClientAssetDto Map(ClientAsset a) =>
         new(
             a.Id,
             a.Label,
             a.Designation,
-            a.Category,
+            a.AssetTypeId,
+            a.AssetType?.Name,
+            a.AssetType?.Icon,
             a.Make,
             a.Model,
             a.Year,
@@ -187,7 +201,6 @@ public class ClientAssetsController(VextaDbContext db, ICurrentUserService curre
     {
         if (string.IsNullOrWhiteSpace(r.Label)) return "Le nom est obligatoire.";
         if (r.Label.Trim().Length > 200) return "Le nom ne peut pas dépasser 200 caractères.";
-        if (r.Category?.Trim().Length > 60) return "La catégorie est trop longue.";
         if (r.Make?.Trim().Length > 80 || r.Model?.Trim().Length > 80) return "80 caractères maximum.";
         if (r.SerialNumber?.Trim().Length > 80) return "Le numéro de série est trop long.";
         if (r.Reference?.Trim().Length > 60) return "La référence est trop longue.";

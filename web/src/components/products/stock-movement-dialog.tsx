@@ -22,6 +22,7 @@ import { parseDecimal, quantity } from "@/components/products/product-format";
 import { RequiredMark } from "@/components/ui/required-mark";
 import { useAddProductStock } from "@/hooks/use-products";
 import { ApiError } from "@/lib/api";
+import { ex } from "@/lib/placeholders";
 
 const formSchema = z.object({
   quantityChange: z.string().trim().min(1, "Indiquez une quantité."),
@@ -115,7 +116,7 @@ export function StockMovementDialog({
                     {...field}
                     id="stock-change"
                     inputMode="text"
-                    placeholder="6"
+                    placeholder={ex("6")}
                     aria-invalid={fieldState.invalid}
                     aria-required="true"
                   />
@@ -139,7 +140,7 @@ export function StockMovementDialog({
                   <Input
                     {...field}
                     id="stock-reason"
-                    placeholder="Réception Patrick Morin"
+                    placeholder={ex("Réception Patrick Morin")}
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid ? (

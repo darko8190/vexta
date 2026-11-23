@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { use, useState } from "react";
 import Link from "next/link";
@@ -39,6 +39,7 @@ import {
 } from "@/components/clients/detail/client-related-lists";
 import { useIsOwner } from "@/hooks/use-can-create";
 import { useClientQuery } from "@/hooks/use-clients";
+import { clientStatusBadge } from "@/lib/labels";
 import { formatAmount } from "@/lib/money";
 import { formatClientNumber } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -111,12 +112,19 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
               <Badge variant={client.type === "Entreprise" ? "default" : "secondary"}>
                 {client.type === "Entreprise" ? "Entreprise" : "Particulier"}
               </Badge>
+              {/* Prospect, client, ancien client — or Banni when the lock is closed, which is
+                  the one case where the state on screen is not the state in the column. */}
+              {!client.isBlocked && (
+                <Badge variant={clientStatusBadge(client).variant}>
+                  {clientStatusBadge(client).label}
+                </Badge>
+              )}
               {client.isTaxExempt && <Badge variant="outline">Non taxable</Badge>}
               {/* Leading the card, because it changes what every button below it will do. */}
               {client.isBlocked && (
                 <Badge variant="destructive">
                   <Lock />
-                  Bloqué
+                  Banni
                 </Badge>
               )}
               {!client.isBlocked && client.isAccountBlocked && (

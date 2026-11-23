@@ -17,6 +17,7 @@ import { useAuth } from "@/lib/auth-context";
 import { usePublicPlansQuery } from "@/hooks/use-catalog";
 import { formatCents } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { ex } from "@/lib/placeholders";
 
 const formSchema = z
   .object({
@@ -180,7 +181,7 @@ function CompanyStep() {
                     {...field}
                     id="company-name"
                     autoFocus
-                    placeholder="Acme inc."
+                    placeholder={ex("Acme inc.")}
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}

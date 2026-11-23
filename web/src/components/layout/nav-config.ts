@@ -1,14 +1,18 @@
-import {
+﻿import {
   Blocks,
   Boxes,
   ChartBar,
   Building2,
+  CalendarClock,
   FileText,
   FolderKanban,
   GraduationCap,
   LayoutDashboard,
+  ListChecks,
   Palette,
+  Receipt,
   Settings,
+  ShoppingCart,
   Tag,
   Users,
   UsersRound,
@@ -35,9 +39,17 @@ export const dashboardNavItem: NavItem = {
 
 const tenantNav: NavItem[] = [
   dashboardNavItem,
+  // The two an employee opens first, and the only two that are about them rather than about the
+  // company. High on the list on purpose: for most of the payroll, these are the application.
+  { href: "/mes-feuilles-de-temps", label: "Mes feuilles de temps", icon: CalendarClock },
+  { href: "/mes-assignations", label: "Mes assignations", icon: ListChecks },
   { href: "/clients", label: "Clients", icon: Users },
   { href: "/projets", label: "Projets", icon: FolderKanban },
   { href: "/factures", label: "Factures", icon: FileText },
+  // Money going out, under the heading it will grow into: purchase orders and suppliers belong
+  // beside the expenses, and putting Dépenses at the top level would have to move later.
+  { href: "/achats", label: "Achats", icon: ShoppingCart },
+  { href: "/achats/depenses", label: "Dépenses", icon: Receipt, depth: 1 },
   { href: "/inventaire", label: "Inventaire", icon: Boxes },
   { href: "/outils", label: "Outils & Formation", icon: GraduationCap },
   // In the built-in menu too, not only as a module: a company whose plan defines no modules

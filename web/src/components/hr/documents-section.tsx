@@ -33,6 +33,7 @@ import { useTeamQuery } from "@/hooks/use-team";
 import { useMediaLink, useUploadMedia } from "@/hooks/use-media";
 import { ApiError } from "@/lib/api";
 import type { HrDocument } from "@/lib/types";
+import { ex } from "@/lib/placeholders";
 
 const WHOLE_COMPANY = "entreprise";
 
@@ -144,7 +145,7 @@ function UploadSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (ope
               id="document-title"
               value={title}
               onChange={(event) => setTitle(event.target.value)}
-              placeholder="Contrat de travail"
+              placeholder={ex("Contrat de travail")}
             />
           </Field>
 
@@ -154,7 +155,7 @@ function UploadSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (ope
               id="document-category"
               value={category}
               onChange={(event) => setCategory(event.target.value)}
-              placeholder="Contrat"
+              placeholder={ex("Contrat")}
             />
           </Field>
 

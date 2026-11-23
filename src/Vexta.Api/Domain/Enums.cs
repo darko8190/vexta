@@ -131,3 +131,29 @@ public enum EmploymentType
     Saisonnier = 3,
     Stage = 4
 }
+
+/// <summary>
+/// Where a client stands with the company. Not what they may do — that is the lock on the
+/// record (see <see cref="Client.IsBlocked"/>) — but who they are to the business today.
+///
+/// Banni is deliberately absent. Barring a client is already one switch, and a second one in
+/// this column could only ever disagree with it: a status reading "Client" on a barred record,
+/// or "Banni" on one that still takes work. A barred client is shown as banni and the lock
+/// stays the only fact.
+///
+/// Client is 1 and the stored default, so every record that existed before this column is what
+/// it always was. Prospect has to be chosen.
+/// </summary>
+public enum ClientStatus
+{
+    /// <summary>Quoted, not yet sold. Work and invoices are allowed: that is how you sell them.</summary>
+    Prospect = 0,
+
+    Client = 1,
+
+    /// <summary>
+    /// Gone quiet or gone elsewhere. Nothing is refused — an ancien client who calls back is a
+    /// client again, and a refusal would be the wrong answer to that phone call.
+    /// </summary>
+    Ancien = 2
+}

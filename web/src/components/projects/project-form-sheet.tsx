@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
 import { AddressPicker } from "@/components/addresses/address-picker";
+import { ClientAssetPicker } from "@/components/assets/client-asset-picker";
 import { ClientPicker } from "@/components/clients/client-picker";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FieldDescription } from "@/components/ui/field";
@@ -34,6 +35,7 @@ import { projectStatusLabels } from "@/lib/labels";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { formatProjectNumber, type PricePolicy, type ProjectRecord, type ProjectStatus } from "@/lib/types";
+import { ex } from "@/lib/placeholders";
 
 const statuses = Object.keys(projectStatusLabels) as ProjectStatus[];
 
@@ -53,6 +55,7 @@ const formSchema = z.object({
   budget: z.string().optional().or(z.literal("")),
   isTaxExempt: z.boolean(),
   pricePolicyId: z.string().optional().or(z.literal("")),
+  clientAssetId: z.string().optional().or(z.literal("")),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -79,6 +82,7 @@ function toFormValues(project?: ProjectRecord, defaultClientId?: string): FormVa
     budget: project?.budget != null ? String(project.budget) : "",
     isTaxExempt: project?.isTaxExempt ?? false,
     pricePolicyId: project?.pricePolicyId ?? "",
+    clientAssetId: project?.clientAssetId ?? "",
   };
 }
 
@@ -103,6 +107,7 @@ function storedValues(project: ProjectRecord): ProjectFormValues {
     budget: project.budget,
     isTaxExempt: project.isTaxExempt,
     pricePolicyId: project.pricePolicyId,
+    clientAssetId: project.clientAssetId,
   };
 }
 
@@ -148,6 +153,7 @@ export function ProjectFormSheet({
       budget: values.budget ? Number(values.budget) : null,
       isTaxExempt: values.isTaxExempt,
       pricePolicyId: values.pricePolicyId || null,
+      clientAssetId: values.clientAssetId || null,
     };
 
     try {
@@ -275,6 +281,10 @@ export function ProjectFormSheet({
                       // did not, it would print the wrong street on the invoice.
                       form.setValue("clientAddressId", "");
                       form.setValue("siteAddressId", "");
+                      // The asset belonged to the client being replaced. The server refuses
+                      // another client's asset, and if it did not, this job would carry
+                      // somebody else's truck on its paperwork.
+                      form.setValue("clientAssetId", "");
                     }}
                     invalid={fieldState.invalid}
                   />
@@ -291,6 +301,26 @@ export function ProjectFormSheet({
                 <Field>
                   <FieldLabel htmlFor="project-description">Description</FieldLabel>
                   <Textarea {...field} id="project-description" rows={3} />
+                </Field>
+              )}
+            />
+
+            <Controller
+              name="clientAssetId"
+              control={form.control}
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel htmlFor="project-asset">Actif</FieldLabel>
+                  <ClientAssetPicker
+                    id="project-asset"
+                    clientId={clientId}
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                  />
+                  <FieldDescription>
+                    Ce sur quoi vous travaillez : le véhicule, le bâtiment, l&apos;appareil. Si
+                    le client ne l&apos;a pas encore, ajoutez-le d&apos;ici.
+                  </FieldDescription>
                 </Field>
               )}
             />
@@ -362,7 +392,7 @@ export function ProjectFormSheet({
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor="project-po">Numéro de PO</FieldLabel>
-                  <Input {...field} id="project-po" placeholder="PO-4471" aria-invalid={fieldState.invalid} />
+                  <Input {...field} id="project-po" placeholder={ex("PO-4471")} aria-invalid={fieldState.invalid} />
                   {fieldState.invalid ? (
                     <FieldError errors={[fieldState.error]} />
                   ) : (

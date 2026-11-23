@@ -41,6 +41,16 @@ public class Project
     public Guid? PricePolicyId { get; set; }
     public PricePolicy? PricePolicy { get; set; }
 
+    /// <summary>
+    /// Which of the client's assets the work is on: the car in the bay, the building being
+    /// reroofed, the furnace being serviced. Null for a job that is about no one thing.
+    ///
+    /// SetNull on delete: removing a car from a client's file must not delete the record of the
+    /// work that was done on it.
+    /// </summary>
+    public Guid? ClientAssetId { get; set; }
+    public ClientAsset? ClientAsset { get; set; }
+
     /// <summary>Which of the client's addresses to bill. Null when none is on file yet.</summary>
     public Guid? ClientAddressId { get; set; }
     public Address? ClientAddress { get; set; }

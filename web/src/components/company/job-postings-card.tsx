@@ -39,6 +39,7 @@ import { useDeleteJobPosting, useJobPostingsQuery, useSaveJobPosting } from "@/h
 import { ApiError } from "@/lib/api";
 import { employmentTypeLabels } from "@/lib/labels";
 import type { EmploymentType, JobPosting } from "@/lib/types";
+import { ex } from "@/lib/placeholders";
 
 const employmentTypes: EmploymentType[] = ["TempsPlein", "TempsPartiel", "Contrat", "Saisonnier", "Stage"];
 
@@ -147,7 +148,7 @@ function JobFormSheet({
                   <Input
                     {...field}
                     id="job-title"
-                    placeholder="Charpentier-menuisier"
+                    placeholder={ex("Charpentier-menuisier")}
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -165,7 +166,7 @@ function JobFormSheet({
                     {...field}
                     id="job-description"
                     rows={5}
-                    placeholder="Les tâches, l'expérience demandée, ce que vous offrez."
+                    placeholder={ex("Les tâches, l'expérience demandée, ce que vous offrez.")}
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -183,7 +184,7 @@ function JobFormSheet({
                     <Input
                       {...field}
                       id="job-location"
-                      placeholder="Québec et environs"
+                      placeholder={ex("Québec et environs")}
                       aria-invalid={fieldState.invalid}
                     />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -227,7 +228,7 @@ function JobFormSheet({
                   <Input
                     {...field}
                     id="job-compensation"
-                    placeholder="28 à 34 $/h"
+                    placeholder={ex("28 à 34 $/h")}
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid ? (
@@ -248,7 +249,7 @@ function JobFormSheet({
                   <Input
                     {...field}
                     id="job-apply"
-                    placeholder="emplois@entreprise.ca ou 418 555-0100"
+                    placeholder={ex("emplois@entreprise.ca ou 418 555-0100")}
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}

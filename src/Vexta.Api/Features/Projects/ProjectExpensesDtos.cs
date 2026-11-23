@@ -1,4 +1,34 @@
-namespace Vexta.Api.Features.Projects;
+﻿namespace Vexta.Api.Features.Projects;
+
+// ---- Lecture d'un reçu ----
+
+/// <param name="MediaAssetId">A photograph or PDF already attached to this expense.</param>
+public record ReadReceiptRequest(Guid MediaAssetId);
+
+/// <summary>
+/// What a model read off a receipt, for the form to fill in.
+///
+/// Nothing here is saved. It is a suggestion the person looks at and accepts or corrects — a
+/// receipt read wrong and filed silently ends up on a client's invoice.
+/// </summary>
+public record ReceiptReadingDto(
+    bool Found,
+    /// <summary>Why nothing came back, or null when the reading speaks for itself.</summary>
+    string? Message,
+    /// <summary>Scans left in the month's allowance.</summary>
+    int Remaining,
+    string? Supplier,
+    decimal? Total,
+    decimal? Gst,
+    decimal? Qst,
+    DateOnly? SpentOn,
+    string? InvoiceNumber);
+
+/// <summary>
+/// Whether the button is worth offering: the platform has a key, and the company has scans
+/// left. Asked before a photograph is attached, so the form knows what to show.
+/// </summary>
+public record ReceiptScanAvailabilityDto(bool Available, int Remaining, int Allowance);
 
 /// <summary>One of the company's expense categories, as the dropdown lists it.</summary>
 public record ExpenseTypeDto(Guid Id, string Name, int ExpenseCount);

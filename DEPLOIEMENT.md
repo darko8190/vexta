@@ -701,6 +701,56 @@ Qui fait quoi : tout le monde lit et remplit (c'est fait sur le chantier) ; l'ad
 le chargé de projet montent les formulaires ; seul l'administrateur supprime une réponse ou un
 formulaire.
 
+### Lecture des reçus (IA)
+
+Dans l'onglet **Dépenses** d'un projet, une fois une photo jointe, un bouton **Lire le reçu**
+remplit le fournisseur, le montant et la date à partir de l'image. Il lit aussi la TPS, la TVQ
+et le numéro de facture, qui n'ont pas encore de champ dans le formulaire.
+
+**Rien n'est enregistré par la lecture.** Elle remplit le formulaire que la personne est déjà en
+train de remplir, et seulement les champs restés vides — quelqu'un qui a déjà tapé le total
+n'est pas corrigé par une machine. Elle enregistre ensuite elle-même, après avoir regardé. Un
+reçu lu de travers et classé en silence finit sur la facture d'un client, et c'est l'entreprise
+qui répond au téléphone.
+
+Les PDF sont acceptés autant que les photos : les fournisseurs envoient les deux.
+
+#### Ce qu'il faut configurer
+
+1. **La clé**, dans **Intégrations → Lecture de reçus**. Elle se crée sur
+   `console.anthropic.com` et se range chiffrée en base comme les autres, jamais dans
+   l'environnement.
+2. **Le quota, sur chaque forfait** : le champ *Lectures de reçus par mois*. **Tous les forfaits
+   existants sont à zéro** — la migration ne l'a allumé pour personne, parce que c'est la seule
+   chose ici qui se facture à l'usage et que l'allumer sans demander mettrait la facture d'API
+   de quelqu'un d'autre sur la plateforme. Zéro retire la fonction : le bouton n'apparaît pas,
+   plutôt que d'apparaître et de refuser.
+
+Un locataire sans forfait — ceux créés à la main — obtient 100 lectures par mois.
+
+#### Ce que ça coûte
+
+Environ **deux cents par reçu** : une photo de téléphone fait à peu près 2 000 jetons d'entrée,
+et la réponse quelques centaines de jetons de sortie. Cent reçus par mois, c'est deux dollars.
+
+Chaque lecture laisse une ligne dans `ReceiptScans` avec son nombre de jetons et le modèle
+utilisé, de sorte que « pourquoi ça coûte ça » ait une réponse qui n'est pas une estimation. Le
+compteur du mois est un `SELECT count(*)` sur cette table et non une colonne entretenue à côté :
+un compteur stocké et une liste de lignes sont deux choses qui doivent concorder, et un mois
+elles ne concorderont plus.
+
+Le modèle est `claude-opus-5-5`, parce qu'un reçu est une lecture difficile — papier froissé,
+impression thermique effacée, photo prise de travers — et qu'un total lu de travers est pire
+qu'un champ vide. `claude-haiku-5-5` est un changement d'une ligne dans `ReceiptScanner` et
+coûte environ quarante fois moins ; c'est un vrai compromis, il lira bien une facture de
+fournisseur propre et perdra davantage de reçus chiffonnés.
+
+#### Ce qui part chez Anthropic
+
+L'image du reçu et les consignes de lecture. Rien d'autre : ni le nom du client, ni celui du
+projet, ni le nom de l'entreprise, ni l'adresse de qui que ce soit. La requête est une image et
+une phrase.
+
 ### Fuseau horaire et langue
 
 L'API décide de « aujourd'hui » dans le fuseau de l'entreprise (`America/Toronto`), jamais dans

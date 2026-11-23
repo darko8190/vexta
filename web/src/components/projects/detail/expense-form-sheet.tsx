@@ -1,10 +1,10 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
 import * as z from "zod";
-import { ImagePlus, Plus, X } from "lucide-react";
+import { ImagePlus, Plus, ScanText, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -29,6 +29,7 @@ import {
   useSaveExpense,
 } from "@/hooks/use-expenses";
 import { useUploadMedia, MAX_UPLOAD_BYTES } from "@/hooks/use-media";
+import { useReceiptScanAvailabilityQuery, useScanReceipt } from "@/hooks/use-receipt-scan";
 import { ApiError } from "@/lib/api";
 import type { ProjectExpense } from "@/lib/types";
 import { ex } from "@/lib/placeholders";
@@ -82,6 +83,8 @@ export function ExpenseFormSheet({
   const isEditing = Boolean(expense);
   const save = useSaveExpense(projectId);
   const upload = useUploadMedia();
+  const { data: scanning } = useReceiptScanAvailabilityQuery(projectId);
+  const scan = useScanReceipt(projectId);
   const { data: types, isLoading: typesLoading } = useExpenseTypesQuery();
   const createType = useCreateExpenseType();
 
@@ -166,6 +169,50 @@ export function ExpenseFormSheet({
             : `Impossible de téléverser ${file.name}.`,
         );
       }
+    }
+  }
+
+  /**
+   * Reads the first attached receipt and fills in what it found.
+   *
+   * Only empty fields are filled. Somebody who has already typed the total is not corrected by
+   * a machine — and the one case where the reading is certainly worth less than what is on
+   * screen is the case where a person has already looked at the paper.
+   */
+  async function onScan() {
+    const first = attachments[0];
+    if (!first) return;
+
+    try {
+      const reading = await scan.mutateAsync(first.mediaAssetId);
+
+      if (!reading.found) {
+        toast.error(reading.message ?? "Rien n'a pu être lu sur ce reçu.");
+        return;
+      }
+
+      const filled: string[] = [];
+
+      function fill(name: "name" | "cost" | "spentOn", value: string | null, label: string) {
+        if (!value) return;
+        if (form.getValues(name).trim().length > 0) return;
+        form.setValue(name, value, { shouldValidate: true });
+        filled.push(label);
+      }
+
+      fill("name", reading.supplier, "le fournisseur");
+      // Two decimals and a comma, which is how the field is typed here.
+      fill("cost", reading.total == null ? null : reading.total.toFixed(2).replace(".", ","), "le montant");
+      fill("spentOn", reading.spentOn, "la date");
+
+      toast.success(
+        filled.length === 0
+          ? "Le reçu est lu, mais les champs sont déjà remplis."
+          : `Lu sur le reçu : ${filled.join(", ")}. Vérifiez avant d'enregistrer.`,
+        { description: `${reading.remaining} lecture(s) restante(s) ce mois-ci.` },
+      );
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "La lecture a échoué.");
     }
   }
 
@@ -453,17 +500,38 @@ export function ExpenseFormSheet({
                 </ul>
               )}
 
-              <Button
-                type="button"
-                variant="outline"
-                disabled={upload.isPending || photosLoading}
-                onClick={() => fileInput.current?.click()}
-              >
-                {upload.isPending || photosLoading ? <Spinner /> : <ImagePlus />}
-                Ajouter des photos
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={upload.isPending || photosLoading}
+                  onClick={() => fileInput.current?.click()}
+                >
+                  {upload.isPending || photosLoading ? <Spinner /> : <ImagePlus />}
+                  Ajouter des photos
+                </Button>
+
+                {/* Offered only when there is something to read and a scan left to read it
+                    with. A button that explains why it cannot work is still a button that
+                    cannot work. */}
+                {scanning?.available && attachments.length > 0 && (
+                  <Button type="button" variant="outline" disabled={scan.isPending} onClick={onScan}>
+                    {scan.isPending ? <Spinner /> : <ScanText />}
+                    Lire le reçu
+                  </Button>
+                )}
+              </div>
+
               <FieldDescription>
                 La photo du reçu, prise sur place. Elle reste aussi dans votre bibliothèque.
+                {scanning?.available && (
+                  <>
+                    {" "}
+                    « Lire le reçu » remplit le fournisseur, le montant et la date à partir de la
+                    première photo — à vérifier avant d&apos;enregistrer. Il vous reste{" "}
+                    {scanning.remaining} lecture(s) ce mois-ci.
+                  </>
+                )}
               </FieldDescription>
             </Field>
           </FieldGroup>

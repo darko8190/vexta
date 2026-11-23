@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+﻿import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { PlatformSettings } from "@/lib/types";
 
@@ -17,6 +17,8 @@ export interface UpdatePlatformSettingsValues {
   r2Bucket?: string;
   /** An empty string clears it; omitting it leaves the stored value alone. */
   r2PublicBaseUrl?: string;
+  /** Reads a photographed receipt. The one key that is billed per use. */
+  anthropicApiKey?: string;
 }
 
 export function usePlatformSettingsQuery() {

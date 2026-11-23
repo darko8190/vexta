@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Vexta.Api.Auth;
 using Vexta.Api.Domain;
@@ -31,7 +31,8 @@ public class SettingsController(
             PlatformSettingKeys.R2AccessKeyId,
             PlatformSettingKeys.R2SecretAccessKey,
             PlatformSettingKeys.R2Bucket,
-            PlatformSettingKeys.R2PublicBaseUrl
+            PlatformSettingKeys.R2PublicBaseUrl,
+            PlatformSettingKeys.AnthropicApiKey
         ]);
 
 
@@ -51,7 +52,8 @@ public class SettingsController(
                 && HasValue(PlatformSettingKeys.R2Bucket),
             R2AccountId: values[PlatformSettingKeys.R2AccountId],
             R2Bucket: values[PlatformSettingKeys.R2Bucket],
-            R2PublicBaseUrl: values[PlatformSettingKeys.R2PublicBaseUrl]));
+            R2PublicBaseUrl: values[PlatformSettingKeys.R2PublicBaseUrl],
+            AnthropicConfigured: HasValue(PlatformSettingKeys.AnthropicApiKey)));
     }
 
     [HttpPut]
@@ -71,7 +73,8 @@ public class SettingsController(
             [PlatformSettingKeys.R2AccessKeyId] = request.R2AccessKeyId,
             [PlatformSettingKeys.R2SecretAccessKey] = request.R2SecretAccessKey,
             [PlatformSettingKeys.R2Bucket] = request.R2Bucket,
-            [PlatformSettingKeys.R2PublicBaseUrl] = request.R2PublicBaseUrl
+            [PlatformSettingKeys.R2PublicBaseUrl] = request.R2PublicBaseUrl,
+            [PlatformSettingKeys.AnthropicApiKey] = request.AnthropicApiKey
         });
 
         if (request.R2PublicBaseUrl is not null && request.R2PublicBaseUrl.Length == 0)

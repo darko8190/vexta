@@ -24,8 +24,53 @@ namespace Vexta.Api.Features.Projects;
 public class ProjectExpensesController(
     VextaDbContext db,
     ICurrentUserService currentUser,
-    IR2StorageService storage) : ControllerBase
+    IR2StorageService storage,
+    IReceiptScanner receipts) : ControllerBase
 {
+    /// <summary>
+    /// Whether to offer the "lire le reçu" button, asked when the panel opens.
+    ///
+    /// Its own call rather than a flag on the expense list: the answer changes as scans are
+    /// spent, and it is about the company and the platform rather than about this project.
+    /// </summary>
+    [HttpGet("lecture-recu")]
+    public async Task<ActionResult<ReceiptScanAvailabilityDto>> ScanAvailability(CancellationToken ct)
+    {
+        var state = await receipts.AvailabilityAsync(ct);
+        return Ok(new ReceiptScanAvailabilityDto(state.Available, state.Remaining, state.Allowance));
+    }
+
+    /// <summary>
+    /// Reads a receipt already attached to this expense and hands the figures back to the form.
+    ///
+    /// Saves nothing. The person sees what was read, in the fields they were about to type, and
+    /// decides — because a receipt read wrong and filed silently ends up on a client's invoice,
+    /// and it is the company that answers the telephone about it.
+    ///
+    /// Always 200, even when nothing could be read: the message is part of the answer, and a
+    /// 400 in front of somebody holding a receipt is a dead end rather than an instruction.
+    /// </summary>
+    [HttpPost("lecture-recu")]
+    [RequireBusinessTenant]
+    public async Task<ActionResult<ReceiptReadingDto>> ReadReceipt(
+        Guid projectId, ReadReceiptRequest request, CancellationToken ct)
+    {
+        if (!await db.Projects.AnyAsync(p => p.Id == projectId, ct)) return NotFound();
+
+        var result = await receipts.ReadAsync(request.MediaAssetId, ct);
+
+        return Ok(new ReceiptReadingDto(
+            Found: result.Reading is not null,
+            Message: result.Message,
+            Remaining: result.Remaining,
+            Supplier: result.Reading?.Supplier,
+            Total: result.Reading?.Total,
+            Gst: result.Reading?.Gst,
+            Qst: result.Reading?.Qst,
+            SpentOn: result.Reading?.SpentOn,
+            InvoiceNumber: result.Reading?.InvoiceNumber));
+    }
+
     [HttpGet]
     public async Task<ActionResult<List<ProjectExpenseDto>>> List(Guid projectId, CancellationToken ct)
     {

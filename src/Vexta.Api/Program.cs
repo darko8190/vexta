@@ -81,6 +81,7 @@ builder.Services.AddScoped<IInvoicePdfService, InvoicePdfService>();
 builder.Services.AddScoped<IPasswordResetService, PasswordResetService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IFormActionRunner, FormActionRunner>();
+builder.Services.AddScoped<IReceiptScanner, ReceiptScanner>();
 
 builder.Services
     .AddIdentityCore<ApplicationUser>(options =>

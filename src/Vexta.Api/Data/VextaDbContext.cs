@@ -78,6 +78,7 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
     public DbSet<FormAction> FormActions => Set<FormAction>();
     public DbSet<FormSubmission> FormSubmissions => Set<FormSubmission>();
     public DbSet<FormAnswer> FormAnswers => Set<FormAnswer>();
+    public DbSet<ReceiptScan> ReceiptScans => Set<ReceiptScan>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -338,6 +339,22 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             // two people filing the same thing in two places.
             e.HasIndex(t => new { t.TenantId, t.Name }).IsUnique();
             e.HasQueryFilter(t => t.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<ReceiptScan>(e =>
+        {
+            // SetNull: deleting the photograph must not erase the fact that a scan was spent on
+            // it. The month's count is what the allowance is enforced against, and a count that
+            // falls when somebody tidies up their receipts is a count that can be gamed.
+            e.HasOne(s => s.MediaAsset).WithMany()
+                .HasForeignKey(s => s.MediaAssetId).OnDelete(DeleteBehavior.SetNull);
+
+            e.Property(s => s.Model).HasMaxLength(60);
+
+            // The one index that matters: the allowance is "how many this tenant this month".
+            e.HasIndex(s => new { s.TenantId, s.CreatedAt });
+
+            e.HasQueryFilter(s => s.TenantId == CurrentTenantId);
         });
 
         builder.Entity<ClientAssetType>(e =>

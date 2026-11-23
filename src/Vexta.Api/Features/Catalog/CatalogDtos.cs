@@ -1,4 +1,4 @@
-namespace Vexta.Api.Features.Catalog;
+﻿namespace Vexta.Api.Features.Catalog;
 
 public record ModuleDto(
     Guid Id,
@@ -22,6 +22,11 @@ public record PlanDto(
     int MinUsers,
     /// <summary>Seats the plan allows, the owner included. This one is enforced.</summary>
     int MaxUsers,
+    /// <summary>
+    /// Receipts a month this plan may have read by a model. Zero turns the feature off, which
+    /// is the honest way to keep it out of a cheap tier.
+    /// </summary>
+    int MonthlyReceiptScans,
     bool IsPublished,
     int SortOrder,
     /// <summary>Null when Stripe could not be reached: such a plan cannot be published.</summary>
@@ -60,4 +65,6 @@ public record SavePlanRequest(
     int MaxUsers,
     int SortOrder,
     bool IsPublished,
-    IReadOnlyList<Guid> ModuleIds);
+    IReadOnlyList<Guid> ModuleIds,
+    /// <summary>Defaults to 100 when a caller says nothing, like the column itself.</summary>
+    int MonthlyReceiptScans = 100);

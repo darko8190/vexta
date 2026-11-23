@@ -1,4 +1,4 @@
-namespace Vexta.Api.Features.Settings;
+﻿namespace Vexta.Api.Features.Settings;
 
 public record PlatformSettingsDto(
     bool MailgunConfigured,
@@ -11,7 +11,12 @@ public record PlatformSettingsDto(
     bool R2Configured,
     string? R2AccountId,
     string? R2Bucket,
-    string? R2PublicBaseUrl);
+    string? R2PublicBaseUrl,
+    /// <summary>
+    /// The one integration billed per use rather than per month. Reads the receipts
+    /// photographed against an expense; how many a company gets is set on its plan.
+    /// </summary>
+    bool AnthropicConfigured);
 
 // Secret fields left null/blank are not overwritten, so the UI can show masked fields without resending them.
 public record UpdatePlatformSettingsRequest(
@@ -29,7 +34,8 @@ public record UpdatePlatformSettingsRequest(
     string? R2Bucket,
     // An empty string clears the public base URL; null leaves it untouched. It is the one field
     // a deployment may legitimately want to empty, when moving to a private bucket.
-    string? R2PublicBaseUrl);
+    string? R2PublicBaseUrl,
+    string? AnthropicApiKey = null);
 
 
 /// <summary>

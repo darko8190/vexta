@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+﻿import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { ModuleRecord, PlanRecord, PublicPlan } from "@/lib/types";
 
@@ -31,6 +31,8 @@ export interface SavePlanValues {
   amountCents: number;
   minUsers: number;
   maxUsers: number;
+  /** Receipts a month this plan may have read by a model. Zero turns the feature off. */
+  monthlyReceiptScans: number;
   sortOrder: number;
   isPublished: boolean;
   moduleIds: string[];

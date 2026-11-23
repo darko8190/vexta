@@ -1,4 +1,4 @@
-namespace Vexta.Api.Domain;
+﻿namespace Vexta.Api.Domain;
 
 /// <summary>
 /// A subscription tier the super admin publishes. The amount here is what the public site shows;
@@ -35,6 +35,20 @@ public class Plan
     /// 6 is a promise nobody made.
     /// </summary>
     public int MaxUsers { get; set; } = 1;
+
+    /// <summary>
+    /// How many receipts this plan's tenants may have read by a model each month.
+    ///
+    /// The only metered thing Vexta sells, so it is sold rather than given: a scan costs real
+    /// money per use (see <see cref="ReceiptScan"/>), and an unlimited allowance is a bill that
+    /// grows with somebody else's habits. Zero turns the feature off for the plan, which is the
+    /// honest way to offer it on a cheap tier rather than letting people find a refusal.
+    ///
+    /// 100 on a new plan, which is a month of receipts for a small crew and a few dollars.
+    /// Plans that existed before the column were set to zero rather than switched on behind
+    /// their owner's back — see the AddReceiptScans migration.
+    /// </summary>
+    public int MonthlyReceiptScans { get; set; } = 100;
 
     public bool IsPublished { get; set; }
     public int SortOrder { get; set; }

@@ -201,6 +201,9 @@ public class TenantsController(
 
             // A submission points at the client it created, and an answer at its question, so
             // the four tables come down innermost first.
+            // Before the media assets they point at, which cascade with the tenant.
+            await Wipe(db.ReceiptScans.Where(x => x.TenantId == id));
+
             await Wipe(db.FormAnswers.Where(x => x.TenantId == id));
             await Wipe(db.FormSubmissions.Where(x => x.TenantId == id));
             await Wipe(db.FormActions.Where(x => x.TenantId == id));

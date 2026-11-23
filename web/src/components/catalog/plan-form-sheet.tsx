@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -51,6 +51,13 @@ const formSchema = z.object({
     .refine((v) => (parseAmountToCents(v) ?? 0) <= MAX_CENTS, "Le tarif maximum est de 100 000 $."),
   minUsers: seatField,
   maxUsers: seatField,
+  // Zero is allowed here and nowhere else in this form: it is how a plan says the feature is
+  // not included at all, which is the honest answer on a cheap tier.
+  monthlyReceiptScans: z
+    .string()
+    .trim()
+    .regex(/^\d{1,5}$/, "Entrez un nombre entre 0 et 10 000.")
+    .refine((v) => Number(v) <= 10_000, "Dix mille lectures par mois, c'est déjà beaucoup."),
   // A string for the same reason as the amount: coercion breaks the resolver's typing.
   sortOrder: z.string().trim().regex(/^\d{1,3}$/, "Entrez un nombre entre 0 et 999."),
   isPublished: z.boolean(),
@@ -73,6 +80,9 @@ function toFormValues(plan?: PlanRecord): FormValues {
     amount: plan ? centsToFieldValue(plan.amountCents) : "",
     minUsers: String(plan?.minUsers ?? 1),
     maxUsers: String(plan?.maxUsers ?? 1),
+    // 100 on a new plan, and whatever the plan says on an existing one — including the zero
+    // every plan was given when the column arrived.
+    monthlyReceiptScans: String(plan?.monthlyReceiptScans ?? 100),
     sortOrder: String(plan?.sortOrder ?? 0),
     isPublished: plan?.isPublished ?? false,
     moduleIds: plan?.modules.map((m) => m.id) ?? [],
@@ -114,6 +124,7 @@ export function PlanFormSheet({
           amountCents,
           minUsers: Number(values.minUsers),
           maxUsers: Number(values.maxUsers),
+          monthlyReceiptScans: Number(values.monthlyReceiptScans),
           sortOrder: Number(values.sortOrder),
           isPublished: values.isPublished,
           moduleIds: values.moduleIds,
@@ -250,6 +261,34 @@ export function PlanFormSheet({
                 entreprises déjà au-dessus gardent leurs accès jusqu&apos;à ce qu&apos;elles en retirent.
               </FieldDescription>
             </Field>
+
+            <Controller
+              name="monthlyReceiptScans"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor="plan-scans">Lectures de reçus par mois</FieldLabel>
+                  <Input
+                    {...field}
+                    id="plan-scans"
+                    inputMode="numeric"
+                    placeholder={ex("100")}
+                    aria-invalid={fieldState.invalid}
+                  />
+                  {fieldState.invalid ? (
+                    <FieldError errors={[fieldState.error]} />
+                  ) : (
+                    <FieldDescription>
+                      Combien de reçus les entreprises de ce forfait peuvent faire lire par
+                      l&apos;IA chaque mois. C&apos;est la seule chose ici qui vous coûte à
+                      l&apos;usage. <strong>0</strong> retire la fonction du forfait : le bouton
+                      n&apos;apparaît pas, plutôt que d&apos;apparaître et de refuser. Le compteur
+                      repart le 1er du mois.
+                    </FieldDescription>
+                  )}
+                </Field>
+              )}
+            />
 
             <Controller
               name="moduleIds"

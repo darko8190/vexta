@@ -1475,6 +1475,9 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<int>("MinUsers")
                         .HasColumnType("integer");
 
+                    b.Property<int>("MonthlyReceiptScans")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
@@ -2196,6 +2199,47 @@ namespace Vexta.Api.Data.Migrations
                     b.HasKey("TenantId");
 
                     b.ToTable("PublicPages");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.ReceiptScan", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("FoundSomething")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("InputTokens")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("MediaAssetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<int>("OutputTokens")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("RequestedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MediaAssetId");
+
+                    b.HasIndex("TenantId", "CreatedAt");
+
+                    b.ToTable("ReceiptScans");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.Report", b =>
@@ -3069,6 +3113,16 @@ namespace Vexta.Api.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.ReceiptScan", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.MediaAsset", "MediaAsset")
+                        .WithMany()
+                        .HasForeignKey("MediaAssetId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("MediaAsset");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.Report", b =>

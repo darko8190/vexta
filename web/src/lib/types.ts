@@ -481,6 +481,11 @@ export interface PlatformSettings {
   r2AccountId: string | null;
   r2Bucket: string | null;
   r2PublicBaseUrl: string | null;
+  /**
+   * The one integration billed per use rather than per month: it reads the receipts
+   * photographed against an expense. How many a company gets is set on its plan.
+   */
+  anthropicConfigured: boolean;
 }
 
 export interface ModuleRecord {
@@ -507,6 +512,8 @@ export interface PlanRecord {
   minUsers: number;
   /** Seats the plan allows, the owner included. This one is enforced. */
   maxUsers: number;
+  /** Receipts a month this plan may have read by a model. Zero turns the feature off. */
+  monthlyReceiptScans: number;
   isPublished: boolean;
   sortOrder: number;
   /** Null when Stripe could not be reached: such a plan cannot be published. */
@@ -1399,4 +1406,33 @@ export interface SubmitFormResult {
   submission: FormSubmissionDetail;
   successMessage: string;
   actionLog: string | null;
+}
+
+// ---- Lecture de reçus ----
+
+/**
+ * What a model read off a receipt.
+ *
+ * Nothing here is saved by the API: it fills the form the person is already in, and they
+ * decide. A receipt read wrong and filed silently ends up on a client's invoice.
+ */
+export interface ReceiptReading {
+  found: boolean;
+  /** Why nothing came back, or null when the reading speaks for itself. */
+  message: string | null;
+  /** Scans left in the month's allowance. */
+  remaining: number;
+  supplier: string | null;
+  total: number | null;
+  gst: number | null;
+  qst: number | null;
+  spentOn: string | null;
+  invoiceNumber: string | null;
+}
+
+/** Whether the button is worth offering: a key on the platform, and scans left this month. */
+export interface ReceiptScanAvailability {
+  available: boolean;
+  remaining: number;
+  allowance: number;
 }

@@ -1,4 +1,4 @@
-using Amazon.Runtime;
+﻿using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Vexta.Api.Domain;
@@ -23,6 +23,15 @@ public interface IR2StorageService
     /// short-lived signed URL, so a private bucket works without one.
     /// </summary>
     Task<string> CreateDownloadUrlAsync(string objectKey, string fileName, CancellationToken ct = default);
+
+    /// <summary>
+    /// The bytes themselves, for the rare caller that has to read a file rather than hand out a
+    /// link to it — the receipt scanner, which sends the image to a model.
+    ///
+    /// Gunzipped on the way out when the object was stored compressed, so callers get the file
+    /// as the person uploaded it and never have to know how it was kept.
+    /// </summary>
+    Task<byte[]> ReadAsync(string objectKey, CancellationToken ct = default);
 
     Task DeleteAsync(string objectKey, CancellationToken ct = default);
 
@@ -152,6 +161,34 @@ public class R2StorageService(IPlatformSettingsService settings) : IR2StorageSer
                 ContentDisposition = $"inline; filename=\"{Uri.EscapeDataString(fileName)}\""
             }
         });
+    }
+
+    public async Task<byte[]> ReadAsync(string objectKey, CancellationToken ct = default)
+    {
+        var config = await RequireConfigurationAsync(ct);
+        using var client = CreateClient(config);
+
+        using var response = await client.GetObjectAsync(
+            new GetObjectRequest { BucketName = config.Bucket, Key = objectKey }, ct);
+
+        using var buffer = new MemoryStream();
+        await response.ResponseStream.CopyToAsync(buffer, ct);
+        var bytes = buffer.ToArray();
+
+        // The browser compresses some uploads before sending them, and R2 keeps the encoding on
+        // the object. A browser inflates that on its own; a caller reading the bytes here does
+        // not, so it is done once, in the one place that knows the file was stored that way.
+        if (string.Equals(response.Headers.ContentEncoding, "gzip", StringComparison.OrdinalIgnoreCase))
+        {
+            using var compressed = new MemoryStream(bytes);
+            using var gzip = new System.IO.Compression.GZipStream(
+                compressed, System.IO.Compression.CompressionMode.Decompress);
+            using var inflated = new MemoryStream();
+            await gzip.CopyToAsync(inflated, ct);
+            return inflated.ToArray();
+        }
+
+        return bytes;
     }
 
     public async Task DeleteAsync(string objectKey, CancellationToken ct = default)

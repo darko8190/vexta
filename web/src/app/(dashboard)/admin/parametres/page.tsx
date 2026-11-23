@@ -1,7 +1,8 @@
-"use client";
+﻿"use client";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/layout/page-header";
+import { AnthropicSettingsCard } from "@/components/admin/anthropic-settings-card";
 import { MailgunSettingsCard } from "@/components/admin/mailgun-settings-card";
 import { R2SettingsCard } from "@/components/admin/r2-settings-card";
 import { StripeSettingsCard } from "@/components/admin/stripe-settings-card";
@@ -29,6 +30,7 @@ export default function PlatformSettingsPage() {
           <MailgunSettingsCard settings={data} />
           <StripeSettingsCard settings={data} />
           <R2SettingsCard settings={data} />
+          <AnthropicSettingsCard settings={data} />
         </div>
       )}
     </div>

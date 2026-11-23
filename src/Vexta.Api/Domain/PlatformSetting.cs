@@ -1,4 +1,4 @@
-namespace Vexta.Api.Domain;
+﻿namespace Vexta.Api.Domain;
 
 // Super-admin-managed global settings (Mailgun, Stripe). Value is encrypted at rest.
 public class PlatformSetting
@@ -28,4 +28,11 @@ public static class PlatformSettingKeys
     public const string R2SecretAccessKey = "R2:SecretAccessKey";
     public const string R2Bucket = "R2:Bucket";
     public const string R2PublicBaseUrl = "R2:PublicBaseUrl";
+
+    /// <summary>
+    /// Reads the receipt photographed against an expense. The only key here that is billed per
+    /// use rather than per month, which is why the plan carries an allowance and every scan is
+    /// written down — see <see cref="ReceiptScan"/>.
+    /// </summary>
+    public const string AnthropicApiKey = "Anthropic:ApiKey";
 }

@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Stripe;
@@ -53,6 +53,7 @@ public class AdminPlansController(VextaDbContext db, IStripeService stripe) : Co
             AmountCents = request.AmountCents,
             MinUsers = request.MinUsers,
             MaxUsers = request.MaxUsers,
+            MonthlyReceiptScans = request.MonthlyReceiptScans,
             SortOrder = request.SortOrder
         };
 
@@ -91,6 +92,7 @@ public class AdminPlansController(VextaDbContext db, IStripeService stripe) : Co
         plan.SortOrder = request.SortOrder;
         plan.MinUsers = request.MinUsers;
         plan.MaxUsers = request.MaxUsers;
+        plan.MonthlyReceiptScans = request.MonthlyReceiptScans;
         plan.Modules = await LoadModulesAsync(request.ModuleIds, ct);
         plan.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -191,6 +193,10 @@ public class AdminPlansController(VextaDbContext db, IStripeService stripe) : Co
             return $"Le maximum d'utilisateurs doit être entre 1 et {MaxSeats}.";
         if (request.MinUsers > request.MaxUsers)
             return "Le minimum d'utilisateurs ne peut pas dépasser le maximum.";
+        // A ceiling, because this is the one thing that bills per use: a typo of 100000 here is
+        // a month's worth of somebody else's money.
+        if (request.MonthlyReceiptScans is < 0 or > 10_000)
+            return "Les lectures de reçus par mois doivent être entre 0 et 10 000.";
         return null;
     }
 
@@ -202,6 +208,7 @@ public class AdminPlansController(VextaDbContext db, IStripeService stripe) : Co
             p.Currency,
             p.MinUsers,
             p.MaxUsers,
+            p.MonthlyReceiptScans,
             p.IsPublished,
             p.SortOrder,
             p.StripePriceId,

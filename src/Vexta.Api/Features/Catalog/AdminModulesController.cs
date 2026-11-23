@@ -81,6 +81,40 @@ public class AdminModulesController(VextaDbContext db) : ControllerBase
         return Ok(ToDto(module));
     }
 
+    /// <summary>
+    /// Writes a new order for the modules, in the order the ids arrive.
+    ///
+    /// The whole list every time rather than one module's new position: dragging a row changes
+    /// the number on every row below it, and sending them one at a time would leave the list
+    /// briefly holding two modules at the same rank — which is exactly when somebody reloads.
+    ///
+    /// Ids that are not in the list are left alone, and an id that no longer exists is skipped
+    /// rather than refused: the browser may have been holding a module somebody else deleted,
+    /// and failing the whole reorder over it would lose the arrangement that was just made.
+    /// </summary>
+    [HttpPut("ordre")]
+    public async Task<ActionResult<IReadOnlyList<ModuleDto>>> Reorder(ReorderModulesRequest request, CancellationToken ct)
+    {
+        if (request.Ids is null || request.Ids.Count == 0)
+        {
+            return BadRequest(new { message = "Aucun ordre reçu." });
+        }
+
+        var modules = await db.Modules.Where(m => request.Ids.Contains(m.Id)).ToListAsync(ct);
+        var byId = modules.ToDictionary(m => m.Id);
+
+        for (var i = 0; i < request.Ids.Count; i++)
+        {
+            if (byId.TryGetValue(request.Ids[i], out var module))
+            {
+                module.SortOrder = i;
+            }
+        }
+
+        await db.SaveChangesAsync(ct);
+        return await List(ct);
+    }
+
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {

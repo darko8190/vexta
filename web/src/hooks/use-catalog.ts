@@ -63,6 +63,28 @@ export function useSaveModule() {
   });
 }
 
+/**
+ * Writes a new order for the modules.
+ *
+ * The whole list goes every time, in sequence, because dragging one row changes the rank of
+ * every row under it. The server takes the position from the order of the ids rather than from
+ * numbers the browser computed, so the two can never disagree about what "third" means.
+ */
+export function useReorderModules() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) => api.put<ModuleRecord[]>("admin/modules/ordre", { ids }),
+    onSuccess: (modules) => {
+      // The endpoint answers with the whole list, so the table is right before the refetch
+      // lands — and the refetch still happens, because the sidebar of every company that
+      // includes these modules is built from the same order.
+      queryClient.setQueryData(["admin", "modules"], modules);
+      queryClient.invalidateQueries({ queryKey: ["admin", "modules"] });
+      queryClient.invalidateQueries({ queryKey: ["navigation"] });
+    },
+  });
+}
+
 export function useDeleteModule() {
   const queryClient = useQueryClient();
   return useMutation({

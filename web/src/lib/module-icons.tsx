@@ -25,6 +25,7 @@ import {
   Mail,
   MapPin,
   Package,
+  PackageCheck,
   Phone,
   Receipt,
   Search,
@@ -88,6 +89,7 @@ export const MODULE_ICONS = {
   HandCoins,
   UserPlus,
   BookUser,
+  PackageCheck,
 } as const;
 
 export type ModuleIconName = keyof typeof MODULE_ICONS;

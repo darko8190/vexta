@@ -1,27 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { Blocks, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { Blocks, Plus } from "lucide-react";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
 import { LoadErrorState } from "@/components/layout/load-error-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { ModuleFormSheet } from "@/components/catalog/module-form-sheet";
+import { ModulesTable } from "@/components/catalog/modules-table";
 import { useDeleteModule, useModulesQuery } from "@/hooks/use-catalog";
 import { ApiError } from "@/lib/api";
-import { ClickableRow } from "@/components/layout/clickable-row";
-import { moduleIcon } from "@/lib/module-icons";
 import type { ModuleRecord } from "@/lib/types";
 
 export default function ModulesPage() {
@@ -90,87 +81,18 @@ export default function ModulesPage() {
           action={createButton}
         />
       ) : (
-        <div className="overflow-hidden rounded-lg border border-border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12">Icône</TableHead>
-                <TableHead>Titre</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Onglet</TableHead>
-                <TableHead className="w-24">Ordre</TableHead>
-                <TableHead className="w-28">Statut</TableHead>
-                <TableHead className="w-10" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.map((module) => {
-                const Icon = moduleIcon(module.icon);
-                return (
-                  <ClickableRow
-                    key={module.id}
-                    label={`Modifier ${module.title}`}
-                    onOpen={() => {
-                      setEditing(module);
-                      setFormOpen(true);
-                    }}
-                  >
-                    <TableCell>
-                      <Icon className="size-4 text-muted-foreground" />
-                    </TableCell>
-                    <TableCell className="font-medium">{module.title}</TableCell>
-                    <TableCell className="max-w-md truncate text-muted-foreground">
-                      {module.description}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {module.navHref ? (
-                        <span className="flex flex-col">
-                          <span className="font-mono text-xs">{module.navHref}</span>
-                          <span className="text-xs">
-                            {module.parentModuleId
-                              ? `Sous-onglet de ${data?.find((m) => m.id === module.parentModuleId)?.title ?? "—"}`
-                              : "Onglet principal"}
-                            {module.ownerOnly ? " · propriétaire" : ""}
-                          </span>
-                        </span>
-                      ) : (
-                        <span className="text-xs">Aucun écran</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground tabular-nums">{module.sortOrder}</TableCell>
-                    <TableCell>
-                      <Badge variant={module.isPublished ? "default" : "outline"}>
-                        {module.isPublished ? "Publié" : "Masqué"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label="Actions" />}>
-                          <MoreHorizontal />
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setEditing(module);
-                              setFormOpen(true);
-                            }}
-                          >
-                            <Pencil />
-                            Modifier
-                          </DropdownMenuItem>
-                          <DropdownMenuItem variant="destructive" onClick={() => setDeleteTarget(module)}>
-                            <Trash2 />
-                            Supprimer
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </ClickableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
+        /* Keyed on the server's order: a save or a refetch that returns a different
+           arrangement remounts the table with it, while one that returns the same thing leaves
+           a drag in progress alone. */
+        <ModulesTable
+          key={data.map((module) => module.id).join()}
+          modules={data}
+          onEdit={(module) => {
+            setEditing(module);
+            setFormOpen(true);
+          }}
+          onDelete={setDeleteTarget}
+        />
       )}
 
       <ModuleFormSheet open={formOpen} onOpenChange={setFormOpen} module={editing} modules={data ?? []} />

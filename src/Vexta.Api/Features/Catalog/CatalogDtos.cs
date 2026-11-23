@@ -68,3 +68,12 @@ public record SavePlanRequest(
     IReadOnlyList<Guid> ModuleIds,
     /// <summary>Defaults to 100 when a caller says nothing, like the column itself.</summary>
     int MonthlyReceiptScans = 100);
+
+/// <summary>
+/// The modules in the order they should appear, parents and children together.
+///
+/// Positions are taken from the order of the list rather than sent as numbers: a browser that
+/// computes its own ranks is a browser that can disagree with the server about what "third"
+/// means, and the only thing that actually matters is the sequence.
+/// </summary>
+public record ReorderModulesRequest(IReadOnlyList<Guid> Ids);

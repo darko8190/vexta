@@ -436,14 +436,9 @@ les liens à y mettre.
 | `/tableau-de-bord` | — | Toujours là, jamais un module. |
 | `/clients` | Clients | |
 | `/projets` | Projets | |
-| `/factures` | Facturation | Les factures. Les paiements sont son sous-onglet. |
-| `/factures/paiements` | Paiements | Sous-onglet de Facturation. |
-| `/achats` | Achats | Parent. Mène à Dépenses tant que c'est son seul enfant. |
-| `/achats/depenses` | Dépenses | Sous-onglet d'Achats. |
-| `/approvisionnement` | Fournisseurs & Commandes | Parent. Mène aux fournisseurs. |
-| `/approvisionnement/fournisseurs` | Fournisseurs | Sous-onglet. |
-| `/approvisionnement/commandes` | Commandes | Sous-onglet. |
-| `/approvisionnement/receptions` | Réceptions | Sous-onglet. |
+| `/factures` | Facturation | Contient Factures et Paiements. |
+| `/achats` | Achats | Contient Dépenses. |
+| `/approvisionnement` | Fournisseurs & Commandes | Contient Fournisseurs, Commandes, Réceptions. |
 | `/inventaire` | Inventaire | |
 | `/mes-feuilles-de-temps` | Mes feuilles de temps | Les heures de la personne connectée. |
 | `/mes-assignations` | Mes assignations | Ses tâches. |
@@ -455,6 +450,19 @@ les liens à y mettre.
 Les deux « Mes… » ne se réservent à personne : ce sont les seuls écrans qui parlent de la
 personne plutôt que de l'entreprise, et un administrateur saisit ses heures comme les autres.
 
+> **Un module par onglet, jamais par section.** Les sections d'une page — Factures et Paiements,
+> Fournisseurs et Commandes et Réceptions, les treize du dossier d'un employé — sont un rail à
+> l'intérieur de l'écran, pas des entrées du menu. Elles n'ont pas de module et n'en veulent pas :
+> c'est l'onglet qui se vend et qui s'ouvre, et le rail est ce qu'on y trouve une fois entré.
+
+#### L'ordre du menu
+
+Les modules se replacent par **glisser-déposer** dans Admin → Modules : attrapez une ligne par
+sa poignée, à gauche. L'ordre du tableau est l'ordre du menu de toutes les entreprises
+concernées, et il s'enregistre dès que vous lâchez.
+
+Sans souris, la poignée prend le focus au clavier et répond aux flèches haut et bas.
+
 #### « Mes entreprises n'ont pas l'onglet Rapports / Achats »
 
 C'est le cas le plus fréquent, et ce n'est pas un bogue. Le forfait de ces entreprises contient
@@ -464,8 +472,8 @@ n'existe pas pour elles, même s'il répond parfaitement quand on tape son adres
 Pour l'ajouter :
 
 1. **Admin → Modules → Ajouter un module.** Titre « Rapports », lien `/rapports`, icône `ChartBar`.
-2. Recommencez pour « Achats » (lien `/achats`, icône `ShoppingCart`), puis pour « Dépenses »
-   (lien `/achats/depenses`) en choisissant **Achats** dans « Sous-onglet de ».
+2. Recommencez pour « Achats » (lien `/achats`, icône `ShoppingCart`). Les dépenses sont une
+   section à l'intérieur : elles n'ont pas de module à elles.
 3. **Admin → Forfaits**, ouvrez chaque forfait, cochez les nouveaux modules.
 4. L'entreprise recharge sa page : le menu se rebâtit tout seul.
 

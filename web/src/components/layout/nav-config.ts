@@ -1,23 +1,19 @@
 ﻿import {
   Blocks,
   Boxes,
-  ClipboardList,
-  ChartBar,
   Building2,
   CalendarClock,
-  FileText,
+  ChartBar,
   ClipboardPen,
+  FileText,
   FolderKanban,
   LayoutDashboard,
   ListChecks,
-  PackageCheck,
   Palette,
-  Receipt,
   Settings,
   ShoppingCart,
-  Truck,
-  Wallet,
   Tag,
+  Truck,
   Users,
   UsersRound,
 } from "lucide-react";
@@ -51,19 +47,13 @@ const tenantNav: NavItem[] = [
   { href: "/projets", label: "Projets", icon: FolderKanban },
   // Facturation rather than Factures: the tab holds the invoices and what was paid on them,
   // and naming it after only the first half would make the second look like it belongs
-  // somewhere else.
+  // somewhere else. Paiements is a section inside it, not a second entry here.
   { href: "/factures", label: "Facturation", icon: FileText },
-  { href: "/factures/paiements", label: "Paiements", icon: Wallet, depth: 1 },
-  // Money going out, under the heading it will grow into: purchase orders and suppliers belong
-  // beside the expenses, and putting Dépenses at the top level would have to move later.
+  // Money already spent, under the heading it will grow into.
   { href: "/achats", label: "Achats", icon: ShoppingCart },
-  { href: "/achats/depenses", label: "Dépenses", icon: Receipt, depth: 1 },
-  // Its own tab rather than a third child of Achats: a dépense is money already gone, and an
-  // order is money promised. They are read by different people on different days.
+  // Its own tab rather than a section of Achats: a dépense is money already gone, and an order
+  // is money promised. They are read by different people on different days.
   { href: "/approvisionnement", label: "Fournisseurs & Commandes", icon: Truck },
-  { href: "/approvisionnement/fournisseurs", label: "Fournisseurs", icon: Building2, depth: 1 },
-  { href: "/approvisionnement/commandes", label: "Commandes", icon: ClipboardList, depth: 1 },
-  { href: "/approvisionnement/receptions", label: "Réceptions", icon: PackageCheck, depth: 1 },
   { href: "/inventaire", label: "Inventaire", icon: Boxes },
   // Outils, not "Outils & Formation": the formations went to Ressources humaines, where the
   // people they belong to are. A heading that still named them would send somebody here first.

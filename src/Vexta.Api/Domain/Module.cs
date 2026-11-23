@@ -62,7 +62,7 @@ public static class ModuleIcons
         // The tabs added after the first batch of modules. Without these a company could not
         // give Achats a basket or Outils a mortarboard, and would have to settle for a cog.
         "ShoppingCart", "GraduationCap", "ClipboardPen", "ListChecks", "CalendarClock",
-        "FolderOpen", "Wallet", "HandCoins", "UserPlus", "BookUser"
+        "FolderOpen", "Wallet", "HandCoins", "UserPlus", "BookUser", "PackageCheck"
     };
 
     public static bool IsAllowed(string? icon) => icon is not null && Allowed.Contains(icon);

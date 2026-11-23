@@ -17,6 +17,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { AssistantButton } from "@/components/assistant/assistant-panel";
 import { VextaIcon, VextaLockup } from "@/components/brand/vexta-logo";
 import { dashboardNavItem, getNavItems, type NavItem } from "@/components/layout/nav-config";
 import { NavLinks } from "@/components/layout/nav-links";
@@ -188,11 +189,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <VextaLockup iconClassName="size-7" />
           </button>
           <div className="flex-1" />
+          {/* Before the theme toggle on purpose: it is the one control here somebody opens on
+              purpose rather than once a year. It draws nothing unless the company has an
+              assistant switched on. */}
+          <AssistantButton />
           <ThemeToggle />
           <UserAvatarMenu />
         </header>
         <header className="hidden h-16 items-center justify-end gap-2 border-b border-border px-6 md:flex">
           <InstallPrompt />
+          <AssistantButton />
           <ThemeToggle />
           <UserAvatarMenu />
         </header>

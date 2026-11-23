@@ -18,6 +18,7 @@ import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
 import { LoadErrorState } from "@/components/layout/load-error-state";
 import { SearchInput } from "@/components/layout/search-input";
+import { WorkbookMenu } from "@/components/import-export/workbook-menu";
 import { SupplierFormSheet } from "@/components/purchasing/supplier-form-sheet";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useDeleteSupplier, useSuppliersQuery } from "@/hooks/use-suppliers";
@@ -76,7 +77,10 @@ export function SuppliersSection() {
             Les cours, les grossistes et les boutiques chez qui vous achetez.
           </p>
         </div>
-        {items.length > 0 && addButton}
+        <div className="flex flex-wrap items-center gap-2">
+          <WorkbookMenu entity="fournisseurs" label="fournisseurs" />
+          {items.length > 0 && addButton}
+        </div>
       </div>
 
       <div className="mb-4 flex flex-wrap items-end gap-4">

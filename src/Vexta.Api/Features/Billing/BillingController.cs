@@ -17,7 +17,12 @@ public record BillingStateDto(
     bool CanManage,
     string? PlanName,
     long? PlanAmountCents,
-    string? PlanCurrency);
+    string? PlanCurrency,
+    /// <summary>
+    /// The company asked to stop and is seeing out the period it has paid for. Distinct from a
+    /// cancelled subscription: the space still works and the button says "reprendre".
+    /// </summary>
+    bool CancelAtPeriodEnd);
 
 public record UpgradeToBusinessRequest(string CompanyName, Guid PlanId);
 
@@ -54,7 +59,8 @@ public class BillingController(
             CanManageBilling,
             plan?.Name,
             plan?.AmountCents,
-            plan?.Currency));
+            plan?.Currency,
+            tenant.CancelAtPeriodEnd));
     }
 
     [HttpPost("checkout-session")]
@@ -180,6 +186,89 @@ public class BillingController(
     /// Knowing a session id grants nothing: the state applied is whatever Stripe reports for it,
     /// and an unpaid session activates nothing.
     /// </summary>
+    /// <summary>
+    /// Ends the subscription at the end of the period already paid for.
+    ///
+    /// Nothing is taken away here: the status stays Active and the space keeps working until
+    /// Stripe stops it on the date the company has paid up to. The alternative — closing the
+    /// doors the moment the button is pressed — would be keeping money for a month nobody got.
+    /// </summary>
+    [HttpPost("cancel")]
+    [Authorize]
+    public async Task<IActionResult> Cancel(CancellationToken ct)
+    {
+        if (!CanManageBilling) return BillingForbidden();
+
+        var tenant = await CurrentTenantAsync();
+        if (tenant is null) return NotFound();
+
+        if (string.IsNullOrWhiteSpace(tenant.StripeSubscriptionId))
+        {
+            return BadRequest(new { message = "Aucun abonnement actif à résilier." });
+        }
+
+        try
+        {
+            var endsOn = await stripeService.SetCancelAtPeriodEndAsync(tenant.StripeSubscriptionId, true, ct);
+            tenant.CancelAtPeriodEnd = true;
+            if (endsOn is not null) tenant.CurrentPeriodEnd = endsOn;
+            await db.SaveChangesAsync(ct);
+
+            return Ok(new
+            {
+                cancelAtPeriodEnd = true,
+                currentPeriodEnd = tenant.CurrentPeriodEnd,
+                message = tenant.CurrentPeriodEnd is { } end
+                    ? $"Abonnement résilié. Votre espace reste ouvert jusqu'au {end.ToLocalTime():d MMMM yyyy}."
+                    : "Abonnement résilié. Votre espace reste ouvert jusqu'à la fin de la période payée."
+            });
+        }
+        catch (StripeException ex)
+        {
+            logger.LogError(ex, "Résiliation refusée par Stripe pour le locataire {TenantId}.", tenant.Id);
+            return BadRequest(new { message = $"Stripe a refusé la résiliation : {ex.StripeError?.Message ?? ex.Message}" });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>Undoes the above, while the period paid for has not run out.</summary>
+    [HttpPost("resume")]
+    [Authorize]
+    public async Task<IActionResult> Resume(CancellationToken ct)
+    {
+        if (!CanManageBilling) return BillingForbidden();
+
+        var tenant = await CurrentTenantAsync();
+        if (tenant is null) return NotFound();
+
+        if (string.IsNullOrWhiteSpace(tenant.StripeSubscriptionId))
+        {
+            return BadRequest(new { message = "Aucun abonnement à reprendre." });
+        }
+
+        try
+        {
+            var endsOn = await stripeService.SetCancelAtPeriodEndAsync(tenant.StripeSubscriptionId, false, ct);
+            tenant.CancelAtPeriodEnd = false;
+            if (endsOn is not null) tenant.CurrentPeriodEnd = endsOn;
+            await db.SaveChangesAsync(ct);
+
+            return Ok(new { cancelAtPeriodEnd = false, message = "Abonnement repris." });
+        }
+        catch (StripeException ex)
+        {
+            logger.LogError(ex, "Reprise refusée par Stripe pour le locataire {TenantId}.", tenant.Id);
+            return BadRequest(new { message = $"Stripe a refusé la reprise : {ex.StripeError?.Message ?? ex.Message}" });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     [HttpPost("confirm")]
     [AllowAnonymous]
     public async Task<IActionResult> ConfirmCheckout(ConfirmCheckoutRequest request, CancellationToken ct)

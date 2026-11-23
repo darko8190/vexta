@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Vexta.Api.Data;
@@ -46,6 +46,11 @@ public class CatalogController(VextaDbContext db) : ControllerBase
                     .Where(m => m.IsPublished)
                     .OrderBy(m => m.SortOrder).ThenBy(m => m.Title)
                     .Select(m => new PublicModuleDto(m.Id, m.Icon, m.Title, m.Description))
+                    .ToList(),
+                p.Features
+                    .Where(f => f.IsPublished)
+                    .OrderBy(f => f.SortOrder).ThenBy(f => f.Name)
+                    .Select(f => new PublicFeatureDto(f.Key, f.Icon, f.Name, f.Description))
                     .ToList()))
             .ToListAsync(ct);
 

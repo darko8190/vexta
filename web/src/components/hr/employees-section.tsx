@@ -21,6 +21,7 @@ import { ClickableRow } from "@/components/layout/clickable-row";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { LoadErrorState } from "@/components/layout/load-error-state";
 import { EmptyState } from "@/components/layout/empty-state";
+import { WorkbookMenu } from "@/components/import-export/workbook-menu";
 import { EmployeeFormSheet } from "@/components/team/employee-form-sheet";
 import { InvitationLinkDialog } from "@/components/team/invitation-link-dialog";
 import {
@@ -176,7 +177,12 @@ export function EmployeesSection() {
             Cochez « Accès » pour qu&apos;une personne puisse se connecter à Vexta.
           </p>
         </div>
-        {createButton}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Importing writes the file and nothing else: nobody is invited to sign in by a
+              spreadsheet. The « Accès » column stays a deliberate click. */}
+          <WorkbookMenu entity="employes" label="employés" />
+          {createButton}
+        </div>
       </div>
 
       {seats && (

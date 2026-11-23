@@ -502,6 +502,24 @@ export interface ModuleRecord {
   ownerOnly: boolean;
 }
 
+/**
+ * Something a plan switches on that is not a tab. A module is a screen; a feature is a
+ * permission to do something inside one.
+ */
+export interface FeatureRecord {
+  id: string;
+  /** What the application checks. Fixed for the two features Vexta ships with. */
+  key: string;
+  name: string;
+  description: string;
+  icon: string;
+  sortOrder: number;
+  isPublished: boolean;
+  /** Shipped with Vexta: its key cannot be changed and the row cannot be deleted. */
+  isBuiltIn: boolean;
+  planCount: number;
+}
+
 export interface PlanRecord {
   id: string;
   name: string;
@@ -519,6 +537,7 @@ export interface PlanRecord {
   /** Null when Stripe could not be reached: such a plan cannot be published. */
   stripePriceId: string | null;
   modules: ModuleRecord[];
+  features: FeatureRecord[];
   tenantCount: number;
 }
 
@@ -539,6 +558,14 @@ export interface PublicPlan {
   /** Seats the plan allows, the owner included. */
   maxUsers: number;
   modules: PublicModule[];
+  features: PublicFeature[];
+}
+
+export interface PublicFeature {
+  key: string;
+  icon: string;
+  name: string;
+  description: string;
 }
 
 export interface MediaAssetRecord {

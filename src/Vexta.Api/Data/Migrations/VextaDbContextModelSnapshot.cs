@@ -37,6 +37,21 @@ namespace Vexta.Api.Data.Migrations
                     b.ToTable("EmployeeTeam");
                 });
 
+            modelBuilder.Entity("FeaturePlan", b =>
+                {
+                    b.Property<Guid>("FeaturesId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PlansId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("FeaturesId", "PlansId");
+
+                    b.HasIndex("PlansId");
+
+                    b.ToTable("FeaturePlan");
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole<System.Guid>", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1247,6 +1262,51 @@ namespace Vexta.Api.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("ExpenseTypes");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.Feature", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Icon")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsBuiltIn")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsPublished")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Key")
+                        .IsUnique();
+
+                    b.HasIndex("SortOrder");
+
+                    b.ToTable("Features");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.FormAction", b =>
@@ -3061,6 +3121,9 @@ namespace Vexta.Api.Data.Migrations
                         .HasMaxLength(7)
                         .HasColumnType("character varying(7)");
 
+                    b.Property<bool>("CancelAtPeriodEnd")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("ContactEmail")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
@@ -3109,6 +3172,39 @@ namespace Vexta.Api.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("Tenants");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.TenantAiSettings", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("CanWrite")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EncryptedApiKey")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("Provider")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("TenantId");
+
+                    b.ToTable("TenantAiSettings");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.TenantLogo", b =>
@@ -3238,6 +3334,21 @@ namespace Vexta.Api.Data.Migrations
                     b.HasOne("Vexta.Api.Domain.Team", null)
                         .WithMany()
                         .HasForeignKey("TeamsId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FeaturePlan", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.Feature", null)
+                        .WithMany()
+                        .HasForeignKey("FeaturesId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Vexta.Api.Domain.Plan", null)
+                        .WithMany()
+                        .HasForeignKey("PlansId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
@@ -4064,6 +4175,17 @@ namespace Vexta.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Plan");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.TenantAiSettings", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.Tenant", "Tenant")
+                        .WithOne()
+                        .HasForeignKey("Vexta.Api.Domain.TenantAiSettings", "TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Tenant");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.TenantLogo", b =>

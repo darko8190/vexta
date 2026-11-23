@@ -26,6 +26,7 @@ public class AdminPlansController(VextaDbContext db, IStripeService stripe) : Co
     {
         var plans = await db.Plans.AsNoTracking()
             .Include(p => p.Modules)
+            .Include(p => p.Features)
             .OrderBy(p => p.SortOrder).ThenBy(p => p.AmountCents)
             .ToListAsync(ct);
 
@@ -58,6 +59,7 @@ public class AdminPlansController(VextaDbContext db, IStripeService stripe) : Co
         };
 
         plan.Modules = await LoadModulesAsync(request.ModuleIds, ct);
+        plan.Features = await LoadFeaturesAsync(request.FeatureIds, ct) ?? [];
 
         var priceError = await AttachPriceAsync(plan, ct);
         if (priceError is not null && request.IsPublished)
@@ -76,7 +78,10 @@ public class AdminPlansController(VextaDbContext db, IStripeService stripe) : Co
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<PlanDto>> Update(Guid id, SavePlanRequest request, CancellationToken ct)
     {
-        var plan = await db.Plans.Include(p => p.Modules).FirstOrDefaultAsync(p => p.Id == id, ct);
+        var plan = await db.Plans
+            .Include(p => p.Modules)
+            .Include(p => p.Features)
+            .FirstOrDefaultAsync(p => p.Id == id, ct);
         if (plan is null)
         {
             return NotFound();
@@ -94,6 +99,7 @@ public class AdminPlansController(VextaDbContext db, IStripeService stripe) : Co
         plan.MaxUsers = request.MaxUsers;
         plan.MonthlyReceiptScans = request.MonthlyReceiptScans;
         plan.Modules = await LoadModulesAsync(request.ModuleIds, ct);
+        if (await LoadFeaturesAsync(request.FeatureIds, ct) is { } features) plan.Features = features;
         plan.UpdatedAt = DateTimeOffset.UtcNow;
 
         // A new amount means a new Stripe price: prices are immutable. Tenants already subscribed
@@ -179,6 +185,19 @@ public class AdminPlansController(VextaDbContext db, IStripeService stripe) : Co
         return await db.Modules.Where(m => ids.Contains(m.Id)).ToListAsync(ct);
     }
 
+    /// <summary>
+    /// Null when the caller said nothing about features, which is not the same as an empty
+    /// list: one leaves the plan as it is, the other takes everything off it.
+    /// </summary>
+    private async Task<List<Feature>?> LoadFeaturesAsync(IReadOnlyList<Guid>? featureIds, CancellationToken ct)
+    {
+        if (featureIds is null) return null;
+        if (featureIds.Count == 0) return [];
+
+        var ids = featureIds.Distinct().ToList();
+        return await db.Features.Where(f => ids.Contains(f.Id)).ToListAsync(ct);
+    }
+
     private static string? Validate(SavePlanRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Name)) return "Le nom du forfait est obligatoire.";
@@ -216,6 +235,11 @@ public class AdminPlansController(VextaDbContext db, IStripeService stripe) : Co
                 .OrderBy(m => m.SortOrder).ThenBy(m => m.Title)
                 .Select(m => new ModuleDto(m.Id, m.Icon, m.Title, m.Description, m.SortOrder, m.IsPublished,
                     m.NavHref, m.ParentModuleId, m.OwnerOnly))
+                .ToList(),
+            p.Features
+                .OrderBy(f => f.SortOrder).ThenBy(f => f.Name)
+                .Select(f => new FeatureDto(f.Id, f.Key, f.Name, f.Description, f.Icon, f.SortOrder,
+                    f.IsPublished, f.IsBuiltIn, 0))
                 .ToList(),
             tenantCount);
 }

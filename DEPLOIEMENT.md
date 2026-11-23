@@ -425,33 +425,43 @@ voyez aujourd'hui ne change tant que vous ne les cochez pas dans un forfait. Si 
 des modules marketing portant les mêmes titres, ils sont conservés tels quels — vous verrez donc
 deux lignes « Clients », celle sans écran et celle avec.
 
-#### Les écrans qui existent et que vous pouvez rattacher à un module
+#### Les onglets sont créés tout seuls
 
-Les nouveaux écrans n'ont **pas** de module créé pour eux : un forfait dont le menu vient des
-modules ne les verra pas tant que vous n'en aurez pas ajouté un dans **Admin → Modules**. Voici
-les liens à y mettre.
+Vous n'avez plus à taper les modules à la main. Au démarrage, l'API regarde la liste des onglets
+que l'application possède réellement et crée celui qui manque, une seule fois, en le reconnaissant
+à son **lien** plutôt qu'à son titre. Un module que vous avez renommé reste le vôtre ; un onglet
+livré dans une mise à jour apparaît dans la liste le jour où elle est déployée.
 
-| Lien | Titre suggéré | Remarque |
-| ---- | ------------- | -------- |
+Les douze qui existent :
+
+| Lien | Titre | Remarque |
+| ---- | ----- | -------- |
 | `/tableau-de-bord` | — | Toujours là, jamais un module. |
+| `/mes-feuilles-de-temps` | Mes feuilles de temps | Les heures de la personne connectée. |
+| `/mes-assignations` | Mes assignations | Ses tâches. |
 | `/clients` | Clients | |
 | `/projets` | Projets | |
 | `/factures` | Facturation | Contient Factures et Paiements. |
 | `/achats` | Achats | Contient Dépenses. |
 | `/approvisionnement` | Fournisseurs & Commandes | Contient Fournisseurs, Commandes, Réceptions. |
 | `/inventaire` | Inventaire | |
-| `/mes-feuilles-de-temps` | Mes feuilles de temps | Les heures de la personne connectée. |
-| `/mes-assignations` | Mes assignations | Ses tâches. |
 | `/outils` | Outils | Les formulaires et leurs réponses. |
 | `/rapports` | Rapports | |
-| `/ressources-humaines` | Ressources humaines | Cochez **réservé au propriétaire**. |
-| `/entreprise` | Entreprise | Cochez **réservé au propriétaire**. |
+| `/ressources-humaines` | Ressources humaines | Réservé au propriétaire. |
+| `/entreprise` | Entreprise | Réservé au propriétaire. |
 
 Les deux « Mes… » ne se réservent à personne : ce sont les seuls écrans qui parlent de la
 personne plutôt que de l'entreprise, et un administrateur saisit ses heures comme les autres.
 
+Il vous reste **une** décision, celle que vous vouliez prendre : ouvrir **Admin → Forfaits** et
+cocher ce que chaque forfait inclut.
+
+Les nouveaux modules sont ajoutés **à la fin** de la liste, pas à leur place naturelle. Un ordre
+que vous avez réglé à la main ne doit pas être réarrangé par un déploiement ; glissez-les où vous
+les voulez.
+
 > **Un module par onglet, jamais par section.** Les sections d'une page — Factures et Paiements,
-> Fournisseurs et Commandes et Réceptions, les treize du dossier d'un employé — sont un rail à
+> Fournisseurs et Commandes et Réceptions, les quatorze du dossier d'un employé — sont un rail à
 > l'intérieur de l'écran, pas des entrées du menu. Elles n'ont pas de module et n'en veulent pas :
 > c'est l'onglet qui se vend et qui s'ouvre, et le rail est ce qu'on y trouve une fois entré.
 
@@ -465,22 +475,156 @@ Sans souris, la poignée prend le focus au clavier et répond aux flèches haut 
 
 #### « Mes entreprises n'ont pas l'onglet Rapports / Achats »
 
-C'est le cas le plus fréquent, et ce n'est pas un bogue. Le forfait de ces entreprises contient
-déjà au moins un module, donc leur menu vient **entièrement** des modules — un écran sans module
-n'existe pas pour elles, même s'il répond parfaitement quand on tape son adresse.
+C'était le cas le plus fréquent, et ce n'était pas un bogue : le forfait contenait déjà au moins
+un module, donc le menu venait **entièrement** des modules, et un écran sans module n'existait pas
+pour ces entreprises même s'il répondait parfaitement quand on tapait son adresse.
 
-Pour l'ajouter :
+Depuis que les douze onglets se créent tout seuls, il ne reste qu'une étape :
 
-1. **Admin → Modules → Ajouter un module.** Titre « Rapports », lien `/rapports`, icône `ChartBar`.
-2. Recommencez pour « Achats » (lien `/achats`, icône `ShoppingCart`). Les dépenses sont une
-   section à l'intérieur : elles n'ont pas de module à elles.
-3. **Admin → Forfaits**, ouvrez chaque forfait, cochez les nouveaux modules.
-4. L'entreprise recharge sa page : le menu se rebâtit tout seul.
+1. **Admin → Forfaits**, ouvrez le forfait.
+2. Cochez les onglets manquants — Rapports, Achats, Inventaire, Outils, ce que vous voulez vendre.
+3. Enregistrez. L'entreprise recharge sa page et le menu se rebâtit.
 
-> **Le piège** : si un forfait est aujourd'hui à **zéro** module, ses entreprises voient le menu
-> intégré au complet. Lui ajouter un seul module fait basculer tout le menu sur les modules —
-> **tous** les onglets qu'elles doivent garder (Clients, Projets, Facturation, Inventaire…)
-> doivent exister comme modules **avant** que vous cochiez le premier, sinon elles les perdent.
+> **Le piège, qui n'a pas changé** : un forfait à **zéro** module laisse voir le menu intégré au
+> complet. Lui cocher un seul module fait basculer tout le menu sur les modules — cochez donc
+> **tous** les onglets que l'entreprise doit garder d'un coup, pas un seul pour essayer.
+
+### Fonctionnalités : ce qu'un forfait permet de faire
+
+Un module est un **onglet** ; une fonctionnalité est ce qu'on a le droit de faire **dedans**.
+Les deux se cochent séparément sur chaque forfait, dans **Admin → Fonctionnalités** pour la liste
+et **Admin → Forfaits** pour l'attribution.
+
+Vexta en livre deux, créées au démarrage comme les modules :
+
+| Clé | Nom | Ce qu'elle ouvre |
+| --- | --- | ---------------- |
+| `ocr` | Lecture de reçus (OCR) | Le bouton qui lit un reçu photographié. Le **nombre** de lectures par mois reste un champ du forfait. |
+| `ia` | Assistant IA | Le bouton d'assistant en haut de l'écran, et l'onglet Assistant IA dans les paramètres de l'entreprise. |
+
+Le **nom** et la description vous appartiennent : renommez « Assistant IA » comme votre marketing
+l'entend. La **clé**, elle, est ce que le code vérifie, et c'est pour ça qu'elle ne se change pas
+sur ces deux lignes-là : la changer éteindrait la fonction pour toutes les entreprises sans que
+rien ne l'explique. Vous pouvez créer les vôtres, mais une clé seule ne fait rien tant que
+l'application ne la connaît pas.
+
+Décocher une fonctionnalité ne retire **aucun écran** : c'est le bouton concerné qui disparaît,
+plutôt que d'apparaître et de refuser.
+
+> Une entreprise dont l'espace n'a **aucun forfait** les a toutes. C'est le cas de tout espace
+> créé à la main, et c'est voulu : un espace d'essai doit pouvoir essayer.
+
+À la première mise à jour, la lecture de reçus est cochée d'office sur les forfaits qui avaient
+déjà une allocation supérieure à zéro — personne ne perd ce qu'il payait déjà.
+
+### Assistant IA
+
+Une entreprise branche **son propre** compte Claude ou ChatGPT dans **Paramètres → Assistant IA**.
+C'est son compte qui est facturé, pas le vôtre : vous n'avez aucune clé à fournir et aucun
+quota à surveiller.
+
+Ce qu'elle règle elle-même :
+
+- **Fournisseur** : Claude (Anthropic) ou ChatGPT (OpenAI).
+- **Modèle** : du texte libre, parce que les noms de modèles changent plus vite que les
+  déploiements. `claude-opus-5-5` et `gpt-5` sont proposés par défaut.
+- **Clé API** : chiffrée au repos et jamais renvoyée au navigateur. L'écran dit qu'une clé est
+  enregistrée, jamais laquelle. « Oublier la clé » est la seule façon de la reprendre.
+- **Activer l'assistant** : le bouton n'apparaît en haut de l'écran que si c'est coché *et*
+  qu'une clé est enregistrée.
+- **L'autoriser à créer et à modifier** : décoché au départ, exprès.
+
+Le bouton **Tester** fait deux vérifications et dit laquelle échoue : est-ce que Vexta se joint
+elle-même, et est-ce que le fournisseur accepte la clé. Ça coûte une fraction de cent et ça évite
+de découvrir le problème au milieu d'une question.
+
+#### Ce que l'assistant peut et ne peut pas faire
+
+Il travaille en appelant l'API de Vexta **au nom de la personne qui lui parle**. Il hérite donc
+de ses droits, de son entreprise et de toutes les règles de l'application — il ne voit rien
+qu'elle ne verrait pas elle-même, et un employé ne peut pas s'en servir pour lire les salaires.
+
+Trois portes restent fermées, côté serveur et pas seulement dans ses instructions :
+
+- **La suppression, toujours.** Créer de travers coûte un après-midi ; supprimer ce qui comptait
+  coûte un appel au client. Il dira d'aller le faire soi-même, depuis l'écran concerné.
+- **Toute écriture**, tant que « L'autoriser à créer et à modifier » n'est pas coché.
+- **La connexion, le super admin, la facturation.** Ce ne sont pas des parties de
+  l'application qu'une entreprise conduit en parlant.
+
+Sous chaque réponse, l'assistant affiche ce qu'il a fait : la méthode, la route, et si ça a
+marché. Un refus est plus utile visible qu'avalé.
+
+Rien de ce qui lui est écrit n'est conservé par Vexta : la conversation vit dans l'onglet du
+navigateur et part avec lui.
+
+### Se désabonner
+
+**Paramètres → Abonnement → Se désabonner.** Rien ne ferme le jour du clic : Stripe laisse
+l'abonnement courir jusqu'à la fin de la période déjà payée, puis il s'éteint tout seul. Garder
+l'argent d'un mois sans livrer le mois serait un drôle de commerce.
+
+Tant que cette date n'est pas passée, le même écran propose **Reprendre l'abonnement**. Une
+résiliation faite depuis le tableau de bord Stripe arrive ici aussi, par le webhook.
+
+Les données restent en place dans tous les cas : c'est l'accès aux modules du forfait qui cesse,
+pas le dossier de l'entreprise.
+
+### Importer et exporter en Excel
+
+Quatre listes voyagent en classeur `.xlsx` : **Clients**, **Employés**, **Fournisseurs** et
+**Produits**. Sur chacune de ces pages, un bouton **Excel** ouvre trois choix :
+
+- **Télécharger le modèle** — un classeur vide, en-têtes et une ligne d'exemple remplie.
+- **Télécharger en xlsx** — la même forme, avec tout ce qui est en place.
+- **Importer un xlsx** — relire un classeur.
+
+Le modèle et l'export ont **exactement la même forme**, et c'est ce qui rend l'aller-retour
+possible : exportez, changez une colonne dans Excel, réimportez.
+
+Chaque classeur porte aussi les sous-onglets qui comptent, parce qu'un client n'est pas une ligne
+— c'est une ligne plus ses contacts plus ses adresses :
+
+| Liste | Onglets du classeur | Clé |
+| ----- | ------------------- | --- |
+| Clients | Clients, Contacts, Adresses | Le nom du client |
+| Employés | Employés, Contacts d'urgence, Adresses, Formations et permis | Le courriel |
+| Fournisseurs | Fournisseurs | Le nom |
+| Produits | Produits, Catégories, Sous-catégories | Le code, sinon le titre |
+
+Sur les onglets secondaires, la colonne qui relie à la fiche principale reprend cette clé —
+le nom du client, le courriel de l'employé. Pas un identifiant interne : une personne qui bâtit
+une liste dans Excel n'en a pas, et un format que seul un export peut produire est un format que
+personne ne peut taper.
+
+**L'importation met à jour plutôt que de dupliquer.** Une clé déjà connue modifie la fiche en
+place ; réimporter deux fois le même fichier ne crée rien la deuxième fois. Une ligne qu'on ne
+peut pas prendre est signalée avec son numéro et la raison, et les autres passent quand même.
+
+Ce qui ne s'importe **pas**, volontairement :
+
+- Les **salaires** et la **banque d'heures**. Un taux est un historique daté, et laisser un
+  tableur l'écraser réécrirait ce que quelqu'un a été payé en mars.
+- La **quantité en stock**. Elle bouge par entrées d'inventaire, qui sont ce qu'un décompte ou
+  une livraison laisse derrière. La taper par-dessus ferait mentir l'historique qui l'explique.
+- Le **rôle** d'un employé qui a déjà un accès. Promouvoir ou rétrograder un compte vivant depuis
+  un tableur, sans rien à l'écran qui le dise, n'est pas une bonne surprise.
+- **Aucune invitation n'est envoyée.** L'importation écrit le dossier ; la case « Accès » reste
+  un geste délibéré.
+
+Importer ou exporter les **employés** est réservé au propriétaire, comme le reste de leur dossier.
+
+### La fiche d'un client
+
+Le premier sous-onglet est **Détails** : tout ce qui a été saisi à la création — numéro, type,
+statut, personne-ressource, téléphone, courriel, numéro de taxe, taxes, adresse principale, solde
+au compte, notes. C'est ce qu'on vient chercher en ouvrant un client neuf fois sur dix, alors
+c'est la section sur laquelle la fiche s'ouvre.
+
+La carte du haut garde le nom, les pastilles qui changent ce que les boutons feront (banni,
+compte bloqué, non taxable) et les boutons eux-mêmes. Elle ne grossit plus à chaque champ ajouté.
+
+Le dossier d'un employé suit exactement la même forme — voir *Le dossier d'un employé*.
 
 ### Actifs, comptes clients et paiements
 
@@ -752,7 +896,9 @@ Les PDF sont acceptés autant que les photos : les fournisseurs envoient les deu
 1. **La clé**, dans **Intégrations → Lecture de reçus**. Elle se crée sur
    `console.anthropic.com` et se range chiffrée en base comme les autres, jamais dans
    l'environnement.
-2. **Le quota, sur chaque forfait** : le champ *Lectures de reçus par mois*. **Tous les forfaits
+2. **La fonctionnalité `ocr`, cochée sur le forfait** (voir *Fonctionnalités*). Elle est cochée
+   d'office sur les forfaits qui avaient déjà une allocation.
+3. **Le quota, sur chaque forfait** : le champ *Lectures de reçus par mois*. **Tous les forfaits
    existants sont à zéro** — la migration ne l'a allumé pour personne, parce que c'est la seule
    chose ici qui se facture à l'usage et que l'allumer sans demander mettrait la facture d'API
    de quelqu'un d'autre sur la plateforme. Zéro retire la fonction : le bouton n'apparaît pas,
@@ -786,13 +932,14 @@ une phrase.
 ### Le dossier d'un employé
 
 La fiche d'un employé a maintenant la même forme que celle d'un client : un rail de sections à
-gauche, le contenu à droite. Treize sections, dont six annoncent honnêtement qu'elles ne
+gauche, le contenu à droite. Quatorze sections, dont deux annoncent honnêtement qu'elles ne
 contiennent encore rien plutôt que d'être cachées — le rail est le plan, et une pastille à zéro
 dit la vérité sur ce qui s'en vient.
 
 | Section | Ce qu'elle contient |
 | ------- | ------------------- |
-| Détails | Ses équipes, son accès, ses coordonnées. |
+| Détails | Ce qui a été saisi à la création : nom, courriel, téléphone, titre, rôle, accès. |
+| Équipes | Celles dont il fait partie, et où il est responsable. Elles se composent depuis l'onglet Équipes des ressources humaines. |
 | Contacts | Ses contacts d'urgence : qui appeler s'il arrive quelque chose sur un chantier. |
 | Adresses | Où il habite. Plusieurs sont permises ; une seule est la principale. |
 | CV | Expériences, formations, compétences — saisies pour pouvoir être cherchées. |

@@ -57,5 +57,12 @@ public class Plan
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public List<Module> Modules { get; set; } = [];
+
+    /// <summary>
+    /// What this plan lets its companies do, as opposed to what it lets them open. See
+    /// <see cref="Feature"/> for why the two are different lists.
+    /// </summary>
+    public List<Feature> Features { get; set; } = [];
+
     public List<Tenant> Tenants { get; set; } = [];
 }

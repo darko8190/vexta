@@ -20,6 +20,7 @@ import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
 import { ClickableRow } from "@/components/layout/clickable-row";
 import { PageHeader } from "@/components/layout/page-header";
+import { WorkbookMenu } from "@/components/import-export/workbook-menu";
 import { UpgradeCta } from "@/components/layout/upgrade-cta";
 import { useCanCreate } from "@/hooks/use-can-create";
 import { PaginationBar } from "@/components/layout/pagination-bar";
@@ -87,14 +88,17 @@ export default function ClientsPage() {
         title="Clients"
         description="Gérez le répertoire de vos clients."
         action={
-          canCreate ? (
-            <Button onClick={openCreate}>
-              <Plus />
-              Nouveau client
-            </Button>
-          ) : (
-            <UpgradeCta />
-          )
+          <div className="flex flex-wrap items-center gap-2">
+            <WorkbookMenu entity="clients" label="clients" />
+            {canCreate ? (
+              <Button onClick={openCreate}>
+                <Plus />
+                Nouveau client
+              </Button>
+            ) : (
+              <UpgradeCta />
+            )}
+          </div>
         }
       />
 

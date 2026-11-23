@@ -12,6 +12,27 @@ public record ModuleDto(
     Guid? ParentModuleId,
     bool OwnerOnly);
 
+public record FeatureDto(
+    Guid Id,
+    /// <summary>What the application checks. Fixed for the two features Vexta ships with.</summary>
+    string Key,
+    string Name,
+    string Description,
+    string Icon,
+    int SortOrder,
+    bool IsPublished,
+    /// <summary>Shipped with Vexta: its key cannot be changed and the row cannot be deleted.</summary>
+    bool IsBuiltIn,
+    int PlanCount);
+
+public record SaveFeatureRequest(
+    string Key,
+    string Name,
+    string Description,
+    string Icon,
+    int SortOrder,
+    bool IsPublished);
+
 public record PlanDto(
     Guid Id,
     string Name,
@@ -32,10 +53,14 @@ public record PlanDto(
     /// <summary>Null when Stripe could not be reached: such a plan cannot be published.</summary>
     string? StripePriceId,
     IReadOnlyList<ModuleDto> Modules,
+    /// <summary>What the plan lets a company do, as opposed to what it lets them open.</summary>
+    IReadOnlyList<FeatureDto> Features,
     int TenantCount);
 
 /// <summary>What the public site needs: no Stripe ids, no unpublished rows.</summary>
 public record PublicModuleDto(Guid Id, string Icon, string Title, string Description);
+
+public record PublicFeatureDto(string Key, string Icon, string Name, string Description);
 
 public record PublicPlanDto(
     Guid Id,
@@ -45,7 +70,8 @@ public record PublicPlanDto(
     string Currency,
     int MinUsers,
     int MaxUsers,
-    IReadOnlyList<PublicModuleDto> Modules);
+    IReadOnlyList<PublicModuleDto> Modules,
+    IReadOnlyList<PublicFeatureDto> Features);
 
 public record SaveModuleRequest(
     string Icon,
@@ -67,7 +93,12 @@ public record SavePlanRequest(
     bool IsPublished,
     IReadOnlyList<Guid> ModuleIds,
     /// <summary>Defaults to 100 when a caller says nothing, like the column itself.</summary>
-    int MonthlyReceiptScans = 100);
+    int MonthlyReceiptScans = 100,
+    /// <summary>
+    /// Optional so a caller written before features existed keeps working: null leaves the
+    /// plan's features alone rather than silently emptying them.
+    /// </summary>
+    IReadOnlyList<Guid>? FeatureIds = null);
 
 /// <summary>
 /// The modules in the order they should appear, parents and children together.

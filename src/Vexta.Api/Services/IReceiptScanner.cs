@@ -58,6 +58,7 @@ public class ReceiptScanner(
     IPlatformSettingsService settings,
     IR2StorageService storage,
     ICurrentUserService currentUser,
+    IFeatureService features,
     ILogger<ReceiptScanner> logger) : IReceiptScanner
 {
     /// <summary>
@@ -106,6 +107,13 @@ public class ReceiptScanner(
         var configured = !string.IsNullOrWhiteSpace(
             await settings.GetAsync(PlatformSettingKeys.AnthropicApiKey, ct));
 
+        // Sold on the plan as well as metered by it. A plan may carry an allowance it never
+        // got around to zeroing; the feature is the switch, the allowance is the ceiling.
+        if (!await features.IsEnabledAsync(FeatureKeys.Ocr, ct))
+        {
+            return new ReceiptScanAvailability(false, 0, 0);
+        }
+
         var allowance = await AllowanceAsync(tenantId, ct);
         var remaining = Math.Max(0, allowance - await UsedThisMonthAsync(tenantId, ct));
 
@@ -124,6 +132,12 @@ public class ReceiptScanner(
         {
             return new ReceiptScanResult(
                 null, "La lecture de reçus n'est pas configurée sur la plateforme.", 0);
+        }
+
+        if (!await features.IsEnabledAsync(FeatureKeys.Ocr, ct))
+        {
+            return new ReceiptScanResult(
+                null, "La lecture de reçus n'est pas incluse dans votre forfait.", 0);
         }
 
         var allowance = await AllowanceAsync(tenantId, ct);

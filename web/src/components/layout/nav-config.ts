@@ -12,6 +12,7 @@
   Palette,
   Settings,
   ShoppingCart,
+  Sparkles,
   Tag,
   Truck,
   Users,
@@ -98,6 +99,9 @@ const superAdminNav: NavItem[] = [
   { href: "/admin/tenants", label: "Locataires", icon: Building2 },
   { href: "/admin/forfaits", label: "Forfaits", icon: Tag },
   { href: "/admin/modules", label: "Modules", icon: Blocks },
+  // Beside Modules, because the two together are what a forfait is made of: the tabs and what
+  // can be done inside them.
+  { href: "/admin/fonctionnalites", label: "Fonctionnalités", icon: Sparkles },
   // After Modules on purpose: a report is attached to one, so the module has to exist first.
   { href: "/admin/rapports", label: "Rapports", icon: ChartBar },
   { href: "/admin/apparence", label: "Apparence", icon: Palette },

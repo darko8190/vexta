@@ -11,6 +11,11 @@ export interface BillingState {
   planName: string | null;
   planAmountCents: number | null;
   planCurrency: string | null;
+  /**
+   * The company asked to stop and is seeing out the period it has paid for. Not the same as a
+   * cancelled subscription: the space still works, and the button offers to resume.
+   */
+  cancelAtPeriodEnd: boolean;
 }
 
 /**

@@ -36,6 +36,8 @@ export interface SavePlanValues {
   sortOrder: number;
   isPublished: boolean;
   moduleIds: string[];
+  /** What the plan lets a company do, as opposed to what it lets them open. */
+  featureIds: string[];
 }
 
 export function useModulesQuery() {

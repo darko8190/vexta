@@ -21,6 +21,7 @@ import { EmptyState } from "@/components/layout/empty-state";
 import { LoadErrorState } from "@/components/layout/load-error-state";
 import { PaginationBar } from "@/components/layout/pagination-bar";
 import { SearchInput } from "@/components/layout/search-input";
+import { WorkbookMenu } from "@/components/import-export/workbook-menu";
 import { ProductFormSheet } from "@/components/products/product-form-sheet";
 import { formatProductNumber, money, quantity } from "@/components/products/product-format";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
@@ -110,7 +111,10 @@ export function ProductsSection() {
           <h2 className="text-base font-semibold text-foreground">Produits</h2>
           <p className="text-sm text-muted-foreground">Ce que vous gardez en stock et revendez.</p>
         </div>
-        {createButton}
+        <div className="flex flex-wrap items-center gap-2">
+          <WorkbookMenu entity="produits" label="produits" />
+          {createButton}
+        </div>
       </div>
 
       <div className="mb-4">

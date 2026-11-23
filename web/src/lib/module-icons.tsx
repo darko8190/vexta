@@ -1,5 +1,6 @@
 import {
   Bell,
+  Bot,
   BookUser,
   CalendarClock,
   ClipboardPen,
@@ -33,6 +34,7 @@ import {
   ShieldCheck,
   ShoppingCart,
   Smartphone,
+  Sparkles,
   TrendingUp,
   Truck,
   Users,
@@ -90,6 +92,8 @@ export const MODULE_ICONS = {
   UserPlus,
   BookUser,
   PackageCheck,
+  Sparkles,
+  Bot,
 } as const;
 
 export type ModuleIconName = keyof typeof MODULE_ICONS;

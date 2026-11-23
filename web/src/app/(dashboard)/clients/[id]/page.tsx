@@ -4,15 +4,13 @@ import { use, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
-  Building2,
   Car,
   FileText,
   FolderKanban,
+  IdCard,
   Lock,
-  Mail,
   MapPin,
   Pencil,
-  Phone,
   UserRound,
   Wallet,
 } from "lucide-react";
@@ -31,6 +29,7 @@ import { ClientFormSheet } from "@/components/clients/client-form-sheet";
 import { ClientAccountSection } from "@/components/clients/detail/client-account-section";
 import { ClientAssetsSection } from "@/components/clients/detail/client-assets-section";
 import { ClientContactsSection } from "@/components/clients/detail/client-contacts-section";
+import { ClientDetailsSection } from "@/components/clients/detail/client-details-section";
 import { SectionNav, type NavSection } from "@/components/layout/section-nav";
 import {
   ClientAddressesSection,
@@ -40,7 +39,6 @@ import {
 import { useIsOwner } from "@/hooks/use-can-create";
 import { useClientQuery } from "@/hooks/use-clients";
 import { clientStatusBadge } from "@/lib/labels";
-import { formatAmount } from "@/lib/money";
 import { formatClientNumber } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -48,7 +46,9 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
   const { id } = use(params);
   const { data: client, isLoading, isError } = useClientQuery(id);
   const isOwner = useIsOwner();
-  const [section, setSection] = useState("contacts");
+  // Détails first, and the one the file opens on: somebody opening a client is looking for a
+  // telephone number or an address far more often than for their list of invoices.
+  const [section, setSection] = useState("details");
   const [editOpen, setEditOpen] = useState(false);
   const [blockScope, setBlockScope] = useState<"client" | "account" | null>(null);
 
@@ -78,6 +78,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
   }
 
   const sections: NavSection[] = [
+    { key: "details", label: "Détails", icon: IdCard },
     { key: "contacts", label: "Contacts", count: client.contactCount, icon: UserRound },
     { key: "actifs", label: "Actifs", count: client.assetCount, icon: Car },
     { key: "adresses", label: "Adresses", count: client.addressCount, icon: MapPin },
@@ -87,8 +88,6 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
     // above rather than squeezed into a badge.
     { key: "compte", label: "Compte", icon: Wallet },
   ];
-
-  const address = client.primaryAddress;
 
   return (
     <div>
@@ -196,59 +195,6 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
           </p>
         )}
 
-        <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
-          {/* Shown on the card and not only in the Compte section: what a client owes is the
-              thing you want to know before picking up the phone to them. */}
-          {client.accountBalance !== 0 && (
-            <div>
-              <dt className="text-muted-foreground">Solde au compte</dt>
-              <dd
-                className={
-                  client.accountBalance > 0
-                    ? "font-medium text-destructive tabular-nums"
-                    : "text-foreground tabular-nums"
-                }
-              >
-                {formatAmount(client.accountBalance)}
-              </dd>
-            </div>
-          )}
-          {client.phone && (
-            <div>
-              <dt className="text-muted-foreground">Téléphone</dt>
-              <dd>
-                <a href={`tel:${client.phone}`} className="inline-flex items-center gap-1.5 text-foreground hover:underline">
-                  <Phone className="size-3.5 shrink-0" />
-                  {client.phone}
-                </a>
-              </dd>
-            </div>
-          )}
-          {client.email && (
-            <div className="min-w-0">
-              <dt className="text-muted-foreground">Courriel</dt>
-              <dd className="truncate">
-                <a href={`mailto:${client.email}`} className="inline-flex max-w-full items-center gap-1.5 text-foreground hover:underline">
-                  <Mail className="size-3.5 shrink-0" />
-                  <span className="truncate">{client.email}</span>
-                </a>
-              </dd>
-            </div>
-          )}
-          {address && (
-            <div className="min-w-0">
-              <dt className="text-muted-foreground">Adresse</dt>
-              <dd className="flex items-start gap-1.5 text-foreground">
-                <Building2 className="mt-0.5 size-3.5 shrink-0" />
-                <span>
-                  {[address.line1, address.apartment].filter(Boolean).join(", ")}
-                  <br />
-                  {[address.city, address.province, address.postalCode].filter(Boolean).join(", ")}
-                </span>
-              </dd>
-            </div>
-          )}
-        </dl>
       </div>
 
       {/* The rail sits beside the content from md up and becomes a scrollable row below it. */}
@@ -256,6 +202,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
         <SectionNav sections={sections} active={section} onSelect={setSection} label="Sections du client" />
 
         <div className="min-w-0 flex-1">
+          {section === "details" && <ClientDetailsSection client={client} />}
           {section === "contacts" && <ClientContactsSection clientId={client.id} />}
           {section === "actifs" && <ClientAssetsSection clientId={client.id} />}
           {section === "compte" && <ClientAccountSection clientId={client.id} />}

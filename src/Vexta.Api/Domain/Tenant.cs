@@ -1,4 +1,4 @@
-namespace Vexta.Api.Domain;
+﻿namespace Vexta.Api.Domain;
 
 public class Tenant
 {
@@ -16,6 +16,17 @@ public class Tenant
     public string? StripeCustomerId { get; set; }
     public string? StripeSubscriptionId { get; set; }
     public DateTimeOffset? CurrentPeriodEnd { get; set; }
+
+    /// <summary>
+    /// The company asked to stop. Stripe keeps the subscription running to the end of the
+    /// period already paid for, so the space stays open until <see cref="CurrentPeriodEnd"/>
+    /// and then lapses on its own.
+    ///
+    /// Stored here as well as in Stripe because this is what the settings screen reads: asking
+    /// Stripe on every page load would make an unsubscribe button that sometimes says nothing
+    /// happened, and the webhook keeps the two in step.
+    /// </summary>
+    public bool CancelAtPeriodEnd { get; set; }
 
     // ---- The company's own profile, shown on its documents and filled in by its owner ----
 

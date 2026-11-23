@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
 import { useModulesQuery, useSavePlan } from "@/hooks/use-catalog";
+import { useFeaturesQuery } from "@/hooks/use-features";
 import { ApiError } from "@/lib/api";
 import { centsToFieldValue, parseAmountToCents } from "@/lib/money";
 import { moduleIcon } from "@/lib/module-icons";
@@ -62,6 +63,7 @@ const formSchema = z.object({
   sortOrder: z.string().trim().regex(/^\d{1,3}$/, "Entrez un nombre entre 0 et 999."),
   isPublished: z.boolean(),
   moduleIds: z.array(z.string()),
+  featureIds: z.array(z.string()),
 });
 
 // On the object rather than on either field: a range is only wrong as a pair, and the message
@@ -86,6 +88,7 @@ function toFormValues(plan?: PlanRecord): FormValues {
     sortOrder: String(plan?.sortOrder ?? 0),
     isPublished: plan?.isPublished ?? false,
     moduleIds: plan?.modules.map((m) => m.id) ?? [],
+    featureIds: plan?.features?.map((f) => f.id) ?? [],
   };
 }
 
@@ -101,6 +104,7 @@ export function PlanFormSheet({
   const isEditing = Boolean(plan);
   const save = useSavePlan();
   const { data: modules } = useModulesQuery();
+  const { data: features } = useFeaturesQuery();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(planSchema),
@@ -128,6 +132,7 @@ export function PlanFormSheet({
           sortOrder: Number(values.sortOrder),
           isPublished: values.isPublished,
           moduleIds: values.moduleIds,
+          featureIds: values.featureIds,
         },
       });
       toast.success(isEditing ? "Forfait mis à jour." : "Forfait créé.");
@@ -325,6 +330,59 @@ export function PlanFormSheet({
                             {!module.isPublished && (
                               <span className="ml-auto text-xs text-muted-foreground">masqué</span>
                             )}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </Field>
+              )}
+            />
+
+            <Controller
+              name="featureIds"
+              control={form.control}
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel>Fonctionnalités incluses</FieldLabel>
+                  <FieldDescription>
+                    Un module est un onglet ; une fonctionnalité est ce qu&apos;on a le droit de
+                    faire dedans. Décocher une fonctionnalité ne retire aucun écran — le bouton
+                    concerné disparaît, plutôt que d&apos;apparaître et de refuser.
+                  </FieldDescription>
+                  {!features || features.length === 0 ? (
+                    <FieldDescription>
+                      Aucune fonctionnalité n&apos;existe encore. Créez-en dans la page
+                      Fonctionnalités pour pouvoir les inclure ici.
+                    </FieldDescription>
+                  ) : (
+                    <div className="space-y-2">
+                      {features.map((feature) => {
+                        const Icon = moduleIcon(feature.icon);
+                        const checked = field.value.includes(feature.id);
+                        return (
+                          <label
+                            key={feature.id}
+                            className="flex cursor-pointer items-start gap-3 rounded-lg border border-border px-3 py-2 transition-colors hover:bg-muted/40"
+                          >
+                            <Checkbox
+                              className="mt-0.5"
+                              checked={checked}
+                              onCheckedChange={(next) =>
+                                field.onChange(
+                                  next === true
+                                    ? [...field.value, feature.id]
+                                    : field.value.filter((id: string) => id !== feature.id),
+                                )
+                              }
+                            />
+                            <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                            <span className="min-w-0">
+                              <span className="block text-sm text-foreground">{feature.name}</span>
+                              <span className="block text-xs text-muted-foreground">
+                                {feature.description}
+                              </span>
+                            </span>
                           </label>
                         );
                       })}

@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Building2, Clock, CreditCard, Mail, Percent, Receipt } from "lucide-react";
+import { Building2, Clock, CreditCard, Mail, Percent, Receipt, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { PageHeader } from "@/components/layout/page-header";
 import { SectionNav, type NavSection } from "@/components/layout/section-nav";
+import { AiAssistantCard } from "@/components/settings/ai-assistant-card";
 import { BillingSettingsCard } from "@/components/settings/billing-settings-card";
 import { HourlyRateCard } from "@/components/settings/hourly-rate-card";
 import { InvoiceEmailCard } from "@/components/settings/invoice-email-card";
@@ -25,6 +26,7 @@ import { usePricePoliciesQuery } from "@/hooks/use-price-policies";
 import { ApiError, api } from "@/lib/api";
 import { tenantStatusBadgeVariant, tenantStatusLabels } from "@/lib/labels";
 import { formatCents } from "@/lib/money";
+import { formatMoment } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 import { ex } from "@/lib/placeholders";
 
@@ -89,6 +91,25 @@ function PaymentReturnNotice() {
 
 function BusinessSubscription({ state }: { state: BillingState }) {
   const isActive = state.subscriptionStatus === "Active";
+  const queryClient = useQueryClient();
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
+
+  /**
+   * Stopping and starting again, which Stripe treats as one flag rather than two operations.
+   * Nothing is taken away on the spot: the space runs to the end of the period already paid
+   * for, which is why the button that undoes it says "reprendre" and not "se réabonner".
+   */
+  const cancel = useMutation({
+    mutationFn: (stop: boolean) =>
+      api.post<{ message: string }>(stop ? "billing/cancel" : "billing/resume"),
+    onSuccess: (data) => {
+      toast.success(data.message);
+      setConfirmingCancel(false);
+      queryClient.invalidateQueries({ queryKey: ["billing-state"] });
+    },
+    onError: (error) =>
+      toast.error(error instanceof ApiError ? error.message : "Impossible de modifier l'abonnement."),
+  });
 
   const checkout = useMutation({
     mutationFn: () => api.post<{ checkoutUrl: string }>("billing/checkout-session"),
@@ -120,19 +141,71 @@ function BusinessSubscription({ state }: { state: BillingState }) {
             : state.tenantName}
         </CardDescription>
       </CardHeader>
-      <CardContent className="text-sm text-muted-foreground">
-        {isActive
-          ? "Votre abonnement est actif."
-          : state.canManage
-            ? "Votre abonnement n'est pas actif. Complétez le paiement pour accéder à tous les modules."
-            : "Votre abonnement n'est pas actif. Demandez à un administrateur de votre entreprise de compléter le paiement."}
+      <CardContent className="space-y-3 text-sm text-muted-foreground">
+        <p>
+          {state.cancelAtPeriodEnd
+            ? state.currentPeriodEnd
+              ? `Abonnement résilié. Votre espace reste ouvert jusqu'au ${formatMoment(state.currentPeriodEnd)}, puis les modules de votre forfait se ferment. Vos données restent en place.`
+              : "Abonnement résilié. Votre espace reste ouvert jusqu'à la fin de la période déjà payée."
+            : isActive
+              ? "Votre abonnement est actif."
+              : state.canManage
+                ? "Votre abonnement n'est pas actif. Complétez le paiement pour accéder à tous les modules."
+                : "Votre abonnement n'est pas actif. Demandez à un administrateur de votre entreprise de compléter le paiement."}
+        </p>
+
+        {/* The question is asked in the card rather than in a dialog: it has one sentence of
+            consequence to read, and a dialog over a card this short just hides the price and
+            the date the person is weighing. */}
+        {confirmingCancel && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-foreground">
+            <p className="font-medium">Résilier l&apos;abonnement ?</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Rien n&apos;est facturé de plus et rien ne ferme aujourd&apos;hui : votre espace
+              fonctionne jusqu&apos;à la fin de la période déjà payée
+              {state.currentPeriodEnd ? `, le ${formatMoment(state.currentPeriodEnd)}` : ""}. Vous
+              pourrez revenir sur cette décision jusque-là.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => cancel.mutate(true)}
+                disabled={cancel.isPending}
+              >
+                {cancel.isPending && <Spinner />}
+                Oui, résilier
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setConfirmingCancel(false)}>
+                Garder mon abonnement
+              </Button>
+            </div>
+          </div>
+        )}
       </CardContent>
-      {!isActive && state.canManage && (
-        <CardFooter>
-          <Button onClick={() => checkout.mutate()} disabled={checkout.isPending}>
-            {checkout.isPending && <Spinner />}
-            Activer l&apos;abonnement
-          </Button>
+
+      {state.canManage && (
+        <CardFooter className="gap-2">
+          {!isActive && !state.cancelAtPeriodEnd && (
+            <Button onClick={() => checkout.mutate()} disabled={checkout.isPending}>
+              {checkout.isPending && <Spinner />}
+              Activer l&apos;abonnement
+            </Button>
+          )}
+
+          {state.cancelAtPeriodEnd ? (
+            <Button onClick={() => cancel.mutate(false)} disabled={cancel.isPending}>
+              {cancel.isPending && <Spinner />}
+              Reprendre l&apos;abonnement
+            </Button>
+          ) : (
+            isActive &&
+            !confirmingCancel && (
+              <Button variant="outline" onClick={() => setConfirmingCancel(true)}>
+                Se désabonner
+              </Button>
+            )
+          )}
         </CardFooter>
       )}
     </Card>
@@ -268,6 +341,8 @@ export default function SettingsPage() {
           { key: "taux", label: "Taux", icon: Clock },
           // The only count that means anything on this page; the others are one thing each.
           { key: "marge", label: "Marge et prix", count: policies?.length ?? 0, icon: Percent },
+          // Last, because it is the one section that is set up once and then forgotten.
+          { key: "assistant", label: "Assistant IA", icon: Sparkles },
         ]
       : []),
   ];
@@ -311,6 +386,7 @@ export default function SettingsPage() {
             {active === "facturation" && <BillingSettingsCard />}
             {active === "courriel" && <InvoiceEmailCard />}
             {active === "taux" && <HourlyRateCard />}
+            {active === "assistant" && <AiAssistantCard />}
             {active === "marge" && (
               <div className="space-y-6">
                 <MarginModeCard />

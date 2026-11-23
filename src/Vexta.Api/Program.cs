@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -82,6 +82,9 @@ builder.Services.AddScoped<IPasswordResetService, PasswordResetService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IFormActionRunner, FormActionRunner>();
 builder.Services.AddScoped<IReceiptScanner, ReceiptScanner>();
+builder.Services.AddScoped<IFeatureService, FeatureService>();
+builder.Services.AddScoped<IWorkbookService, WorkbookService>();
+builder.Services.AddScoped<IAssistantService, AssistantService>();
 
 builder.Services
     .AddIdentityCore<ApplicationUser>(options =>
@@ -275,5 +278,9 @@ app.MapControllers();
 
 var startupLogger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
 await SuperAdminSeeder.SeedAsync(app.Services, startupLogger);
+
+// After the migrations the line above runs, and after the super admin, because both the
+// modules and the features are ordinary rows in tables those migrations create.
+await CatalogSeeder.SeedAsync(app.Services, startupLogger);
 
 app.Run();

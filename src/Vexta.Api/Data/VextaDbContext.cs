@@ -42,6 +42,8 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
     public DbSet<MediaAsset> MediaAssets => Set<MediaAsset>();
     public DbSet<Plan> Plans => Set<Plan>();
     public DbSet<Module> Modules => Set<Module>();
+    public DbSet<Feature> Features => Set<Feature>();
+    public DbSet<TenantAiSettings> TenantAiSettings => Set<TenantAiSettings>();
     public DbSet<BrandingAsset> BrandingAssets => Set<BrandingAsset>();
     public DbSet<Employee> Employees => Set<Employee>();
     public DbSet<ClientContact> ClientContacts => Set<ClientContact>();
@@ -138,6 +140,27 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
         {
             e.HasIndex(p => p.SortOrder);
             e.HasMany(p => p.Modules).WithMany(m => m.Plans);
+            e.HasMany(p => p.Features).WithMany(f => f.Plans);
+        });
+
+        builder.Entity<Feature>(e =>
+        {
+            // The key is what the application checks, so two rows claiming the same one would
+            // make "does this plan include the assistant" a question with two answers.
+            e.Property(f => f.Key).HasMaxLength(40);
+            e.HasIndex(f => f.Key).IsUnique();
+            e.HasIndex(f => f.SortOrder);
+        });
+
+        builder.Entity<TenantAiSettings>(e =>
+        {
+            e.HasKey(s => s.TenantId);
+            e.HasOne(s => s.Tenant).WithOne()
+                .HasForeignKey<TenantAiSettings>(s => s.TenantId).OnDelete(DeleteBehavior.Cascade);
+            e.Property(s => s.Model).HasMaxLength(100);
+
+            // No query filter: this row is read while deciding what the current tenant may do,
+            // which is sometimes before the filter's tenant has been established.
         });
 
         builder.Entity<Module>(e =>

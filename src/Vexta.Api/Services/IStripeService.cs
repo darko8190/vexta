@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Stripe;
 using Stripe.Checkout;
@@ -30,6 +30,16 @@ public interface IStripeService
         IDictionary<string, string>? sessionMetadata = null,
         CancellationToken ct = default);
     Task<Event> ConstructEventAsync(string payload, string signatureHeader, CancellationToken ct = default);
+
+    /// <summary>
+    /// Stops a subscription at the end of the period already paid for, or puts it back.
+    ///
+    /// Never cancels on the spot: the company has paid to the end of the month and taking their
+    /// space away the moment they press the button would be charging for something and then not
+    /// delivering it. Stripe keeps billing nothing further and the subscription lapses by itself.
+    /// </summary>
+    /// <returns>When the access actually ends, as Stripe sees it.</returns>
+    Task<DateTimeOffset?> SetCancelAtPeriodEndAsync(string subscriptionId, bool cancel, CancellationToken ct = default);
     Task ApplySubscriptionEventAsync(Event stripeEvent, VextaDbContext db, CancellationToken ct = default);
 
     /// <summary>
@@ -150,6 +160,26 @@ public class StripeService(IPlatformSettingsService settings, ILogger<StripeServ
         return session.Url;
     }
 
+    public async Task<DateTimeOffset?> SetCancelAtPeriodEndAsync(
+        string subscriptionId, bool cancel, CancellationToken ct = default)
+    {
+        var secretKey = await GetSecretKeyAsync(ct);
+        if (string.IsNullOrWhiteSpace(secretKey))
+        {
+            throw new InvalidOperationException("Stripe n'est pas configuré. Contactez l'administrateur de la plateforme.");
+        }
+
+        var client = new StripeClient(secretKey);
+        var subscription = await new SubscriptionService(client).UpdateAsync(
+            subscriptionId,
+            new SubscriptionUpdateOptions { CancelAtPeriodEnd = cancel },
+            cancellationToken: ct);
+
+        // Taken from the item rather than the subscription: the period moved onto the items in
+        // a recent API version, and the subscription-level field is gone on newer accounts.
+        return subscription.Items?.Data?.FirstOrDefault()?.CurrentPeriodEnd;
+    }
+
     public async Task<Event> ConstructEventAsync(string payload, string signatureHeader, CancellationToken ct)
     {
         var webhookSecret = await settings.GetAsync(PlatformSettingKeys.StripeWebhookSecret, ct);
@@ -250,6 +280,17 @@ public class StripeService(IPlatformSettingsService settings, ILogger<StripeServ
                     "past_due" or "unpaid" or "incomplete" => TenantSubscriptionStatus.PastDue,
                     _ => TenantSubscriptionStatus.Canceled
                 };
+
+                // Kept in step here as well as when the button is pressed, because a cancellation
+                // can also come from the Stripe dashboard — and because a subscription that has
+                // actually ended is no longer waiting for anything.
+                tenant.CancelAtPeriodEnd =
+                    subscription.CancelAtPeriodEnd && tenant.SubscriptionStatus != TenantSubscriptionStatus.Canceled;
+
+                if (subscription.Items?.Data?.FirstOrDefault()?.CurrentPeriodEnd is { } periodEnd)
+                {
+                    tenant.CurrentPeriodEnd = periodEnd;
+                }
                 await db.SaveChangesAsync(ct);
                 break;
             }

@@ -15,10 +15,8 @@ import {
   Hourglass,
   IdCard,
   LifeBuoy,
-  Mail,
   Palmtree,
   Pencil,
-  Phone,
   Receipt,
   Send,
   ShieldCheck,
@@ -37,6 +35,8 @@ import { DocumentsSection } from "@/components/hr/documents-section";
 import { EmergencyContactsSection } from "@/components/hr/emergency-contacts-section";
 import { EmployeeAddressesSection } from "@/components/hr/employee-addresses-section";
 import { CvSection } from "@/components/hr/employee/cv-section";
+import { EmployeeDetailsSection } from "@/components/hr/employee/employee-details-section";
+import { TeamsSection } from "@/components/hr/employee/teams-section";
 import { EmployeeTimesheetsSection } from "@/components/hr/employee/employee-timesheets-section";
 import { HourBankSection } from "@/components/hr/employee/hour-bank-section";
 import { LeavesSection } from "@/components/hr/employee/leaves-section";
@@ -115,6 +115,9 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
   // on it, and a badge at zero is honest about there being nothing there today.
   const sections: NavSection[] = [
     { key: "details", label: "Détails", icon: IdCard },
+    // Its own section rather than a paragraph under Détails: a crew on four teams is a list,
+    // and a list pinned under somebody's telephone number is a list nobody finds.
+    { key: "equipes", label: "Équipes", count: teams.length, icon: UsersRound },
     { key: "contacts", label: "Contacts", count: counts?.emergencyContacts, icon: LifeBuoy },
     { key: "adresses", label: "Adresses", count: counts?.addresses, icon: Home },
     { key: "cv", label: "CV", count: counts?.cvEntries, icon: FileUser },
@@ -224,35 +227,6 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
           </div>
         </div>
 
-        <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
-          <div className="min-w-0">
-            <dt className="text-muted-foreground">Courriel</dt>
-            <dd className="truncate">
-              <a
-                href={`mailto:${employee.email}`}
-                className="inline-flex max-w-full items-center gap-1.5 text-foreground hover:underline"
-              >
-                <Mail className="size-3.5 shrink-0" />
-                <span className="truncate">{employee.email}</span>
-              </a>
-            </dd>
-          </div>
-          {employee.phone && (
-            <div>
-              <dt className="text-muted-foreground">Téléphone</dt>
-              <dd>
-                <a
-                  href={`tel:${employee.phone}`}
-                  className="inline-flex items-center gap-1.5 text-foreground hover:underline"
-                >
-                  <Phone className="size-3.5 shrink-0" />
-                  {employee.phone}
-                </a>
-              </dd>
-            </div>
-          )}
-        </dl>
-
         {employee.isOwner && (
           <p className="mt-4 border-t border-border pt-3 text-xs text-muted-foreground">
             C&apos;est le compte auquel l&apos;espace appartient : son accès ne peut pas être
@@ -272,33 +246,9 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
         />
 
         <div className="min-w-0 flex-1">
-          {section === "details" && (
-            <div>
-              <div className="mb-4">
-                <h2 className="text-base font-semibold text-foreground">Équipes</h2>
-                <p className="text-sm text-muted-foreground">
-                  Les équipes se composent depuis l&apos;onglet Équipes des ressources humaines.
-                </p>
-              </div>
+          {section === "details" && <EmployeeDetailsSection employee={employee} />}
 
-              {teams.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Cette personne n&apos;est dans aucune équipe.
-                </p>
-              ) : (
-                <ul className="flex flex-wrap gap-2">
-                  {teams.map((team) => (
-                    <li key={team.id}>
-                      <Badge variant={team.isLead ? "default" : "secondary"}>
-                        {team.name}
-                        {team.isLead && " · responsable"}
-                      </Badge>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
+          {section === "equipes" && <TeamsSection teams={teams} />}
 
           {section === "contacts" && <EmergencyContactsSection employeeId={employee.id} />}
           {section === "adresses" && <EmployeeAddressesSection employeeId={employee.id} />}

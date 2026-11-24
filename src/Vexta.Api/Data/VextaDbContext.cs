@@ -1569,6 +1569,8 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.Property(b => b.Currency).HasMaxLength(3);
             e.Property(b => b.InvoiceEmailSubject).HasMaxLength(300);
             e.Property(b => b.InvoiceEmailBody).HasMaxLength(8000);
+            e.Property(b => b.QuoteEmailSubject).HasMaxLength(300);
+            e.Property(b => b.QuoteEmailBody).HasMaxLength(8000);
             e.Property(b => b.GstRate).HasPrecision(6, 3);
             e.Property(b => b.QstRate).HasPrecision(6, 3);
             e.Property(b => b.DefaultHourlyRate).HasPrecision(14, 2);

@@ -17,7 +17,7 @@ import { SectionNav, type NavSection } from "@/components/layout/section-nav";
 import { AiAssistantCard } from "@/components/settings/ai-assistant-card";
 import { BillingSettingsCard } from "@/components/settings/billing-settings-card";
 import { HourlyRateCard } from "@/components/settings/hourly-rate-card";
-import { InvoiceEmailCard } from "@/components/settings/invoice-email-card";
+import { EmailTemplateCard } from "@/components/settings/email-template-card";
 import { MarginModeCard } from "@/components/settings/margin-mode-card";
 import { OnlinePaymentsCard } from "@/components/settings/online-payments-card";
 import { PricePoliciesCard } from "@/components/settings/price-policies-card";
@@ -389,7 +389,12 @@ export default function SettingsPage() {
                 <BusinessSubscription state={data} />
               ))}
             {active === "facturation" && <BillingSettingsCard />}
-            {active === "courriel" && <InvoiceEmailCard />}
+            {active === "courriel" && (
+              <div className="space-y-6">
+                <EmailTemplateCard kind="facture" />
+                <EmailTemplateCard kind="soumission" />
+              </div>
+            )}
             {active === "paiements" && <OnlinePaymentsCard />}
             {active === "taux" && (
               <div className="space-y-6">

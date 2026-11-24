@@ -419,6 +419,14 @@ namespace Vexta.Api.Data.Migrations
                         .HasPrecision(6, 3)
                         .HasColumnType("numeric(6,3)");
 
+                    b.Property<string>("QuoteEmailBody")
+                        .HasMaxLength(8000)
+                        .HasColumnType("character varying(8000)");
+
+                    b.Property<string>("QuoteEmailSubject")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
                     b.Property<string>("RbqNumber")
                         .HasColumnType("text");
 

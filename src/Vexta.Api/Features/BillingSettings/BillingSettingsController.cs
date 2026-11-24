@@ -61,7 +61,13 @@ public record BillingSettingsDto(
     /// The fields a template may use. Sent from the renderer's own list rather than written
     /// into the screen, so the fields offered are the fields that get filled in.
     /// </summary>
-    IReadOnlyList<InvoiceEmailFieldDto> InvoiceEmailFields);
+    IReadOnlyList<InvoiceEmailFieldDto> InvoiceEmailFields,
+    /// <summary>The same four for the message a quote leaves with.</summary>
+    string? QuoteEmailSubject,
+    string? QuoteEmailBody,
+    string DefaultQuoteEmailSubject,
+    string DefaultQuoteEmailBody,
+    IReadOnlyList<InvoiceEmailFieldDto> QuoteEmailFields);
 
 /// <summary>One field a template may drop in, and what it stands for.</summary>
 public record InvoiceEmailFieldDto(string Field, string Description);
@@ -210,8 +216,29 @@ public class BillingSettingsController(VextaDbContext db, ICurrentUserService cu
     /// </summary>
     [HttpPut("email")]
     [Authorize(Roles = Roles.Owner)]
-    public async Task<ActionResult<BillingSettingsDto>> SaveInvoiceEmail(
-        SaveInvoiceEmailRequest request, CancellationToken ct)
+    public Task<ActionResult<BillingSettingsDto>> SaveInvoiceEmail(
+        SaveInvoiceEmailRequest request, CancellationToken ct) =>
+        SaveEmailAsync(request, (settings, subject, body) =>
+        {
+            settings.InvoiceEmailSubject = subject;
+            settings.InvoiceEmailBody = body;
+        }, ct);
+
+    /// <summary>The quote's wording, saved the same way and under the same limits.</summary>
+    [HttpPut("email/soumission")]
+    [Authorize(Roles = Roles.Owner)]
+    public Task<ActionResult<BillingSettingsDto>> SaveQuoteEmail(
+        SaveInvoiceEmailRequest request, CancellationToken ct) =>
+        SaveEmailAsync(request, (settings, subject, body) =>
+        {
+            settings.QuoteEmailSubject = subject;
+            settings.QuoteEmailBody = body;
+        }, ct);
+
+    private async Task<ActionResult<BillingSettingsDto>> SaveEmailAsync(
+        SaveInvoiceEmailRequest request,
+        Action<Domain.BillingSettings, string?, string?> apply,
+        CancellationToken ct)
     {
         if (currentUser.TenantId is not { } tenantId) return Forbid();
 
@@ -239,8 +266,7 @@ public class BillingSettingsController(VextaDbContext db, ICurrentUserService cu
             db.BillingSettings.Add(settings);
         }
 
-        settings.InvoiceEmailSubject = subject;
-        settings.InvoiceEmailBody = body;
+        apply(settings, subject, body);
         settings.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
 
@@ -284,6 +310,53 @@ public class BillingSettingsController(VextaDbContext db, ICurrentUserService cu
             // and must, which is the one thing this flag decides.
             InvoiceEmailTemplate.Render(subject, values, escapeHtml: false),
             InvoiceEmailTemplate.Render(body, values, escapeHtml: true)));
+    }
+
+    /// <summary>
+    /// The quote's template filled in with a sample quote, through the same renderer the send
+    /// form uses. The sample client has portal access, so the preview shows the link.
+    /// </summary>
+    [HttpPost("email/soumission/preview")]
+    [Authorize]
+    public async Task<ActionResult<InvoiceEmailPreviewDto>> PreviewQuoteEmail(
+        PreviewInvoiceEmailRequest request, CancellationToken ct)
+    {
+        if (currentUser.TenantId is not { } tenantId) return Forbid();
+
+        var settings = await db.BillingSettings.AsNoTracking()
+            .FirstOrDefaultAsync(b => b.TenantId == tenantId, ct);
+        var company = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
+            .Where(t => t.Id == tenantId)
+            .Select(t => t.Name)
+            .FirstOrDefaultAsync(ct) ?? "Votre entreprise";
+
+        var model = settings ?? new Domain.BillingSettings();
+        var subtotal = 2_450.00m;
+        var taxes = Math.Round(subtotal * model.GstRate / 100m, 2) + Math.Round(subtotal * model.QstRate / 100m, 2);
+        var issued = BusinessDay.Today;
+        var validUntil = issued.AddDays(30).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+        var values = new Dictionary<string, string>
+        {
+            ["numero"] = "S-0042",
+            ["entreprise"] = company,
+            ["client"] = "Construction Lavoie & Fils",
+            ["contact"] = "Marie Lavoie",
+            ["description"] = "Réfection de la toiture",
+            ["total"] = InvoiceEmailTemplate.Money(subtotal + taxes),
+            ["sous_total"] = InvoiceEmailTemplate.Money(subtotal),
+            ["taxes"] = InvoiceEmailTemplate.Money(taxes),
+            ["date_emission"] = issued.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            ["date_validite"] = validUntil,
+            ["validite"] = QuoteEmailTemplate.Validity(validUntil),
+            ["devise"] = CurrencyCode(model.Currency),
+            // "#" rather than a real address: the preview is clicked by the company, not the client.
+            [QuoteEmailTemplate.AcceptField] = QuoteEmailTemplate.AcceptParagraph("#")
+        };
+
+        return Ok(new InvoiceEmailPreviewDto(
+            QuoteEmailTemplate.Render(Clean(request.Subject) ?? QuoteEmailTemplate.DefaultSubject, values, escapeHtml: false),
+            QuoteEmailTemplate.Render(Clean(request.Body) ?? QuoteEmailTemplate.DefaultBody, values, escapeHtml: true)));
     }
 
     /// <summary>
@@ -427,7 +500,12 @@ public class BillingSettingsController(VextaDbContext db, ICurrentUserService cu
             model.InvoiceEmailBody,
             InvoiceEmailTemplate.DefaultSubject,
             InvoiceEmailTemplate.DefaultBody,
-            [.. InvoiceEmailTemplate.Fields.Select(f => new InvoiceEmailFieldDto(f.Field, f.Description))]);
+            [.. InvoiceEmailTemplate.Fields.Select(f => new InvoiceEmailFieldDto(f.Field, f.Description))],
+            model.QuoteEmailSubject,
+            model.QuoteEmailBody,
+            QuoteEmailTemplate.DefaultSubject,
+            QuoteEmailTemplate.DefaultBody,
+            [.. QuoteEmailTemplate.Fields.Select(f => new InvoiceEmailFieldDto(f.Field, f.Description))]);
     }
 }
 

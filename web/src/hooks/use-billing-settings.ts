@@ -38,7 +38,22 @@ export interface BillingSettings {
   defaultInvoiceEmailBody: string;
   /** The fields a template may use, as the renderer itself lists them. */
   invoiceEmailFields: InvoiceEmailField[];
+  /** The same for the message a quote leaves with. */
+  quoteEmailSubject: string | null;
+  quoteEmailBody: string | null;
+  defaultQuoteEmailSubject: string;
+  defaultQuoteEmailBody: string;
+  quoteEmailFields: InvoiceEmailField[];
 }
+
+/** Which document's email a template card edits. */
+export type EmailTemplateKind = "facture" | "soumission";
+
+/** Where each kind is saved and previewed. */
+const emailEndpoint: Record<EmailTemplateKind, string> = {
+  facture: "billing-settings/email",
+  soumission: "billing-settings/email/soumission",
+};
 
 /**
  * The email template is deliberately absent: the full PUT does not carry it, and a card that
@@ -53,6 +68,11 @@ export type SaveBillingSettingsValues = Omit<
   | "defaultInvoiceEmailSubject"
   | "defaultInvoiceEmailBody"
   | "invoiceEmailFields"
+  | "quoteEmailSubject"
+  | "quoteEmailBody"
+  | "defaultQuoteEmailSubject"
+  | "defaultQuoteEmailBody"
+  | "quoteEmailFields"
 >;
 
 /**
@@ -128,11 +148,10 @@ export interface SaveInvoiceEmailValues {
  * a company declares its taxes and its numbering, and writing an email template is not that
  * decision. Borrowing the full PUT here would unlock invoicing with rates nobody looked at.
  */
-export function useSaveInvoiceEmail() {
+export function useSaveEmailTemplate(kind: EmailTemplateKind) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (values: SaveInvoiceEmailValues) =>
-      api.put<BillingSettings>("billing-settings/email", values),
+    mutationFn: (values: SaveInvoiceEmailValues) => api.put<BillingSettings>(emailEndpoint[kind], values),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["billing-settings"] }),
   });
 }
@@ -150,10 +169,10 @@ export interface InvoiceEmailPreview {
  * template to find out what it looks like. Feed it a debounced value — the query key is the
  * template itself, so every keystroke would otherwise be a request.
  */
-export function useInvoiceEmailPreviewQuery(subject: string, body: string, enabled = true) {
+export function useEmailPreviewQuery(kind: EmailTemplateKind, subject: string, body: string, enabled = true) {
   return useQuery({
-    queryKey: ["invoice-email-preview", subject, body],
-    queryFn: () => api.post<InvoiceEmailPreview>("billing-settings/email/preview", { subject, body }),
+    queryKey: ["email-preview", kind, subject, body],
+    queryFn: () => api.post<InvoiceEmailPreview>(`${emailEndpoint[kind]}/preview`, { subject, body }),
     enabled,
     // The previous rendering stays on screen while the next one is fetched, so the preview
     // never blinks empty between two keystrokes.

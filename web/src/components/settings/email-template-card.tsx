@@ -22,8 +22,10 @@ import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import {
   useBillingSettingsQuery,
-  useInvoiceEmailPreviewQuery,
-  useSaveInvoiceEmail,
+  useEmailPreviewQuery,
+  useSaveEmailTemplate,
+  type BillingSettings,
+  type EmailTemplateKind,
 } from "@/hooks/use-billing-settings";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { ApiError } from "@/lib/api";
@@ -31,16 +33,50 @@ import { ApiError } from "@/lib/api";
 /** Which of the two fields a clicked token goes into. */
 type Target = "subject" | "body";
 
-export function InvoiceEmailCard() {
+/** What differs between the two documents: the words on the card and where the row keeps them. */
+const kinds = {
+  facture: {
+    title: "Courriel de facturation",
+    description: "Le message avec lequel une facture part.",
+    document: "la facture",
+    sample: "une facture d'exemple",
+    saved: "Courriel de facturation enregistré.",
+    read: (s: BillingSettings) => ({
+      subject: s.invoiceEmailSubject,
+      body: s.invoiceEmailBody,
+      defaultSubject: s.defaultInvoiceEmailSubject,
+      defaultBody: s.defaultInvoiceEmailBody,
+      fields: s.invoiceEmailFields,
+    }),
+  },
+  soumission: {
+    title: "Courriel de soumission",
+    description: "Le message avec lequel une soumission part.",
+    document: "la soumission",
+    sample: "une soumission d'exemple",
+    saved: "Courriel de soumission enregistré.",
+    read: (s: BillingSettings) => ({
+      subject: s.quoteEmailSubject,
+      body: s.quoteEmailBody,
+      defaultSubject: s.defaultQuoteEmailSubject,
+      defaultBody: s.defaultQuoteEmailBody,
+      fields: s.quoteEmailFields,
+    }),
+  },
+} satisfies Record<EmailTemplateKind, unknown>;
+
+export function EmailTemplateCard({ kind }: { kind: EmailTemplateKind }) {
+  const copy = kinds[kind];
   const { data: settings, isLoading } = useBillingSettingsQuery();
-  const save = useSaveInvoiceEmail();
+  const template = settings ? copy.read(settings) : undefined;
+  const save = useSaveEmailTemplate(kind);
 
   // Null until something is typed, so what is stored shows through without an effect copying
   // it into state — and an empty field stays empty, because empty is what means "use the
   // built-in wording" rather than "not loaded yet".
   const [draft, setDraft] = useState<{ subject: string; body: string } | null>(null);
-  const subject = draft?.subject ?? settings?.invoiceEmailSubject ?? "";
-  const body = draft?.body ?? settings?.invoiceEmailBody ?? "";
+  const subject = draft?.subject ?? template?.subject ?? "";
+  const body = draft?.body ?? template?.body ?? "";
 
   const [confirmReset, setConfirmReset] = useState(false);
 
@@ -53,7 +89,8 @@ export function InvoiceEmailCard() {
   // The preview is a request, so it follows the typing at a distance rather than per keystroke.
   const debouncedSubject = useDebouncedValue(subject, 400);
   const debouncedBody = useDebouncedValue(body, 400);
-  const { data: preview } = useInvoiceEmailPreviewQuery(
+  const { data: preview } = useEmailPreviewQuery(
+    kind,
     debouncedSubject,
     debouncedBody,
     settings != null,
@@ -89,49 +126,46 @@ export function InvoiceEmailCard() {
   }
 
   function resetToDefault() {
-    if (!settings) return;
-    setDraft({
-      subject: settings.defaultInvoiceEmailSubject,
-      body: settings.defaultInvoiceEmailBody,
-    });
+    if (!template) return;
+    setDraft({ subject: template.defaultSubject, body: template.defaultBody });
     setConfirmReset(false);
   }
 
   async function onSave() {
     try {
       await save.mutateAsync({ subject, body });
-      toast.success("Courriel de facturation enregistré.");
+      toast.success(copy.saved);
     } catch (error) {
       toast.error(error instanceof ApiError ? error.message : "Impossible d'enregistrer ce modèle.");
     }
   }
 
-  if (isLoading || !settings) return <Skeleton className="h-96 max-w-5xl" />;
+  if (isLoading || !template) return <Skeleton className="h-96 max-w-5xl" />;
 
   return (
     <Card className="max-w-5xl">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <Mail className="size-4" />
-          Courriel de facturation
+          {copy.title}
         </CardTitle>
         <CardDescription>
-          Le message avec lequel une facture part. Les champs entre accolades sont remplacés par
-          les valeurs de la facture au moment de l&apos;envoi.
+          {copy.description} Les champs entre accolades sont remplacés par les valeurs de{" "}
+          {copy.document} au moment de l&apos;envoi.
         </CardDescription>
       </CardHeader>
 
       <CardContent className="grid gap-6 lg:grid-cols-2">
         <div className="min-w-0 space-y-4">
           <Field>
-            <FieldLabel htmlFor="invoice-email-subject">Sujet</FieldLabel>
+            <FieldLabel htmlFor={`${kind}-email-subject`}>Sujet</FieldLabel>
             <Input
               ref={subjectRef}
-              id="invoice-email-subject"
+              id={`${kind}-email-subject`}
               value={subject}
               onChange={(event) => setField("subject", event.target.value)}
               onFocus={() => setTarget("subject")}
-              placeholder={settings.defaultInvoiceEmailSubject}
+              placeholder={template.defaultSubject}
             />
             <FieldDescription>
               Facultatif : laissé vide, le sujet intégré est utilisé.
@@ -139,10 +173,10 @@ export function InvoiceEmailCard() {
           </Field>
 
           <Field>
-            <FieldLabel htmlFor="invoice-email-body">Message</FieldLabel>
+            <FieldLabel htmlFor={`${kind}-email-body`}>Message</FieldLabel>
             <Textarea
               ref={bodyRef}
-              id="invoice-email-body"
+              id={`${kind}-email-body`}
               value={body}
               onChange={(event) => setField("body", event.target.value)}
               onFocus={() => setTarget("body")}
@@ -163,7 +197,7 @@ export function InvoiceEmailCard() {
               champ touché ({target === "subject" ? "le sujet" : "le message"}).
             </p>
             <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
-              {settings.invoiceEmailFields.map((item) => (
+              {template.fields.map((item) => (
                 <li key={item.field}>
                   <button
                     type="button"
@@ -186,7 +220,7 @@ export function InvoiceEmailCard() {
         <div className="min-w-0 space-y-2">
           <p className="text-sm font-medium text-foreground">Aperçu</p>
           <p className="text-sm text-muted-foreground">
-            Rendu par le même code que l&apos;envoi, avec une facture d&apos;exemple.
+            Rendu par le même code que l&apos;envoi, avec {copy.sample}.
           </p>
 
           <div className="rounded-lg border border-border">

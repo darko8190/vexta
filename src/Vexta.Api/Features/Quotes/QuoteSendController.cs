@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO.Compression;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -71,34 +72,39 @@ public class QuoteSendController(
             .ToListAsync(ct);
 
         var company = await CompanyNameAsync(ct);
-        var number = $"S-{quote.Number:0000}";
-        var total = await TotalWithTaxesAsync(quote, ct);
-        var greeting = recipients.FirstOrDefault()?.Name ?? quote.Client?.Name ?? "";
+        var settings = await db.BillingSettings.AsNoTracking()
+            .FirstOrDefaultAsync(b => b.TenantId == quote.TenantId, ct);
+        var totals = Totals(quote, settings);
 
-        var subject = $"Soumission {number} — {company}";
-        var validity = quote.ValidUntil is { } until
-            ? $", valide jusqu'au {until.ToString("d MMMM yyyy", Formats.Quebec)}"
-            : "";
-
-        // A customer who can sign in answers with one button, so the message offers it. One
-        // without access is not sent to a page that would only ask them for a password.
+        // A customer who can sign in gets the portal link in {{acceptation}}.
         var hasPortal = quote.Client?.UserId is not null
             || await db.ClientContacts.AnyAsync(c => c.ClientId == quote.ClientId && c.UserId != null, ct);
-        var howToAccept = hasPortal
-            ? $"<p>Vous pouvez la consulter et l'accepter en ligne depuis votre portail : " +
-              $"<a href=\"{FrontendUrl}/soumissions/{quote.Id}\">voir la soumission</a>. " +
-              "Vous pouvez aussi nous la retourner signée ou répondre à ce courriel.</p>"
-            : "<p>Pour l'accepter, il suffit de nous la retourner signée ou de répondre à ce courriel. " +
-              "N'hésitez pas à nous écrire pour toute question.</p>";
 
-        // Plain wording rather than a template the company edits: quotes do not have one yet,
-        // and the person reads and can change every word before it leaves.
-        var body =
-            $"<p>Bonjour {Html(greeting)},</p>" +
-            $"<p>Vous trouverez ci-joint notre soumission {Html(number)} au montant de " +
-            $"{Html(total.ToString("C2", Formats.Quebec))} taxes incluses{Html(validity)}.</p>" +
-            howToAccept +
-            $"<p>{Html(company)}</p>";
+        // Dates the way the PDF prints them, so the message and the attachment agree.
+        var validUntil = quote.ValidUntil?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var values = new Dictionary<string, string>
+        {
+            ["numero"] = $"S-{quote.Number:0000}",
+            ["entreprise"] = company,
+            ["client"] = quote.Client?.Name ?? "",
+            ["contact"] = recipients.FirstOrDefault()?.Name ?? quote.Client?.Name ?? "",
+            ["description"] = quote.Description ?? "",
+            ["total"] = InvoiceEmailTemplate.Money(totals.Subtotal + totals.Taxes),
+            ["sous_total"] = InvoiceEmailTemplate.Money(totals.Subtotal),
+            ["taxes"] = InvoiceEmailTemplate.Money(totals.Taxes),
+            ["date_emission"] = (quote.IssuedOn ?? DateOnly.FromDateTime(quote.CreatedAt.UtcDateTime))
+                .ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            ["date_validite"] = validUntil ?? "",
+            ["validite"] = QuoteEmailTemplate.Validity(validUntil),
+            ["devise"] = Currency(settings?.Currency),
+            [QuoteEmailTemplate.AcceptField] = QuoteEmailTemplate.AcceptParagraph(
+                hasPortal ? $"{FrontendUrl}/soumissions/{quote.Id}" : null)
+        };
+
+        var subject = QuoteEmailTemplate.Render(
+            Template(settings?.QuoteEmailSubject) ?? QuoteEmailTemplate.DefaultSubject, values, escapeHtml: false);
+        var body = QuoteEmailTemplate.Render(
+            Template(settings?.QuoteEmailBody) ?? QuoteEmailTemplate.DefaultBody, values, escapeHtml: true);
 
         return Ok(new InvoiceSendDefaultsDto(
             recipients.FirstOrDefault()?.Email, subject, body, recipients, employees, documents));
@@ -210,13 +216,6 @@ public class QuoteSendController(
 
     private record StoredFile(string ObjectKey, string FileName, string ContentType, string? ContentEncoding);
 
-    /// <summary>
-    /// Only the characters that change the markup. WebUtility would also turn every accent into
-    /// a numeric entity, and the body is shown to the person to edit before it leaves.
-    /// </summary>
-    private static string Html(string value) => value
-        .Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;");
-
     private static bool IsEmailAddress(string value) =>
         System.Net.Mail.MailAddress.TryCreate(value, out var parsed)
         && string.Equals(parsed.Address, value, StringComparison.OrdinalIgnoreCase)
@@ -229,17 +228,21 @@ public class QuoteSendController(
             .FirstOrDefaultAsync(ct)!;
 
     /// <summary>The same arithmetic as the PDF, so the message and the attachment agree.</summary>
-    private async Task<decimal> TotalWithTaxesAsync(Quote quote, CancellationToken ct)
+    private static (decimal Subtotal, decimal Taxes) Totals(Quote quote, Domain.BillingSettings? settings)
     {
-        var settings = await db.BillingSettings.AsNoTracking()
-            .FirstOrDefaultAsync(b => b.TenantId == quote.TenantId, ct);
         var totals = InvoiceTotals.For(
             quote.Lines.Select(l => new InvoiceTotals.Line(l.Quantity, l.UnitPrice, true)),
             settings?.GstRate ?? 0m,
             settings?.QstRate ?? 0m,
             quote.IsTaxExempt);
-        return totals.Subtotal + (quote.IsTaxExempt ? 0m : totals.TaxTotal);
+        return (totals.Subtotal, quote.IsTaxExempt ? 0m : totals.TaxTotal);
     }
+
+    private static string Currency(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "CAD" : value.Trim().ToUpperInvariant();
+
+    private static string? Template(string? stored) =>
+        string.IsNullOrWhiteSpace(stored) ? null : stored;
 
     /// <summary>The client's own address, then its contacts — the billing contact first.</summary>
     private async Task<List<InvoiceRecipientDto>> RecipientsAsync(Quote quote, CancellationToken ct)

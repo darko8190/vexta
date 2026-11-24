@@ -57,16 +57,34 @@ public static class InvoiceEmailTemplate
     /// client called "Lavoie &amp; Fils" would otherwise arrive as broken markup.
     /// </summary>
     public static string Render(
-        string template, IReadOnlyDictionary<string, string> values, bool escapeHtml)
+        string template, IReadOnlyDictionary<string, string> values, bool escapeHtml) =>
+        Render(template, Fields, values, escapeHtml, rawHtmlFields: null);
+
+    /// <summary>
+    /// The same filling for any template: the quote's runs through here too, so the two never
+    /// disagree about what a field or an escape is.
+    ///
+    /// <paramref name="rawHtmlFields"/> names fields whose value is markup written by Vexta
+    /// itself, not data — they go into the body as is, and into a plain-text subject not at all.
+    /// </summary>
+    public static string Render(
+        string template,
+        IReadOnlyList<(string Field, string Description)> fields,
+        IReadOnlyDictionary<string, string> values,
+        bool escapeHtml,
+        IReadOnlySet<string>? rawHtmlFields)
     {
         var rendered = template;
 
-        foreach (var (field, _) in Fields)
+        foreach (var (field, _) in fields)
         {
             var value = values.TryGetValue(field, out var found) ? found : string.Empty;
+            var raw = rawHtmlFields?.Contains(field) == true;
+            if (raw && !escapeHtml) value = string.Empty;
+
             rendered = rendered.Replace(
                 $"{{{{{field}}}}}",
-                escapeHtml ? WebUtility.HtmlEncode(value) : value,
+                escapeHtml && !raw ? WebUtility.HtmlEncode(value) : value,
                 StringComparison.Ordinal);
         }
 

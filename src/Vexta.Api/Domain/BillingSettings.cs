@@ -85,6 +85,13 @@ public class BillingSettings
     public string? InvoiceEmailSubject { get; set; }
     public string? InvoiceEmailBody { get; set; }
 
+    /// <summary>
+    /// The same for a quote, with its own fields (validity, the way to accept). Null means the
+    /// built-in wording, for the same reason as the invoice's.
+    /// </summary>
+    public string? QuoteEmailSubject { get; set; }
+    public string? QuoteEmailBody { get; set; }
+
     /// <summary>Payment conditions, as printed.</summary>
     public string? Terms { get; set; }
 

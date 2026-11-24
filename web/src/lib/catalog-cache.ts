@@ -6,12 +6,8 @@ import type { PublicModule, PublicPlan } from "@/lib/types";
 export const CATALOG_TAG = "catalog";
 
 /**
- * Five minutes, even though every change purges the tag explicitly.
- *
- * The expiry is the safety net, not the mechanism. These functions return an empty list when the
- * API cannot be reached, and that answer gets cached like any other — including during the
- * production build, where no API is running at all. Without an expiry the image would ship a
- * permanently empty pricing section. With one, a bad entry heals itself within five minutes.
+ * Five minutes, even though every change purges the tag explicitly. The expiry is a safety net
+ * for a purge that never arrived, not the mechanism.
  */
 const CATALOG_CACHE = { stale: 300, revalidate: 300, expire: 3600 } as const;
 
@@ -38,16 +34,14 @@ export async function getPublishedPlans(): Promise<PublicPlan[]> {
 }
 
 /**
- * An empty list on any failure is deliberate: a marketing page that renders without its prices
- * is better than one that fails to render at all.
+ * Throws rather than returning an empty list. A "use cache" function that returns stores its
+ * answer; one that throws stores nothing. An empty list here used to be cached as the
+ * catalogue — at build time, with no API running, and then for every visitor after the deploy.
+ * The page catches the error and shows the section empty for that one request.
  */
 async function readJson<T>(path: string): Promise<T[]> {
   const response = await apiFetch(path, { timeoutMs: 2_500, inheritCache: true });
-  if (!response.ok) return [];
+  if (!response.ok) throw new Error(`Catalogue indisponible (${path}: ${response.status}).`);
 
-  try {
-    return (await response.json()) as T[];
-  } catch {
-    return [];
-  }
+  return (await response.json()) as T[];
 }

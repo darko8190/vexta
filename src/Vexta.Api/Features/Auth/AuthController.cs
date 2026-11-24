@@ -155,11 +155,19 @@ public class AuthController(
             ? await workspaces.FindAsync(user.Id, own, HttpContext.RequestAborted)
             : null;
 
+        // No place left in the space the token is for — an employee the company has since
+        // marked inactive. Renewing from the account would hand them that same company back,
+        // because an invited employee's account lives there; they are moved to the one space
+        // that is always theirs instead, and at once rather than at the session's halfway mark.
+        var movedOut = home is null && currentUser.TenantId is not null;
+        if (movedOut) home = await workspaces.HomeMembershipAsync(user, HttpContext.RequestAborted);
+
         SlideSession(
             () => home is not null
                 ? tokenService.CreateAccessToken(user, home)
                 : tokenService.CreateAccessToken(user),
-            home?.Role);
+            home?.Role,
+            force: movedOut);
         return Ok(UserDto.ForHome(user, home));
     }
 
@@ -179,7 +187,7 @@ public class AuthController(
     /// whatever its expiry: an employee promoted this morning should not have to wait out a
     /// thirty-day window — or be told to sign out and back in — before the promotion works.
     /// </summary>
-    private void SlideSession(Func<string> issue, UserRole? currentRole = null)
+    private void SlideSession(Func<string> issue, UserRole? currentRole = null, bool force = false)
     {
         var expiry = currentUser.ExpiresAt;
         if (expiry is null) return;
@@ -187,7 +195,7 @@ public class AuthController(
         var roleChanged = currentRole is { } role && currentUser.Role != role;
 
         var window = TimeSpan.FromMinutes(jwtOptions.Value.AccessTokenMinutes);
-        if (!roleChanged && expiry.Value - DateTimeOffset.UtcNow > window / 2) return;
+        if (!force && !roleChanged && expiry.Value - DateTimeOffset.UtcNow > window / 2) return;
 
         Response.Headers[AuthHeaders.RenewedToken] = issue();
     }

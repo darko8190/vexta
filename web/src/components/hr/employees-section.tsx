@@ -256,6 +256,9 @@ export function EmployeesSection() {
                     {employee.isOwner && (
                       <div className="text-xs font-normal text-muted-foreground">Propriétaire</div>
                     )}
+                    {!employee.isActive && (
+                      <div className="text-xs font-normal text-destructive">Inactif</div>
+                    )}
                   </TableCell>
                   <TableCell className="text-muted-foreground">{employee.email}</TableCell>
                   <TableCell className="text-muted-foreground">{employee.jobTitle ?? "—"}</TableCell>

@@ -695,6 +695,8 @@ export interface Employee {
   /** The person who opened the company: their access cannot be removed, nor their record. */
   isOwner: boolean;
   createdAt: string;
+  /** Still works here. An inactive employee cannot enter the company from their account. */
+  isActive: boolean;
 }
 
 /** One employee's own page: the record, plus the teams they are on. */

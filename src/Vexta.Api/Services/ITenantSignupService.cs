@@ -41,8 +41,30 @@ public record CompanySignupProfile(
     string Country,
     string? BusinessNumber);
 
+/// <summary>
+/// A company opened by somebody who already has an account. Carries the new company so the
+/// browser can switch into it, and a checkout address when the plan has to be paid first.
+/// </summary>
+public record CompanyCreationResult(bool Succeeded, Guid? TenantId = null, string? CheckoutUrl = null, string? Error = null)
+{
+    public static CompanyCreationResult Failed(string error) => new(false, Error: error);
+}
+
 public interface ITenantSignupService
 {
+    /// <summary>
+    /// Opens a company for an account that already exists — somebody in their personal space
+    /// starting a business of their own. The same company a sign-up makes (address, first
+    /// location, the founder on staff, a plan and its trial or its checkout), without making
+    /// a second account: the company is added to their space switcher beside the ones they have.
+    /// </summary>
+    Task<CompanyCreationResult> CreateForExistingUserAsync(
+        ApplicationUser user,
+        string companyName,
+        Guid? planId,
+        CompanySignupProfile? profile,
+        CancellationToken ct = default);
+
     /// <summary>
     /// Creates the tenant and its first admin. A business space also gets a Stripe checkout
     /// session for the plan it chose; a personal one is free and never reaches Stripe. Pass a
@@ -69,6 +91,116 @@ public class TenantSignupService(
     IConfiguration configuration,
     ILogger<TenantSignupService> logger) : ITenantSignupService
 {
+    public async Task<CompanyCreationResult> CreateForExistingUserAsync(
+        ApplicationUser user,
+        string companyName,
+        Guid? planId,
+        CompanySignupProfile? profile,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(companyName)) return CompanyCreationResult.Failed("Le nom de l'entreprise est requis.");
+        if (companyName.Trim().Length > 200) return CompanyCreationResult.Failed("Le nom de l'entreprise est trop long.");
+
+        if (profile is null
+            || string.IsNullOrWhiteSpace(profile.Line1)
+            || string.IsNullOrWhiteSpace(profile.City)
+            || string.IsNullOrWhiteSpace(profile.PostalCode)
+            || string.IsNullOrWhiteSpace(profile.Country))
+        {
+            return CompanyCreationResult.Failed("L'adresse de l'entreprise est requise.");
+        }
+
+        var plan = await db.Plans.FirstOrDefaultAsync(
+            p => p.Id == planId && p.IsPublished && p.StripePriceId != null, ct);
+
+        if (plan is null) return CompanyCreationResult.Failed("Ce forfait n'est plus offert. Choisissez-en un autre.");
+
+        var slug = await TenantSlug.UniqueAsync(
+            companyName,
+            candidate => db.Tenants.AnyAsync(t => t.Slug == candidate, ct));
+
+        var tenant = new Tenant
+        {
+            Name = companyName.Trim(),
+            Slug = slug,
+            Kind = TenantKind.Business,
+            PlanId = plan.Id,
+            BusinessNumber = Trimmed(profile.BusinessNumber)
+        };
+
+        if (plan.TrialDays > 0)
+        {
+            tenant.SubscriptionStatus = TenantSubscriptionStatus.Trialing;
+            tenant.TrialEndsAt = DateTimeOffset.UtcNow.AddDays(plan.TrialDays);
+        }
+
+        db.Tenants.Add(tenant);
+
+        db.CompanyLocations.Add(new CompanyLocation
+        {
+            TenantId = tenant.Id,
+            Label = "Siège social",
+            IsPrimary = true,
+            Line1 = profile.Line1.Trim(),
+            Line2 = Trimmed(profile.Line2),
+            City = profile.City.Trim(),
+            Province = Trimmed(profile.Province),
+            PostalCode = profile.PostalCode.Trim(),
+            Country = profile.Country.Trim()
+        });
+
+        // A membership, not a move: their home stays where it is, and the company joins the
+        // spaces they can switch to. Administrator of it, because it is theirs.
+        db.TenantMemberships.Add(new TenantMembership
+        {
+            UserId = user.Id,
+            TenantId = tenant.Id,
+            Role = UserRole.TenantAdmin
+        });
+
+        // On their own staff list, like a founder who signed up — see CreateAsync.
+        db.Employees.Add(new Employee
+        {
+            TenantId = tenant.Id,
+            FirstName = user.FirstName,
+            LastName = user.LastName,
+            Email = (user.Email ?? "").ToLowerInvariant(),
+            Role = UserRole.TenantAdmin,
+            UserId = user.Id
+        });
+
+        await db.SaveChangesAsync(ct);
+
+        await supplierLinks.LinkOnSignupAsync(tenant.Id, ct);
+
+        if (tenant.SubscriptionStatus == TenantSubscriptionStatus.Trialing)
+        {
+            return new CompanyCreationResult(true, tenant.Id);
+        }
+
+        var frontendUrl = configuration["Frontend:BaseUrl"] ?? "http://localhost:3000";
+        try
+        {
+            var checkoutUrl = await stripeService.CreateCheckoutSessionAsync(
+                tenant,
+                user.Email!,
+                plan.StripePriceId!,
+                successUrl: $"{frontendUrl}/inscription/succes?session_id={{CHECKOUT_SESSION_ID}}",
+                cancelUrl: $"{frontendUrl}/mes-entreprises",
+                couponId: plan.StripeCouponId,
+                ct: ct);
+
+            return new CompanyCreationResult(true, tenant.Id, checkoutUrl);
+        }
+        catch (InvalidOperationException ex)
+        {
+            // Same reasoning as a sign-up: the company exists now, and the subscription gate
+            // keeps its modules shut until it is paid from Paramètres.
+            logger.LogError(ex, "Stripe indisponible à la création de {Tenant}; entreprise créée sans paiement.", tenant.Slug);
+            return new CompanyCreationResult(true, tenant.Id);
+        }
+    }
+
     /// <summary>An empty box and an absent answer are the same thing here.</summary>
     private static string? Trimmed(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();

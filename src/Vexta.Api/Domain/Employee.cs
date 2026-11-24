@@ -26,6 +26,14 @@ public class Employee : IInvitable
     public string? Phone { get; set; }
 
     /// <summary>
+    /// Whether they still work here. An inactive employee keeps their record — their hours,
+    /// their file, their history — but the company leaves their space switcher and they can no
+    /// longer enter it. Separate from revoking the access: somebody laid off for the winter is
+    /// inactive, not erased, and comes back in the spring with the same account.
+    /// </summary>
+    public bool IsActive { get; set; } = true;
+
+    /// <summary>
     /// What they may do once they can sign in: Administrateur, Chargé de projet or Employé.
     ///
     /// Kept here rather than only on the membership so the owner can decide it while the person

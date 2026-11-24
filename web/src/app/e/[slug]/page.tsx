@@ -13,6 +13,7 @@ import {
   SectionBand,
 } from "@/components/public/page-blocks";
 import { PublicAccountBar } from "@/components/public/public-account-bar";
+import { PublicBackLink } from "@/components/public/public-back-link";
 import { apiFetch } from "@/lib/api-server";
 import { styleTokensFor } from "@/lib/public-page-style";
 import type { PublicCompany } from "@/lib/types";
@@ -152,8 +153,12 @@ async function CompanyPageContent({ params }: Pick<PageProps<"/e/[slug]">, "para
         <header className={s.header}>
           {/* Above the company's own header and outside it: this belongs to Vexta, not to the
               company, and it must not take on whichever arrangement the company chose. */}
-          <div className={cn(s.container, "flex items-center justify-end gap-2 pt-3")}>
-            <PublicAccountBar slug={company.slug} />
+          <div className={cn(s.container, "flex items-center justify-between gap-2 pt-3")}>
+            <PublicBackLink />
+            {/* ml-auto keeps the account bar on the right when there is no way back to show. */}
+            <div className="ml-auto">
+              <PublicAccountBar slug={company.slug} />
+            </div>
           </div>
 
           <div className={cn(s.container, "py-10 sm:py-14")}>

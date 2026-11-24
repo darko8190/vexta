@@ -11,6 +11,8 @@ import type {
 const TEAM_KEY = ["team", "employees"];
 
 export interface SaveEmployeeValues {
+  /** Omitted leaves it as it is. */
+  isActive?: boolean;
   firstName: string;
   lastName: string;
   email: string;

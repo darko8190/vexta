@@ -28,7 +28,9 @@ public record EmployeeDto(
     /// owns the space down with them.
     /// </summary>
     bool IsOwner,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    /// <summary>Still works here. An inactive employee cannot enter the company.</summary>
+    bool IsActive = true);
 
 /// <summary>One employee's own page: the record, plus the teams they are on.</summary>
 public record EmployeeDetailDto(EmployeeDto Employee, IReadOnlyList<EmployeeTeamDto> Teams);
@@ -53,7 +55,9 @@ public record SaveEmployeeRequest(
     /// Defaults to Employé, which is the role that can do the least: a form that forgot the
     /// field must not quietly hand out an administrator.
     /// </summary>
-    UserRole Role = UserRole.TenantUser);
+    UserRole Role = UserRole.TenantUser,
+    /// <summary>Null leaves it as it is, so an older form that does not send it changes nothing.</summary>
+    bool? IsActive = null);
 
 /// <summary>
 /// The link is returned even when the email went out, so the admin can hand it over directly

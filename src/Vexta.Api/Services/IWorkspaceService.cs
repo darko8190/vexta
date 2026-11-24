@@ -16,7 +16,10 @@ public interface IWorkspaceService
     /// </summary>
     Task<IReadOnlyList<WorkspaceDto>> ListAsync(ApplicationUser user, Guid? currentTenantId, CancellationToken ct = default);
 
-    /// <summary>The membership for one space, or null when this person has no place in it.</summary>
+    /// <summary>
+    /// The membership for one space, or null when this person has no place in it — which
+    /// includes an employee the company has marked inactive.
+    /// </summary>
     Task<TenantMembership?> FindAsync(Guid userId, Guid tenantId, CancellationToken ct = default);
 
     /// <summary>
@@ -168,8 +171,13 @@ public class WorkspaceService(VextaDbContext db, UserManager<ApplicationUser> us
             .Include(m => m.Tenant)
             .ToListAsync(ct);
 
+        var shut = await InactiveTenantsAsync(user.Id, ct);
+
         return memberships
             .Where(m => m.Tenant is not null)
+            // A company that marked them inactive is not offered: pressing it would only be
+            // refused, and the list is meant to be the places they can actually go.
+            .Where(m => !shut.Contains(m.TenantId) || m.Tenant!.Kind == TenantKind.Personal || m.Role == UserRole.Client)
             // Personal first: it is the one space that is always there and always free, so it is
             // the stable anchor of the switcher rather than one company among several.
             .OrderByDescending(m => m.Tenant!.Kind == TenantKind.Personal)
@@ -188,11 +196,56 @@ public class WorkspaceService(VextaDbContext db, UserManager<ApplicationUser> us
         if (user.TenantId is not { } tenantId) return null;
 
         await EnsureAsync(user, ct);
-        return await FindAsync(user.Id, tenantId, ct);
+
+        // Their home is a company that has since marked them inactive. Signing in still has to
+        // land somewhere, and the one place that is always theirs is the personal space —
+        // landing them in the company would be the door the inactive flag exists to close.
+        return await FindAsync(user.Id, tenantId, ct)
+            ?? await db.TenantMemberships
+                .Include(m => m.Tenant)
+                .FirstOrDefaultAsync(m => m.UserId == user.Id && m.Tenant!.Kind == TenantKind.Personal, ct);
     }
 
-    public Task<TenantMembership?> FindAsync(Guid userId, Guid tenantId, CancellationToken ct = default) =>
-        db.TenantMemberships
+    public async Task<TenantMembership?> FindAsync(Guid userId, Guid tenantId, CancellationToken ct = default)
+    {
+        var membership = await db.TenantMemberships
             .Include(m => m.Tenant)
             .FirstOrDefaultAsync(m => m.UserId == userId && m.TenantId == tenantId, ct);
+
+        // Checked here and not only in the switcher: entering a space, renewing a session and
+        // signing in all come through this method, and an inactive employee must be refused by
+        // all three — hiding the button alone would leave the session they already hold working.
+        if (membership is not null
+            && membership.Tenant?.Kind != TenantKind.Personal
+            && membership.Role != UserRole.Client
+            && (await InactiveTenantsAsync(userId, ct)).Contains(tenantId))
+        {
+            return null;
+        }
+
+        return membership;
+    }
+
+    /// <summary>
+    /// The companies where this person's staff record says they no longer work.
+    ///
+    /// A company where they have an active record as well is not counted — two records for one
+    /// person is a filing mistake, and the active one is the company's latest word. A company
+    /// with no staff record for them at all is not counted either: the founders of companies
+    /// opened before staff records existed have none, and they must not be locked out of their
+    /// own business by a rule about employees.
+    /// </summary>
+    private async Task<HashSet<Guid>> InactiveTenantsAsync(Guid userId, CancellationToken ct)
+    {
+        var records = await db.Employees.IgnoreQueryFilters().AsNoTracking()
+            .Where(e => e.UserId == userId)
+            .Select(e => new { e.TenantId, e.IsActive })
+            .ToListAsync(ct);
+
+        return records
+            .GroupBy(r => r.TenantId)
+            .Where(g => g.All(r => !r.IsActive))
+            .Select(g => g.Key)
+            .ToHashSet();
+    }
 }

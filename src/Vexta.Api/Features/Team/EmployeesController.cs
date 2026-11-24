@@ -88,7 +88,8 @@ public class EmployeesController(
             Email = email,
             JobTitle = Clean(request.JobTitle),
             Phone = Clean(request.Phone),
-            Role = request.Role
+            Role = request.Role,
+            IsActive = request.IsActive ?? true
         };
 
         db.Employees.Add(employee);
@@ -133,9 +134,20 @@ public class EmployeesController(
             });
         }
 
+        // The founder cannot be made inactive either, for the same reason: it would lock the
+        // company out of itself.
+        if (request.IsActive == false && employee.IsActive && await IsOwnerAsync(employee, ct))
+        {
+            return BadRequest(new
+            {
+                message = "Le propriétaire de l'entreprise reste actif."
+            });
+        }
+
         employee.FirstName = request.FirstName.Trim();
         employee.LastName = request.LastName.Trim();
         employee.Email = email;
+        employee.IsActive = request.IsActive ?? employee.IsActive;
         employee.JobTitle = Clean(request.JobTitle);
         employee.Phone = Clean(request.Phone);
         employee.Role = request.Role;
@@ -301,7 +313,8 @@ public class EmployeesController(
             e.InvitationSentAt,
             e.InvitationExpiresAt,
             e.UserId is { } ownerId && owners.Contains(ownerId),
-            e.CreatedAt);
+            e.CreatedAt,
+            e.IsActive);
     }
 
     private static SeatUsageDto ToDto(SeatUsage s) =>

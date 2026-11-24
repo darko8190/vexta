@@ -6,6 +6,7 @@ import { Controller, useForm } from "react-hook-form";
 import * as z from "zod";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { RequiredMark } from "@/components/ui/required-mark";
@@ -39,6 +40,7 @@ const formSchema = z.object({
   jobTitle: z.string().trim().max(100, "100 caractères maximum."),
   phone: z.string().trim().max(40, "40 caractères maximum."),
   role: z.enum(["TenantAdmin", "ProjectManager", "TenantUser"]),
+  isActive: z.boolean(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -53,6 +55,7 @@ function toFormValues(employee?: Employee): FormValues {
     // Employé by default, which can do the least: a form someone closes without thinking about
     // the question must not hand out an administrator.
     role: employee?.role ?? "TenantUser",
+    isActive: employee?.isActive ?? true,
   };
 }
 
@@ -96,6 +99,7 @@ export function EmployeeFormSheet({
           jobTitle: values.jobTitle ? values.jobTitle : null,
           phone: values.phone ? values.phone : null,
           role: values.role,
+          isActive: values.isActive,
         },
       });
       toast.success(isEditing ? "Employé mis à jour." : "Employé ajouté.");
@@ -239,6 +243,29 @@ export function EmployeeFormSheet({
                     {ownerLocked
                       ? "Le propriétaire de l'entreprise reste administrateur."
                       : userRoleHints[field.value]}
+                  </FieldDescription>
+                </Field>
+              )}
+            />
+
+            <Controller
+              name="isActive"
+              control={form.control}
+              render={({ field }) => (
+                <Field>
+                  <div className="flex items-center gap-3">
+                    <Checkbox
+                      id="employee-active"
+                      checked={field.value}
+                      disabled={ownerLocked}
+                      onCheckedChange={(checked) => field.onChange(checked === true)}
+                    />
+                    <FieldLabel htmlFor="employee-active">Actif</FieldLabel>
+                  </div>
+                  <FieldDescription>
+                    {ownerLocked
+                      ? "Le propriétaire de l'entreprise reste actif."
+                      : "Décoché, la fiche reste, mais la personne ne peut plus entrer dans l'entreprise depuis son compte."}
                   </FieldDescription>
                 </Field>
               )}

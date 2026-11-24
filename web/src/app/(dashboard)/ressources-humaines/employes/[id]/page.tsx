@@ -16,7 +16,6 @@ import {
   IdCard,
   LifeBuoy,
   Palmtree,
-  Pencil,
   Receipt,
   Send,
   ShieldCheck,
@@ -42,7 +41,6 @@ import { HourBankSection } from "@/components/hr/employee/hour-bank-section";
 import { LeavesSection } from "@/components/hr/employee/leaves-section";
 import { ScheduleSection } from "@/components/hr/employee/schedule-section";
 import { WagesSection } from "@/components/hr/employee/wages-section";
-import { EmployeeFormSheet } from "@/components/team/employee-form-sheet";
 import { InvitationLinkDialog } from "@/components/team/invitation-link-dialog";
 import { useEmployeeFileCountsQuery } from "@/hooks/use-employee-file";
 import { useIsOwner } from "@/hooks/use-can-create";
@@ -76,7 +74,6 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
   const revokeAccess = useRevokeAccess();
   const resendInvitation = useResendInvitation();
 
-  const [editOpen, setEditOpen] = useState(false);
   const [grant, setGrant] = useState<AccessGranted | null>(null);
 
   // Always Détails, and not remembered between visits: the file is opened to look somebody up,
@@ -220,10 +217,6 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
                   Donner l&apos;accès
                 </Button>
               ))}
-            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
-              <Pencil />
-              Modifier
-            </Button>
           </div>
         </div>
 
@@ -303,7 +296,6 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
         </div>
       </div>
 
-      <EmployeeFormSheet open={editOpen} onOpenChange={setEditOpen} employee={employee} />
 
       <InvitationLinkDialog
         grant={grant}

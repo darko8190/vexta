@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, buildQuery } from "@/lib/api";
-import type { ClientAsset, SaveClientAssetValues } from "@/lib/types";
+import type { AssetTask, ClientAsset, SaveClientAssetValues } from "@/lib/types";
 
 /**
  * One invalidate of the whole "clients" key, like the rest of the client hooks: the card at the
@@ -18,6 +18,24 @@ export function useClientAssetsQuery(clientId: string | undefined, includeRetire
     queryFn: () =>
       api.get<ClientAsset[]>(`clients/${clientId}/actifs${buildQuery({ inactifs: includeRetired })}`),
     enabled: Boolean(clientId),
+  });
+}
+
+/** One asset, for its own file. Under the "clients" key so every write above refreshes it too. */
+export function useClientAssetQuery(clientId: string | undefined, id: string | undefined) {
+  return useQuery({
+    queryKey: ["clients", "actif", clientId, id],
+    queryFn: () => api.get<ClientAsset>(`clients/${clientId}/actifs/${id}`),
+    enabled: Boolean(clientId && id),
+  });
+}
+
+/** Every task on every job done on the asset. */
+export function useAssetTasksQuery(clientId: string | undefined, id: string | undefined) {
+  return useQuery({
+    queryKey: ["clients", "actif-taches", clientId, id],
+    queryFn: () => api.get<AssetTask[]>(`clients/${clientId}/actifs/${id}/taches`),
+    enabled: Boolean(clientId && id),
   });
 }
 

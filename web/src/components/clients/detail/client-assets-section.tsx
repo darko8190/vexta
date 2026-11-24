@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Car, MapPin, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -62,6 +63,7 @@ export function ClientAssetsSection({ clientId }: { clientId: string }) {
 
   const remove = useDeleteClientAsset(clientId);
 
+  const router = useRouter();
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<ClientAsset | undefined>(undefined);
   const [deleteTarget, setDeleteTarget] = useState<ClientAsset | undefined>(undefined);
@@ -146,11 +148,14 @@ export function ClientAssetsSection({ clientId }: { clientId: string }) {
           {assets.map((asset) => (
             <div
               key={asset.id}
-              {...(canManage ? rowOpenProps(() => openEdit(asset), `Ouvrir l'actif ${asset.label}`) : {})}
+              {...rowOpenProps(
+                () => router.push(`/clients/${clientId}/actifs/${asset.id}`),
+                `Ouvrir l'actif ${asset.label}`,
+              )}
               className={cn(
                 "flex items-start gap-3 rounded-lg border border-border bg-card p-3",
                 !asset.isActive && "opacity-60",
-                canManage && rowOpenClassName,
+                rowOpenClassName,
               )}
             >
               <div className="min-w-0 flex-1">

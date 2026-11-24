@@ -14,11 +14,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ClientFormSheet } from "@/components/clients/client-form-sheet";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
-import { ClickableRow } from "@/components/layout/clickable-row";
+import { DataTable, type DataColumn } from "@/components/layout/data-table";
 import { PageHeader } from "@/components/layout/page-header";
 import { WorkbookMenu } from "@/components/import-export/workbook-menu";
 import { UpgradeCta } from "@/components/layout/upgrade-cta";
@@ -26,9 +25,9 @@ import { useCanCreate } from "@/hooks/use-can-create";
 import { PaginationBar } from "@/components/layout/pagination-bar";
 import { SearchInput } from "@/components/layout/search-input";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
-import { useClientsQuery, useDeleteClient } from "@/hooks/use-clients";
+import { storedClientValues, useClientsQuery, useDeleteClient, useUpdateClient } from "@/hooks/use-clients";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { clientStatusBadge } from "@/lib/labels";
+import { clientStatusBadge, clientStatusLabels } from "@/lib/labels";
 import { formatClientNumber, type ClientRecord, type ClientStatus } from "@/lib/types";
 
 /** The filter's own values: the three states, the lock, and everybody. */
@@ -56,6 +55,7 @@ export default function ClientsPage() {
     statusFilter === "Tous" ? undefined : statusFilter,
   );
   const deleteClient = useDeleteClient();
+  const updateClient = useUpdateClient();
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<ClientRecord | undefined>(undefined);
@@ -70,6 +70,119 @@ export default function ClientsPage() {
     setEditingClient(client);
     setFormOpen(true);
   }
+
+  async function saveRow(clientItem: ClientRecord, changes: Record<string, string>) {
+    const values = storedClientValues(clientItem);
+    if ("courriel" in changes) values.email = changes.courriel.trim() || null;
+    if ("telephone" in changes) values.phone = changes.telephone.trim() || null;
+    if ("statut" in changes) values.status = changes.statut as ClientStatus;
+    if ("prenom" in changes) values.firstName = changes.prenom.trim();
+    if ("nomFamille" in changes) values.lastName = changes.nomFamille.trim();
+    if ("entreprise" in changes && clientItem.type === "Entreprise") values.companyName = changes.entreprise.trim();
+    await updateClient.mutateAsync({ id: clientItem.id, values });
+  }
+
+  const columns: DataColumn<ClientRecord>[] = [
+    {
+      key: "numero",
+      label: "Numéro",
+      locked: true,
+      headClassName: "w-24",
+      cellClassName: "font-mono text-xs text-muted-foreground tabular-nums",
+      cell: (clientItem) => formatClientNumber(clientItem.number),
+    },
+    {
+      key: "nom",
+      label: "Nom",
+      cell: (clientItem) => (
+        <>
+          <span className="font-medium text-foreground">{clientItem.name}</span>
+          <div className="mt-0.5 flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">
+              {clientItem.type === "Entreprise" ? "Entreprise" : "Particulier"}
+            </span>
+            {/* One badge, never two: the lock wins over the state. */}
+            <Badge variant={clientStatusBadge(clientItem).variant} className="text-[10px]">
+              {clientStatusBadge(clientItem).label}
+            </Badge>
+          </div>
+        </>
+      ),
+    },
+    {
+      key: "entreprise",
+      label: "Nom de l'entreprise",
+      hiddenByDefault: true,
+      cellClassName: "text-muted-foreground",
+      cell: (clientItem) => clientItem.companyName ?? "—",
+      edit: { type: "text", value: (clientItem) => clientItem.companyName ?? "" },
+    },
+    {
+      key: "prenom",
+      label: "Prénom",
+      hiddenByDefault: true,
+      cellClassName: "text-muted-foreground",
+      cell: (clientItem) => clientItem.firstName ?? "—",
+      edit: { type: "text", value: (clientItem) => clientItem.firstName ?? "" },
+    },
+    {
+      key: "nomFamille",
+      label: "Nom de famille",
+      hiddenByDefault: true,
+      cellClassName: "text-muted-foreground",
+      cell: (clientItem) => clientItem.lastName ?? "—",
+      edit: { type: "text", value: (clientItem) => clientItem.lastName ?? "" },
+    },
+    {
+      key: "statut",
+      label: "État",
+      hiddenByDefault: true,
+      cell: (clientItem) => clientStatusLabels[clientItem.status],
+      edit: {
+        type: "select",
+        value: (clientItem) => clientItem.status,
+        options: (Object.keys(clientStatusLabels) as ClientStatus[]).map((status) => ({
+          value: status,
+          label: clientStatusLabels[status],
+        })),
+      },
+    },
+    {
+      key: "courriel",
+      label: "Courriel",
+      cellClassName: "text-muted-foreground",
+      cell: (clientItem) => clientItem.email ?? "—",
+      edit: { type: "text", value: (clientItem) => clientItem.email ?? "" },
+    },
+    {
+      key: "telephone",
+      label: "Téléphone",
+      cellClassName: "text-muted-foreground",
+      cell: (clientItem) => clientItem.phone ?? "—",
+      edit: { type: "text", value: (clientItem) => clientItem.phone ?? "" },
+    },
+    {
+      key: "ville",
+      label: "Ville",
+      hiddenByDefault: true,
+      cellClassName: "text-muted-foreground",
+      cell: (clientItem) => clientItem.primaryAddress?.city ?? "—",
+    },
+    {
+      key: "projets",
+      label: "Projets",
+      headClassName: "text-center",
+      cellClassName: "text-center",
+      cell: (clientItem) => <Badge variant="secondary">{clientItem.projectCount}</Badge>,
+    },
+    {
+      key: "factures",
+      label: "Factures",
+      headClassName: "text-center",
+      cellClassName: "text-center",
+      cell: (clientItem) => <Badge variant="secondary">{clientItem.invoiceCount}</Badge>,
+    },
+  ];
 
   async function confirmDelete() {
     if (!deleteTarget) return;
@@ -156,84 +269,36 @@ export default function ClientsPage() {
           }
         />
       ) : (
-        <div className="overflow-hidden rounded-lg border border-border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-24">Numéro</TableHead>
-                <TableHead>Nom</TableHead>
-                {/* Hidden on narrow screens: the name and number are what identify a row, and
-                    the rest is one tap away on the client's own page. */}
-                <TableHead className="hidden md:table-cell">Courriel</TableHead>
-                <TableHead className="hidden lg:table-cell">Téléphone</TableHead>
-                <TableHead className="hidden text-center sm:table-cell">Projets</TableHead>
-                <TableHead className="hidden text-center sm:table-cell">Factures</TableHead>
-                <TableHead className="w-10" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.items.map((clientItem) => (
-                <ClickableRow
-                  key={clientItem.id}
-                  label={`Ouvrir la fiche de ${clientItem.name}`}
-                  onOpen={() => router.push(`/clients/${clientItem.id}`)}
-                >
-                  <TableCell className="font-mono text-xs text-muted-foreground tabular-nums">
-                    {formatClientNumber(clientItem.number)}
-                  </TableCell>
-                  <TableCell>
-                    <Link
-                      href={`/clients/${clientItem.id}`}
-                      className="group/name inline-flex items-center gap-1.5 font-medium text-foreground underline-offset-4 hover:underline"
-                    >
-                      {clientItem.name}
-                      <ExternalLink className="size-3 opacity-0 transition-opacity group-hover/name:opacity-60" />
-                    </Link>
-                    <div className="mt-0.5 flex items-center gap-1.5">
-                      <span className="text-xs text-muted-foreground">
-                        {clientItem.type === "Entreprise" ? "Entreprise" : "Particulier"}
-                      </span>
-                      {/* One badge, never two: the lock wins over the state, because it is what
-                          changes whether anything can be opened for them. */}
-                      <Badge variant={clientStatusBadge(clientItem).variant} className="text-[10px]">
-                        {clientStatusBadge(clientItem).label}
-                      </Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell className="hidden text-muted-foreground md:table-cell">{clientItem.email ?? "—"}</TableCell>
-                  <TableCell className="hidden text-muted-foreground lg:table-cell">{clientItem.phone ?? "—"}</TableCell>
-                  <TableCell className="hidden text-center sm:table-cell">
-                    <Badge variant="secondary">{clientItem.projectCount}</Badge>
-                  </TableCell>
-                  <TableCell className="hidden text-center sm:table-cell">
-                    <Badge variant="secondary">{clientItem.invoiceCount}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label="Actions" />}>
-                        <MoreHorizontal />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem render={<Link href={`/clients/${clientItem.id}`} />}>
-                          <ExternalLink />
-                          Ouvrir la fiche
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => openEdit(clientItem)}>
-                          <Pencil />
-                          Modifier
-                        </DropdownMenuItem>
-                        <DropdownMenuItem variant="destructive" onClick={() => setDeleteTarget(clientItem)}>
-                          <Trash2 />
-                          Supprimer
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </ClickableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable
+          id="clients"
+          columns={columns}
+          rows={data.items}
+          getRowId={(clientItem) => clientItem.id}
+          rowLabel={(clientItem) => `Ouvrir la fiche de ${clientItem.name}`}
+          onOpen={(clientItem) => router.push(`/clients/${clientItem.id}`)}
+          onSaveRow={canCreate ? saveRow : undefined}
+          actions={(clientItem) => (
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label="Actions" />}>
+                <MoreHorizontal />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem render={<Link href={`/clients/${clientItem.id}`} />}>
+                  <ExternalLink />
+                  Ouvrir la fiche
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openEdit(clientItem)}>
+                  <Pencil />
+                  Modifier
+                </DropdownMenuItem>
+                <DropdownMenuItem variant="destructive" onClick={() => setDeleteTarget(clientItem)}>
+                  <Trash2 />
+                  Supprimer
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        />
       )}
 
       <PaginationBar result={data} onPageChange={setPage} />

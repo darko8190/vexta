@@ -14,20 +14,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
-import { ClickableRow } from "@/components/layout/clickable-row";
+import { DataTable, type DataColumn } from "@/components/layout/data-table";
 import { PageHeader } from "@/components/layout/page-header";
 import { UpgradeCta } from "@/components/layout/upgrade-cta";
 import { useCanCreate, useIsClientUser } from "@/hooks/use-can-create";
 import { PaginationBar } from "@/components/layout/pagination-bar";
 import { SearchInput } from "@/components/layout/search-input";
-import { ProjectFormSheet } from "@/components/projects/project-form-sheet";
+import { ProjectFormSheet, storedValues } from "@/components/projects/project-form-sheet";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
-import { useDeleteProject, useProjectsQuery } from "@/hooks/use-projects";
+import { useDeleteProject, useProjectsQuery, useUpdateProject } from "@/hooks/use-projects";
 import { projectStatusBadgeVariant, projectStatusLabels } from "@/lib/labels";
-import { formatProjectNumber, type ProjectRecord } from "@/lib/types";
+import { formatProjectNumber, type ProjectRecord, type ProjectStatus } from "@/lib/types";
 
 function formatCurrency(amount: number | null) {
   if (amount == null) return "—";
@@ -44,6 +43,7 @@ export default function ProjectsPage() {
 
   const { data, isLoading } = useProjectsQuery(page, debouncedSearch);
   const deleteProject = useDeleteProject();
+  const updateProject = useUpdateProject();
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<ProjectRecord | undefined>(undefined);
@@ -58,6 +58,99 @@ export default function ProjectsPage() {
     setEditingProject(project);
     setFormOpen(true);
   }
+
+  async function saveRow(projectItem: ProjectRecord, changes: Record<string, string>) {
+    const values = storedValues(projectItem);
+    if ("description" in changes) values.description = changes.description;
+    if ("statut" in changes) values.status = changes.statut as ProjectStatus;
+    if ("debut" in changes) values.startDate = changes.debut || null;
+    if ("fin" in changes) values.endDate = changes.fin || null;
+    if ("budget" in changes) values.budget = changes.budget ? Number(changes.budget) : null;
+    if ("po" in changes) values.poNumber = changes.po.trim() || null;
+    await updateProject.mutateAsync({ id: projectItem.id, values });
+  }
+
+  const columns: DataColumn<ProjectRecord>[] = [
+    {
+      key: "numero",
+      label: "Numéro",
+      locked: true,
+      headClassName: "w-24",
+      cellClassName: "font-mono text-xs font-medium tabular-nums",
+      cell: (projectItem) => formatProjectNumber(projectItem.number),
+    },
+    { key: "client", label: "Client", cellClassName: "font-medium", cell: (projectItem) => projectItem.clientName },
+    {
+      key: "description",
+      label: "Description",
+      cellClassName: "max-w-xs truncate text-muted-foreground",
+      cell: (projectItem) => projectItem.description || "—",
+      edit: { type: "text", value: (projectItem) => projectItem.description ?? "" },
+    },
+    {
+      key: "statut",
+      label: "Statut",
+      cell: (projectItem) => (
+        <Badge variant={projectStatusBadgeVariant[projectItem.status]}>
+          {projectStatusLabels[projectItem.status]}
+        </Badge>
+      ),
+      edit: {
+        type: "select",
+        value: (projectItem) => projectItem.status,
+        options: (Object.keys(projectStatusLabels) as ProjectStatus[]).map((status) => ({
+          value: status,
+          label: projectStatusLabels[status],
+        })),
+      },
+    },
+    {
+      key: "debut",
+      label: "Début",
+      cellClassName: "text-muted-foreground",
+      cell: (projectItem) => projectItem.startDate ?? "—",
+      edit: { type: "date", value: (projectItem) => projectItem.startDate ?? "" },
+    },
+    {
+      key: "fin",
+      label: "Fin",
+      cellClassName: "text-muted-foreground",
+      cell: (projectItem) => projectItem.endDate ?? "—",
+      edit: { type: "date", value: (projectItem) => projectItem.endDate ?? "" },
+    },
+    {
+      key: "budget",
+      label: "Budget",
+      cellClassName: "text-muted-foreground tabular-nums",
+      cell: (projectItem) => formatCurrency(projectItem.budget),
+      edit: { type: "number", value: (projectItem) => (projectItem.budget != null ? String(projectItem.budget) : "") },
+    },
+    {
+      key: "po",
+      label: "PO",
+      hiddenByDefault: true,
+      cellClassName: "text-muted-foreground",
+      cell: (projectItem) => projectItem.poNumber || "—",
+      edit: { type: "text", value: (projectItem) => projectItem.poNumber ?? "" },
+    },
+    {
+      key: "categorie",
+      label: "Catégorie",
+      hiddenByDefault: true,
+      cellClassName: "text-muted-foreground",
+      cell: (projectItem) =>
+        projectItem.categoryName
+          ? `${projectItem.categoryName}${projectItem.subCategoryName ? ` › ${projectItem.subCategoryName}` : ""}`
+          : "—",
+    },
+    {
+      key: "actif",
+      label: "Actif",
+      hiddenByDefault: true,
+      cellClassName: "text-muted-foreground",
+      cell: (projectItem) => projectItem.clientAssetLabel ?? "—",
+    },
+  ];
 
   async function confirmDelete() {
     if (!deleteTarget) return;
@@ -123,79 +216,40 @@ export default function ProjectsPage() {
           }
         />
       ) : (
-        <div className="overflow-hidden rounded-lg border border-border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-24">Numéro</TableHead>
-                <TableHead>Client</TableHead>
-                <TableHead className="hidden md:table-cell">Description</TableHead>
-                <TableHead>Statut</TableHead>
-                <TableHead>Échéancier</TableHead>
-                <TableHead>Budget</TableHead>
-                {/* Nothing to offer a customer here: every action behind it is refused. */}
-                {!isClient && <TableHead className="w-10" />}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.items.map((projectItem) => (
-                <ClickableRow
-                  key={projectItem.id}
-                  label={`Ouvrir le projet ${formatProjectNumber(projectItem.number)}`}
-                  onOpen={() => router.push(`/projets/${projectItem.id}`)}
-                >
-                  <TableCell className="font-mono text-xs tabular-nums">
-                    <Link
-                      href={`/projets/${projectItem.id}`}
-                      className="font-medium text-foreground underline-offset-4 hover:underline"
-                    >
-                      {formatProjectNumber(projectItem.number)}
-                    </Link>
-                    {projectItem.poNumber && (
-                      <div className="font-sans text-xs text-muted-foreground">PO {projectItem.poNumber}</div>
-                    )}
-                  </TableCell>
-                  <TableCell className="font-medium">{projectItem.clientName}</TableCell>
-                  <TableCell className="hidden max-w-xs truncate text-muted-foreground md:table-cell">
-                    {projectItem.description || "—"}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={projectStatusBadgeVariant[projectItem.status]}>
-                      {projectStatusLabels[projectItem.status]}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {projectItem.startDate ?? "—"} → {projectItem.endDate ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{formatCurrency(projectItem.budget)}</TableCell>
-                  {!isClient && (
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label="Actions" />}>
-                        <MoreHorizontal />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem render={<Link href={`/projets/${projectItem.id}`} />}>
-                          <ExternalLink />
-                          Ouvrir la fiche
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => openEdit(projectItem)}>
-                          <Pencil />
-                          Modifier
-                        </DropdownMenuItem>
-                        <DropdownMenuItem variant="destructive" onClick={() => setDeleteTarget(projectItem)}>
-                          <Trash2 />
-                          Supprimer
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                  )}
-                </ClickableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable
+          id="projets"
+          columns={columns}
+          rows={data.items}
+          getRowId={(projectItem) => projectItem.id}
+          rowLabel={(projectItem) => `Ouvrir le projet ${formatProjectNumber(projectItem.number)}`}
+          onOpen={(projectItem) => router.push(`/projets/${projectItem.id}`)}
+          onSaveRow={canCreate && !isClient ? saveRow : undefined}
+          actions={
+            isClient
+              ? undefined
+              : (projectItem) => (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label="Actions" />}>
+                      <MoreHorizontal />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem render={<Link href={`/projets/${projectItem.id}`} />}>
+                        <ExternalLink />
+                        Ouvrir la fiche
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => openEdit(projectItem)}>
+                        <Pencil />
+                        Modifier
+                      </DropdownMenuItem>
+                      <DropdownMenuItem variant="destructive" onClick={() => setDeleteTarget(projectItem)}>
+                        <Trash2 />
+                        Supprimer
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )
+          }
+        />
       )}
 
       <PaginationBar result={data} onPageChange={setPage} />

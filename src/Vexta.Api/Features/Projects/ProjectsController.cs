@@ -19,12 +19,15 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
 {
     [HttpGet]
     public async Task<ActionResult<PagedResult<ProjectDto>>> List(
-        [FromQuery] PagingQuery query, [FromQuery] Guid? clientId, [FromQuery] ProjectStatus? status)
+        [FromQuery] PagingQuery query, [FromQuery] Guid? clientId, [FromQuery] ProjectStatus? status,
+        [FromQuery] Guid? clientAssetId)
     {
         var projects = db.Projects.AsNoTracking().AsQueryable();
 
         if (clientId is not null) projects = projects.Where(p => p.ClientId == clientId);
         if (status is not null) projects = projects.Where(p => p.Status == status);
+        // The jobs done on one car or one building, for that asset's own file.
+        if (clientAssetId is not null) projects = projects.Where(p => p.ClientAssetId == clientAssetId);
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {

@@ -13,13 +13,13 @@ import {
   Info,
   ListChecks,
   MapPin,
-  Pencil,
   Plus,
   Receipt,
   Wrench,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
+import { InlineSheet } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/layout/empty-state";
 import { SectionNav, type NavSection } from "@/components/layout/section-nav";
@@ -94,7 +94,6 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const { data: summary, isLoading: summaryLoading } = useProjectSummaryQuery(id, !isClient);
 
   const [section, setSection] = useState("details");
-  const [editOpen, setEditOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -194,12 +193,6 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             )}
           </div>
 
-          {!isClient && (
-            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
-              <Pencil />
-              Modifier
-            </Button>
-          )}
         </div>
       </div>
 
@@ -213,7 +206,25 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         />
 
         <div className="min-w-0 flex-1">
-          {section === "details" && (
+          {/* Staff edit the job where they read it: the form is the section, with one
+              Enregistrer, instead of a summary and a Modifier that opened the same fields. */}
+          {section === "details" && !isClient && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-base font-semibold text-foreground">Détails</h2>
+                <p className="text-sm text-muted-foreground">
+                  Modifiez les champs directement, puis enregistrez.
+                </p>
+              </div>
+              <InlineSheet>
+                <ProjectFormSheet open onOpenChange={() => {}} project={project} />
+              </InlineSheet>
+              <ProjectCostTable costs={summary?.costs} isLoading={summaryLoading} />
+            </div>
+          )}
+
+          {/* A customer reads their job; nothing on it is theirs to change. */}
+          {section === "details" && isClient && (
             <div className="space-y-6">
               <div>
                 <h2 className="text-base font-semibold text-foreground">Détails</h2>
@@ -273,7 +284,6 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                 />
               </dl>
 
-              {!isClient && <ProjectCostTable costs={summary?.costs} isLoading={summaryLoading} />}
             </div>
           )}
 
@@ -317,7 +327,6 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
-      <ProjectFormSheet open={editOpen} onOpenChange={setEditOpen} project={project} />
     </div>
   );
 }

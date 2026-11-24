@@ -25,6 +25,37 @@ export interface ClientFormValues {
   /** Prospect, client or ancien client. Never "Banni" — that is the lock on the record. */
   status: ClientStatus;
   primaryAddress: Omit<ClientAddress, "id"> | null;
+  /** The contact the invoices go to first. Null falls back to the client's own person. */
+  billingContactId?: string | null;
+}
+
+/**
+ * The client exactly as stored, in the save endpoint's shape — what the form would send if
+ * nothing were touched. A table that edits one cell patches this and sends the rest unchanged.
+ */
+export function storedClientValues(client: ClientRecord): ClientFormValues {
+  const address = client.primaryAddress;
+  return {
+    type: client.type,
+    companyName: client.type === "Entreprise" ? client.companyName : null,
+    firstName: client.firstName ?? "",
+    lastName: client.lastName ?? "",
+    email: client.email,
+    phone: client.phone,
+    isTaxExempt: client.isTaxExempt,
+    status: client.status,
+    billingContactId: client.billingContactId,
+    primaryAddress: address
+      ? {
+          line1: address.line1,
+          apartment: address.apartment,
+          city: address.city,
+          province: address.province,
+          postalCode: address.postalCode,
+          country: address.country,
+        }
+      : null,
+  };
 }
 
 export interface ClientContactFormValues {

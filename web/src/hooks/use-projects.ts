@@ -31,10 +31,19 @@ export interface ProjectFormValues {
   wageClassificationId?: string | null;
 }
 
-export function useProjectsQuery(page: number, search: string, clientId?: string, status?: ProjectStatus) {
+export function useProjectsQuery(
+  page: number,
+  search: string,
+  clientId?: string,
+  status?: ProjectStatus,
+  clientAssetId?: string,
+) {
   return useQuery({
-    queryKey: ["projects", page, search, clientId, status],
-    queryFn: () => api.get<PagedResult<ProjectRecord>>(`projects${buildQuery({ page, search, clientId, status })}`),
+    queryKey: ["projects", page, search, clientId, status, clientAssetId],
+    queryFn: () =>
+      api.get<PagedResult<ProjectRecord>>(
+        `projects${buildQuery({ page, search, clientId, status, clientAssetId })}`,
+      ),
     placeholderData: (previous) => previous,
   });
 }

@@ -5,12 +5,12 @@ import Link from "next/link";
 import {
   ArrowLeft,
   Car,
+  ClipboardPen,
   FileText,
   FolderKanban,
   IdCard,
   Lock,
   MapPin,
-  Pencil,
   UserRound,
   Wallet,
 } from "lucide-react";
@@ -25,7 +25,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { BlockClientDialog } from "@/components/clients/block-client-dialog";
-import { ClientFormSheet } from "@/components/clients/client-form-sheet";
 import { ClientAccountSection } from "@/components/clients/detail/client-account-section";
 import { ClientAssetsSection } from "@/components/clients/detail/client-assets-section";
 import { ClientContactsSection } from "@/components/clients/detail/client-contacts-section";
@@ -35,6 +34,7 @@ import {
   ClientAddressesSection,
   ClientInvoicesSection,
   ClientProjectsSection,
+  ClientQuotesSection,
 } from "@/components/clients/detail/client-related-lists";
 import { useIsOwner } from "@/hooks/use-can-create";
 import { useClientQuery } from "@/hooks/use-clients";
@@ -49,7 +49,6 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
   // Détails first, and the one the file opens on: somebody opening a client is looking for a
   // telephone number or an address far more often than for their list of invoices.
   const [section, setSection] = useState("details");
-  const [editOpen, setEditOpen] = useState(false);
   const [blockScope, setBlockScope] = useState<"client" | "account" | null>(null);
 
   if (isLoading) {
@@ -82,6 +81,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
     { key: "contacts", label: "Contacts", count: client.contactCount, icon: UserRound },
     { key: "actifs", label: "Actifs", count: client.assetCount, icon: Car },
     { key: "adresses", label: "Adresses", count: client.addressCount, icon: MapPin },
+    { key: "soumissions", label: "Soumissions", icon: ClipboardPen },
     { key: "projets", label: "Projets", count: client.projectCount, icon: FolderKanban },
     { key: "factures", label: "Factures", count: client.invoiceCount, icon: FileText },
     // No count: a balance is one figure, not a number of things, and it is shown on the card
@@ -144,11 +144,6 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
           </div>
 
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
-              <Pencil />
-              Modifier
-            </Button>
-
             {/* Who the company will do business with at all is the owner's call, not a chargé
                 de projet's — the API says the same. */}
             {isOwner && (
@@ -207,12 +202,11 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
           {section === "actifs" && <ClientAssetsSection clientId={client.id} />}
           {section === "compte" && <ClientAccountSection clientId={client.id} />}
           {section === "adresses" && <ClientAddressesSection clientId={client.id} />}
+          {section === "soumissions" && <ClientQuotesSection clientId={client.id} />}
           {section === "projets" && <ClientProjectsSection clientId={client.id} />}
           {section === "factures" && <ClientInvoicesSection clientId={client.id} />}
         </div>
       </div>
-
-      <ClientFormSheet open={editOpen} onOpenChange={setEditOpen} client={client} />
 
       {blockScope && (
         <BlockClientDialog

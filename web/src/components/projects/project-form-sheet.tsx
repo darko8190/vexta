@@ -69,7 +69,11 @@ type FormValues = z.infer<typeof formSchema>;
 /** A week. Long enough to be a plausible mandate, short enough that a wrong one gets corrected. */
 const DEFAULT_DURATION_IN_DAYS = 7;
 
-function toFormValues(project?: ProjectRecord, defaultClientId?: string): FormValues {
+function toFormValues(
+  project?: ProjectRecord,
+  defaultClientId?: string,
+  defaultClientAssetId?: string,
+): FormValues {
   return {
     clientId: project?.clientId ?? defaultClientId ?? "",
     poNumber: project?.poNumber ?? "",
@@ -88,7 +92,7 @@ function toFormValues(project?: ProjectRecord, defaultClientId?: string): FormVa
     budget: project?.budget != null ? String(project.budget) : "",
     isTaxExempt: project?.isTaxExempt ?? false,
     pricePolicyId: project?.pricePolicyId ?? "",
-    clientAssetId: project?.clientAssetId ?? "",
+    clientAssetId: project?.clientAssetId ?? defaultClientAssetId ?? "",
     categoryId: project?.categoryId ?? "",
     subCategoryId: project?.subCategoryId ?? "",
     wageClassificationId: project?.wageClassificationId ?? "",
@@ -102,7 +106,7 @@ function toFormValues(project?: ProjectRecord, defaultClientId?: string): FormVa
  * reopening has to send back every other field unchanged rather than whatever happens to be in
  * the form at that moment.
  */
-function storedValues(project: ProjectRecord): ProjectFormValues {
+export function storedValues(project: ProjectRecord): ProjectFormValues {
   return {
     clientId: project.clientId,
     poNumber: project.poNumber,
@@ -128,11 +132,14 @@ export function ProjectFormSheet({
   onOpenChange,
   project,
   defaultClientId,
+  defaultClientAssetId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   project?: ProjectRecord;
   defaultClientId?: string;
+  /** Opened from an asset's file: the job is on that asset until somebody says otherwise. */
+  defaultClientAssetId?: string;
 }) {
   const isEditing = Boolean(project);
   const createProject = useCreateProject();
@@ -144,12 +151,12 @@ export function ProjectFormSheet({
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: toFormValues(project, defaultClientId),
+    defaultValues: toFormValues(project, defaultClientId, defaultClientAssetId),
   });
 
   useEffect(() => {
-    if (open) form.reset(toFormValues(project, defaultClientId));
-  }, [open, project, defaultClientId, form]);
+    if (open) form.reset(toFormValues(project, defaultClientId, defaultClientAssetId));
+  }, [open, project, defaultClientId, defaultClientAssetId, form]);
 
   async function onSubmit(values: FormValues) {
     const payload: ProjectFormValues = {

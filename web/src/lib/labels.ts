@@ -26,6 +26,7 @@ import type {
   ProjectTaskStatus,
   TenantSubscriptionStatus,
   UserRole,
+  QuoteStatus,
 } from "@/lib/types";
 
 /**
@@ -447,4 +448,21 @@ export const purchaseOrderStatusBadgeVariant: Record<PurchaseOrderStatus, "defau
   PartiellementRecue: "secondary",
   Recue: "default",
   Annulee: "destructive",
+};
+
+export const quoteStatusLabels: Record<QuoteStatus, string> = {
+  Brouillon: "Brouillon",
+  Envoyee: "Envoyée",
+  Acceptee: "Acceptée",
+  Refusee: "Refusée",
+  Expiree: "Expirée",
+};
+
+export const quoteStatusBadgeVariant: Record<QuoteStatus, "default" | "secondary" | "destructive" | "outline"> = {
+  Brouillon: "outline",
+  // Sent is the one waiting on an answer, so it is the one that stands out.
+  Envoyee: "default",
+  Acceptee: "secondary",
+  Refusee: "destructive",
+  Expiree: "outline",
 };

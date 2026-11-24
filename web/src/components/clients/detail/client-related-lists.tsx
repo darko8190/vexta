@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { FileText, FolderKanban, MapPin, Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ClipboardPen, FileText, FolderKanban, MapPin, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,10 +15,15 @@ import { useCanCreate } from "@/hooks/use-can-create";
 import { useAddressesQuery } from "@/hooks/use-addresses";
 import { useInvoicesQuery } from "@/hooks/use-invoices";
 import { useProjectsQuery } from "@/hooks/use-projects";
+import { useQuotesQuery } from "@/hooks/use-quotes";
+import { QuoteFormSheet } from "@/components/quotes/quote-form-sheet";
+import { rowOpenClassName, rowOpenProps } from "@/components/layout/row-open";
+import { formatAmount } from "@/lib/money";
+import { cn } from "@/lib/utils";
 import { formatDateOnly } from "@/lib/dates";
 import { formatCents } from "@/lib/money";
-import { formatProjectNumber } from "@/lib/types";
-import { invoiceStatusLabels, projectStatusLabels } from "@/lib/labels";
+import { formatProjectNumber, formatQuoteNumber } from "@/lib/types";
+import { invoiceStatusLabels, projectStatusLabels, quoteStatusBadgeVariant, quoteStatusLabels } from "@/lib/labels";
 import type { AddressRecord } from "@/lib/types";
 
 function Loading({ rows = 3 }: { rows?: number }) {
@@ -284,6 +290,93 @@ export function ClientInvoicesSection({ clientId }: { clientId: string }) {
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+/** The prices given to this client, newest first. Pressing one opens it. */
+export function ClientQuotesSection({ clientId }: { clientId: string }) {
+  const router = useRouter();
+  const { data, isLoading, isError, isPlaceholderData, error: loadError, refetch } = useQuotesQuery(
+    1,
+    "",
+    undefined,
+    clientId,
+  );
+  const canCreate = useCanCreate();
+  const [formOpen, setFormOpen] = useState(false);
+  const items = data?.items ?? [];
+
+  const addButton = canCreate ? (
+    <Button onClick={() => setFormOpen(true)}>
+      <Plus />
+      Nouvelle soumission
+    </Button>
+  ) : undefined;
+
+  return (
+    <div>
+      <SectionHeading
+        title="Soumissions"
+        description="Les prix donnés à ce client, et ce qu'ils sont devenus."
+        action={addButton}
+      />
+      {isLoading ? (
+        <Loading />
+      ) : isError && (!data || isPlaceholderData) ? (
+        <LoadErrorState
+          error={loadError}
+          title="Soumissions indisponibles"
+          fallback="Les soumissions de ce client n'ont pas pu être chargées."
+          onRetry={() => refetch()}
+        />
+      ) : items.length === 0 ? (
+        <EmptyState
+          icon={ClipboardPen}
+          title="Aucune soumission"
+          description="Préparez un prix pour ce client : le client est déjà choisi."
+          action={addButton}
+        />
+      ) : (
+        <ul className="space-y-2">
+          {items.map((quote) => (
+            <li
+              key={quote.id}
+              {...rowOpenProps(
+                () => router.push(`/soumissions/${quote.id}`),
+                `Ouvrir la soumission ${formatQuoteNumber(quote.number)}`,
+              )}
+              className={cn(
+                "flex items-start justify-between gap-3 rounded-lg border border-border bg-card p-3",
+                rowOpenClassName,
+              )}
+            >
+              <div className="min-w-0">
+                <span className="font-mono text-sm font-medium text-foreground">
+                  {formatQuoteNumber(quote.number)}
+                </span>
+                <span className="ml-2 text-sm tabular-nums text-muted-foreground">
+                  {formatAmount(quote.subtotal)}
+                </span>
+                {quote.description && (
+                  <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">{quote.description}</p>
+                )}
+              </div>
+              <Badge variant={quoteStatusBadgeVariant[quote.status]} className="shrink-0">
+                {quoteStatusLabels[quote.status]}
+              </Badge>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <QuoteFormSheet
+        key={String(formOpen)}
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        defaultClientId={clientId}
+        onCreated={(created) => router.push(`/soumissions/${created.id}`)}
+      />
     </div>
   );
 }

@@ -149,6 +149,19 @@ export interface ClientAsset {
   createdAt: string;
 }
 
+/** A task seen from the asset it was done on, with the job it belongs to. */
+export interface AssetTask {
+  id: string;
+  projectId: string;
+  projectNumber: number;
+  title: string;
+  status: ProjectTaskStatus;
+  priority: string;
+  dueDate: string | null;
+  completedAt: string | null;
+  isLate: boolean;
+}
+
 export interface SaveClientAssetValues {
   label: string;
   assetTypeId: string | null;
@@ -2976,4 +2989,98 @@ export interface DirectorySummary {
   products: number;
   /** Only the categories that actually have a public product in them. */
   categories: string[];
+}
+
+// ---- Soumissions ----
+
+export type QuoteStatus = "Brouillon" | "Envoyee" | "Acceptee" | "Refusee" | "Expiree";
+
+/** Which project section the line becomes on acceptance: a task, a material, an extra charge. */
+export type QuoteLineKind = "Tache" | "Materiel" | "Frais";
+
+export function formatQuoteNumber(n: number): string {
+  return `S-${String(n).padStart(4, "0")}`;
+}
+
+export interface QuoteRecord {
+  id: string;
+  number: number;
+  clientId: string;
+  clientName: string;
+  poNumber: string | null;
+  description: string | null;
+  status: QuoteStatus;
+  issuedOn: string | null;
+  validUntil: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  isTaxExempt: boolean;
+  clientAssetId: string | null;
+  clientAssetLabel: string | null;
+  clientAddress: ProjectAddress | null;
+  sameAddressAsClient: boolean;
+  siteAddress: ProjectAddress | null;
+  categoryId: string | null;
+  categoryName: string | null;
+  subCategoryId: string | null;
+  subCategoryName: string | null;
+  wageClassificationId: string | null;
+  wageClassificationName: string | null;
+  /** The project it became, once accepted. */
+  projectId: string | null;
+  projectNumber: number | null;
+  subtotal: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface QuoteFormValues {
+  clientId: string;
+  poNumber: string | null;
+  description: string | null;
+  status: QuoteStatus;
+  issuedOn: string | null;
+  validUntil: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  isTaxExempt: boolean | null;
+  clientAddressId: string | null;
+  sameAddressAsClient: boolean;
+  siteAddressId: string | null;
+  clientAssetId: string | null;
+  categoryId: string | null;
+  subCategoryId: string | null;
+  wageClassificationId: string | null;
+}
+
+export interface QuoteLine {
+  id: string;
+  kind: QuoteLineKind;
+  productId: string | null;
+  code: string | null;
+  description: string;
+  unit: string | null;
+  quantity: number;
+  unitCost: number | null;
+  unitPrice: number;
+  total: number;
+  sortOrder: number;
+}
+
+export interface SaveQuoteLineValues {
+  kind: QuoteLineKind;
+  description: string;
+  quantity: number;
+  unitCost: number | null;
+  unitPrice: number;
+  productId?: string | null;
+  code?: string | null;
+  unit?: string | null;
+}
+
+export interface QuoteSummary {
+  tasks: number;
+  materials: number;
+  extraCharges: number;
+  costs: ProjectCostTable;
 }

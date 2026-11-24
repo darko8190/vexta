@@ -55,6 +55,34 @@ public class ClientAssetsController(VextaDbContext db, ICurrentUserService curre
         return asset is null ? NotFound() : Ok(Map(asset));
     }
 
+    /// <summary>
+    /// Every task on every job done on this asset, newest job first — the asset's own punch list
+    /// across its history. Staff only: tasks are the company's internal plan of the work, and a
+    /// customer reading their project is not shown them there either.
+    /// </summary>
+    [HttpGet("{id:guid}/taches")]
+    [Authorize(Roles = Roles.Staff)]
+    public async Task<ActionResult<List<AssetTaskDto>>> Tasks(Guid clientId, Guid id, CancellationToken ct)
+    {
+        if (!await db.ClientAssets.AnyAsync(a => a.Id == id && a.ClientId == clientId, ct)) return NotFound();
+
+        var today = BusinessDay.Today;
+        var tasks = await db.ProjectTasks.AsNoTracking()
+            .Where(t => t.Project!.ClientAssetId == id)
+            .OrderByDescending(t => t.Project!.Number)
+            .ThenBy(t => t.SortOrder)
+            .Select(t => new
+            {
+                t.Id, t.ProjectId, ProjectNumber = t.Project!.Number, t.Title, t.Status, t.Priority,
+                t.DueDate, t.CompletedAt, Task = t,
+            })
+            .ToListAsync(ct);
+
+        return Ok(tasks.Select(t => new AssetTaskDto(
+            t.Id, t.ProjectId, t.ProjectNumber, t.Title, t.Status, t.Priority, t.DueDate, t.CompletedAt,
+            t.Task.IsLate(today))).ToList());
+    }
+
     [HttpPost]
     [Authorize(Roles = Roles.Managers)]
     [RequireBusinessTenant]
@@ -219,3 +247,15 @@ public class ClientAssetsController(VextaDbContext db, ICurrentUserService curre
         return null;
     }
 }
+
+/// <summary>A task seen from the asset it was done on, with the job it belongs to.</summary>
+public record AssetTaskDto(
+    Guid Id,
+    Guid ProjectId,
+    int ProjectNumber,
+    string Title,
+    ProjectTaskStatus Status,
+    ProjectTaskPriority Priority,
+    DateOnly? DueDate,
+    DateTimeOffset? CompletedAt,
+    bool IsLate);

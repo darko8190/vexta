@@ -68,6 +68,8 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
     public DbSet<ProjectSubCategory> ProjectSubCategories => Set<ProjectSubCategory>();
     public DbSet<WageClassification> WageClassifications => Set<WageClassification>();
     public DbSet<WageClassificationStep> WageClassificationSteps => Set<WageClassificationStep>();
+    public DbSet<Quote> Quotes => Set<Quote>();
+    public DbSet<QuoteLine> QuoteLines => Set<QuoteLine>();
     public DbSet<ProductImage> ProductImages => Set<ProductImage>();
     public DbSet<ProductPriceEntry> ProductPriceEntries => Set<ProductPriceEntry>();
     public DbSet<ProductStockEntry> ProductStockEntries => Set<ProductStockEntry>();
@@ -1226,6 +1228,48 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.Property(c => c.Name).HasMaxLength(100);
             e.HasIndex(c => new { c.TenantId, c.Name }).IsUnique();
             e.HasQueryFilter(c => c.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<Quote>(e =>
+        {
+            e.HasIndex(q => new { q.TenantId, q.Number }).IsUnique();
+            e.Property(q => q.PoNumber).HasMaxLength(100);
+            e.Property(q => q.Description).HasMaxLength(4000);
+
+            // Restrict on the client, like a project: a client with quotes on file is not
+            // deleted out from under them.
+            e.HasOne(q => q.Client).WithMany().HasForeignKey(q => q.ClientId).OnDelete(DeleteBehavior.Restrict);
+
+            // SetNull everywhere else: tidying an address book, an asset list or the filing
+            // categories must never take a quote with it.
+            e.HasOne(q => q.ClientAsset).WithMany().HasForeignKey(q => q.ClientAssetId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(q => q.ClientAddress).WithMany().HasForeignKey(q => q.ClientAddressId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(q => q.SiteAddress).WithMany().HasForeignKey(q => q.SiteAddressId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(q => q.Category).WithMany().HasForeignKey(q => q.CategoryId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(q => q.SubCategory).WithMany().HasForeignKey(q => q.SubCategoryId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(q => q.WageClassification).WithMany().HasForeignKey(q => q.WageClassificationId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(q => q.Project).WithMany().HasForeignKey(q => q.ProjectId).OnDelete(DeleteBehavior.SetNull);
+
+            e.HasQueryFilter(q => q.TenantId == CurrentTenantId
+                && (CurrentClientId == null || q.ClientId == CurrentClientId));
+        });
+
+        builder.Entity<QuoteLine>(e =>
+        {
+            e.Property(l => l.Code).HasMaxLength(100);
+            e.Property(l => l.Description).HasMaxLength(2000);
+            e.Property(l => l.Unit).HasMaxLength(50);
+            e.Property(l => l.Quantity).HasPrecision(14, 3);
+            e.Property(l => l.UnitCost).HasPrecision(14, 2);
+            e.Property(l => l.UnitPrice).HasPrecision(14, 2);
+
+            e.HasOne(l => l.Quote).WithMany(q => q.Lines).HasForeignKey(l => l.QuoteId).OnDelete(DeleteBehavior.Cascade);
+            // SetNull: retiring a product from the catalogue must not change a price already given.
+            e.HasOne(l => l.Product).WithMany().HasForeignKey(l => l.ProductId).OnDelete(DeleteBehavior.SetNull);
+
+            e.HasIndex(l => new { l.QuoteId, l.Kind, l.SortOrder });
+            e.HasQueryFilter(l => l.TenantId == CurrentTenantId
+                && (CurrentClientId == null || l.Quote!.ClientId == CurrentClientId));
         });
 
         builder.Entity<WageClassificationStep>(e =>

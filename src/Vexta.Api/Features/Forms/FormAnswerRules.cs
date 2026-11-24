@@ -31,9 +31,12 @@ public static class FormAnswerRules
         switch (field.Type)
         {
             case FormFieldType.Nombre:
-                // Both separators: a Québec keyboard types 12,5 and a form filled on a phone
-                // keypad types 12.5, and refusing either would be refusing the right answer.
-                if (!decimal.TryParse(answer.Replace(',', '.'), NumberStyles.Number, CultureInfo.InvariantCulture, out _))
+                // Read the way it is typed. A Québec keyboard gives 12,5 and a phone keypad
+                // 12.5, and a kilometre reading is written 142 350 — refusing any of the three
+                // would be refusing the right answer. The spaces go because they are a grouping
+                // mark here and not a separator the invariant culture knows; the non-breaking
+                // one goes too, because that is what a paste from a spreadsheet carries.
+                if (!decimal.TryParse(Numeric(answer), NumberStyles.Number, CultureInfo.InvariantCulture, out _))
                 {
                     return $"« {field.Label} » attend un nombre.";
                 }
@@ -89,4 +92,16 @@ public static class FormAnswerRules
 
         return null;
     }
+
+    /// <summary>
+    /// A typed figure as the invariant culture can read it. Kept beside the rule that uses it
+    /// and mirrored by the form action runner, which has to be able to read everything this
+    /// accepts — a validator that says yes to an answer the runner cannot parse is an answer
+    /// that silently lands nowhere.
+    /// </summary>
+    public static string Numeric(string value) => value
+        .Replace(" ", string.Empty)
+        .Replace(" ", string.Empty)
+        .Replace(" ", string.Empty)
+        .Replace(',', '.');
 }

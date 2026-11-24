@@ -1,12 +1,13 @@
 import { cache, Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Building2, BriefcaseBusiness, FileText, Mail, MapPin, Phone } from "lucide-react";
+import { Building2, BriefcaseBusiness, ClipboardPen, FileText, Mail, MapPin, Phone } from "lucide-react";
 import { BrandTheme } from "@/components/layout/brand-theme";
 import { JobApplicationDialog } from "@/components/public/job-application-dialog";
 import { PublicAccountBar } from "@/components/public/public-account-bar";
+import { PublicFormDialog } from "@/components/public/public-form-dialog";
 import { apiFetch } from "@/lib/api-server";
-import { employmentTypeLabels } from "@/lib/labels";
+import { employmentTypeLabels, formKindLabels } from "@/lib/labels";
 import { styleTokensFor } from "@/lib/public-page-style";
 import type { PublicCompany } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -116,10 +117,11 @@ async function CompanyPageContent({ params }: Pick<PageProps<"/e/[slug]">, "para
   const hasAbout = Boolean(company.about?.trim());
   const hasProducts = company.products.length > 0;
   const hasJobs = company.jobs.length > 0;
+  const hasForms = company.forms.length > 0;
 
   // A company that turned the page on and wrote nothing still gets a page that looks chosen:
   // its name, and one honest line instead of a screen of empty headings.
-  const isBare = !hasAbout && !hasProducts && !hasJobs && !hasContact;
+  const isBare = !hasAbout && !hasProducts && !hasJobs && !hasForms && !hasContact;
 
   // Which of the four arrangements this company chose. Resolved once: every class name below
   // comes from it, and a style this build does not recognise falls back rather than failing.
@@ -299,6 +301,45 @@ async function CompanyPageContent({ params }: Pick<PageProps<"/e/[slug]">, "para
                           {job.applyTo}
                         </p>
                       )}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {hasForms && (
+              <section>
+                <h2 className={cn("flex items-center gap-2", s.sectionTitle)}>
+                  <ClipboardPen className="size-5 shrink-0" aria-hidden="true" />
+                  Nous écrire
+                </h2>
+
+                <ul className="mt-4 space-y-4">
+                  {company.forms.map((form) => (
+                    <li
+                      key={form.id}
+                      className={cn(s.card, "flex flex-wrap items-start justify-between gap-3 p-4 sm:p-5")}
+                    >
+                      <div className="min-w-0">
+                        <h3 className="text-base font-medium text-foreground">{form.title}</h3>
+
+                        {/* The kind named only when it says something a visitor can act on. A
+                            quote request and a vehicle sheet are answered in different frames
+                            of mind; "Formulaire" is a word that earns nothing. */}
+                        {form.kind !== "Defaut" && (
+                          <p className="mt-0.5 text-sm text-muted-foreground">
+                            {formKindLabels[form.kind]}
+                          </p>
+                        )}
+
+                        {form.description && (
+                          <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
+                            {form.description}
+                          </p>
+                        )}
+                      </div>
+
+                      <PublicFormDialog slug={company.slug} form={form} />
                     </li>
                   ))}
                 </ul>

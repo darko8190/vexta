@@ -68,6 +68,14 @@ public class PublicCompanyController(VextaDbContext db, IR2StorageService storag
 
         var jobs = page.ShowJobs ? await JobsAsync(tenant.Id, ct) : [];
 
+        // Titles only. The questions are fetched when somebody opens one, like a posting's:
+        // most visitors read a page and fill nothing.
+        var forms = page.ShowForms
+            ? (await PublicFormGate.ListAsync(db, tenant.Id, ct))
+                .Select(f => new PublicPageFormDto(f.FormId, f.Title, f.Description, f.Kind))
+                .ToList()
+            : [];
+
         return Ok(new PublicCompanyDto(
             tenant.Name,
             tenant.Slug,
@@ -82,7 +90,8 @@ public class PublicCompanyController(VextaDbContext db, IR2StorageService storag
             page.Style,
             address,
             products,
-            jobs));
+            jobs,
+            forms));
     }
 
     /// <summary>
@@ -234,7 +243,9 @@ public record PublicCompanyDto(
     PublicPageStyle Style,
     CompanyAddressDto? Address,
     List<PublicProductDto> Products,
-    List<PublicJobDto> Jobs);
+    List<PublicJobDto> Jobs,
+    /// <summary>The forms the company offers its visitors. Empty unless the page shows them.</summary>
+    List<PublicPageFormDto> Forms);
 
 /// <summary>A product on the shop window. The selling price is the only figure on it.</summary>
 public record PublicProductDto(

@@ -8,6 +8,7 @@ import type {
   EmploymentType,
   FormActionKind,
   FormFieldTarget,
+  FormKind,
   FormFieldType,
   InvoiceLineKind,
   InvoiceStatus,
@@ -105,20 +106,51 @@ export const formFieldTypeHints: Record<FormFieldType, string> = {
   Fichier: "Un fichier ou une image à téléverser.",
 };
 
-/** Which field of a client an answer fills, when the form is set to create one. */
+/** What a form is about. The order is the order they are offered in. */
+export const formKindLabels: Record<FormKind, string> = {
+  Defaut: "Formulaire",
+  Actif: "Actif d'un client",
+  Client: "Nouveau client",
+  Soumission: "Demande de soumission",
+};
+
+/** The line under the choice: what picking this kind is for. */
+export const formKindHints: Record<FormKind, string> = {
+  Defaut: "Des questions, conservées et envoyées au bureau. Une inspection, une feuille de chantier.",
+  Actif: "Au sujet de quelque chose qu'un client possède : un véhicule à l'atelier, un immeuble à inspecter.",
+  Client: "Fait entrer quelqu'un : un formulaire de contact, une fiche de nouveau client.",
+  Soumission:
+    "Une demande de prix. Les réponses arrivent dans Réponses et le bureau les chiffre — Vexta n'a pas encore de soumissions.",
+};
+
+/**
+ * Which field of a client, or of one of its assets, an answer fills.
+ *
+ * Each one names the record it fills, because the list is read in a dropdown with no headings
+ * above it: « Marque » alone leaves somebody wondering marque de quoi.
+ */
 export const formFieldTargetLabels: Record<FormFieldTarget, string> = {
   Aucun: "Aucun",
-  Prenom: "Prénom du client",
-  Nom: "Nom du client",
-  NomEntreprise: "Nom de l'entreprise",
-  Courriel: "Courriel du client",
-  Telephone: "Téléphone du client",
-  Notes: "Notes du client",
+  Prenom: "Client — prénom",
+  Nom: "Client — nom",
+  NomEntreprise: "Client — nom de l'entreprise",
+  Courriel: "Client — courriel",
+  Telephone: "Client — téléphone",
+  Notes: "Client — notes",
+  ActifLibelle: "Actif — libellé",
+  ActifMarque: "Actif — marque",
+  ActifModele: "Actif — modèle",
+  ActifAnnee: "Actif — année",
+  ActifNumeroSerie: "Actif — numéro de série ou NIV",
+  ActifReference: "Actif — plaque ou référence",
+  ActifUsage: "Actif — usage (km, heures)",
+  ActifNotes: "Actif — notes",
 };
 
 export const formActionKindLabels: Record<FormActionKind, string> = {
   EnvoyerCourriel: "Envoyer les réponses par courriel",
   CreerClient: "Créer un client",
+  CreerActifClient: "Créer un actif de client",
 };
 
 export const addressTypeLabels: Record<AddressType, string> = {

@@ -10,7 +10,10 @@ public record FormTemplateDto(
     string Title,
     string? Description,
     string? SuccessMessage,
+    FormKind Kind,
     bool IsPublished,
+    /// <summary>Ticked for the company's page at /e/{slug}. Shown there only once published too.</summary>
+    bool ShowOnPublicPage,
     int SortOrder,
     int FieldCount,
     int ActionCount,
@@ -34,6 +37,10 @@ public record FormActionDto(
     string? Recipients,
     string? Subject,
     ClientStatus NewClientStatus,
+    /// <summary>The kind of asset a CreerActifClient files. Null is an asset with no kind.</summary>
+    Guid? NewAssetTypeId,
+    string? NewAssetTypeName,
+    string? NewAssetUsageUnit,
     bool IsActive,
     int SortOrder);
 
@@ -47,7 +54,9 @@ public record SaveFormTemplateRequest(
     string Title,
     string? Description = null,
     string? SuccessMessage = null,
+    FormKind Kind = FormKind.Defaut,
     bool IsPublished = false,
+    bool ShowOnPublicPage = false,
     int SortOrder = 0);
 
 /// <param name="Id">
@@ -77,6 +86,8 @@ public record SaveFormActionRequest(
     string? Recipients = null,
     string? Subject = null,
     ClientStatus NewClientStatus = ClientStatus.Prospect,
+    Guid? NewAssetTypeId = null,
+    string? NewAssetUsageUnit = null,
     bool IsActive = true);
 
 public record SaveFormActionsRequest(IReadOnlyList<SaveFormActionRequest> Actions);
@@ -99,8 +110,12 @@ public record FormSubmissionDto(
     Guid FormTemplateId,
     string FormTitle,
     string? SubmittedByName,
+    /// <summary>True when a stranger filled it on the company's public page.</summary>
+    bool FromPublicPage,
     Guid? CreatedClientId,
     string? CreatedClientName,
+    Guid? CreatedClientAssetId,
+    string? CreatedClientAssetLabel,
     /// <summary>What the actions did, failures included. Null when the form sets nothing off.</summary>
     string? ActionLog,
     int AnswerCount,
@@ -139,6 +154,7 @@ public record SubmitFormResultDto(FormSubmissionDetailDto Submission, string Suc
 public record FormResponsesSummaryDto(
     Guid Id,
     string Title,
+    FormKind Kind,
     bool IsPublished,
     int SubmissionCount,
     DateTimeOffset? LastSubmissionAt);

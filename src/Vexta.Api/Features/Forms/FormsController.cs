@@ -50,6 +50,7 @@ public class FormsController(VextaDbContext db, ICurrentUserService currentUser)
             .Select(f => new FormResponsesSummaryDto(
                 f.Id,
                 f.Title,
+                f.Kind,
                 f.IsPublished,
                 f.Submissions.Count,
                 f.Submissions.Max(s => (DateTimeOffset?)s.CreatedAt)))
@@ -92,7 +93,11 @@ public class FormsController(VextaDbContext db, ICurrentUserService currentUser)
             Title = request.Title.Trim(),
             Description = Clean(request.Description),
             SuccessMessage = Clean(request.SuccessMessage),
+            Kind = Enum.IsDefined(request.Kind) ? request.Kind : FormKind.Defaut,
             IsPublished = false,
+            // Nor on the public page, for the same reason: it has no questions yet, and the
+            // page would be offering strangers a form that asks nothing.
+            ShowOnPublicPage = false,
             SortOrder = request.SortOrder
         };
 
@@ -116,10 +121,25 @@ public class FormsController(VextaDbContext db, ICurrentUserService currentUser)
             return BadRequest(new { message = "Ajoutez au moins une question avant de publier ce formulaire." });
         }
 
+        // A visitor with no account has nowhere to upload to: the media routes need a session,
+        // and a company's library is not a place strangers write. Refused here rather than the
+        // question being skipped on the page, because a skipped question is a form that comes
+        // back missing the photograph it was built to collect.
+        if (request.ShowOnPublicPage
+            && await db.FormFields.AnyAsync(f => f.FormTemplateId == id && f.Type == FormFieldType.Fichier, ct))
+        {
+            return BadRequest(new
+            {
+                message = "Un formulaire qui demande un fichier ne peut pas être mis sur la page publique : un visiteur sans compte ne peut rien téléverser."
+            });
+        }
+
         form.Title = request.Title.Trim();
         form.Description = Clean(request.Description);
         form.SuccessMessage = Clean(request.SuccessMessage);
+        form.Kind = Enum.IsDefined(request.Kind) ? request.Kind : FormKind.Defaut;
         form.IsPublished = request.IsPublished;
+        form.ShowOnPublicPage = request.ShowOnPublicPage;
         form.SortOrder = request.SortOrder;
         form.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -177,6 +197,17 @@ public class FormsController(VextaDbContext db, ICurrentUserService currentUser)
             if (Problem(field) is { } problem) return BadRequest(new { message = problem });
         }
 
+        // Refused rather than quietly taking the form off the page: whoever is adding the
+        // question is not looking at the public-page switch, and a website that stops offering
+        // a quote request because somebody added a photograph field is a change nobody saw.
+        if (form.ShowOnPublicPage && incoming.Any(f => f.Type == FormFieldType.Fichier))
+        {
+            return BadRequest(new
+            {
+                message = "Ce formulaire est sur la page publique : il ne peut pas demander de fichier. Retirez-le de la page, ou changez le type de cette question."
+            });
+        }
+
         var existing = await db.FormFields.Where(f => f.FormTemplateId == id).ToListAsync(ct);
 
         // Deleted first, so a question removed in the same save as a new one with its label does
@@ -208,7 +239,11 @@ public class FormsController(VextaDbContext db, ICurrentUserService currentUser)
 
         // A form that loses its last question stops being offered: an empty published form is a
         // page that asks nothing and files nothing.
-        if (incoming.Count == 0) form.IsPublished = false;
+        if (incoming.Count == 0)
+        {
+            form.IsPublished = false;
+            form.ShowOnPublicPage = false;
+        }
         form.UpdatedAt = DateTimeOffset.UtcNow;
 
         await db.SaveChangesAsync(ct);
@@ -236,9 +271,31 @@ public class FormsController(VextaDbContext db, ICurrentUserService currentUser)
             .Select(f => f.Target)
             .ToListAsync(ct);
 
+        // Checked against this company's own list, not merely for existence: an id arrives from
+        // a browser, and a type belonging to another company would file cars under a kind its
+        // owner never defined -- and would name that company's word on this company's screen.
+        var wantedTypes = incoming.Select(a => a.NewAssetTypeId).OfType<Guid>().Distinct().ToList();
+
+        var knownTypes = wantedTypes.Count == 0
+            ? []
+            : await db.ClientAssetTypes.AsNoTracking()
+                .Where(type => wantedTypes.Contains(type.Id))
+                .Select(type => type.Id)
+                .ToListAsync(ct);
+
+        if (knownTypes.Count != wantedTypes.Count)
+        {
+            return BadRequest(new { message = "Ce type d'actif n'existe plus." });
+        }
+
+        var createsClient = incoming.Any(a => a.Kind == FormActionKind.CreerClient && a.IsActive);
+
         foreach (var action in incoming)
         {
-            if (Problem(action, targets) is { } problem) return BadRequest(new { message = problem });
+            if (Problem(action, targets, createsClient) is { } problem)
+            {
+                return BadRequest(new { message = problem });
+            }
         }
 
         var existing = await db.FormActions.Where(a => a.FormTemplateId == id).ToListAsync(ct);
@@ -260,6 +317,15 @@ public class FormsController(VextaDbContext db, ICurrentUserService currentUser)
             target.Recipients = source.Kind == FormActionKind.EnvoyerCourriel ? Clean(source.Recipients) : null;
             target.Subject = source.Kind == FormActionKind.EnvoyerCourriel ? Clean(source.Subject) : null;
             target.NewClientStatus = source.NewClientStatus;
+
+            // Cleared when the action is no longer about an asset. A kind of asset left behind
+            // on an e-mail action is a setting that does nothing and will confuse whoever reads
+            // the row next year.
+            target.NewAssetTypeId = source.Kind == FormActionKind.CreerActifClient ? source.NewAssetTypeId : null;
+            target.NewAssetUsageUnit = source.Kind == FormActionKind.CreerActifClient
+                ? Clean(source.NewAssetUsageUnit)
+                : null;
+
             target.IsActive = source.IsActive;
             target.SortOrder = index;
         }
@@ -299,7 +365,17 @@ public class FormsController(VextaDbContext db, ICurrentUserService currentUser)
         db.FormActions.AsNoTracking()
             .Where(a => a.FormTemplateId == id)
             .OrderBy(a => a.SortOrder)
-            .Select(a => new FormActionDto(a.Id, a.Kind, a.Recipients, a.Subject, a.NewClientStatus, a.IsActive, a.SortOrder))
+            .Select(a => new FormActionDto(
+                a.Id,
+                a.Kind,
+                a.Recipients,
+                a.Subject,
+                a.NewClientStatus,
+                a.NewAssetTypeId,
+                a.NewAssetType == null ? null : a.NewAssetType.Name,
+                a.NewAssetUsageUnit,
+                a.IsActive,
+                a.SortOrder))
             .ToListAsync(ct);
 
     private static System.Linq.Expressions.Expression<Func<FormTemplate, FormTemplateDto>> Fields() =>
@@ -308,7 +384,9 @@ public class FormsController(VextaDbContext db, ICurrentUserService currentUser)
             f.Title,
             f.Description,
             f.SuccessMessage,
+            f.Kind,
             f.IsPublished,
+            f.ShowOnPublicPage,
             f.SortOrder,
             f.Fields.Count,
             f.Actions.Count(a => a.IsActive),
@@ -358,7 +436,12 @@ public class FormsController(VextaDbContext db, ICurrentUserService currentUser)
         return null;
     }
 
-    private static string? Problem(SaveFormActionRequest action, IReadOnlyList<FormFieldTarget> targets)
+    /// <param name="createsClient">
+    /// Whether another action on the same form brings a client in. An asset action needs a
+    /// client from somewhere, and this is one of the two places it can come from.
+    /// </param>
+    private static string? Problem(
+        SaveFormActionRequest action, IReadOnlyList<FormFieldTarget> targets, bool createsClient)
     {
         if (action.Kind == FormActionKind.EnvoyerCourriel)
         {
@@ -378,6 +461,26 @@ public class FormsController(VextaDbContext db, ICurrentUserService currentUser)
             && !targets.Any(t => t is FormFieldTarget.Nom or FormFieldTarget.NomEntreprise))
         {
             return "Pour créer un client, une question doit remplir son nom ou le nom de son entreprise.";
+        }
+
+        if (action.Kind == FormActionKind.CreerActifClient && action.IsActive)
+        {
+            // The same reasoning as above, and the same three fields the runner builds a label
+            // from. A form with none of them files answers and creates nothing.
+            if (!targets.Any(t => t is FormFieldTarget.ActifLibelle
+                or FormFieldTarget.ActifMarque or FormFieldTarget.ActifModele))
+            {
+                return "Pour créer un actif, une question doit remplir son libellé, sa marque ou son modèle.";
+            }
+
+            // Nothing to hang it on, and nothing on this form will ever produce one. Said now,
+            // where it can be fixed, rather than once a week in a log nobody reads.
+            if (!targets.Contains(FormFieldTarget.Courriel) && !createsClient)
+            {
+                return "Pour créer un actif, il faut un client : ajoutez l'action « Créer un client » avant celle-ci, ou une question qui remplit le courriel du client.";
+            }
+
+            if (action.NewAssetUsageUnit?.Trim().Length > 20) return "L'unité d'usage est trop longue.";
         }
 
         return null;

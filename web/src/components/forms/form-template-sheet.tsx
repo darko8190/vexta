@@ -10,6 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { RequiredMark } from "@/components/ui/required-mark";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Sheet,
   SheetClose,
@@ -24,13 +25,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { useCreateForm, useUpdateForm } from "@/hooks/use-forms";
 import { ApiError } from "@/lib/api";
 import { ex } from "@/lib/placeholders";
-import type { FormTemplate } from "@/lib/types";
+import { formKindHints, formKindLabels } from "@/lib/labels";
+import type { FormKind, FormTemplate } from "@/lib/types";
+
+const kinds = Object.keys(formKindLabels) as FormKind[];
 
 const formSchema = z.object({
   title: z.string().trim().min(1, "Le titre est obligatoire.").max(200, "200 caractères maximum."),
   description: z.string().trim().max(1000, "1000 caractères maximum."),
   successMessage: z.string().trim().max(500, "500 caractères maximum."),
+  kind: z.enum(["Defaut", "Actif", "Client", "Soumission"]),
   isPublished: z.boolean(),
+  showOnPublicPage: z.boolean(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -40,7 +46,9 @@ function toFormValues(template?: FormTemplate): FormValues {
     title: template?.title ?? "",
     description: template?.description ?? "",
     successMessage: template?.successMessage ?? "",
+    kind: template?.kind ?? "Defaut",
     isPublished: template?.isPublished ?? false,
+    showOnPublicPage: template?.showOnPublicPage ?? false,
   };
 }
 
@@ -82,7 +90,9 @@ export function FormTemplateSheet({
       title: values.title,
       description: values.description || null,
       successMessage: values.successMessage || null,
+      kind: values.kind,
       isPublished: values.isPublished,
+      showOnPublicPage: values.showOnPublicPage,
       sortOrder: 0,
     };
 
@@ -140,6 +150,34 @@ export function FormTemplateSheet({
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              )}
+            />
+
+            <Controller
+              name="kind"
+              control={form.control}
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel htmlFor="form-kind">Type</FieldLabel>
+                  <Select
+                    value={field.value}
+                    onValueChange={(value) => field.onChange((value ?? "Defaut") as FormKind)}
+                  >
+                    <SelectTrigger id="form-kind" className="w-full">
+                      <SelectValue>{(value: FormKind) => formKindLabels[value]}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {kinds.map((kind) => (
+                        <SelectItem key={kind} value={kind}>
+                          {formKindLabels[kind]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {/* The hint changes with the choice rather than listing all four: somebody
+                      picking a type wants to know what the one under their cursor does. */}
+                  <FieldDescription>{formKindHints[field.value]}</FieldDescription>
                 </Field>
               )}
             />
@@ -209,6 +247,33 @@ export function FormTemplateSheet({
                     <FieldDescription>
                       Un formulaire publié peut être rempli par vos employés. Tant qu&apos;il ne
                       l&apos;est pas, vous êtes seul à le voir — le temps de le finir.
+                    </FieldDescription>
+                  </Field>
+                )}
+              />
+            )}
+
+            {isEditing && (
+              <Controller
+                name="showOnPublicPage"
+                control={form.control}
+                render={({ field }) => (
+                  <Field>
+                    <div className="flex items-center gap-3">
+                      <Checkbox
+                        id="form-public"
+                        checked={field.value}
+                        onCheckedChange={(checked) => field.onChange(checked === true)}
+                      />
+                      <FieldLabel htmlFor="form-public" className="font-normal">
+                        Sur ma page publique
+                      </FieldLabel>
+                    </div>
+                    <FieldDescription>
+                      Offert aux visiteurs de votre page, sans compte. Il faut aussi que le
+                      formulaire soit publié et que la page affiche les formulaires. Un
+                      formulaire qui demande un fichier ne peut pas y aller : un visiteur sans
+                      compte n&apos;a nulle part pour téléverser.
                     </FieldDescription>
                   </Field>
                 )}

@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -696,6 +696,10 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.Property(f => f.SuccessMessage).HasMaxLength(500);
 
             e.HasIndex(f => new { f.TenantId, f.SortOrder });
+
+            // The public page asks for exactly this set, on every visit, for a company that has
+            // one form among forty rows of drafts and checklists.
+            e.HasIndex(f => new { f.TenantId, f.ShowOnPublicPage });
             e.HasQueryFilter(f => f.TenantId == CurrentTenantId);
         });
 
@@ -717,8 +721,15 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.HasOne(a => a.FormTemplate).WithMany(t => t.Actions)
                 .HasForeignKey(a => a.FormTemplateId).OnDelete(DeleteBehavior.Cascade);
 
+            // Restrict: a kind of asset still named by an action cannot be deleted out from
+            // under it, which would leave the form creating vehicles of a type that is gone.
+            // The types endpoint already refuses a type in use and says what is using it.
+            e.HasOne(a => a.NewAssetType).WithMany()
+                .HasForeignKey(a => a.NewAssetTypeId).OnDelete(DeleteBehavior.Restrict);
+
             e.Property(a => a.Recipients).HasMaxLength(500);
             e.Property(a => a.Subject).HasMaxLength(200);
+            e.Property(a => a.NewAssetUsageUnit).HasMaxLength(20);
 
             e.HasIndex(a => new { a.FormTemplateId, a.SortOrder });
             e.HasQueryFilter(a => a.TenantId == CurrentTenantId);
@@ -733,6 +744,13 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             // brought them in, which is often the only record of where they came from.
             e.HasOne(s => s.CreatedClient).WithMany()
                 .HasForeignKey(s => s.CreatedClientId).OnDelete(DeleteBehavior.SetNull);
+
+            // SetNull again, for the same reason: scrapping the car does not unsay the sheet
+            // that filed it. Note that deleting the client cascades the asset away, and this
+            // submission then keeps neither — which is correct, and why the answers themselves
+            // carry their own copies of everything that was said.
+            e.HasOne(s => s.CreatedClientAsset).WithMany()
+                .HasForeignKey(s => s.CreatedClientAssetId).OnDelete(DeleteBehavior.SetNull);
 
             e.Property(s => s.SubmittedByName).HasMaxLength(200);
             e.Property(s => s.ActionLog).HasMaxLength(1000);

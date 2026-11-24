@@ -69,6 +69,13 @@ public class PublicPage
     public bool ShowProducts { get; set; } = true;
     public bool ShowJobs { get; set; } = true;
 
+    /// <summary>
+    /// The forms the company ticked for its page. Off by default, unlike the other two: a
+    /// company that has built forms for its crew has not thereby offered them to the internet,
+    /// and the switch that changes that is one somebody has to reach for.
+    /// </summary>
+    public bool ShowForms { get; set; }
+
     public PublicPageStyle Style { get; set; } = PublicPageStyle.Classique;
 
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;

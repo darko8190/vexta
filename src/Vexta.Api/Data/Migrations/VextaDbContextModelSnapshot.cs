@@ -1340,6 +1340,13 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<int>("Kind")
                         .HasColumnType("integer");
 
+                    b.Property<Guid?>("NewAssetTypeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("NewAssetUsageUnit")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<int>("NewClientStatus")
                         .HasColumnType("integer");
 
@@ -1358,6 +1365,8 @@ namespace Vexta.Api.Data.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("NewAssetTypeId");
 
                     b.HasIndex("FormTemplateId", "SortOrder");
 
@@ -1465,11 +1474,17 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("CreatedClientAssetId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("CreatedClientId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("FormTemplateId")
                         .HasColumnType("uuid");
+
+                    b.Property<bool>("FromPublicPage")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("SubmittedByName")
                         .HasMaxLength(200)
@@ -1482,6 +1497,8 @@ namespace Vexta.Api.Data.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CreatedClientAssetId");
 
                     b.HasIndex("CreatedClientId");
 
@@ -1506,6 +1523,12 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<bool>("IsPublished")
                         .HasColumnType("boolean");
 
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("ShowOnPublicPage")
+                        .HasColumnType("boolean");
+
                     b.Property<int>("SortOrder")
                         .HasColumnType("integer");
 
@@ -1525,6 +1548,8 @@ namespace Vexta.Api.Data.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "ShowOnPublicPage");
 
                     b.HasIndex("TenantId", "SortOrder");
 
@@ -3073,6 +3098,9 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<bool>("IsPublished")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("ShowForms")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("ShowJobs")
                         .HasColumnType("boolean");
 
@@ -4055,7 +4083,14 @@ namespace Vexta.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Vexta.Api.Domain.ClientAssetType", "NewAssetType")
+                        .WithMany()
+                        .HasForeignKey("NewAssetTypeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("FormTemplate");
+
+                    b.Navigation("NewAssetType");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.FormAnswer", b =>
@@ -4096,6 +4131,11 @@ namespace Vexta.Api.Data.Migrations
 
             modelBuilder.Entity("Vexta.Api.Domain.FormSubmission", b =>
                 {
+                    b.HasOne("Vexta.Api.Domain.ClientAsset", "CreatedClientAsset")
+                        .WithMany()
+                        .HasForeignKey("CreatedClientAssetId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Vexta.Api.Domain.Client", "CreatedClient")
                         .WithMany()
                         .HasForeignKey("CreatedClientId")
@@ -4108,6 +4148,8 @@ namespace Vexta.Api.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("CreatedClient");
+
+                    b.Navigation("CreatedClientAsset");
 
                     b.Navigation("FormTemplate");
                 });

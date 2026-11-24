@@ -1,4 +1,4 @@
-﻿# Déploiement de Vexta sur Dokploy
+﻿﻿# Déploiement de Vexta sur Dokploy
 
 Deux environnements, deux branches, deux fichiers compose :
 
@@ -1776,6 +1776,69 @@ second reconnaît la ligne du premier au lieu d'en ajouter une deuxième.
 le paiement. Ce qui manque, c'est l'avertissement automatique quand Stripe autorise une
 entreprise du jour au lendemain — la carte Paiements a un bouton **Actualiser** pour ça, et le
 dit.
+
+### Formulaires : un type, un actif de client, et la page publique
+
+Trois choses d'un coup, parce qu'elles se tiennent.
+
+**Un formulaire a maintenant un type** — *Formulaire*, *Actif d'un client*, *Nouveau client*,
+*Demande de soumission*. Ce n'est pas un interrupteur : les quatre acceptent les mêmes questions
+et déclenchent les mêmes actions. C'est ce que le formulaire *est*, et ça sert à deux choses —
+retrouver le bon parmi quinze, et savoir quelle action proposer. Vexta n'a pas encore d'entité
+Soumission ; une demande de soumission arrive donc dans Réponses et le bureau la chiffre à la
+main, ce qui est exactement ce qu'il fait aujourd'hui avec le courriel qu'il reçoit, moins la
+retranscription. Le type est là pour que ce travail soit déjà étiqueté le jour où les soumissions
+existeront.
+
+**Une nouvelle action : « Créer un actif de client ».** Un formulaire peut maintenant ficher la
+voiture déposée ce matin ou l'immeuble qu'on demande d'inspecter. Les questions pointent vers les
+champs de l'actif — libellé, marque, modèle, année, numéro de série, plaque, usage, notes — comme
+elles pointaient déjà vers ceux du client.
+
+Il faut un client pour y accrocher l'actif, et il est trouvé de trois façons, dans cet ordre : le
+client que l'action « Créer un client » vient de créer dans la même soumission ; celui dont le
+courriel revient dans les réponses ; celui qui a rempli le formulaire depuis son compte. Aucun des
+trois et **rien n'est créé**, dit en toutes lettres dans le journal de la réponse — un actif qui
+n'appartient à personne est une ligne que personne ne retrouvera. Jamais de rapprochement par nom :
+deux Jean Tremblay sont deux personnes.
+
+Le type d'actif (*Véhicule*, *Immeuble*, *Machinerie*) et l'unité d'usage (*km*, *heures*) se
+choisissent **sur l'action**, une fois pour toutes. Une fiche véhicule crée un véhicule chaque
+fois, et le demander à chaque personne qui répond est une occasion de plus de se tromper.
+
+**Un formulaire peut aller sur la page publique.** Deux cases, parce que ce sont deux décisions :
+*Publié* l'offre à vos employés, *Sur ma page publique* l'offre aux visiteurs. La seconde seule ne
+fait rien — il faut aussi que le formulaire soit publié et que la page affiche les formulaires —
+ce qui veut dire que remettre un formulaire en brouillon le retire du site dans le même geste.
+
+Un visiteur n'a pas besoin de compte. C'est volontaire, contrairement aux candidatures : un CV
+s'écrit une fois et s'envoie dix fois, ce qui vaut un compte ; une demande de soumission ne vaut
+rien si la personne doit d'abord s'inscrire — elle appellera un concurrent.
+
+Ce que ça coûte, c'est un inconnu qui écrit dans l'espace d'une entreprise, et c'est encadré :
+
+- **Un formulaire qui demande un fichier ne peut pas aller sur la page.** Un visiteur sans compte
+  n'a nulle part où téléverser. Refusé là où on le coche, et refusé aussi si on ajoute une question
+  « fichier » à un formulaire déjà sur la page — plutôt que de l'en retirer en silence.
+- **Un plafond par adresse** : cinq envois par heure et par formulaire. Assez pour quelqu'un qui
+  s'est trompé de numéro de téléphone deux fois.
+- **Un plafond par entreprise** : soixante par jour, tous formulaires confondus. C'est le filet
+  contre un envoi distribué, où les adresses sont toutes différentes mais la journée de
+  l'entreprise se termine quand même.
+- Les compteurs sont **en mémoire**. Redémarrez l'API et ils repartent à zéro, et une deuxième
+  instance compte séparément. C'est assumé : ce que ça achète, c'est un plafond sans nouvelle
+  infrastructure, et les chiffres sont choisis pour que la fuite compte moins que le plancher.
+
+Chaque réponse venue de la page porte la mention **Page publique** dans Réponses. Le bureau ne lit
+pas de la même façon une feuille remplie par un employé et une demande venue d'un inconnu, et
+« Rempli par Jean Dubé » ne veut pas dire la même chose dans les deux cas.
+
+**Au passage, un défaut corrigé.** Le moteur d'actions filtrait sur l'entreprise de la session. Il
+tourne aussi là où il n'y en a pas — une candidature arrive du compte personnel de quelqu'un, un
+formulaire public de personne du tout — et dans ces deux cas il ne trouvait aucune action et le
+formulaire ne faisait rien, sans le dire. **Si vous aviez attaché un courriel ou une création de
+client à un formulaire de candidature, il ne partait pas.** Il part maintenant : l'entreprise est
+lue sur la soumission elle-même, qui est l'autorité qui compte.
 
 ---
 

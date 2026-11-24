@@ -197,8 +197,11 @@ public class FormSubmissionsController(
             s.FormTemplateId,
             s.FormTemplate!.Title,
             s.SubmittedByName,
+            s.FromPublicPage,
             s.CreatedClientId,
             s.CreatedClient == null ? null : s.CreatedClient.Name,
+            s.CreatedClientAssetId,
+            s.CreatedClientAsset == null ? null : s.CreatedClientAsset.Label,
             s.ActionLog,
             s.Answers.Count,
             s.CreatedAt);

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ClipboardPen, PenLine, Plus } from "lucide-react";
+import { ClipboardPen, Globe, PenLine, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -13,6 +13,7 @@ import { FillFormSheet } from "@/components/forms/fill-form-sheet";
 import { FormTemplateSheet } from "@/components/forms/form-template-sheet";
 import { useCanManage } from "@/hooks/use-can-create";
 import { useFormsQuery } from "@/hooks/use-forms";
+import { formKindLabels } from "@/lib/labels";
 import type { FormTemplate } from "@/lib/types";
 
 /**
@@ -79,10 +80,25 @@ export function FormsSection() {
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium text-foreground">{template.title}</span>
+                  {/* The kind first: it is what the form is, and it is what somebody scanning
+                      forty rows is looking for. Not shown for a plain one — "Formulaire" on a
+                      list of formulaires is a word that earns nothing. */}
+                  {template.kind !== "Defaut" && (
+                    <Badge variant="outline">{formKindLabels[template.kind]}</Badge>
+                  )}
                   {template.isPublished ? (
                     <Badge variant="secondary">Publié</Badge>
                   ) : (
                     <Badge variant="outline">Brouillon</Badge>
+                  )}
+                  {/* Only when it is actually reachable. A form ticked for the page but still a
+                      draft is not on the internet, and a badge saying it is would be a lie
+                      about who can read the answers. */}
+                  {template.showOnPublicPage && template.isPublished && (
+                    <Badge variant="secondary">
+                      <Globe className="size-3" />
+                      Page publique
+                    </Badge>
                   )}
                 </div>
 

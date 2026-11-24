@@ -30,6 +30,7 @@ const formSchema = z.object({
   contactNote: z.string().trim().max(1000, "1000 caractères maximum."),
   showProducts: z.boolean(),
   showJobs: z.boolean(),
+  showForms: z.boolean(),
   style: z.enum(["Classique", "Chantier", "Epure", "Vitrine", "Journal", "Panneau", "Affiche"]),
 });
 
@@ -42,6 +43,7 @@ function toFormValues(settings?: PublicPageSettings): FormValues {
     contactNote: settings?.contactNote ?? "",
     showProducts: settings?.showProducts ?? true,
     showJobs: settings?.showJobs ?? true,
+    showForms: settings?.showForms ?? false,
     style: settings?.style ?? "Classique",
   };
 }
@@ -66,6 +68,7 @@ function PublishCard({ settings }: { settings: PublicPageSettings }) {
         contactNote: settings.contactNote,
         showProducts: settings.showProducts,
         showJobs: settings.showJobs,
+        showForms: settings.showForms,
         // Carried through unchanged: this switch publishes the page, and leaving the style out
         // would reset the company's choice every time it went online.
         style: settings.style,
@@ -175,6 +178,7 @@ function ContentCard({ settings }: { settings: PublicPageSettings }) {
         contactNote: values.contactNote || null,
         showProducts: values.showProducts,
         showJobs: values.showJobs,
+        showForms: values.showForms,
         style: values.style,
       });
       toast.success("Page publique mise à jour.");
@@ -288,8 +292,24 @@ function ContentCard({ settings }: { settings: PublicPageSettings }) {
                   </Field>
                 )}
               />
+              <Controller
+                name="showForms"
+                control={form.control}
+                render={({ field }) => (
+                  <Field orientation="horizontal">
+                    <Checkbox
+                      id="public-show-forms"
+                      checked={field.value}
+                      onCheckedChange={(checked) => field.onChange(checked === true)}
+                    />
+                    <FieldLabel htmlFor="public-show-forms">Afficher mes formulaires</FieldLabel>
+                  </Field>
+                )}
+              />
               <FieldDescription>
-                Une section décochée est masquée sans être vidée.
+                Une section décochée est masquée sans être vidée. Côté formulaires, seuls ceux que
+                vous avez cochés « sur la page publique » apparaissent — ce qui veut dire que
+                décocher ici les retire tous d&apos;un coup.
               </FieldDescription>
             </div>
 

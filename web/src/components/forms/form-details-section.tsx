@@ -2,6 +2,7 @@
 
 import { Badge } from "@/components/ui/badge";
 import { formatMoment } from "@/lib/dates";
+import { formKindLabels } from "@/lib/labels";
 import type { FormTemplate } from "@/lib/types";
 
 function Line({ label, children }: { label: string; children: React.ReactNode }) {
@@ -36,11 +37,27 @@ export function FormDetailsSection({ form }: { form: FormTemplate }) {
       <dl className="grid gap-4 rounded-lg border border-border bg-card p-4 sm:grid-cols-2">
         <Line label="Titre">{form.title}</Line>
 
+        <Line label="Type">{formKindLabels[form.kind]}</Line>
+
         <Line label="État">
           {form.isPublished ? (
             <Badge variant="secondary">Publié</Badge>
           ) : (
             <Badge variant="outline">Brouillon</Badge>
+          )}
+        </Line>
+
+        {/* Said in full rather than as a tick, because the answer has three states and only one
+            of them means somebody outside can fill it in. */}
+        <Line label="Page publique">
+          {!form.showOnPublicPage ? (
+            <span className="text-muted-foreground">Non</span>
+          ) : form.isPublished ? (
+            "Oui"
+          ) : (
+            <span className="text-muted-foreground">
+              Coché, mais invisible tant que le formulaire est un brouillon
+            </span>
           )}
         </Line>
 

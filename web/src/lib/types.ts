@@ -1483,6 +1483,8 @@ export interface PublicPageSettings {
   contactNote: string | null;
   showProducts: boolean;
   showJobs: boolean;
+  /** Off by default: forms built for the crew are not thereby offered to the internet. */
+  showForms: boolean;
   style: PublicPageStyle;
   /** Where the page lives: /e/{slug}. */
   slug: string;
@@ -1506,6 +1508,25 @@ export interface PublicCompany {
   address: CompanyAddress | null;
   products: PublicProduct[];
   jobs: PublicJob[];
+  /** Titles only. The questions are fetched when a visitor opens one. */
+  forms: PublicPageForm[];
+}
+
+/** A form on a company's public page, before anybody opens it. */
+export interface PublicPageForm {
+  id: string;
+  title: string;
+  description: string | null;
+  kind: FormKind;
+}
+
+/** One of the company's forms, with its questions, as a visitor fills it. */
+export interface PublicForm {
+  id: string;
+  title: string;
+  description: string | null;
+  kind: FormKind;
+  fields: PublicFormField[];
 }
 
 export interface PublicProduct {
@@ -1701,7 +1722,21 @@ export type FormFieldType =
   | "Telephone"
   | "Fichier";
 
-/** Which field of a new client an answer fills, when the form is set to create one. */
+/**
+ * What a form is about.
+ *
+ * Not a behaviour switch: every kind accepts the same questions and runs the same actions. It is
+ * what lets a company with fifteen forms find the one it wants, and lets the builder offer the
+ * matching action instead of making somebody discover it.
+ */
+export type FormKind = "Defaut" | "Actif" | "Client" | "Soumission";
+
+/**
+ * Which field of a client, or of one of its assets, an answer fills.
+ *
+ * One target per column rather than a single description somebody parses later: a year typed
+ * into a text box is a year nobody can filter on.
+ */
 export type FormFieldTarget =
   | "Aucun"
   | "Prenom"
@@ -1709,17 +1744,28 @@ export type FormFieldTarget =
   | "NomEntreprise"
   | "Courriel"
   | "Telephone"
-  | "Notes";
+  | "Notes"
+  | "ActifLibelle"
+  | "ActifMarque"
+  | "ActifModele"
+  | "ActifAnnee"
+  | "ActifNumeroSerie"
+  | "ActifReference"
+  | "ActifUsage"
+  | "ActifNotes";
 
-export type FormActionKind = "EnvoyerCourriel" | "CreerClient";
+export type FormActionKind = "EnvoyerCourriel" | "CreerClient" | "CreerActifClient";
 
 export interface FormTemplate {
   id: string;
   title: string;
   description: string | null;
   successMessage: string | null;
+  kind: FormKind;
   /** False while it is being written: a draft is not offered to be filled. */
   isPublished: boolean;
+  /** Ticked for the company's page at /e/{slug}. Shown there only once published too. */
+  showOnPublicPage: boolean;
   sortOrder: number;
   fieldCount: number;
   actionCount: number;
@@ -1745,6 +1791,11 @@ export interface FormAction {
   recipients: string | null;
   subject: string | null;
   newClientStatus: ClientStatus;
+  /** The kind of asset a CreerActifClient files. Null is an asset with no kind. */
+  newAssetTypeId: string | null;
+  newAssetTypeName: string | null;
+  /** What the usage figure is counted in — km, heures, cycles. */
+  newAssetUsageUnit: string | null;
   isActive: boolean;
   sortOrder: number;
 }
@@ -1759,7 +1810,9 @@ export interface SaveFormTemplateValues {
   title: string;
   description: string | null;
   successMessage: string | null;
+  kind: FormKind;
   isPublished: boolean;
+  showOnPublicPage: boolean;
   sortOrder: number;
 }
 
@@ -1780,6 +1833,8 @@ export interface SaveFormActionValues {
   recipients: string | null;
   subject: string | null;
   newClientStatus: ClientStatus;
+  newAssetTypeId: string | null;
+  newAssetUsageUnit: string | null;
   isActive: boolean;
 }
 
@@ -1801,8 +1856,12 @@ export interface FormSubmission {
   formTemplateId: string;
   formTitle: string;
   submittedByName: string | null;
+  /** True when a stranger filled it on the company's public page. */
+  fromPublicPage: boolean;
   createdClientId: string | null;
   createdClientName: string | null;
+  createdClientAssetId: string | null;
+  createdClientAssetLabel: string | null;
   /** What the actions did, failures included. Null when the form sets nothing off. */
   actionLog: string | null;
   answerCount: number;
@@ -2306,6 +2365,7 @@ export interface PaymentList {
 export interface FormResponsesSummary {
   id: string;
   title: string;
+  kind: FormKind;
   isPublished: boolean;
   submissionCount: number;
   /** Null when nobody has filled it yet. */

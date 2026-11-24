@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+﻿﻿﻿using System.Globalization;
 using System.Text;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -40,6 +40,12 @@ builder.Services.AddHttpClient();
 // Behind Traefik the API only ever sees a plain HTTP request from the proxy. Without this it
 // builds its own absolute URLs as http://, which breaks the one flow that depends on them:
 // an OAuth provider will refuse a redirect_uri that does not match the https one registered.
+// Used by the public form limiter, and bounded on purpose: the keys it writes include a
+// visitor's address, so a flood of distinct addresses must not be able to grow without end.
+// Anything else that reaches for IMemoryCache has to set an entry Size, which a size limit
+// makes mandatory.
+builder.Services.AddMemoryCache(options => options.SizeLimit = 50_000);
+
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders =
@@ -83,6 +89,9 @@ builder.Services.AddScoped<IInvoicePdfService, InvoicePdfService>();
 builder.Services.AddScoped<IPasswordResetService, PasswordResetService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IFormActionRunner, FormActionRunner>();
+
+// Singleton: the counters are the point, and a scoped one would start every request at zero.
+builder.Services.AddSingleton<IPublicSubmissionLimiter, PublicSubmissionLimiter>();
 builder.Services.AddScoped<IReceiptScanner, ReceiptScanner>();
 builder.Services.AddScoped<IFeatureService, FeatureService>();
 builder.Services.AddScoped<IWorkbookService, WorkbookService>();

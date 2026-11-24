@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Inbox, Paperclip, Trash2 } from "lucide-react";
+import { Car, Globe, Inbox, Paperclip, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -102,6 +102,15 @@ export function FormSubmissionsSection({ formId }: { formId: string }) {
                         ? "1 réponse"
                         : `${submission.answerCount} réponses`}
                     </Badge>
+                    {/* Who filled it changes what the office does with it. "Rempli par Jean
+                        Dubé" means one thing from the crew and quite another from a stranger on
+                        the website, and nothing else on the row says which. */}
+                    {submission.fromPublicPage && (
+                      <Badge variant="outline">
+                        <Globe className="size-3" />
+                        Page publique
+                      </Badge>
+                    )}
                   </div>
 
                   {submission.actionLog && (
@@ -117,6 +126,14 @@ export function FormSubmissionsSection({ formId }: { formId: string }) {
                     >
                       {submission.createdClientName ?? "Client créé"}
                     </Link>
+                  )}
+                  {/* Named, not linked: an asset is read on its client's file, and the client
+                      is already a link away when there is one. */}
+                  {submission.createdClientAssetLabel && (
+                    <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <Car className="size-4 shrink-0" aria-hidden="true" />
+                      {submission.createdClientAssetLabel}
+                    </span>
                   )}
                   {isOwner && (
                     <Button

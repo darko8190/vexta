@@ -9,6 +9,7 @@ export interface PublicPageValues {
   contactNote: string | null;
   showProducts: boolean;
   showJobs: boolean;
+  showForms: boolean;
   style: PublicPageStyle;
 }
 

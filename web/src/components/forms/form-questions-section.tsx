@@ -243,7 +243,8 @@ export function FormQuestionsSection({
                         </SelectContent>
                       </Select>
                       <FieldDescription>
-                        Seulement si le formulaire crée un client. Sinon, laissez « Aucun ».
+                        Seulement si le formulaire crée un client ou un de ses actifs. Sinon,
+                        laissez « Aucun ».
                       </FieldDescription>
                     </Field>
                   </div>

@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/layout/empty-state";
+import { useClientAssetTypesQuery } from "@/hooks/use-client-asset-types";
 import { useSaveFormActions } from "@/hooks/use-forms";
 import { ApiError } from "@/lib/api";
 import { clientStatusLabels, formActionKindLabels } from "@/lib/labels";
@@ -22,6 +23,9 @@ import type {
 } from "@/lib/types";
 
 const kinds = Object.keys(formActionKindLabels) as FormActionKind[];
+
+/** A Select cannot hold an empty value, and "no kind of asset" is a real answer. */
+const NO_TYPE = "__aucun__";
 const statuses = Object.keys(clientStatusLabels) as ClientStatus[];
 
 interface Row extends SaveFormActionValues {
@@ -36,6 +40,8 @@ function toRows(actions: FormAction[]): Row[] {
     recipients: action.recipients,
     subject: action.subject,
     newClientStatus: action.newClientStatus,
+    newAssetTypeId: action.newAssetTypeId,
+    newAssetUsageUnit: action.newAssetUsageUnit,
     isActive: action.isActive,
   }));
 }
@@ -48,6 +54,8 @@ function blankRow(): Row {
     recipients: null,
     subject: null,
     newClientStatus: "Prospect",
+    newAssetTypeId: null,
+    newAssetUsageUnit: null,
     isActive: true,
   };
 }
@@ -71,6 +79,10 @@ export function FormActionsSection({
 }) {
   const save = useSaveFormActions(formId);
 
+  // The company's own kinds of asset: Véhicule, Immeuble, Machinerie. Fetched here rather than
+  // per row -- a form with three asset actions would otherwise ask three times for one list.
+  const assetTypes = useClientAssetTypesQuery();
+
   // Seeded once, at mount — see FormQuestionsSection: the page re-keys this component when the
   // form is saved, so there is nothing to mirror from the props afterwards.
   const [rows, setRows] = useState<Row[]>(() => toRows(actions));
@@ -90,6 +102,8 @@ export function FormActionsSection({
           recipients: row.recipients?.trim() || null,
           subject: row.subject?.trim() || null,
           newClientStatus: row.newClientStatus,
+          newAssetTypeId: row.newAssetTypeId,
+          newAssetUsageUnit: row.newAssetUsageUnit?.trim() || null,
           isActive: row.isActive,
         })),
       );
@@ -235,6 +249,69 @@ export function FormActionsSection({
                         pointe vers un de ses champs. Il faut au moins un nom.
                       </FieldDescription>
                     </Field>
+                  )}
+
+                  {row.kind === "CreerActifClient" && (
+                    <>
+                      <Field>
+                        <FieldLabel htmlFor={`asset-type-${row.key}`}>Type d&apos;actif</FieldLabel>
+                        <Select
+                          value={row.newAssetTypeId ?? NO_TYPE}
+                          disabled={!canManage}
+                          onValueChange={(value) =>
+                            edit(row.key, { newAssetTypeId: value === NO_TYPE ? null : (value ?? null) })
+                          }
+                        >
+                          <SelectTrigger id={`asset-type-${row.key}`} className="w-full">
+                            <SelectValue>
+                              {(value: string) =>
+                                value === NO_TYPE
+                                  ? "Aucun"
+                                  : (assetTypes.data ?? []).find((type) => type.id === value)?.name ??
+                                    "Aucun"
+                              }
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={NO_TYPE}>Aucun</SelectItem>
+                            {(assetTypes.data ?? []).map((type) => (
+                              <SelectItem key={type.id} value={type.id}>
+                                {type.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FieldDescription>
+                          Choisi ici une fois pour toutes : une « fiche véhicule » crée un
+                          véhicule chaque fois, et le demander à chaque personne est une occasion
+                          de plus de se tromper. Les types se créent depuis la fiche d&apos;un
+                          client.
+                        </FieldDescription>
+                      </Field>
+
+                      <Field>
+                        <FieldLabel htmlFor={`asset-unit-${row.key}`}>Unité d&apos;usage</FieldLabel>
+                        <Input
+                          id={`asset-unit-${row.key}`}
+                          value={row.newAssetUsageUnit ?? ""}
+                          disabled={!canManage}
+                          onChange={(event) => edit(row.key, { newAssetUsageUnit: event.target.value })}
+                          placeholder={ex("km")}
+                        />
+                        <FieldDescription>
+                          Ce que compte la question « Actif — usage ». Le nombre ne veut rien dire
+                          sans son unité, et l&apos;unité est la vôtre, pas celle de la personne
+                          qui répond.
+                        </FieldDescription>
+                      </Field>
+
+                      <FieldDescription>
+                        L&apos;actif se construit avec les questions dont la colonne « Remplit »
+                        pointe vers un de ses champs, et se rattache au client créé par
+                        l&apos;action précédente, à celui dont le courriel revient dans les
+                        réponses, ou à celui qui a rempli le formulaire depuis son compte.
+                      </FieldDescription>
+                    </>
                   )}
 
                   <Field orientation="horizontal">

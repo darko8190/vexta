@@ -52,7 +52,7 @@ public class InvoiceDocument(InvoicePdfModel model) : IDocument
 
     public DocumentMetadata GetMetadata() => new()
     {
-        Title = $"Facture {model.Number}",
+        Title = $"{model.Wording.Name} {model.Number}",
         Author = model.CompanyName
     };
 
@@ -97,10 +97,13 @@ public class InvoiceDocument(InvoicePdfModel model) : IDocument
 
             row.ConstantItem(180).Column(right =>
             {
-                right.Item().AlignRight().Text("FACTURE").FontSize(18).Bold().FontColor(Blue);
+                right.Item().AlignRight().Text(model.Wording.Title).FontSize(18).Bold().FontColor(Blue);
                 right.Item().AlignRight().Text($"No: {model.Number}");
                 right.Item().AlignRight().Text($"Date: {model.IssueDate:yyyy-MM-dd}");
-                right.Item().AlignRight().Text($"Échéance: {model.DueDate:yyyy-MM-dd}");
+                if (model.DueDate is { } due)
+                {
+                    right.Item().AlignRight().Text($"{model.Wording.DueLabel}: {due:yyyy-MM-dd}");
+                }
 
                 if (model.ProjectLabel is { Length: > 0 } project)
                 {
@@ -123,7 +126,7 @@ public class InvoiceDocument(InvoicePdfModel model) : IDocument
         {
             row.RelativeItem().Column(bill =>
             {
-                bill.Item().Text("Facturer à:").Bold().FontColor(Blue);
+                bill.Item().Text(model.Wording.BillToLabel).Bold().FontColor(Blue);
                 bill.Item().Text(model.BillTo.Name);
 
                 foreach (var line in model.BillTo.Lines)
@@ -247,10 +250,10 @@ public class InvoiceDocument(InvoicePdfModel model) : IDocument
             column.Item().PaddingBottom(10).Text(terms).FontSize(8).FontColor(Grey);
         }
 
-        column.Item().Text("Réception").Bold().FontColor(Blue);
+        column.Item().Text(model.Wording.SignatureHeading).Bold().FontColor(Blue);
 
         column.Item().PaddingTop(8).Text(
-                "En signant, le client confirme avoir reçu la présente facture et les travaux ou biens qu'elle décrit.")
+                model.Wording.SignatureText)
             .FontSize(8).FontColor(Grey);
 
         column.Item().PaddingTop(28).Row(row =>

@@ -3032,6 +3032,8 @@ export interface QuoteRecord {
   subtotal: number;
   createdAt: string;
   updatedAt: string;
+  /** When it was last emailed to the client. */
+  sentAt: string | null;
 }
 
 export interface QuoteFormValues {

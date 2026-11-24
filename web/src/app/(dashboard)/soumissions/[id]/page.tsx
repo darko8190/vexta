@@ -8,11 +8,13 @@ import {
   ArrowRightLeft,
   ClipboardPen,
   FolderKanban,
+  FileText,
   FolderOpen,
   HardHat,
   Info,
   ListChecks,
   Plus,
+  Send,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -33,7 +35,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
 import { SectionNav, type NavSection } from "@/components/layout/section-nav";
+import { InvoiceSendDialog } from "@/components/invoices/invoice-send-dialog";
+import { PdfViewer } from "@/components/layout/pdf-viewer";
 import { ProjectCostTable } from "@/components/projects/detail/project-cost-table";
+import { usePdfDocument } from "@/hooks/use-pdf-document";
 import { ProjectDocumentsSection } from "@/components/projects/detail/project-documents-section";
 import { QuoteFormSheet } from "@/components/quotes/quote-form-sheet";
 import { QuoteLinesSection } from "@/components/quotes/quote-lines-section";
@@ -44,10 +49,10 @@ import {
   useQuoteSummaryQuery,
 } from "@/hooks/use-quotes";
 import { ApiError } from "@/lib/api";
-import { formatDateOnly } from "@/lib/dates";
+import { formatDateOnly, formatMoment } from "@/lib/dates";
 import { quoteStatusBadgeVariant, quoteStatusLabels } from "@/lib/labels";
 import { formatAmount } from "@/lib/money";
-import { formatProjectNumber, formatQuoteNumber } from "@/lib/types";
+import { formatProjectNumber, formatQuoteNumber, type QuoteRecord } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /**
@@ -65,6 +70,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
   const [section, setSection] = useState("details");
   const [confirmConvert, setConfirmConvert] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [sending, setSending] = useState(false);
 
   if (isLoading) {
     return (
@@ -99,6 +105,8 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
     { key: "taches", label: "Tâches", count: summary?.tasks ?? 0, icon: ListChecks },
     { key: "materiaux", label: "Matériaux", count: summary?.materials ?? 0, icon: HardHat },
     { key: "frais", label: "Frais supplémentaires", count: summary?.extraCharges ?? 0, icon: Plus },
+    // The paper the client receives, drawn by the same code that attaches it to the email.
+    { key: "apercu", label: "Aperçu PDF", icon: FileText },
     {
       key: "documents",
       label: "Documents et notes",
@@ -151,6 +159,11 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
               </span>
               <Badge variant={quoteStatusBadgeVariant[quote.status]}>{quoteStatusLabels[quote.status]}</Badge>
               {quote.isTaxExempt && <Badge variant="outline">Non taxable</Badge>}
+              {quote.sentAt && (
+                <span className="text-xs text-muted-foreground">
+                  Envoyée le {formatMoment(quote.sentAt)}
+                </span>
+              )}
               {quote.validUntil && (
                 <span className="text-xs text-muted-foreground">
                   Valide jusqu&apos;au {formatDateOnly(quote.validUntil)}
@@ -169,6 +182,10 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setSending(true)}>
+              <Send />
+              {quote.sentAt ? "Renvoyer" : "Envoyer"}
+            </Button>
             {quote.projectId && quote.projectNumber != null ? (
               <Link href={`/projets/${quote.projectId}`} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
                 <FolderKanban />
@@ -232,6 +249,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
           )}
           {/* The same tab as a project's, pointed at the quote: they are carried over together
               when it is accepted. */}
+          {section === "apercu" && <QuotePdfPreview key={quote.updatedAt} quote={quote} />}
           {section === "documents" && (
             <ProjectDocumentsSection projectId={{ kind: "soumissions", id: quote.id }} />
           )}
@@ -258,7 +276,30 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
 
       {/* Not a deletion, but the same shape of question: one deliberate press for a step that
           creates a project and freezes the quote. */}
+      <InvoiceSendDialog open={sending} onOpenChange={setSending} quote={quote} />
+
       <ConvertDialog open={confirmConvert} onOpenChange={setConfirmConvert} onConfirm={onConvert} pending={convert.isPending} />
+    </div>
+  );
+}
+
+/** Keyed on the quote's last change by the page, so an edited quote is drawn again. */
+function QuotePdfPreview({ quote }: { quote: QuoteRecord }) {
+  const pdf = usePdfDocument(`soumissions/${quote.id}/pdf`);
+  const number = formatQuoteNumber(quote.number);
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-base font-semibold text-foreground">Aperçu PDF</h2>
+        <p className="text-sm text-muted-foreground">Le document que le client recevra en pièce jointe.</p>
+      </div>
+      <PdfViewer
+        url={pdf.url}
+        loading={pdf.loading}
+        error={pdf.error}
+        title={`Soumission ${number}`}
+        fileName={`Soumission-${number}.pdf`}
+      />
     </div>
   );
 }

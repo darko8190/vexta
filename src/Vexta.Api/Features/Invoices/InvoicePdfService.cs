@@ -21,6 +21,13 @@ public interface IInvoicePdfService
     /// number rather than the one the next invoice will be given.
     /// </summary>
     Task<byte[]> RenderDraftAsync(UpsertInvoiceRequest request, Guid? invoiceId = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// A quote, printed through the invoice's layout with the quote's own words — the same
+    /// company header, the same lines and taxes, an acceptance block in place of the receipt.
+    /// Null when there is no such quote here.
+    /// </summary>
+    Task<(byte[] Bytes, int Number)?> RenderQuoteAsync(Guid quoteId, CancellationToken ct = default);
 }
 
 public class InvoicePdfService(VextaDbContext db, ICurrentUserService currentUser) : IInvoicePdfService
@@ -86,6 +93,84 @@ public class InvoicePdfService(VextaDbContext db, ICurrentUserService currentUse
             ct);
 
         return new InvoiceDocument(model).GeneratePdf();
+    }
+
+    public async Task<(byte[] Bytes, int Number)?> RenderQuoteAsync(Guid quoteId, CancellationToken ct = default)
+    {
+        var quote = await db.Quotes.AsNoTracking()
+            .Include(q => q.Lines)
+            .Include(q => q.Client!).ThenInclude(c => c.Addresses)
+            .Include(q => q.ClientAddress)
+            .Include(q => q.SiteAddress)
+            .FirstOrDefaultAsync(q => q.Id == quoteId, ct);
+
+        if (quote is null) return null;
+
+        var tenant = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
+            .FirstOrDefaultAsync(t => t.Id == quote.TenantId, ct);
+        var settings = await db.BillingSettings.AsNoTracking()
+            .FirstOrDefaultAsync(b => b.TenantId == quote.TenantId, ct);
+        var location = await db.CompanyLocations.AsNoTracking()
+            .OrderByDescending(l => l.IsPrimary).ThenBy(l => l.CreatedAt)
+            .FirstOrDefaultAsync(ct);
+        var logo = await db.TenantLogos.IgnoreQueryFilters().AsNoTracking()
+            .Where(l => l.TenantId == quote.TenantId)
+            .Select(l => l.Content)
+            .FirstOrDefaultAsync(ct);
+
+        var client = quote.Client;
+        var billingAddress = quote.ClientAddress
+            ?? client?.Addresses.FirstOrDefault(a => a.IsPrimary)
+            ?? client?.Addresses.FirstOrDefault();
+        var siteAddress = quote.SameAddressAsClient ? null : quote.SiteAddress;
+
+        // Labour first, then materials, then the extra charges: the order the price is built in,
+        // and the order a client reads a quote to see where the money goes.
+        var ordered = quote.Lines
+            .OrderBy(l => l.Kind).ThenBy(l => l.SortOrder).ThenBy(l => l.CreatedAt)
+            .ToList();
+
+        var items = ordered
+            .Select(l => new InvoicePdfLine(
+                l.Kind == QuoteLineKind.Tache ? $"{l.Description.Trim()} (main-d'œuvre)" : l.Description.Trim(),
+                l.Quantity,
+                l.UnitPrice,
+                Round(l.Quantity * l.UnitPrice)))
+            .ToList();
+
+        var totals = InvoiceTotals.For(
+            ordered.Select(l => new InvoiceTotals.Line(l.Quantity, l.UnitPrice, true)),
+            settings?.GstRate ?? 0m,
+            settings?.QstRate ?? 0m,
+            quote.IsTaxExempt);
+        var taxes = quote.IsTaxExempt ? ExemptLine : TaxLines(totals, settings);
+
+        var number = $"S-{quote.Number:0000}";
+        var model = new InvoicePdfModel
+        {
+            Number = number,
+            IssueDate = quote.IssuedOn ?? DateOnly.FromDateTime(quote.CreatedAt.UtcDateTime),
+            DueDate = quote.ValidUntil,
+            PoNumber = quote.PoNumber,
+            Currency = settings?.Currency ?? "CAD",
+            Notes = Clean(quote.Description),
+            CompanyName = tenant?.Name ?? "",
+            CompanyLines = CompanyLines(location, tenant, settings),
+            Logo = logo,
+            BrandColor = tenant?.BrandColor,
+            BillTo = new InvoicePdfParty(client?.Name ?? "", AddressLines(billingAddress), Clean(client?.Email)),
+            SiteAddress = AddressLines(siteAddress),
+            Lines = items,
+            Subtotal = totals.Subtotal,
+            Taxes = taxes,
+            Total = totals.Subtotal + taxes.Sum(t => t.Amount),
+            // No payment terms: "Payable à réception" is the invoice's promise, and on a quote it
+            // would ask for money nobody owes yet.
+            FooterNote = Clean(settings?.FooterNote),
+            Wording = InvoicePdfWording.Quote,
+        };
+
+        return (new InvoiceDocument(model).GeneratePdf(), quote.Number);
     }
 
     /// <summary>

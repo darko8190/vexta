@@ -25,10 +25,10 @@ import {
 } from "@/components/ui/dialog";
 import { formatFileSize } from "@/components/projects/detail/document-file-size";
 import { useSaveClientContact } from "@/hooks/use-clients";
-import { useInvoiceSendDefaultsQuery, useSendInvoice } from "@/hooks/use-invoices";
+import { useInvoiceSendDefaultsQuery, useSendInvoice, type SendBase } from "@/hooks/use-invoices";
 import { MAX_UPLOAD_BYTES, useUploadMedia } from "@/hooks/use-media";
 import { ApiError } from "@/lib/api";
-import type { InvoiceRecord } from "@/lib/types";
+import { formatQuoteNumber, type InvoiceRecord, type QuoteRecord } from "@/lib/types";
 import { ex } from "@/lib/placeholders";
 
 /** A file picked in this form and already in the library, waiting to ride along. */
@@ -48,18 +48,59 @@ const emptyContact = { firstName: "", lastName: "", email: "", role: "" };
  * and what travels with it. Nothing here is guessed — the wording is the company's own template
  * with this invoice's figures in it, so the screen shows the message that will arrive.
  */
+/** What is being sent: an invoice, or a quote, which goes out the same way with its own words. */
+interface Sendable {
+  base: SendBase;
+  id: string;
+  number: string;
+  clientId: string;
+  clientName: string;
+  /** Where the documents offered above come from, or null when there are none to offer. */
+  documentsFrom: string | null;
+  /** "la facture", "la soumission". */
+  noun: string;
+  /** "Facture", "Soumission" — the file name and the confirmation. */
+  title: string;
+  sentMessage: string;
+}
+
 export function InvoiceSendDialog({
   open,
   onOpenChange,
-  invoice,
+  invoice: invoiceRecord,
+  quote,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  invoice: InvoiceRecord;
+  invoice?: InvoiceRecord;
+  quote?: QuoteRecord;
 }) {
+  const invoice: Sendable = quote
+    ? {
+        base: "soumissions",
+        id: quote.id,
+        number: formatQuoteNumber(quote.number),
+        clientId: quote.clientId,
+        clientName: quote.clientName,
+        documentsFrom: "de la soumission",
+        noun: "la soumission",
+        title: "Soumission",
+        sentMessage: "Soumission envoyée",
+      }
+    : {
+        base: "invoices",
+        id: invoiceRecord!.id,
+        number: invoiceRecord!.number,
+        clientId: invoiceRecord!.clientId,
+        clientName: invoiceRecord!.clientName,
+        documentsFrom: invoiceRecord!.projectId ? "du projet" : null,
+        noun: "la facture",
+        title: "Facture",
+        sentMessage: "Facture envoyée",
+      };
   const queryClient = useQueryClient();
-  const { data: defaults, isLoading, isError } = useInvoiceSendDefaultsQuery(invoice.id, open);
-  const send = useSendInvoice();
+  const { data: defaults, isLoading, isError } = useInvoiceSendDefaultsQuery(invoice.id, open, invoice.base);
+  const send = useSendInvoice(invoice.base);
   const upload = useUploadMedia();
   const saveContact = useSaveClientContact(invoice.clientId);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -138,7 +179,7 @@ export function InvoiceSendDialog({
     }
 
     if (!email) {
-      toast.error("Un contact sans courriel ne peut pas recevoir la facture.");
+      toast.error(`Un contact sans courriel ne peut pas recevoir ${invoice.noun}.`);
       return;
     }
 
@@ -156,7 +197,7 @@ export function InvoiceSendDialog({
 
       // The contact belongs to the client's file now, which is the whole point of adding one
       // from here. The defaults are this invoice's own key, so they have to be told.
-      await queryClient.invalidateQueries({ queryKey: ["invoice-send-defaults", invoice.id] });
+      await queryClient.invalidateQueries({ queryKey: ["invoice-send-defaults", invoice.base, invoice.id] });
 
       setTo(created.email ?? email);
       setContact(emptyContact);
@@ -183,13 +224,13 @@ export function InvoiceSendDialog({
         },
       });
 
-      toast.success(`Facture envoyée à ${result.email}.`);
+      toast.success(`${invoice.sentMessage} à ${result.email}.`);
       reset();
       onOpenChange(false);
     } catch (error) {
       // The API says what went wrong — an address it refused, a limit the attachments passed,
       // Mailgun turning the key down. "Réessayez" would send someone to press the same button.
-      toast.error(error instanceof ApiError ? error.message : "Impossible d'envoyer cette facture.");
+      toast.error(error instanceof ApiError ? error.message : `Impossible d'envoyer ${invoice.noun}.`);
     }
   }
 
@@ -208,9 +249,9 @@ export function InvoiceSendDialog({
     >
       <DialogContent className="grid max-h-[90vh] grid-rows-[auto_minmax(0,1fr)_auto] sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Envoyer la facture {invoice.number}</DialogTitle>
+          <DialogTitle>Envoyer {invoice.noun} {invoice.number}</DialogTitle>
           <DialogDescription>
-            {`À ${invoice.clientName}, avec la facture en pièce jointe.`}
+            {`À ${invoice.clientName}, avec ${invoice.noun} en pièce jointe.`}
           </DialogDescription>
         </DialogHeader>
 
@@ -477,7 +518,7 @@ export function InvoiceSendDialog({
                     <Checkbox checked disabled />
                     <FileText className="size-4 shrink-0 text-muted-foreground" />
                     <span className="min-w-0 flex-1 truncate text-foreground">
-                      {`Facture-${invoice.number}.pdf`}
+                      {`${invoice.title}-${invoice.number}.pdf`}
                     </span>
                     <span className="shrink-0 text-xs text-muted-foreground">Toujours joint</span>
                   </div>
@@ -554,8 +595,8 @@ export function InvoiceSendDialog({
                   Ajouter des fichiers
                 </Button>
                 <FieldDescription>
-                  {invoice.projectId
-                    ? "Les documents du projet sont au-dessus. Le tout doit tenir sous 20 Mo."
+                  {invoice.documentsFrom
+                    ? `Les documents ${invoice.documentsFrom} sont au-dessus. Le tout doit tenir sous 20 Mo.`
                     : "Le tout doit tenir sous 20 Mo."}
                 </FieldDescription>
               </Field>
@@ -570,7 +611,7 @@ export function InvoiceSendDialog({
             disabled={send.isPending || isLoading || !toValue}
           >
             {send.isPending && <Spinner />}
-            Envoyer la facture
+            Envoyer {invoice.noun}
           </Button>
           <DialogClose render={<Button type="button" variant="outline" />}>Annuler</DialogClose>
         </DialogFooter>

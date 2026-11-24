@@ -10,7 +10,8 @@ public record InvoicePdfModel
 {
     public required string Number { get; init; }
     public required DateOnly IssueDate { get; init; }
-    public required DateOnly DueDate { get; init; }
+    /// <summary>The invoice's due date, or how long a quote holds. A quote may have none.</summary>
+    public DateOnly? DueDate { get; init; }
     public string? ProjectLabel { get; init; }
     public string? PoNumber { get; init; }
     public required string Currency { get; init; }
@@ -48,6 +49,38 @@ public record InvoicePdfModel
     public decimal Total { get; init; }
     public string? Terms { get; init; }
     public string? FooterNote { get; init; }
+
+    /// <summary>
+    /// What the paper calls itself, and the few words that change with it. An invoice by
+    /// default; a quote prints through the same layout with its own words, so the two documents
+    /// a client gets from one company look like they came from one company.
+    /// </summary>
+    public InvoicePdfWording Wording { get; init; } = InvoicePdfWording.Invoice;
+}
+
+public record InvoicePdfWording(
+    string Title,
+    string Name,
+    string DueLabel,
+    string BillToLabel,
+    string SignatureHeading,
+    string SignatureText)
+{
+    public static readonly InvoicePdfWording Invoice = new(
+        "FACTURE",
+        "Facture",
+        "Échéance",
+        "Facturer à:",
+        "Réception",
+        "En signant, le client confirme avoir reçu la présente facture et les travaux ou biens qu'elle décrit.");
+
+    public static readonly InvoicePdfWording Quote = new(
+        "SOUMISSION",
+        "Soumission",
+        "Valide jusqu'au",
+        "Préparée pour:",
+        "Acceptation",
+        "En signant, le client accepte la présente soumission et autorise les travaux qu'elle décrit, aux prix indiqués.");
 }
 
 public record InvoicePdfParty(string Name, IReadOnlyList<string> Lines, string? Email);

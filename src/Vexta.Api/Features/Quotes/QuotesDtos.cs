@@ -34,7 +34,9 @@ public record QuoteDto(
     /// <summary>Before taxes, so the list can show the price without a second request.</summary>
     decimal Subtotal,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    /// <summary>When it was last emailed to the client.</summary>
+    DateTimeOffset? SentAt);
 
 public record UpsertQuoteRequest(
     Guid ClientId,

@@ -3739,6 +3739,9 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<bool>("SameAddressAsClient")
                         .HasColumnType("boolean");
 
+                    b.Property<DateTimeOffset?>("SentAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid?>("SiteAddressId")
                         .HasColumnType("uuid");
 

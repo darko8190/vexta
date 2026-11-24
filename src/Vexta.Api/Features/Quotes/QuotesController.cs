@@ -530,5 +530,6 @@ public class QuotesController(VextaDbContext db, ICurrentUserService currentUser
         q.Project == null ? null : q.Project.Number,
         q.Lines.Sum(l => Math.Round(l.Quantity * l.UnitPrice, 2)),
         q.CreatedAt,
-        q.UpdatedAt);
+        q.UpdatedAt,
+        q.SentAt);
 }

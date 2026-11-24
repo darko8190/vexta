@@ -53,6 +53,9 @@ public class Quote
     public DateOnly? IssuedOn { get; set; }
     public DateOnly? ValidUntil { get; set; }
 
+    /// <summary>When it was last emailed to the client. Null until it has left.</summary>
+    public DateTimeOffset? SentAt { get; set; }
+
     /// <summary>The work's own planned dates, carried to the project on acceptance.</summary>
     public DateOnly? StartDate { get; set; }
     public DateOnly? EndDate { get; set; }

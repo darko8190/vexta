@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
@@ -139,6 +140,12 @@ function ResponseLine({ quote, expired }: { quote: QuoteRecord; expired: boolean
       <>
         {verb} le {formatMoment(quote.clientRespondedAt)}
         {quote.clientRespondedBy ? ` par ${quote.clientRespondedBy}` : ""}.
+        {quote.clientSignature && (
+          <span className="mt-1 block">
+            Signée électroniquement au nom de{" "}
+            <span className="font-medium text-foreground italic">{quote.clientSignature}</span>.
+          </span>
+        )}
         {quote.clientResponseNote && (
           <span className="mt-1 block whitespace-pre-line text-foreground">« {quote.clientResponseNote} »</span>
         )}
@@ -185,12 +192,20 @@ function QuoteDocument({ quote }: { quote: QuoteRecord }) {
 function AnswerDialog({ quote, answer, onClose }: { quote: QuoteRecord; answer: Answer; onClose: () => void }) {
   const respond = useRespondToQuote();
   const [note, setNote] = useState("");
+  const [signature, setSignature] = useState("");
   const accepting = answer === "accepter";
+  // Typing one's name is the signature, so the button waits for one.
+  const signed = signature.trim().length >= 2;
   const number = formatQuoteNumber(quote.number);
 
   async function submit() {
     try {
-      await respond.mutateAsync({ id: quote.id, answer, note: note.trim() || null });
+      await respond.mutateAsync({
+        id: quote.id,
+        answer,
+        note: note.trim() || null,
+        signature: accepting ? signature.trim() : null,
+      });
       toast.success(
         accepting
           ? `Soumission ${number} acceptée. Votre fournisseur en est avisé.`
@@ -214,7 +229,24 @@ function AnswerDialog({ quote, answer, onClose }: { quote: QuoteRecord; answer: 
           </DialogDescription>
         </DialogHeader>
 
-        <div className="px-4">
+        <div className="space-y-4 px-4">
+          {accepting && (
+            <Field>
+              <FieldLabel htmlFor="quote-answer-signature">Votre nom complet</FieldLabel>
+              <Input
+                id="quote-answer-signature"
+                autoComplete="name"
+                maxLength={200}
+                value={signature}
+                onChange={(event) => setSignature(event.target.value)}
+                className="italic"
+              />
+              <FieldDescription>
+                En tapant votre nom, vous signez l&apos;acceptation. Votre signature, la date et
+                l&apos;heure s&apos;impriment sur la soumission.
+              </FieldDescription>
+            </Field>
+          )}
           <Field>
             <FieldLabel htmlFor="quote-answer-note">Message (facultatif)</FieldLabel>
             <Textarea
@@ -231,9 +263,9 @@ function AnswerDialog({ quote, answer, onClose }: { quote: QuoteRecord; answer: 
         </div>
 
         <DialogFooter>
-          <Button type="button" variant={accepting ? "default" : "destructive"} disabled={respond.isPending} onClick={submit}>
+          <Button type="button" variant={accepting ? "default" : "destructive"} disabled={respond.isPending || (accepting && !signed)} onClick={submit}>
             {respond.isPending && <Spinner />}
-            {accepting ? "Accepter la soumission" : "Refuser la soumission"}
+            {accepting ? "Signer et accepter" : "Refuser la soumission"}
           </Button>
           <DialogClose render={<Button type="button" variant="outline" />}>Annuler</DialogClose>
         </DialogFooter>

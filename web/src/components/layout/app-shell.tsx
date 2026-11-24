@@ -27,6 +27,7 @@ import { TrialBanner } from "@/components/layout/trial-banner";
 import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { useNavigationQuery, type NavigationItem } from "@/hooks/use-navigation";
+import { useQuoteStatusCountsQuery } from "@/hooks/use-quotes";
 import { moduleIcon } from "@/lib/module-icons";
 import { useAuth } from "@/lib/auth-context";
 
@@ -61,7 +62,14 @@ function useTenantNavItems(): { items: NavItem[]; pending: boolean } {
     (user!.role !== "SuperAdmin" || user!.isImpersonating);
 
   const { data, isPending } = useNavigationQuery(fromModules);
-  const builtIn = getNavItems(user?.role, user?.isImpersonating, user?.tenantKind);
+  const isClient = user?.role === "Client";
+  const { data: quoteCounts } = useQuoteStatusCountsQuery(isClient);
+  // A customer is offered « Mes soumissions » once they have been sent one — a tab that can
+  // only ever be empty is a tab for a service their supplier does not use.
+  const hasQuotes = (quoteCounts ?? []).some((item) => item.count > 0);
+  const builtIn = getNavItems(user?.role, user?.isImpersonating, user?.tenantKind).filter(
+    (item) => !isClient || item.href !== "/soumissions" || hasQuotes,
+  );
 
   // A fixed menu has nothing in flight, so it draws at once.
   if (!fromModules) return { items: builtIn, pending: false };

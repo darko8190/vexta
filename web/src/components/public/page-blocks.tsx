@@ -324,6 +324,7 @@ export function FormsBlock({ company, s, title = "Nous écrire" }: BlockProps) {
         {company.forms.map((form) => (
           <li
             key={form.id}
+            id={`formulaire-${form.id}`}
             className={cn(s.card, "flex flex-wrap items-start justify-between gap-3 p-4 sm:p-5")}
           >
             <div className="min-w-0">

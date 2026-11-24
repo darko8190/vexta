@@ -51,6 +51,12 @@ public record InvoicePdfModel
     public string? FooterNote { get; init; }
 
     /// <summary>
+    /// The signature given online, printed where a pen would sign. Null leaves the blank line
+    /// for a signature on paper.
+    /// </summary>
+    public InvoicePdfSignature? Signature { get; init; }
+
+    /// <summary>
     /// What the paper calls itself, and the few words that change with it. An invoice by
     /// default; a quote prints through the same layout with its own words, so the two documents
     /// a client gets from one company look like they came from one company.
@@ -82,6 +88,11 @@ public record InvoicePdfWording(
         "Acceptation",
         "En signant, le client accepte la présente soumission et autorise les travaux qu'elle décrit, aux prix indiqués.");
 }
+
+/// <param name="Name">The name as the customer typed it to sign.</param>
+/// <param name="Date">The day, as the paper prints dates.</param>
+/// <param name="Statement">The sentence that says how and when it was signed.</param>
+public record InvoicePdfSignature(string Name, string Date, string Statement);
 
 public record InvoicePdfParty(string Name, IReadOnlyList<string> Lines, string? Email);
 

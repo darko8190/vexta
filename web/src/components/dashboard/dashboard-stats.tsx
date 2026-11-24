@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { QuoteStatsCard } from "@/components/dashboard/quote-stats-card";
 import { LoadErrorState } from "@/components/layout/load-error-state";
 import { useDashboardQuery } from "@/hooks/use-dashboard";
 import { formatDateOnly } from "@/lib/dates";
@@ -355,6 +356,8 @@ export function DashboardStats() {
           </CardContent>
         </Card>
       </div>
+
+      <QuoteStatsCard />
 
       {data.recentInvoices.length > 0 && (
         <Card>

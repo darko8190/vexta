@@ -65,6 +65,12 @@ public class Quote
     public string? ClientRespondedBy { get; set; }
     public string? ClientResponseNote { get; set; }
 
+    /// <summary>
+    /// The name the customer typed to sign when accepting from the portal — their signature, as
+    /// they wrote it, kept apart from the account name. Printed on the PDF of the accepted quote.
+    /// </summary>
+    public string? ClientSignature { get; set; }
+
     /// <summary>The work's own planned dates, carried to the project on acceptance.</summary>
     public DateOnly? StartDate { get; set; }
     public DateOnly? EndDate { get; set; }

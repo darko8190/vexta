@@ -10,7 +10,8 @@ import { PageHeader } from "@/components/layout/page-header";
 import { UpgradeCta } from "@/components/layout/upgrade-cta";
 import { useProjectsQuery } from "@/hooks/use-projects";
 import { useInvoicesQuery } from "@/hooks/use-invoices";
-import { useQuotesQuery } from "@/hooks/use-quotes";
+import { useQuoteStatusCountsQuery } from "@/hooks/use-quotes";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 import { tenantStatusLabels } from "@/lib/labels";
 
@@ -76,13 +77,19 @@ function PersonalDashboard() {
  */
 function ClientDashboard() {
   const { data: projects } = useProjectsQuery(1, "");
-  const { data: quotes } = useQuotesQuery(1, "", "Envoyee");
+  const { data: quoteCounts } = useQuoteStatusCountsQuery();
   const { data: invoices } = useInvoicesQuery(1, "");
 
+  // The quotes tile only for a customer who has been sent one, like the menu entry.
+  const hasQuotes = (quoteCounts ?? []).some((item) => item.count > 0);
+  const awaiting = quoteCounts?.find((item) => item.status === "Envoyee")?.count ?? 0;
+
   return (
-    <div className="grid gap-4 sm:grid-cols-3">
+    <div className={cn("grid gap-4", hasQuotes ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
       <StatCard href="/projets" label="Mes projets" value={projects?.totalCount ?? "—"} icon={FolderKanban} />
-      <StatCard href="/soumissions" label="Soumissions à répondre" value={quotes?.totalCount ?? "—"} icon={ClipboardPen} />
+      {hasQuotes && (
+        <StatCard href="/soumissions" label="Soumissions à répondre" value={awaiting} icon={ClipboardPen} />
+      )}
       <StatCard href="/factures" label="Mes factures" value={invoices?.totalCount ?? "—"} icon={FileText} />
     </div>
   );

@@ -3,7 +3,7 @@
 import { use, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ClipboardPen, IdCard, Inbox, ListPlus, Pencil, PenLine, Trash2, Zap } from "lucide-react";
+import { ArrowLeft, ClipboardPen, IdCard, Inbox, Link2, ListPlus, Pencil, PenLine, Trash2, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -20,7 +20,7 @@ import { FormSubmissionsSection } from "@/components/forms/form-submissions-sect
 import { FormTemplateSheet } from "@/components/forms/form-template-sheet";
 import { useCanManage } from "@/hooks/use-can-create";
 import { ApiError } from "@/lib/api";
-import { useDeleteForm, useFormQuery } from "@/hooks/use-forms";
+import { useDeleteForm, useFormPublicLinkQuery, useFormQuery } from "@/hooks/use-forms";
 
 /**
  * Pattern 2 — Detail / Record: one form, with its questions, its actions and its replies in the
@@ -113,6 +113,7 @@ export default function FormBuilderPage({ params }: { params: Promise<{ id: stri
                 Remplir
               </Button>
             )}
+            <CopyLinkButton formId={form.id} />
             {canManage && (
               <Button variant="outline" onClick={() => setEditOpen(true)}>
                 <Pencil />
@@ -193,5 +194,37 @@ export default function FormBuilderPage({ params }: { params: Promise<{ id: stri
       />
       <FillFormSheet open={fillOpen} onOpenChange={setFillOpen} formId={form.id} />
     </div>
+  );
+}
+
+/**
+ * Copies the address where a client or a stranger fills this form. The API only gives a path
+ * when every gate of the public page is open, so a copied link always works; otherwise the
+ * button says which switch is missing instead of copying a link that would answer 404.
+ */
+function CopyLinkButton({ formId }: { formId: string }) {
+  const { data: link } = useFormPublicLinkQuery(formId);
+
+  async function copy() {
+    if (!link) return;
+    if (!link.path) {
+      toast.info(link.missing ?? "Ce formulaire n'a pas encore de lien public.");
+      return;
+    }
+    const url = `${window.location.origin}${link.path}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Lien copié.", { description: url });
+    } catch {
+      // Clipboard refused (an http page, a browser setting): the link is still given to read.
+      toast.info("Copiez ce lien :", { description: url });
+    }
+  }
+
+  return (
+    <Button variant="outline" disabled={!link} onClick={copy}>
+      <Link2 />
+      Copier le lien
+    </Button>
   );
 }

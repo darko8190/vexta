@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CheckCircle2, Send } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -49,6 +49,16 @@ export function PublicFormDialog({ slug, form }: { slug: string; form: PublicPag
   // Asked before any question is shown: filling a whole form and only then being told to sign
   // in loses the answers on the way to the sign-in page.
   const mustSignIn = requiresIdentification && !authLoading && !user;
+
+  // A shared link (/e/{slug}?formulaire={id}) opens this form straight away. Read once, on
+  // the client: the page itself is prerendered and does not know its query string.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("formulaire") !== form.id) return;
+    document.getElementById(`formulaire-${form.id}`)?.scrollIntoView({ block: "center" });
+    void onOpenChange(true);
+    // Only on arrival: reopening on every render would trap the visitor in the dialog.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function onOpenChange(next: boolean) {
     setOpen(next);

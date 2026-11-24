@@ -39,6 +39,23 @@ export function useFormQuery(id: string | undefined) {
   });
 }
 
+/** Where strangers fill the form, or why there is no such place yet. */
+export interface FormPublicLink {
+  /** A path on this site: the company's page, opening the form. */
+  path: string | null;
+  /** The step that would make a link, worded for the person. */
+  missing: string | null;
+}
+
+/** Under the "formulaires" key, so saving the fiche (publishing, ticking the page) refreshes it. */
+export function useFormPublicLinkQuery(id: string | undefined) {
+  return useQuery({
+    queryKey: ["formulaires", "lien", id],
+    queryFn: () => api.get<FormPublicLink>(`formulaires/${id}/lien`),
+    enabled: Boolean(id),
+  });
+}
+
 export function useCreateForm() {
   const queryClient = useQueryClient();
   return useMutation({

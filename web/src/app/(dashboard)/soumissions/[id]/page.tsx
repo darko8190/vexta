@@ -257,6 +257,12 @@ function StaffQuoteDetail({ id }: { id: string }) {
             {quote.status === "Refusee" ? "Refusée" : "Acceptée"} par le client depuis son portail le{" "}
             {formatMoment(quote.clientRespondedAt)}
             {quote.clientRespondedBy ? ` (${quote.clientRespondedBy})` : ""}.
+            {quote.clientSignature && (
+              <span className="mt-1 block">
+                Signée électroniquement au nom de{" "}
+                <span className="font-medium text-foreground italic">{quote.clientSignature}</span>.
+              </span>
+            )}
             {quote.clientResponseNote && (
               <span className="mt-1 block whitespace-pre-line text-foreground">« {quote.clientResponseNote} »</span>
             )}

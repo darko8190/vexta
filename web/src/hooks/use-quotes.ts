@@ -6,7 +6,9 @@ import type {
   QuoteLine,
   QuoteLineKind,
   QuoteRecord,
+  QuoteStats,
   QuoteStatus,
+  QuoteStatusCount,
   QuoteSummary,
   SaveQuoteLineValues,
 } from "@/lib/types";
@@ -26,6 +28,23 @@ export function useQuotesQuery(page: number, search: string, status?: QuoteStatu
     queryFn: () =>
       api.get<PagedResult<QuoteRecord>>(`soumissions${buildQuery({ page, search, status, clientId })}`),
     placeholderData: (previous) => previous,
+  });
+}
+
+/** Quotes per status, among those this person may read. Under "quotes", so every write refreshes it. */
+export function useQuoteStatusCountsQuery(enabled = true) {
+  return useQuery({
+    queryKey: ["quotes", "statuts"],
+    queryFn: () => api.get<QuoteStatusCount[]>("soumissions/statuts"),
+    enabled,
+  });
+}
+
+/** What became of the quotes sent in the last `days` days, for the company's dashboard. */
+export function useQuoteStatsQuery(days = 90) {
+  return useQuery({
+    queryKey: ["quotes", "statistiques", days],
+    queryFn: () => api.get<QuoteStats>(`soumissions/statistiques?jours=${days}`),
   });
 }
 
@@ -122,8 +141,18 @@ export function useQuoteFromSubmission() {
 export function useRespondToQuote() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, answer, note }: { id: string; answer: "accepter" | "refuser"; note: string | null }) =>
-      api.post<QuoteRecord>(`soumissions/${id}/${answer}`, { note }),
+    mutationFn: ({
+      id,
+      answer,
+      note,
+      signature = null,
+    }: {
+      id: string;
+      answer: "accepter" | "refuser";
+      note: string | null;
+      /** The typed full name that signs an acceptance. */
+      signature?: string | null;
+    }) => api.post<QuoteRecord>(`soumissions/${id}/${answer}`, { note, signature }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["quotes"] });
       queryClient.invalidateQueries({ queryKey: ["projects"] });

@@ -97,6 +97,63 @@ public class QuotesController(
         return Ok(new PagedResult<QuoteDto> { Items = items, Page = query.Page, PageSize = query.PageSize, TotalCount = totalCount });
     }
 
+    /// <summary>
+    /// How many quotes per status, among those this person may read. Lapsed ones are expired
+    /// first, so the counts and the filtered list agree. A customer's answer with no row at all
+    /// is also how the portal knows to leave « Mes soumissions » out of its menu.
+    /// </summary>
+    [HttpGet("statuts")]
+    public async Task<ActionResult<List<QuoteStatusCountDto>>> StatusCounts(CancellationToken ct)
+    {
+        await ExpireLapsedAsync(ct);
+        var counts = await Visible().AsNoTracking()
+            .GroupBy(q => q.Status)
+            .Select(g => new QuoteStatusCountDto(g.Key, g.Count()))
+            .ToListAsync(ct);
+        return Ok(counts.OrderBy(c => c.Status).ToList());
+    }
+
+    /// <summary>
+    /// The quotes sent in the last <paramref name="jours"/> days and what became of them, for
+    /// the company's dashboard. Counted by when they were sent, so a quote answered this week
+    /// for a price given in the spring belongs to the spring. Amounts are before taxes.
+    /// </summary>
+    [HttpGet("statistiques")]
+    [StaffOnly]
+    public async Task<ActionResult<QuoteStatsDto>> Stats([FromQuery] int jours = 90, CancellationToken ct = default)
+    {
+        jours = Math.Clamp(jours, 7, 366);
+        await ExpireLapsedAsync(ct);
+        var since = DateTimeOffset.UtcNow.AddDays(-jours);
+
+        var rows = await db.Quotes.AsNoTracking()
+            .Where(q => q.SentAt != null && q.SentAt >= since)
+            .Select(q => new
+            {
+                // A quote made a project counts as accepted whatever its status says.
+                Accepted = q.ProjectId != null || q.Status == QuoteStatus.Acceptee,
+                q.Status,
+                Amount = q.Lines.Sum(l => (decimal?)(l.Quantity * l.UnitPrice)) ?? 0m
+            })
+            .ToListAsync(ct);
+
+        var accepted = rows.Where(r => r.Accepted).ToList();
+        var refused = rows.Count(r => !r.Accepted && r.Status == QuoteStatus.Refusee);
+        var expired = rows.Count(r => !r.Accepted && r.Status == QuoteStatus.Expiree);
+        var decided = accepted.Count + refused + expired;
+
+        return Ok(new QuoteStatsDto(
+            jours,
+            rows.Count,
+            accepted.Count,
+            refused,
+            expired,
+            rows.Count - decided,
+            decided == 0 ? null : Math.Round(100m * accepted.Count / decided, 1),
+            Math.Round(rows.Sum(r => r.Amount), 2),
+            Math.Round(accepted.Sum(r => r.Amount), 2)));
+    }
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<QuoteDto>> Get(Guid id)
     {
@@ -505,7 +562,16 @@ public class QuotesController(
         if (quote.Client!.WorkRefusal() is not null)
             return BadRequest(new { message = "Cette soumission ne peut pas être acceptée en ligne. Communiquez avec l'entreprise." });
 
+        // Typing one's name is the signature: two letters at least, so an empty or stray key
+        // press is not taken for one.
+        var signature = Clean(request.Signature);
+        if (signature is not { Length: >= 2 })
+            return BadRequest(new { message = "Tapez votre nom complet pour signer l'acceptation." });
+        if (signature.Length > 200)
+            return BadRequest(new { message = "Le nom est limité à 200 caractères." });
+
         await RecordResponseAsync(quote, request, ct);
+        quote.ClientSignature = signature;
         var project = await CreateProjectAsync(quote);
         await db.SaveChangesAsync(ct);
 
@@ -582,11 +648,15 @@ public class QuotesController(
             var client = quote.Client?.Name ?? "Le client";
             var verb = accepted ? "accepté" : "refusé";
             var who = quote.ClientRespondedBy is { } name && name != client ? $" ({Html(name)})" : "";
+            var signed = quote.ClientSignature is { } signature
+                ? $"<p>Signée électroniquement au nom de <strong>{Html(signature)}</strong>.</p>"
+                : "";
             var note = quote.ClientResponseNote is { } text
                 ? $"<p>Son message :</p><blockquote>{Html(text).Replace("\n", "<br>")}</blockquote>"
                 : "";
             var body =
                 $"<p>{Html(client)}{who} a {verb} la soumission {number} depuis son portail.</p>" +
+                signed +
                 (extra is null ? "" : $"<p>{Html(extra)}</p>") +
                 note +
                 $"<p><a href=\"{FrontendUrl}/soumissions/{quote.Id}\">Ouvrir la soumission</a></p>";
@@ -856,5 +926,6 @@ public class QuotesController(
         q.SentAt,
         q.ClientRespondedAt,
         q.ClientRespondedBy,
-        q.ClientResponseNote);
+        q.ClientResponseNote,
+        q.ClientSignature);
 }

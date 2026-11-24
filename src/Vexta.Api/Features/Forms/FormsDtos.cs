@@ -46,6 +46,12 @@ public record FormActionDto(
     bool IsActive,
     int SortOrder);
 
+/// <summary>
+/// Where a stranger fills the form: a path on the site (the company's page, opening this form),
+/// or why there is none yet, worded as the step that would make one.
+/// </summary>
+public record FormPublicLinkDto(string? Path, string? Missing);
+
 /// <summary>The whole form: the record, its questions and what a filled copy sets off.</summary>
 public record FormTemplateDetailDto(
     FormTemplateDto Form,

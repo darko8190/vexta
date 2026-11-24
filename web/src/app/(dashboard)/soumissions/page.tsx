@@ -12,6 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { DataTable, type DataColumn } from "@/components/layout/data-table";
@@ -23,7 +24,13 @@ import { UpgradeCta } from "@/components/layout/upgrade-cta";
 import { QuoteFormSheet } from "@/components/quotes/quote-form-sheet";
 import { useCanCreate, useIsClientUser } from "@/hooks/use-can-create";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
-import { storedQuoteValues, useDeleteQuote, useQuotesQuery, useUpdateQuote } from "@/hooks/use-quotes";
+import {
+  storedQuoteValues,
+  useDeleteQuote,
+  useQuoteStatusCountsQuery,
+  useQuotesQuery,
+  useUpdateQuote,
+} from "@/hooks/use-quotes";
 import { formatDateOnly } from "@/lib/dates";
 import { quoteStatusBadgeVariant, quoteStatusLabels } from "@/lib/labels";
 import { formatAmount } from "@/lib/money";
@@ -49,9 +56,26 @@ export default function QuotesPage() {
   const canCreate = useCanCreate() && !isClient;
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<QuoteStatus | "Toutes">("Toutes");
   const debouncedSearch = useDebouncedValue(search);
 
-  const { data, isLoading } = useQuotesQuery(page, debouncedSearch);
+  const { data, isLoading } = useQuotesQuery(
+    page,
+    debouncedSearch,
+    statusFilter === "Toutes" ? undefined : statusFilter,
+  );
+  const { data: counts } = useQuoteStatusCountsQuery();
+  const countOf = (status: QuoteStatus | "Toutes") =>
+    status === "Toutes"
+      ? (counts ?? []).reduce((sum, item) => sum + item.count, 0)
+      : (counts?.find((item) => item.status === status)?.count ?? 0);
+  // A customer never sees a draft, so the filter does not offer one.
+  const filterOptions: (QuoteStatus | "Toutes")[] = [
+    "Toutes",
+    ...(Object.keys(quoteStatusLabels) as QuoteStatus[]).filter((status) => !isClient || status !== "Brouillon"),
+  ];
+  const filterLabel = (status: QuoteStatus | "Toutes") =>
+    `${status === "Toutes" ? "Tous les statuts" : quoteStatusLabels[status]}${counts ? ` (${countOf(status)})` : ""}`;
   const update = useUpdateQuote();
   const remove = useDeleteQuote();
 
@@ -155,14 +179,37 @@ export default function QuotesPage() {
   );
 
   const searchBox = (
-    <SearchInput
-      value={search}
-      onChange={(value) => {
-        setSearch(value);
-        setPage(1);
-      }}
-      placeholder="Rechercher une soumission…"
-    />
+    <div className="flex flex-col gap-2 sm:flex-row">
+      <div className="min-w-0 flex-1">
+        <SearchInput
+          value={search}
+          onChange={(value) => {
+            setSearch(value);
+            setPage(1);
+          }}
+          placeholder="Rechercher une soumission…"
+        />
+      </div>
+      {/* With the count in each choice, so the list says how many wait before it is opened. */}
+      <Select
+        value={statusFilter}
+        onValueChange={(value) => {
+          setStatusFilter((value ?? "Toutes") as QuoteStatus | "Toutes");
+          setPage(1);
+        }}
+      >
+        <SelectTrigger className="sm:w-52" aria-label="Filtrer par statut">
+          <SelectValue>{(value: QuoteStatus | "Toutes") => filterLabel(value)}</SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          {filterOptions.map((status) => (
+            <SelectItem key={status} value={status}>
+              {filterLabel(status)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   );
 
   return (
@@ -188,15 +235,19 @@ export default function QuotesPage() {
           <div className="mb-4">{searchBox}</div>
           <EmptyState
             icon={ClipboardPen}
-            title={debouncedSearch ? "Aucune soumission trouvée" : "Aucune soumission pour l'instant"}
+            title={
+              debouncedSearch || statusFilter !== "Toutes"
+                ? "Aucune soumission trouvée"
+                : "Aucune soumission pour l'instant"
+            }
             description={
-              debouncedSearch
-                ? "Essayez une autre recherche."
+              debouncedSearch || statusFilter !== "Toutes"
+                ? "Essayez une autre recherche ou un autre statut."
                 : isClient
                   ? "Aucune soumission ne vous a été envoyée pour l'instant."
                   : "Préparez un prix : tâches, matériaux et frais. Acceptée, elle devient un projet."
             }
-            action={!debouncedSearch && addButton ? addButton : undefined}
+            action={!debouncedSearch && statusFilter === "Toutes" && addButton ? addButton : undefined}
           />
         </>
       ) : (

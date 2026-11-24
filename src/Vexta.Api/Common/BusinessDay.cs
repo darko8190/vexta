@@ -23,6 +23,9 @@ public static class BusinessDay
     /// <summary>Now, in the company's own calendar, for the rare caller that needs the clock too.</summary>
     public static DateTimeOffset Now => TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, Zone);
 
+    /// <summary>A moment stored in UTC, on the company's clock.</summary>
+    public static DateTimeOffset ToLocal(DateTimeOffset moment) => TimeZoneInfo.ConvertTime(moment, Zone);
+
     /// <summary>The company's calendar date of a moment stored in UTC.</summary>
     public static DateOnly DateOf(DateTimeOffset moment) =>
         DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(moment, Zone).DateTime);

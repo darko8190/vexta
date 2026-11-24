@@ -256,10 +256,16 @@ public class InvoiceDocument(InvoicePdfModel model) : IDocument
                 model.Wording.SignatureText)
             .FontSize(8).FontColor(Grey);
 
-        column.Item().PaddingTop(28).Row(row =>
+        // Signed online: the typed name sits on the line where the pen would go, the date beside
+        // it, and a sentence under both says how it was given.
+        var signed = model.Signature;
+
+        column.Item().PaddingTop(signed is null ? 28 : 14).Row(row =>
         {
             row.RelativeItem(3).Column(signature =>
             {
+                if (signed is not null)
+                    signature.Item().PaddingBottom(2).Text(signed.Name).FontSize(13).Italic().FontColor(Blue);
                 signature.Item().LineHorizontal(0.5f).LineColor(Grey);
                 signature.Item().PaddingTop(4).Text($"Signature — {model.BillTo.Name}").FontSize(8).FontColor(Grey);
             });
@@ -268,10 +274,17 @@ public class InvoiceDocument(InvoicePdfModel model) : IDocument
 
             row.RelativeItem(1).Column(date =>
             {
+                if (signed is not null)
+                    date.Item().PaddingBottom(2).Text(signed.Date).FontSize(10);
                 date.Item().LineHorizontal(0.5f).LineColor(Grey);
                 date.Item().PaddingTop(4).Text("Date").FontSize(8).FontColor(Grey);
             });
         });
+
+        if (signed is not null)
+        {
+            column.Item().PaddingTop(6).Text(signed.Statement).FontSize(8).FontColor(Grey);
+        }
 
         if (model.FooterNote is { Length: > 0 } footer)
         {

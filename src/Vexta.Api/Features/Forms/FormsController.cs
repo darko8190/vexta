@@ -69,6 +69,41 @@ public class FormsController(VextaDbContext db, ICurrentUserService currentUser)
             .ToList());
     }
 
+    /// <summary>
+    /// The link to share. It exists only when every one of the public page's gates is open (see
+    /// PublicFormGate), so a link copied here is a link that works; otherwise the first closed
+    /// gate is named, so the person knows what to switch on.
+    /// </summary>
+    [HttpGet("{id:guid}/lien")]
+    public async Task<ActionResult<FormPublicLinkDto>> PublicLink(Guid id, CancellationToken ct)
+    {
+        var form = await db.FormTemplates.AsNoTracking()
+            .Where(f => f.Id == id)
+            .Select(f => new { f.TenantId, f.IsPublished, f.ShowOnPublicPage })
+            .FirstOrDefaultAsync(ct);
+        if (form is null) return NotFound();
+
+        var slug = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
+            .Where(t => t.Id == form.TenantId)
+            .Select(t => t.Slug)
+            .FirstOrDefaultAsync(ct);
+        var page = await db.PublicPages.AsNoTracking()
+            .Where(p => p.TenantId == form.TenantId)
+            .Select(p => new { p.IsPublished, p.ShowForms })
+            .FirstOrDefaultAsync(ct);
+
+        var missing =
+            !form.IsPublished ? "Publiez le formulaire pour obtenir son lien."
+            : !form.ShowOnPublicPage ? "Cochez « Sur ma page publique » dans « Modifier la fiche » pour obtenir son lien."
+            : string.IsNullOrWhiteSpace(slug) || page is not { IsPublished: true } ? "Publiez la page publique de l'entreprise (Entreprise › Page publique) pour obtenir le lien."
+            : !page.ShowForms ? "Affichez les formulaires sur la page publique (Entreprise › Page publique) pour obtenir le lien."
+            : null;
+
+        return Ok(missing is null
+            ? new FormPublicLinkDto($"/e/{Uri.EscapeDataString(slug!)}?formulaire={id}", null)
+            : new FormPublicLinkDto(null, missing));
+    }
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<FormTemplateDetailDto>> Get(Guid id, CancellationToken ct)
     {

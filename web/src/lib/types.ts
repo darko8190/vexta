@@ -3042,6 +3042,8 @@ export interface QuoteRecord {
   clientRespondedAt: string | null;
   clientRespondedBy: string | null;
   clientResponseNote: string | null;
+  /** The name the customer typed to sign the acceptance in their portal. */
+  clientSignature: string | null;
 }
 
 export interface QuoteFormValues {
@@ -3094,4 +3096,24 @@ export interface QuoteSummary {
   extraCharges: number;
   documentsAndNotes: number;
   costs: ProjectCostTable;
+}
+
+/** How many quotes this person can see in one status. */
+export interface QuoteStatusCount {
+  status: QuoteStatus;
+  count: number;
+}
+
+/** What became of the quotes sent over a period. Amounts are before taxes. */
+export interface QuoteStats {
+  days: number;
+  sent: number;
+  accepted: number;
+  refused: number;
+  expired: number;
+  pending: number;
+  /** Accepted over decided, in percent. Null while none has been decided. */
+  acceptanceRate: number | null;
+  sentAmount: number;
+  acceptedAmount: number;
 }

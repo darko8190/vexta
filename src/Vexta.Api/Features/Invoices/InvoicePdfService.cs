@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using QuestPDF.Fluent;
 using Vexta.Api.Common;
@@ -95,6 +96,16 @@ public class InvoicePdfService(VextaDbContext db, ICurrentUserService currentUse
         return new InvoiceDocument(model).GeneratePdf();
     }
 
+    /// <summary>The company's local day and time of an online signature, as the paper prints them.</summary>
+    private static InvoicePdfSignature Signed(string name, DateTimeOffset at)
+    {
+        var local = BusinessDay.ToLocal(at);
+        return new InvoicePdfSignature(
+            name,
+            local.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            $"Signée électroniquement dans le portail client par {name}, le {local:yyyy-MM-dd} à {local:HH} h {local:mm}.");
+    }
+
     public async Task<(byte[] Bytes, int Number)?> RenderQuoteAsync(Guid quoteId, CancellationToken ct = default)
     {
         var quote = await db.Quotes.AsNoTracking()
@@ -168,6 +179,9 @@ public class InvoicePdfService(VextaDbContext db, ICurrentUserService currentUse
             // would ask for money nobody owes yet.
             FooterNote = Clean(settings?.FooterNote),
             Wording = InvoicePdfWording.Quote,
+            Signature = quote.ClientSignature is { } typed && quote.ClientRespondedAt is { } at
+                ? Signed(typed, at)
+                : null,
         };
 
         return (new InvoiceDocument(model).GeneratePdf(), quote.Number);

@@ -182,6 +182,8 @@ public class TenantsController(
             // Before the invoices they hang off, and before the clients they belong to. Both
             // would cascade from the database, but this sweep is explicit about everything so
             // that reading it tells you what a deleted tenant takes with it.
+            // Refunds before the payments they point at, which they do not cascade from.
+            await Wipe(db.InvoiceRefunds.Where(x => x.TenantId == id));
             await Wipe(db.InvoicePayments.Where(x => x.TenantId == id));
             await Wipe(db.ClientAccountEntries.Where(x => x.TenantId == id));
             await Wipe(db.Invoices.Where(x => x.TenantId == id));

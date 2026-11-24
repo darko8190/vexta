@@ -2073,6 +2073,58 @@ namespace Vexta.Api.Data.Migrations
                     b.ToTable("InvoicePayments");
                 });
 
+            modelBuilder.Entity("Vexta.Api.Domain.InvoiceRefund", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("InvoiceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("InvoicePaymentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Method")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("StripeRefundId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InvoicePaymentId");
+
+                    b.HasIndex("InvoiceId", "Date");
+
+                    b.ToTable("InvoiceRefunds");
+                });
+
             modelBuilder.Entity("Vexta.Api.Domain.JobPosting", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4596,6 +4648,24 @@ namespace Vexta.Api.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Invoice");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.InvoiceRefund", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.Invoice", "Invoice")
+                        .WithMany()
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Vexta.Api.Domain.InvoicePayment", "InvoicePayment")
+                        .WithMany()
+                        .HasForeignKey("InvoicePaymentId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Invoice");
+
+                    b.Navigation("InvoicePayment");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.JobPosting", b =>

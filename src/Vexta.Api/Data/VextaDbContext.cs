@@ -83,6 +83,7 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
     public DbSet<ClientAsset> ClientAssets => Set<ClientAsset>();
     public DbSet<ClientAccountEntry> ClientAccountEntries => Set<ClientAccountEntry>();
     public DbSet<InvoicePayment> InvoicePayments => Set<InvoicePayment>();
+    public DbSet<InvoiceRefund> InvoiceRefunds => Set<InvoiceRefund>();
     public DbSet<ClientAssetType> ClientAssetTypes => Set<ClientAssetType>();
     public DbSet<Gallery> Galleries => Set<Gallery>();
     public DbSet<GalleryImage> GalleryImages => Set<GalleryImage>();
@@ -306,6 +307,30 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             // what they have paid on it and nothing from anybody else's.
             e.HasQueryFilter(p => p.TenantId == CurrentTenantId
                 && (CurrentClientId == null || p.Invoice!.ClientId == CurrentClientId));
+        });
+
+        builder.Entity<InvoiceRefund>(e =>
+        {
+            e.HasOne(r => r.Invoice).WithMany()
+                .HasForeignKey(r => r.InvoiceId).OnDelete(DeleteBehavior.Cascade);
+
+            // SetNull rather than Cascade: a payment entered by mistake can be removed, and the
+            // refund of real money that followed it must not vanish with it. It loses the
+            // pointer and keeps the amount, the date and the reason.
+            e.HasOne(r => r.InvoicePayment).WithMany()
+                .HasForeignKey(r => r.InvoicePaymentId).OnDelete(DeleteBehavior.SetNull);
+
+            e.Property(r => r.Amount).HasPrecision(14, 2);
+            e.Property(r => r.Reference).HasMaxLength(80);
+            e.Property(r => r.Note).HasMaxLength(300);
+            e.Property(r => r.StripeRefundId).HasMaxLength(200);
+
+            e.HasIndex(r => new { r.InvoiceId, r.Date });
+
+            // The same filter as the payments it mirrors: a customer reading their own invoice
+            // sees what was given back on it, and nothing from anybody else's.
+            e.HasQueryFilter(r => r.TenantId == CurrentTenantId
+                && (CurrentClientId == null || r.Invoice!.ClientId == CurrentClientId));
         });
 
         builder.Entity<ClientContact>(e =>

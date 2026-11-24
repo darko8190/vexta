@@ -118,6 +118,16 @@ public interface IStripeConnectService
         string sessionId, Tenant tenant, VextaDbContext db, CancellationToken ct = default);
 
     /// <summary>
+    /// Sends a card payment back the way it came, and hands back the id Stripe gives the refund.
+    ///
+    /// Charging being enabled is deliberately not required. A company whose account has stopped
+    /// taking payments -- a document expired, a verification lapsed -- still has to be able to
+    /// give money back, and that is the moment it most needs to.
+    /// </summary>
+    Task<string> RefundAsync(
+        Tenant tenant, string paymentIntentId, decimal amount, CancellationToken ct = default);
+
+    /// <summary>
     /// Verifies a delivery from the Connect endpoint, which signs with its own secret — see
     /// <see cref="PlatformSettingKeys.StripeConnectWebhookSecret"/>.
     /// </summary>
@@ -457,6 +467,41 @@ public class StripeConnectService(
         return new OrderCheckout(session.Url, session.Id);
     }
 
+    public async Task<string> RefundAsync(
+        Tenant tenant, string paymentIntentId, decimal amount, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(tenant.StripeAccountId))
+        {
+            throw new InvalidOperationException("Cette entreprise n'a pas de compte Stripe branché.");
+        }
+
+        if (amount <= 0)
+        {
+            throw new InvalidOperationException("Le montant à rembourser doit être positif.");
+        }
+
+        var client = new StripeClient(await RequireSecretKeyAsync(ct));
+
+        // On the connected account, because that is where the charge was made. The platform
+        // took no fee on it, so there is no application fee to give back alongside.
+        var refund = await new RefundService(client).CreateAsync(
+            new RefundCreateOptions
+            {
+                PaymentIntent = paymentIntentId,
+                // Cents, rounded the way the invoice rounds. Stripe takes an integer and
+                // nothing else.
+                Amount = (long)decimal.Round(amount * 100m, 0, MidpointRounding.AwayFromZero)
+            },
+            new RequestOptions { StripeAccount = tenant.StripeAccountId },
+            ct);
+
+        logger.LogInformation(
+            "Remboursement Stripe {Refund} de {Amount} sur {Intent} ({Account}).",
+            refund.Id, amount, paymentIntentId, tenant.StripeAccountId);
+
+        return refund.Id;
+    }
+
     public async Task<Event> ConstructEventAsync(
         string payload, string signatureHeader, CancellationToken ct = default)
     {
@@ -606,9 +651,13 @@ public class StripeConnectService(
 
         var total = InvoiceTotals.For(invoice.Lines, billing, invoice.IsTaxExempt).Total;
 
-        var paidBefore = await db.InvoicePayments.IgnoreQueryFilters()
+        var takenBefore = await db.InvoicePayments.IgnoreQueryFilters()
             .Where(p => p.InvoiceId == invoiceId)
             .SumAsync(p => (decimal?)p.Amount, ct) ?? 0m;
+
+        var paidBefore = InvoiceSettlement.Net(
+            takenBefore,
+            await InvoiceSettlement.RefundedAsync(db.InvoiceRefunds.IgnoreQueryFilters(), invoiceId, ct));
 
         InvoiceStatusRules.ApplyPaid(invoice, paidBefore + amount, total);
 

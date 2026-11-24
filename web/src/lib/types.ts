@@ -239,7 +239,10 @@ export interface InvoicePayment {
 /** The payments and the three figures they are read against, which travel together. */
 export interface InvoicePayments {
   total: number;
+  /** What stayed with the company: taken in, less given back. */
   paid: number;
+  /** What was given back, kept beside the paid figure rather than folded into it. */
+  refunded: number;
   outstanding: number;
   /** Why "porté au compte" cannot be used, or null when it can. */
   accountRefusal: string | null;
@@ -2572,6 +2575,81 @@ export interface PaymentList {
   page: PagedResult<PaymentListItem>;
   totals: PaymentTotals;
 }
+
+// ---- Remboursements ----
+
+export interface InvoiceRefund {
+  id: string;
+  /** The payment it reverses, when it reverses one in particular. */
+  invoicePaymentId: string | null;
+  date: string;
+  amount: number;
+  method: PaymentMethod;
+  reference: string | null;
+  note: string | null;
+  /** Set when Stripe really sent the money back. Such a refund cannot be deleted. */
+  stripeRefundId: string | null;
+  createdAt: string;
+}
+
+/** One payment that can still be given back, and how much of it is left. */
+export interface RefundablePayment {
+  id: string;
+  date: string;
+  amount: number;
+  remaining: number;
+  method: PaymentMethod;
+  reference: string | null;
+  /** Whether it can be sent back through the card it arrived on. */
+  online: boolean;
+}
+
+export interface InvoiceRefunds {
+  /** The most that can be given back: what stayed with the company. */
+  refundable: number;
+  refunded: number;
+  payments: RefundablePayment[];
+  refunds: InvoiceRefund[];
+}
+
+export interface SaveInvoiceRefundValues {
+  amount: number;
+  method: PaymentMethod;
+  invoicePaymentId: string | null;
+  date: string | null;
+  reference: string | null;
+  note: string | null;
+  /** Send it back through Stripe rather than only writing it down. */
+  online: boolean;
+}
+
+export interface RefundListItem {
+  id: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  clientId: string | null;
+  clientName: string;
+  date: string;
+  amount: number;
+  method: PaymentMethod;
+  reference: string | null;
+  note: string | null;
+  stripeRefundId: string | null;
+  createdAt: string;
+}
+
+/** `online` is held apart: it is the part that left the bank on its own. */
+export interface RefundTotals {
+  count: number;
+  givenBack: number;
+  online: number;
+}
+
+export interface RefundList {
+  page: PagedResult<RefundListItem>;
+  totals: RefundTotals;
+}
+
 
 // ---- Réponses aux formulaires ----
 

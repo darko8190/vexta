@@ -141,6 +141,18 @@ public class InvoicePaymentsController(VextaDbContext db, ICurrentUserService cu
             .FirstOrDefaultAsync(p => p.Id == id && p.InvoiceId == invoiceId, ct);
         if (payment is null) return NotFound();
 
+        // A payment that has been given back cannot be deleted. The refund would survive --
+        // it points at real money and is deliberately not cascaded away -- and the invoice
+        // would then be short twice over: once for the payment that vanished and once for the
+        // refund still counting against it.
+        if (await db.InvoiceRefunds.AnyAsync(r => r.InvoicePaymentId == id, ct))
+        {
+            return BadRequest(new
+            {
+                message = "Ce paiement a été remboursé. Supprimez d'abord le remboursement."
+            });
+        }
+
         // Read before anything is staged for removal. BuildAsync queries the database, so
         // reading it afterwards would depend on the deletes not having been flushed yet — true
         // today, and the kind of thing that stops being true quietly.
@@ -192,11 +204,13 @@ public class InvoicePaymentsController(VextaDbContext db, ICurrentUserService cu
                 p.Id, p.Date, p.Amount, p.Method, p.Reference, p.Note, p.CreatedAt))
             .ToListAsync(ct);
 
-        var paid = payments.Sum(p => p.Amount);
+        var refunded = await InvoiceSettlement.RefundedAsync(db.InvoiceRefunds, invoice.Id, ct);
+        var paid = InvoiceSettlement.Net(payments.Sum(p => p.Amount), refunded);
 
         return new InvoicePaymentsDto(
             total,
             paid,
+            refunded,
             // Never negative: a rounding cent on an over-collected invoice should read as
             // settled, not as a debt owed back through this screen.
             Math.Max(0m, InvoiceTotals.Round(total - paid)),

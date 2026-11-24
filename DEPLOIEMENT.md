@@ -2044,6 +2044,47 @@ deux fois.
 
 ---
 
+### Remboursements
+
+L'onglet **Facturation → Remboursements** n'est plus une case vide. On rembourse depuis la
+facture concernée, et la liste de l'onglet rassemble tout ce qui est ressorti, toutes factures
+confondues.
+
+**Un remboursement n'est pas un paiement négatif.** Il a sa propre date, sa propre raison et
+souvent son propre mode — une carte rendue par chèque est une semaine ordinaire — et une colonne
+qui porterait les deux sens rendrait les recettes d'une journée impossibles à additionner.
+
+**Un remboursement ne change pas ce qui a été facturé.** La facture dit toujours ce qu'elle dit ;
+le remboursement dit que l'argent est reparti. Le montant dû remonte donc d'autant, et c'est
+voulu : tant qu'une note de crédit n'a pas fait baisser la facture elle-même, la paperasse n'est
+pas carrée, et l'écran le montre au lieu de faire coller les chiffres en douce. Une facture
+intégralement remboursée repasse de **Payée** à **Envoyée**.
+
+**Vous ne pouvez pas rendre plus que ce qui est resté chez vous** — ni plus que ce qui reste sur
+le paiement choisi. Et « Porté au compte » ne se rembourse pas : aucun argent n'a bougé, c'est un
+ajustement sur le compte du client.
+
+**Une carte encaissée par Vexta se renvoie sur la carte.** Si le paiement est arrivé par Stripe,
+une case « Renvoyer sur la carte » apparaît et Stripe renvoie l'argent au client en quelques
+jours, sur le compte de l'entreprise. Un paiement par carte saisi à la main depuis un terminal de
+comptoir n'a pas cette case : Vexta n'a jamais vu cette transaction et ne peut rien renverser.
+Le remboursement est alors seulement inscrit, et l'argent se rend autrement.
+
+**Un remboursement parti par Stripe ne peut pas être effacé d'ici.** L'argent est rendu ; effacer
+la ligne ne le ramènerait pas, ça ne ferait que mettre le livre en désaccord avec la banque. Un
+remboursement saisi à la main, lui, se retire — c'est le cas de la faute de frappe.
+
+Et un paiement qui a été remboursé ne peut plus être supprimé : il faut retirer le remboursement
+d'abord, sinon la facture serait amputée deux fois.
+
+Les six écrans qui lisent « ce qui est payé » comptent maintenant net : la facture, le tableau de
+bord, l'espace du client, la page publique de paiement, le paiement en ligne qui arrive tout
+seul, et la règle qui décide de l'état « Payée ». C'était le vrai risque de la chose — une
+facture qui se lit « réglée » sur la page même où quelqu'un s'apprête à la payer une deuxième
+fois.
+
+---
+
 ## 7. Compression des fichiers R2
 
 Les fichiers sont compressés en gzip **dans le navigateur**, avant d'être envoyés — le fichier ne

@@ -70,13 +70,19 @@ public class DashboardController(VextaDbContext db, ICurrentUserService currentU
             .Select(g => new { InvoiceId = g.Key, Amount = g.Sum(p => p.Amount) })
             .ToDictionaryAsync(x => x.InvoiceId, x => x.Amount, ct);
 
+        // What went back out again. Without it an invoice the company refunded last week still
+        // counts as money in hand on the one screen somebody reads every morning.
+        var refunded = await InvoiceSettlement.RefundedByInvoiceAsync(
+            db.InvoiceRefunds.AsNoTracking(), invoices.Select(i => i.Id).ToList(), ct);
+
         var rows = invoices.Select(i =>
         {
             var totals = InvoiceTotals.For(
                 i.Lines.Select(l => new InvoiceTotals.Line(l.Quantity, l.UnitPrice, l.IsTaxable)),
                 gst, qst, i.IsTaxExempt);
 
-            var settled = paid.GetValueOrDefault(i.Id, 0m);
+            var settled = InvoiceSettlement.Net(
+                paid.GetValueOrDefault(i.Id, 0m), refunded.GetValueOrDefault(i.Id, 0m));
 
             return new
             {

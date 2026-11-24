@@ -84,6 +84,7 @@ export function InvoicePaymentsSection({ invoiceId }: { invoiceId: string }) {
 
   const payments = data?.payments ?? [];
   const outstanding = data?.outstanding ?? 0;
+  const refunded = data?.refunded ?? 0;
   const settled = Boolean(data) && outstanding <= 0;
 
   async function confirmDelete() {
@@ -131,7 +132,12 @@ export function InvoicePaymentsSection({ invoiceId }: { invoiceId: string }) {
         />
       ) : (
         <>
-          <dl className="mb-4 grid gap-4 rounded-lg border border-border bg-card p-4 text-sm sm:grid-cols-3">
+          <dl
+            className={cn(
+              "mb-4 grid gap-4 rounded-lg border border-border bg-card p-4 text-sm",
+              refunded > 0 ? "sm:grid-cols-4" : "sm:grid-cols-3",
+            )}
+          >
             <div>
               <dt className="text-muted-foreground">Total de la facture</dt>
               <dd className="text-foreground tabular-nums">{formatAmount(data?.total ?? 0)}</dd>
@@ -140,6 +146,14 @@ export function InvoicePaymentsSection({ invoiceId }: { invoiceId: string }) {
               <dt className="text-muted-foreground">Encaissé</dt>
               <dd className="text-foreground tabular-nums">{formatAmount(data?.paid ?? 0)}</dd>
             </div>
+            {/* Shown only when there is some, and shown separately: without it the lines below
+                would add up to more than the figure above them, with nothing to explain it. */}
+            {refunded > 0 && (
+              <div>
+                <dt className="text-muted-foreground">Remboursé</dt>
+                <dd className="text-foreground tabular-nums">{formatAmount(refunded)}</dd>
+              </div>
+            )}
             <div>
               <dt className="text-muted-foreground">Reste à payer</dt>
               <dd

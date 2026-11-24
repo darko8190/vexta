@@ -21,6 +21,7 @@ import {
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
 import { InvoicePaymentsSection } from "@/components/invoices/invoice-payments-section";
+import { InvoiceRefundsSection } from "@/components/invoices/invoice-refunds-section";
 import { PdfViewer } from "@/components/layout/pdf-viewer";
 import { InvoiceSendDialog } from "@/components/invoices/invoice-send-dialog";
 import { useIsClientUser } from "@/hooks/use-can-create";
@@ -290,7 +291,14 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             money that was asked for, and a customer reading their own invoice sees what they
             have paid on it. A draft has nothing to pay yet — the API refuses it and says why,
             so the panel would only offer a button that fails. */}
-        {invoice.status !== "Brouillon" && <InvoicePaymentsSection invoiceId={invoice.id} />}
+        {invoice.status !== "Brouillon" && (
+          <>
+            <InvoicePaymentsSection invoiceId={invoice.id} />
+            {/* Under the payments and not beside them: giving money back is something that
+                happens to a payment, and reading it the other way round makes no sense. */}
+            <InvoiceRefundsSection invoiceId={invoice.id} />
+          </>
+        )}
         </div>
 
         {/* Beside the lines on a wide screen, under them otherwise. Sticky so the document

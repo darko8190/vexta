@@ -201,6 +201,11 @@ public class PersonalDeskController(VextaDbContext db, ICurrentUserService curre
             .Select(g => new { g.Key, Amount = g.Sum(x => x.Amount) })
             .ToDictionaryAsync(x => x.Key, x => x.Amount, ct);
 
+        // Less what was given back, or somebody refunded last month would still be looking at
+        // an invoice that says it is settled.
+        var refunds = await InvoiceSettlement.RefundedByInvoiceAsync(
+            db.InvoiceRefunds.IgnoreQueryFilters().AsNoTracking(), invoiceIds, ct);
+
         var items = rows
             .Select(r =>
             {
@@ -212,7 +217,8 @@ public class PersonalDeskController(VextaDbContext db, ICurrentUserService curre
                     settings.GetValueOrDefault(r.TenantId)?.QstRate ?? 0m,
                     r.IsTaxExempt).Total;
 
-                var paid = payments.GetValueOrDefault(r.Id);
+                var paid = InvoiceSettlement.Net(
+                    payments.GetValueOrDefault(r.Id), refunds.GetValueOrDefault(r.Id));
                 var outstanding = InvoiceTotals.Round(Math.Max(0m, total - paid));
 
                 // The link is offered only when pressing it would work: the company has an

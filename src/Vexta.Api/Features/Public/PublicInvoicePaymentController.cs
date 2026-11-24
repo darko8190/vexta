@@ -199,9 +199,15 @@ public class PublicInvoicePaymentController(
 
         var total = InvoiceTotals.For(invoice.Lines, billing, invoice.IsTaxExempt).Total;
 
-        var paid = await db.InvoicePayments.IgnoreQueryFilters()
+        var taken = await db.InvoicePayments.IgnoreQueryFilters()
             .Where(p => p.InvoiceId == invoice.Id)
             .SumAsync(p => (decimal?)p.Amount, ct) ?? 0m;
+
+        // Refunds come off before the outstanding figure is worked out. This is the screen where
+        // getting it wrong costs the most: an invoice that was paid and then refunded would say
+        // "déjà réglée" to the one person standing in front of it willing to pay it.
+        var paid = InvoiceSettlement.Net(
+            taken, await InvoiceSettlement.RefundedAsync(db.InvoiceRefunds.IgnoreQueryFilters(), invoice.Id, ct));
 
         var outstanding = InvoiceTotals.Round(Math.Max(0m, total - paid));
         var cancelled = invoice.Status == InvoiceStatus.Annulee;

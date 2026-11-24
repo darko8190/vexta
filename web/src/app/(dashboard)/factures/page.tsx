@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { SectionNav, type NavSection } from "@/components/layout/section-nav";
 import { InvoicesSection } from "@/components/invoices/invoices-section";
 import { PaymentsSection } from "@/components/invoices/payments-section";
+import { RefundsSection } from "@/components/invoices/refunds-section";
 import { SectionPlaceholder } from "@/components/projects/detail/section-placeholder";
 import { useIsClientUser } from "@/hooks/use-can-create";
 
@@ -26,7 +27,7 @@ export default function BillingPage() {
   const sections: NavSection[] = [
     { key: "factures", label: "Factures", icon: FileText },
     { key: "paiements", label: "Paiements", icon: Wallet },
-    // Both still to be built. They are in the rail because the rail is the plan — somebody
+    // Crédits is still to be built. It is in the rail because the rail is the plan — somebody
     // reconciling a month can see where a credit note will go instead of inventing a negative
     // invoice for it, which is the one thing that cannot be undone later.
     { key: "credits", label: "Crédits", icon: ReceiptText },
@@ -68,13 +69,7 @@ export default function BillingPage() {
               description="Les notes de crédit : ce qui est retiré d'une facture déjà envoyée, sans la réécrire. En attendant, une correction se fait à la main sur le compte du client."
             />
           )}
-          {section === "remboursements" && (
-            <SectionPlaceholder
-              icon={Undo2}
-              title="Remboursements"
-              description="L'argent rendu à un client. Un remboursement n'est pas un paiement négatif : c'est son propre événement, avec sa propre date, sinon les recettes d'une journée ne s'additionnent plus."
-            />
-          )}
+          {section === "remboursements" && <RefundsSection />}
         </div>
       </div>
     </div>

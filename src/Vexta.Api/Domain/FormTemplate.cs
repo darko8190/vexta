@@ -23,10 +23,8 @@ public enum FormKind
     Client = 2,
 
     /// <summary>
-    /// A request for a price. Vexta has no quote record yet, so the answers land in Réponses and
-    /// the office prices them by hand — which is what a company does with the e-mail it gets
-    /// today, minus the retyping. The kind is here so that work is already labelled when quotes
-    /// arrive.
+    /// A request for a price. The answers land in Réponses, where the office turns one into a
+    /// draft quote for the client who asked, the answers copied onto it as a note.
     /// </summary>
     Soumission = 3
 }
@@ -299,6 +297,10 @@ public class FormSubmission
     /// <summary>The asset this submission filed, when an action did. SetNull if it is deleted.</summary>
     public Guid? CreatedClientAssetId { get; set; }
     public ClientAsset? CreatedClientAsset { get; set; }
+
+    /// <summary>The quote this request was priced in, once the office made one. SetNull if deleted.</summary>
+    public Guid? CreatedQuoteId { get; set; }
+    public Quote? CreatedQuote { get; set; }
 
     /// <summary>
     /// True when it came from a stranger on the company's public page rather than from the crew.

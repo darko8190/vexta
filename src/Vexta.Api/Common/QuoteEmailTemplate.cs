@@ -22,7 +22,7 @@ public static class QuoteEmailTemplate
         ("taxes", "Le total des deux taxes."),
         ("date_emission", "La date de la soumission."),
         ("date_validite", "La date limite pour l'accepter, ou vide si elle n'en a pas."),
-        ("validite", "« Elle est valide jusqu'au … », ou rien si la soumission n'a pas de date limite."),
+        ("validite", "« Elle est valide jusqu’au … », ou rien si la soumission n'a pas de date limite."),
         ("devise", "La devise, par exemple CAD."),
         (AcceptField, "Comment l'accepter : un lien vers le portail si le client y a accès, sinon une invitation à répondre au courriel. Dans le message seulement.")
     ];
@@ -44,6 +44,22 @@ public static class QuoteEmailTemplate
         <p style="color:#666">{{entreprise}}</p>
         """;
 
+    /// <summary>
+    /// The reminder for a quote still waiting on an answer. Built in rather than a second
+    /// template in the settings: it is read and edited in the send form every time, and it
+    /// shares every field with the first message.
+    /// </summary>
+    public const string ReminderSubject = "Rappel : soumission {{numero}} — {{entreprise}}";
+
+    public const string ReminderBody =
+        """
+        <p>Bonjour {{contact}},</p>
+        <p>Nous revenons vers vous au sujet de notre soumission <strong>{{numero}}</strong> au montant de {{total}} {{devise}}, taxes incluses, que vous trouverez de nouveau ci-jointe. {{validite}}</p>
+        {{acceptation}}
+        <p>Avez-vous des questions ou souhaitez-vous qu'on y apporte des changements ? Il nous fera plaisir d'en discuter.</p>
+        <p style="color:#666">{{entreprise}}</p>
+        """;
+
     public static string Render(string template, IReadOnlyDictionary<string, string> values, bool escapeHtml) =>
         InvoiceEmailTemplate.Render(template, Fields, values, escapeHtml, RawHtmlFields);
 
@@ -60,6 +76,10 @@ public static class QuoteEmailTemplate
               $"<a href=\"{System.Net.WebUtility.HtmlEncode(portalUrl)}\">voir la soumission</a>. " +
               "Vous pouvez aussi nous la retourner signée ou répondre à ce courriel.</p>";
 
+    /// <summary>
+    /// The typographic apostrophe on purpose: the body escapes what it fills in, and a straight
+    /// one would arrive in the editable message as &amp;#39;.
+    /// </summary>
     public static string Validity(string? date) =>
-        date is null ? string.Empty : $"Elle est valide jusqu'au {date}.";
+        date is null ? string.Empty : $"Elle est valide jusqu’au {date}.";
 }

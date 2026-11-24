@@ -936,6 +936,10 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.HasOne(s => s.CreatedClientAsset).WithMany()
                 .HasForeignKey(s => s.CreatedClientAssetId).OnDelete(DeleteBehavior.SetNull);
 
+            // SetNull: deleting the quote leaves the request, which can then be priced again.
+            e.HasOne(s => s.CreatedQuote).WithMany()
+                .HasForeignKey(s => s.CreatedQuoteId).OnDelete(DeleteBehavior.SetNull);
+
             e.Property(s => s.SubmittedByName).HasMaxLength(200);
             e.Property(s => s.ActionLog).HasMaxLength(1000);
 

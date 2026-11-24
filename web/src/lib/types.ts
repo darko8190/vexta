@@ -2164,6 +2164,10 @@ export interface FormSubmission {
   actionLog: string | null;
   answerCount: number;
   createdAt: string;
+  formKind: FormKind;
+  /** The quote this request was priced in, once the office made one. */
+  createdQuoteId: string | null;
+  createdQuoteNumber: number | null;
 }
 
 export interface FormSubmissionDetail {

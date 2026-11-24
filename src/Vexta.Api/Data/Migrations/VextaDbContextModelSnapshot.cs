@@ -1643,6 +1643,9 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<Guid?>("CreatedClientId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("CreatedQuoteId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("FormTemplateId")
                         .HasColumnType("uuid");
 
@@ -1664,6 +1667,8 @@ namespace Vexta.Api.Data.Migrations
                     b.HasIndex("CreatedClientAssetId");
 
                     b.HasIndex("CreatedClientId");
+
+                    b.HasIndex("CreatedQuoteId");
 
                     b.HasIndex("FormTemplateId", "CreatedAt");
 
@@ -4987,6 +4992,11 @@ namespace Vexta.Api.Data.Migrations
                         .HasForeignKey("CreatedClientId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("Vexta.Api.Domain.Quote", "CreatedQuote")
+                        .WithMany()
+                        .HasForeignKey("CreatedQuoteId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Vexta.Api.Domain.FormTemplate", "FormTemplate")
                         .WithMany("Submissions")
                         .HasForeignKey("FormTemplateId")
@@ -4996,6 +5006,8 @@ namespace Vexta.Api.Data.Migrations
                     b.Navigation("CreatedClient");
 
                     b.Navigation("CreatedClientAsset");
+
+                    b.Navigation("CreatedQuote");
 
                     b.Navigation("FormTemplate");
                 });

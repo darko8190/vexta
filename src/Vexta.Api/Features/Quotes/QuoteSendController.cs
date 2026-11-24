@@ -49,7 +49,8 @@ public class QuoteSendController(
     /// quote's documents. Writes nothing.
     /// </summary>
     [HttpGet("send-defaults")]
-    public async Task<ActionResult<InvoiceSendDefaultsDto>> SendDefaults(Guid id, CancellationToken ct)
+    public async Task<ActionResult<InvoiceSendDefaultsDto>> SendDefaults(
+        Guid id, [FromQuery] bool relance, CancellationToken ct)
     {
         var quote = await db.Quotes.AsNoTracking()
             .Include(q => q.Client)
@@ -101,10 +102,16 @@ public class QuoteSendController(
                 hasPortal ? $"{FrontendUrl}/soumissions/{quote.Id}" : null)
         };
 
-        var subject = QuoteEmailTemplate.Render(
-            Template(settings?.QuoteEmailSubject) ?? QuoteEmailTemplate.DefaultSubject, values, escapeHtml: false);
-        var body = QuoteEmailTemplate.Render(
-            Template(settings?.QuoteEmailBody) ?? QuoteEmailTemplate.DefaultBody, values, escapeHtml: true);
+        // A reminder (relance) has its own wording; everything else about the message is the same.
+        var subjectTemplate = relance
+            ? QuoteEmailTemplate.ReminderSubject
+            : Template(settings?.QuoteEmailSubject) ?? QuoteEmailTemplate.DefaultSubject;
+        var bodyTemplate = relance
+            ? QuoteEmailTemplate.ReminderBody
+            : Template(settings?.QuoteEmailBody) ?? QuoteEmailTemplate.DefaultBody;
+
+        var subject = QuoteEmailTemplate.Render(subjectTemplate, values, escapeHtml: false);
+        var body = QuoteEmailTemplate.Render(bodyTemplate, values, escapeHtml: true);
 
         return Ok(new InvoiceSendDefaultsDto(
             recipients.FirstOrDefault()?.Email, subject, body, recipients, employees, documents));
@@ -206,6 +213,10 @@ public class QuoteSendController(
 
         quote.SentAt = DateTimeOffset.UtcNow;
         if (quote.Status == QuoteStatus.Brouillon) quote.Status = QuoteStatus.Envoyee;
+        // An expired quote sent again with a new date is out with the client again.
+        if (quote.Status == QuoteStatus.Expiree && quote.ProjectId is null
+            && quote.ValidUntil is { } until && until >= BusinessDay.Today)
+            quote.Status = QuoteStatus.Envoyee;
         quote.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
 

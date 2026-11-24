@@ -43,11 +43,29 @@ public class QuotesController(
             ? db.Quotes.Where(q => q.Status != QuoteStatus.Brouillon)
             : db.Quotes;
 
+    /// <summary>
+    /// Sent quotes whose validity date has passed become Expirée. Done when quotes are read
+    /// rather than on a timer: there is no scheduler in this application, and a status is only
+    /// wrong if somebody can see it, so the moment it is read is the moment it has to be right.
+    /// The tenant filter (and, for a customer, the client filter) bounds the update.
+    /// </summary>
+    private Task ExpireLapsedAsync(CancellationToken ct = default)
+    {
+        var today = BusinessDay.Today;
+        return db.Quotes
+            .Where(q => q.Status == QuoteStatus.Envoyee && q.ProjectId == null
+                && q.ValidUntil != null && q.ValidUntil < today)
+            .ExecuteUpdateAsync(set => set
+                .SetProperty(q => q.Status, QuoteStatus.Expiree)
+                .SetProperty(q => q.UpdatedAt, DateTimeOffset.UtcNow), ct);
+    }
+
     [HttpGet]
     public async Task<ActionResult<PagedResult<QuoteDto>>> List(
         [FromQuery] PagingQuery query, [FromQuery] Guid? clientId, [FromQuery] QuoteStatus? status,
         [FromQuery] Guid? clientAssetId)
     {
+        await ExpireLapsedAsync();
         var quotes = Visible().AsNoTracking();
         if (clientId is not null) quotes = quotes.Where(q => q.ClientId == clientId);
         if (status is not null) quotes = quotes.Where(q => q.Status == status);
@@ -82,6 +100,7 @@ public class QuotesController(
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<QuoteDto>> Get(Guid id)
     {
+        await ExpireLapsedAsync();
         var quote = await GetDtoAsync(id);
         return quote is null ? NotFound() : Ok(quote);
     }
@@ -197,6 +216,142 @@ public class QuotesController(
 
         await db.SaveChangesAsync();
         return Ok(await GetDtoAsync(id));
+    }
+
+    /// <summary>
+    /// A request received through a « Demande de soumission » form, made into a draft quote for
+    /// the client who sent it. The work described becomes the quote's description, and every
+    /// answer is copied onto it as a note, so whoever prices it has the request beside the lines
+    /// without going back to Réponses. One quote per request: the link is what tells the office
+    /// a request has been dealt with.
+    /// </summary>
+    [HttpPost("depuis-reponse/{submissionId:guid}")]
+    [Authorize(Roles = Roles.Managers)]
+    [StaffOnly]
+    [RequireBusinessTenant]
+    public async Task<ActionResult<QuoteDto>> FromSubmission(Guid submissionId, CancellationToken ct)
+    {
+        var submission = await db.FormSubmissions
+            .Include(s => s.FormTemplate)
+            .Include(s => s.CreatedClient)
+            .Include(s => s.CreatedQuote)
+            .FirstOrDefaultAsync(s => s.Id == submissionId, ct);
+        if (submission is null) return NotFound();
+
+        if (submission.FormTemplate!.Kind != FormKind.Soumission)
+            return BadRequest(new { message = "Seule une demande de soumission devient une soumission." });
+        if (submission.CreatedQuote is { } existing)
+            return BadRequest(new { message = $"Cette demande a déjà sa soumission, S-{existing.Number:0000}." });
+        if (submission.CreatedClient is not { } client)
+            return BadRequest(new { message = "Cette demande n'est rattachée à aucun client. Créez la soumission depuis la fiche du client." });
+        if (client.WorkRefusal() is { } refusal) return BadRequest(new { message = refusal });
+
+        var answers = await db.FormAnswers.AsNoTracking()
+            .Where(a => a.SubmissionId == submissionId)
+            .OrderBy(a => a.SortOrder)
+            .Select(a => new { a.Label, a.Type, a.Value, a.MediaAssetId })
+            .ToListAsync(ct);
+
+        // The first long answer is the work described — the base form asks for it first.
+        var work = answers.FirstOrDefault(a => a.Type == FormFieldType.TexteLong && !string.IsNullOrWhiteSpace(a.Value))?.Value?.Trim();
+
+        var note = new System.Text.StringBuilder()
+            .Append($"Demande reçue le {BusinessDay.DateOf(submission.CreatedAt):yyyy-MM-dd} par le formulaire « {submission.FormTemplate.Title} »");
+        if (!string.IsNullOrWhiteSpace(submission.SubmittedByName)) note.Append($", de {submission.SubmittedByName}");
+        note.Append('.');
+        foreach (var answer in answers)
+        {
+            var value = answer.MediaAssetId is not null
+                ? "un fichier, joint à la réponse dans Formulaires › Réponses"
+                : answer.Value?.Trim();
+            if (string.IsNullOrEmpty(value)) continue;
+            note.Append(Environment.NewLine).Append(Environment.NewLine).Append(answer.Label).Append(" : ").Append(value);
+        }
+
+        var tenantId = currentUser.TenantId!.Value;
+        var quote = new Quote
+        {
+            TenantId = tenantId,
+            Number = await NextNumberAsync(tenantId),
+            ClientId = client.Id,
+            IsTaxExempt = client.IsTaxExempt,
+            Status = QuoteStatus.Brouillon,
+            IssuedOn = BusinessDay.Today,
+            Description = work is null ? null : Truncate(work, 4000),
+            Notes =
+            [
+                new QuoteNote { TenantId = tenantId, Body = Truncate(note.ToString(), 4000), CreatedById = currentUser.UserId }
+            ]
+        };
+
+        db.Quotes.Add(quote);
+        submission.CreatedQuoteId = quote.Id;
+        await db.SaveChangesAsync(ct);
+        return CreatedAtAction(nameof(Get), new { id = quote.Id }, await GetDtoAsync(quote.Id));
+    }
+
+    /// <summary>
+    /// A new draft with the same client, words and lines — for pricing again after a refusal or
+    /// an expiry, or for a job like one already quoted. What happened to the original (sent,
+    /// answered, made a project) stays with it; its documents and notes stay too, being about
+    /// that quote. The validity keeps its length, counted from today.
+    /// </summary>
+    [HttpPost("{id:guid}/dupliquer")]
+    [Authorize(Roles = Roles.Managers)]
+    [StaffOnly]
+    [RequireBusinessTenant]
+    public async Task<ActionResult<QuoteDto>> Duplicate(Guid id)
+    {
+        var source = await db.Quotes.AsNoTracking()
+            .Include(q => q.Lines)
+            .Include(q => q.Client)
+            .FirstOrDefaultAsync(q => q.Id == id);
+        if (source is null) return NotFound();
+        if (source.Client!.WorkRefusal() is { } refusal) return BadRequest(new { message = refusal });
+
+        var today = BusinessDay.Today;
+        var validity = source.ValidUntil is { } until
+            ? until.DayNumber - (source.IssuedOn ?? DateOnly.FromDateTime(source.CreatedAt.UtcDateTime)).DayNumber
+            : (int?)null;
+
+        var tenantId = currentUser.TenantId!.Value;
+        var copy = new Quote
+        {
+            TenantId = tenantId,
+            Number = await NextNumberAsync(tenantId),
+            ClientId = source.ClientId,
+            PoNumber = source.PoNumber,
+            Description = source.Description,
+            Status = QuoteStatus.Brouillon,
+            IssuedOn = today,
+            ValidUntil = validity is >= 0 and var days ? today.AddDays(days) : null,
+            IsTaxExempt = source.IsTaxExempt,
+            ClientAssetId = source.ClientAssetId,
+            ClientAddressId = source.ClientAddressId,
+            SameAddressAsClient = source.SameAddressAsClient,
+            SiteAddressId = source.SiteAddressId,
+            CategoryId = source.CategoryId,
+            SubCategoryId = source.SubCategoryId,
+            WageClassificationId = source.WageClassificationId,
+            // Dates of the work are not copied: they belong to the job that was planned.
+            Lines = [.. source.Lines.OrderBy(l => l.SortOrder).Select(l => new QuoteLine
+            {
+                TenantId = tenantId,
+                Kind = l.Kind,
+                ProductId = l.ProductId,
+                Code = l.Code,
+                Description = l.Description,
+                Unit = l.Unit,
+                Quantity = l.Quantity,
+                UnitCost = l.UnitCost,
+                UnitPrice = l.UnitPrice,
+                SortOrder = l.SortOrder
+            })]
+        };
+
+        db.Quotes.Add(copy);
+        await db.SaveChangesAsync();
+        return CreatedAtAction(nameof(Get), new { id = copy.Id }, await GetDtoAsync(copy.Id));
     }
 
     [HttpDelete("{id:guid}")]

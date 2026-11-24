@@ -204,7 +204,10 @@ public class FormSubmissionsController(
             s.CreatedClientAsset == null ? null : s.CreatedClientAsset.Label,
             s.ActionLog,
             s.Answers.Count,
-            s.CreatedAt);
+            s.CreatedAt,
+            s.FormTemplate!.Kind,
+            s.CreatedQuoteId,
+            s.CreatedQuote == null ? null : s.CreatedQuote.Number);
 
     /// <summary>
     /// The name to write on the reply. The employee record first, because that is the name the

@@ -69,11 +69,14 @@ export function InvoiceSendDialog({
   onOpenChange,
   invoice: invoiceRecord,
   quote,
+  reminder = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   invoice?: InvoiceRecord;
   quote?: QuoteRecord;
+  /** A quote still waiting on an answer: the message opens as a reminder. */
+  reminder?: boolean;
 }) {
   const invoice: Sendable = quote
     ? {
@@ -99,7 +102,7 @@ export function InvoiceSendDialog({
         sentMessage: "Facture envoyée",
       };
   const queryClient = useQueryClient();
-  const { data: defaults, isLoading, isError } = useInvoiceSendDefaultsQuery(invoice.id, open, invoice.base);
+  const { data: defaults, isLoading, isError } = useInvoiceSendDefaultsQuery(invoice.id, open, invoice.base, reminder);
   const send = useSendInvoice(invoice.base);
   const upload = useUploadMedia();
   const saveContact = useSaveClientContact(invoice.clientId);
@@ -249,7 +252,9 @@ export function InvoiceSendDialog({
     >
       <DialogContent className="grid max-h-[90vh] grid-rows-[auto_minmax(0,1fr)_auto] sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Envoyer {invoice.noun} {invoice.number}</DialogTitle>
+          <DialogTitle>
+            {reminder ? "Relancer pour" : "Envoyer"} {invoice.noun} {invoice.number}
+          </DialogTitle>
           <DialogDescription>
             {`À ${invoice.clientName}, avec ${invoice.noun} en pièce jointe.`}
           </DialogDescription>

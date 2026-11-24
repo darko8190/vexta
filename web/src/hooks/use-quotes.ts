@@ -91,6 +91,30 @@ export function useConvertQuote() {
   });
 }
 
+/** A new draft with the same client, words and lines. Answers with the new quote. */
+export function useDuplicateQuote() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: (id: string) => api.post<QuoteRecord>(`soumissions/${id}/dupliquer`),
+    onSuccess: () => invalidate(),
+  });
+}
+
+/**
+ * A « Demande de soumission » reply made into a draft quote. The form's replies are refreshed
+ * too, since the reply now points at its quote.
+ */
+export function useQuoteFromSubmission() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (submissionId: string) => api.post<QuoteRecord>(`soumissions/depuis-reponse/${submissionId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["formulaires"] });
+    },
+  });
+}
+
 /**
  * The customer's answer from their portal. Accepting makes the project on the server, so the
  * project lists are refreshed along with the quote.

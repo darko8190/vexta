@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Car, Globe, Inbox, Paperclip, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Car, ClipboardPen, Globe, Inbox, Paperclip, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,11 +17,12 @@ import {
   useFormSubmissionQuery,
   useFormSubmissionsQuery,
 } from "@/hooks/use-forms";
-import { useIsOwner } from "@/hooks/use-can-create";
+import { useCanManage, useIsOwner } from "@/hooks/use-can-create";
+import { useQuoteFromSubmission } from "@/hooks/use-quotes";
 import { useMediaLink } from "@/hooks/use-media";
 import { ApiError } from "@/lib/api";
 import { formatMoment } from "@/lib/dates";
-import type { FormSubmission } from "@/lib/types";
+import { formatQuoteNumber, type FormSubmission } from "@/lib/types";
 
 /**
  * The filled copies, newest first, each one openable.
@@ -29,7 +31,10 @@ import type { FormSubmission } from "@/lib/types";
  * still says what was asked last autumn — even if the form has been rewritten twice since.
  */
 export function FormSubmissionsSection({ formId }: { formId: string }) {
+  const router = useRouter();
   const isOwner = useIsOwner();
+  const canManage = useCanManage();
+  const makeQuote = useQuoteFromSubmission();
   const { data, isLoading, isError, error, refetch } = useFormSubmissionsQuery(formId);
   const remove = useDeleteFormSubmission(formId);
 
@@ -37,6 +42,16 @@ export function FormSubmissionsSection({ formId }: { formId: string }) {
   const [deleteTarget, setDeleteTarget] = useState<FormSubmission | undefined>(undefined);
 
   const submissions = data ?? [];
+
+  async function onMakeQuote(submission: FormSubmission) {
+    try {
+      const quote = await makeQuote.mutateAsync(submission.id);
+      toast.success(`Soumission ${formatQuoteNumber(quote.number)} créée, en brouillon.`);
+      router.push(`/soumissions/${quote.id}`);
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Impossible de créer la soumission.");
+    }
+  }
 
   async function confirmDelete() {
     if (!deleteTarget) return;
@@ -134,6 +149,35 @@ export function FormSubmissionsSection({ formId }: { formId: string }) {
                       <Car className="size-4 shrink-0" aria-hidden="true" />
                       {submission.createdClientAssetLabel}
                     </span>
+                  )}
+                  {/* A request for a price is dealt with once it has its quote: the link says
+                      so, and replaces the button that would make a second one. */}
+                  {submission.createdQuoteId && submission.createdQuoteNumber != null ? (
+                    <Link
+                      href={`/soumissions/${submission.createdQuoteId}`}
+                      className="inline-flex items-center gap-1.5 text-sm text-foreground underline-offset-4 hover:underline"
+                    >
+                      <ClipboardPen className="size-4 shrink-0" aria-hidden="true" />
+                      Soumission {formatQuoteNumber(submission.createdQuoteNumber)}
+                    </Link>
+                  ) : (
+                    submission.formKind === "Soumission" &&
+                    submission.createdClientId &&
+                    canManage && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={makeQuote.isPending}
+                        onClick={() => onMakeQuote(submission)}
+                      >
+                        {makeQuote.isPending && makeQuote.variables === submission.id ? (
+                          <Spinner />
+                        ) : (
+                          <ClipboardPen />
+                        )}
+                        Créer une soumission
+                      </Button>
+                    )
                   )}
                   {isOwner && (
                     <Button

@@ -123,10 +123,17 @@ export function useDeleteInvoice() {
  */
 export type SendBase = "invoices" | "soumissions";
 
-export function useInvoiceSendDefaultsQuery(id: string, enabled: boolean, base: SendBase = "invoices") {
+export function useInvoiceSendDefaultsQuery(
+  id: string,
+  enabled: boolean,
+  base: SendBase = "invoices",
+  /** A quote's reminder: the same form, with the reminder's wording. */
+  reminder = false,
+) {
   return useQuery({
-    queryKey: ["invoice-send-defaults", base, id],
-    queryFn: () => api.get<InvoiceSendDefaults>(`${base}/${id}/send-defaults`),
+    queryKey: ["invoice-send-defaults", base, id, reminder],
+    queryFn: () =>
+      api.get<InvoiceSendDefaults>(`${base}/${id}/send-defaults${reminder ? "?relance=true" : ""}`),
     enabled: enabled && Boolean(id),
     staleTime: Infinity,
     refetchOnWindowFocus: false,

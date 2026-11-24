@@ -6,7 +6,9 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRightLeft,
+  BellRing,
   ClipboardPen,
+  Copy,
   FolderKanban,
   FileText,
   FolderOpen,
@@ -38,7 +40,7 @@ import { SectionNav, type NavSection } from "@/components/layout/section-nav";
 import { InvoiceSendDialog } from "@/components/invoices/invoice-send-dialog";
 import { PdfViewer } from "@/components/layout/pdf-viewer";
 import { ProjectCostTable } from "@/components/projects/detail/project-cost-table";
-import { useIsClientUser } from "@/hooks/use-can-create";
+import { useCanManage, useIsClientUser } from "@/hooks/use-can-create";
 import { usePdfDocument } from "@/hooks/use-pdf-document";
 import { ProjectDocumentsSection } from "@/components/projects/detail/project-documents-section";
 import { ClientQuoteView } from "@/components/quotes/client-quote-view";
@@ -47,9 +49,11 @@ import { QuoteLinesSection } from "@/components/quotes/quote-lines-section";
 import {
   useConvertQuote,
   useDeleteQuote,
+  useDuplicateQuote,
   useQuoteQuery,
   useQuoteSummaryQuery,
 } from "@/hooks/use-quotes";
+import { Spinner } from "@/components/ui/spinner";
 import { ApiError } from "@/lib/api";
 import { formatDateOnly, formatMoment } from "@/lib/dates";
 import { quoteStatusBadgeVariant, quoteStatusLabels } from "@/lib/labels";
@@ -77,10 +81,13 @@ function StaffQuoteDetail({ id }: { id: string }) {
   const { data: summary, isLoading: summaryLoading } = useQuoteSummaryQuery(id);
   const convert = useConvertQuote();
   const remove = useDeleteQuote();
+  const duplicate = useDuplicateQuote();
+  const canManage = useCanManage();
   const [section, setSection] = useState("details");
   const [confirmConvert, setConfirmConvert] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [sending, setSending] = useState(false);
+  const [reminding, setReminding] = useState(false);
 
   if (isLoading) {
     return (
@@ -109,6 +116,23 @@ function StaffQuoteDetail({ id }: { id: string }) {
 
   const locked = Boolean(quote.projectId);
   const canConvert = !locked && quote.status !== "Refusee" && quote.status !== "Expiree";
+  // Out with the client and not answered yet: the next message is a reminder, not a copy.
+  const awaiting = quote.status === "Envoyee" && !locked && Boolean(quote.sentAt);
+
+  function openSend(reminder: boolean) {
+    setReminding(reminder);
+    setSending(true);
+  }
+
+  async function onDuplicate() {
+    try {
+      const copy = await duplicate.mutateAsync(id);
+      toast.success(`Soumission ${formatQuoteNumber(copy.number)} créée, en brouillon.`);
+      router.push(`/soumissions/${copy.id}`);
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Impossible de dupliquer la soumission.");
+    }
+  }
 
   const sections: NavSection[] = [
     { key: "details", label: "Détails", icon: Info },
@@ -192,10 +216,23 @@ function StaffQuoteDetail({ id }: { id: string }) {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setSending(true)}>
-              <Send />
-              {quote.sentAt ? "Renvoyer" : "Envoyer"}
-            </Button>
+            {awaiting ? (
+              <Button variant="outline" size="sm" onClick={() => openSend(true)}>
+                <BellRing />
+                Relancer
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" onClick={() => openSend(false)}>
+                <Send />
+                {quote.sentAt ? "Renvoyer" : "Envoyer"}
+              </Button>
+            )}
+            {canManage && (
+              <Button variant="outline" size="sm" disabled={duplicate.isPending} onClick={onDuplicate}>
+                {duplicate.isPending ? <Spinner /> : <Copy />}
+                Dupliquer
+              </Button>
+            )}
             {quote.projectId && quote.projectNumber != null ? (
               <Link href={`/projets/${quote.projectId}`} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
                 <FolderKanban />
@@ -297,7 +334,15 @@ function StaffQuoteDetail({ id }: { id: string }) {
 
       {/* Not a deletion, but the same shape of question: one deliberate press for a step that
           creates a project and freezes the quote. */}
-      <InvoiceSendDialog open={sending} onOpenChange={setSending} quote={quote} />
+      <InvoiceSendDialog
+        // Remounted when the kind of message changes, so a reminder never opens over a draft
+        // of the first message.
+        key={reminding ? "relance" : "envoi"}
+        open={sending}
+        onOpenChange={setSending}
+        quote={quote}
+        reminder={reminding}
+      />
 
       <ConvertDialog open={confirmConvert} onOpenChange={setConfirmConvert} onConfirm={onConvert} pending={convert.isPending} />
     </div>

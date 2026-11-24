@@ -122,7 +122,11 @@ public record FormSubmissionDto(
     /// <summary>What the actions did, failures included. Null when the form sets nothing off.</summary>
     string? ActionLog,
     int AnswerCount,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    /// <summary>The form's kind, so a request for a price can offer « Créer une soumission ».</summary>
+    FormKind FormKind,
+    Guid? CreatedQuoteId,
+    int? CreatedQuoteNumber);
 
 public record FormSubmissionDetailDto(FormSubmissionDto Submission, IReadOnlyList<FormAnswerDto> Answers);
 

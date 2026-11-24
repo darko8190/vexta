@@ -38,6 +38,7 @@ import {
   useJobPostingsQuery,
   useSaveJobPosting,
 } from "@/hooks/use-job-postings";
+import { JobDocumentsField, JobFormPicker } from "@/components/hr/job-posting-attachments";
 import { ApiError } from "@/lib/api";
 import { formatDateOnly } from "@/lib/dates";
 import {
@@ -71,6 +72,8 @@ const formSchema = z
     status: z.enum(["Brouillon", "Publiee", "Pourvue", "Fermee"]),
     postedOn: z.string(),
     closesOn: z.string(),
+    // Null means "no form", which is what every posting did before forms existed.
+    formTemplateId: z.string().nullable(),
   })
   .refine((values) => !values.postedOn || !values.closesOn || values.closesOn >= values.postedOn, {
     message: "La fermeture ne peut pas précéder l'affichage.",
@@ -94,6 +97,7 @@ function toFormValues(job?: JobPosting): FormValues {
     status: job?.status ?? "Publiee",
     postedOn: job?.postedOn ?? "",
     closesOn: job?.closesOn ?? "",
+    formTemplateId: job?.formTemplateId ?? null,
   };
 }
 
@@ -142,6 +146,7 @@ function JobFormSheet({
           status: values.status,
           postedOn: values.postedOn || null,
           closesOn: values.closesOn || null,
+          formTemplateId: values.formTemplateId,
         },
       });
       toast.success(isEditing ? "Offre mise à jour." : "Offre ajoutée.");
@@ -392,6 +397,18 @@ function JobFormSheet({
                 </Field>
               )}
             />
+
+            <Controller
+              name="formTemplateId"
+              control={form.control}
+              render={({ field }) => (
+                <JobFormPicker value={field.value} onChange={field.onChange} />
+              )}
+            />
+
+            {/* Only once the posting exists: a file needs a row to hang on, and these save
+                themselves rather than waiting for the button below. */}
+            {job && <JobDocumentsField job={job} />}
           </FieldGroup>
         </form>
 

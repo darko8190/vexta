@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import * as z from "zod";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,9 @@ import {
 } from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
 import { ClientSelect } from "@/components/clients/client-select";
+import { CountrySelect, SubdivisionField } from "@/components/addresses/country-field";
 import { useCreateAddress, useUpdateAddress, type AddressFormValues } from "@/hooks/use-addresses";
+import { defaultCountryName, isKnownSubdivision, subdivisionLabel } from "@/lib/geo";
 import { addressTypeLabels } from "@/lib/labels";
 import type { AddressRecord, AddressType } from "@/lib/types";
 
@@ -52,7 +54,7 @@ function toFormValues(address?: AddressRecord, defaultClientId?: string): FormVa
     city: address?.city ?? "",
     province: address?.province ?? "",
     postalCode: address?.postalCode ?? "",
-    country: address?.country ?? "Canada",
+    country: address?.country ?? defaultCountryName,
   };
 }
 
@@ -82,6 +84,10 @@ export function AddressFormSheet({
   useEffect(() => {
     if (open) form.reset(toFormValues(address, defaultClientId));
   }, [open, address, defaultClientId, form]);
+
+  // Watched rather than read on render: the province field below is a list for some countries
+  // and a text box for the others, and it has to change the moment the country does.
+  const country = useWatch({ control: form.control, name: "country" });
 
   async function onSubmit(values: FormValues) {
     const payload: AddressFormValues = {
@@ -207,19 +213,6 @@ export function AddressFormSheet({
                 )}
               />
               <Controller
-                name="province"
-                control={form.control}
-                render={({ field }) => (
-                  <Field>
-                    <FieldLabel htmlFor="address-province">Province</FieldLabel>
-                    <Input {...field} id="address-province" />
-                  </Field>
-                )}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <Controller
                 name="postalCode"
                 control={form.control}
                 render={({ field, fieldState }) => (
@@ -233,21 +226,50 @@ export function AddressFormSheet({
                   </Field>
                 )}
               />
-              <Controller
-                name="country"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="address-country">
+            </div>
+
+            <Controller
+              name="country"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor="address-country">
                     Pays
                     <RequiredMark />
                   </FieldLabel>
-                    <Input {...field} id="address-country" aria-invalid={fieldState.invalid} />
-                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                  </Field>
-                )}
-              />
-            </div>
+                  <CountrySelect
+                    id="address-country"
+                    value={field.value}
+                    onChange={(next) => {
+                      field.onChange(next);
+                      // The province list belongs to the country. Leaving "Québec" under France
+                      // would print an address that reads as a mistake on every document.
+                      if (!isKnownSubdivision(next, form.getValues("province"))) {
+                        form.setValue("province", "");
+                      }
+                    }}
+                    invalid={fieldState.invalid}
+                  />
+                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              )}
+            />
+
+            <Controller
+              name="province"
+              control={form.control}
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel htmlFor="address-province">{subdivisionLabel(country)}</FieldLabel>
+                  <SubdivisionField
+                    id="address-province"
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    countryName={country}
+                  />
+                </Field>
+              )}
+            />
 
             <Controller
               name="isPrimary"

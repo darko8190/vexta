@@ -1388,6 +1388,208 @@ la main à la variable d'environnement, puis à l'image livrée avec le front.
 L'image apparaît partout dans la minute : la route la sert avec un `ETag` et un cache court, donc
 une image inchangée ne coûte rien et une nouvelle s'impose tout de suite.
 
+### Pays et provinces sur les adresses
+
+Chaque champ d'adresse offre maintenant la liste des pays, et sous elle la liste des provinces ou
+des états quand le pays en a une. Ailleurs, la ligne reste une boîte de texte : une liste à
+laquelle manque la région de celui qui écrit refuse la seule réponse exacte, alors qu'une boîte
+l'accepte.
+
+La liste des 250 pays est **générée une fois et versionnée** (`web/src/lib/geo.ts`), pas lue dans
+le navigateur à l'exécution. La réponse d'un navigateur dépend de sa version d'ICU — « États-Unis »
+sur une machine, « États-Unis d'Amérique » sur une autre — et ces chaînes sont **enregistrées**,
+pas seulement affichées : un libellé qui dérive, c'est deux orthographes du même pays en base, et
+une adresse qui ne se reconnaît plus elle-même. C'est aussi pourquoi la valeur stockée reste le nom
+français, qui est ce que la colonne contenait déjà : un code se serait mieux lu mais aurait demandé
+de réécrire chaque adresse existante et chaque document qui en imprime une, pour ne rien gagner de
+visible.
+
+Changer le pays efface la province si le nouveau pays ne l'a pas : « Québec » sous la France
+imprimerait une adresse qui se lit comme une erreur. Une valeur saisie avant l'existence de la
+liste est réoffertes telle quelle plutôt que perdue — un sélecteur qui vide un champ rempli est
+pire qu'une boîte de texte.
+
+Le fournisseur avait une adresse sans pays ; la colonne est ajoutée et **nullable**, parce que les
+fiches existantes n'en ont pas et qu'on ne va pas obliger le bureau à en remplir une avant de
+pouvoir corriger un numéro de téléphone.
+
+### Adresse et numéro d'entreprise à l'inscription
+
+Une entreprise qui s'inscrit doit donner son adresse. Une entreprise facture, et une facture sans
+l'adresse de son émetteur n'est pas un document utilisable — demandée à l'inscription plutôt que
+laissée à un écran de réglages que personne n'ouvre avant que la première facture soit déjà partie
+sans elle. Un espace personnel ne facture personne et ne se fait rien demander.
+
+L'adresse devient le **premier emplacement** de l'entreprise, marqué principal, et non des colonnes
+sur le locataire : le modèle a déjà un endroit pour « un lieu qu'occupe l'entreprise », et un
+deuxième voudrait dire deux réponses à ce qui va en haut d'une facture.
+
+Le **numéro d'entreprise** (le NEQ au Québec) est demandé mais jamais obligatoire : une entreprise
+s'enregistre avant de le recevoir, et un travailleur autonome sous son propre nom n'en a jamais.
+Il est modifiable ensuite dans la fiche de l'entreprise — sinon un numéro laissé vide à
+l'inscription serait inaccessible à vie.
+
+La validation est faite **avant** que le compte soit créé. Un locataire et un utilisateur créés
+puis abandonnés faute d'adresse garderaient le courriel en otage, et la deuxième tentative se
+ferait répondre que le compte existe déjà.
+
+Les deux chemins d'inscription — le formulaire par courriel et celui qui termine une inscription
+Google ou Microsoft — partagent les champs et la règle (`web/src/lib/company-signup.ts`). Écrites
+deux fois, elles divergent, et ça se voit sous la forme d'une inscription refusée avec un message
+mais aucun champ marqué : la pire erreur de formulaire possible, parce qu'il n'y a rien à corriger.
+
+### Style visuel de la page publique
+
+Quatre arrangements : **Classique**, **Chantier** (bandeau foncé, titres en majuscules),
+**Épuré** (étroit, sans cadres) et **Vitrine** (produits en premier et plus grands). Ce n'est pas
+un éditeur de thème : aucun des quatre ne choisit de couleur. Tous peignent avec la couleur de
+l'entreprise et gardent les contrastes de l'application, donc **aucun choix fait ici ne peut
+produire une page illisible** — et c'est le nom de l'entreprise qui est dessus.
+
+Un seul tableau de classes (`web/src/lib/public-page-style.ts`) plutôt que quatre copies de la
+page : les quatre looks diffèrent sur une huitaine de décisions, et quatre mises en page
+complètes voudraient dire qu'une correction à la section des produits doit être faite quatre fois
+— c'est comme ça que trois d'entre elles prennent du retard en silence.
+
+Les pages existantes arrivent en Classique (`defaultValue: 0`), donc rien ne change d'apparence au
+déploiement.
+
+### Formulaire et documents sur une offre d'emploi
+
+Une offre peut se faire **attribuer un formulaire** que l'entreprise a déjà construit, et la page
+publique affiche alors un bouton **Postuler**. Une référence vers un formulaire existant plutôt que
+des questions sur l'offre : une entreprise qui embauche deux charpentiers et un chauffeur pose les
+mêmes questions chaque fois, et un formulaire par offre serait les mêmes questions retapées puis
+corrigées dans un seul des trois endroits.
+
+Seuls les formulaires **publiés** sont offerts, et une offre dont le formulaire est redevenu
+brouillon n'affiche pas de bouton : elle redit où écrire, comme avant qu'un formulaire existe. La
+fiche prévient quand c'est le cas.
+
+Une candidature crée **la soumission et une fiche candidat**, reliée à l'offre — ce qui alimente le
+compteur de candidatures déjà affiché sur la ligne. La fiche est bâtie à partir des réponses dont
+la question est **pointée** vers un nom, un courriel ou un téléphone, exactement comme un
+formulaire sait déjà créer un client. L'entreprise pose donc ses questions dans ses propres mots et
+dit ce qu'est la réponse ; rien ici ne devine laquelle était le nom. Un formulaire qui ne demande
+pas de nom se fait refuser avec une phrase qui le dit, parce qu'une fiche candidat sans nom est une
+ligne sur laquelle personne ne peut agir.
+
+Le chemin d'écriture anonyme est le seul endroit de Vexta où un inconnu écrit, et il est tenu par
+quatre règles :
+
+- La page doit être publiée, la section emplois affichée, l'offre publiée et son formulaire publié.
+  Chaque échec répond **404**, identique : on ne peut pas distinguer une entreprise qui n'existe pas
+  d'une page retirée ou d'un formulaire en brouillon. Une page mise hors ligne retire ses offres
+  avec elle, donc un lien enregistré ne continue pas de déposer des candidatures.
+- Les réponses sont validées par **les mêmes règles** que le bureau
+  (`src/Vexta.Api/Features/Forms/FormAnswerRules.cs`, partagé). Deux copies voudraient dire un
+  formulaire qui accepte de la rue ce qu'il refuse au bureau.
+- On parcourt **les questions**, pas ce qui arrive : une réponse envoyée pour un champ absent du
+  formulaire est ignorée, pas stockée, et un champ obligatoire omis du corps reste un champ vide.
+- Le journal des actions n'est **pas** renvoyé. Qu'un courriel soit parti ou non est l'affaire de
+  l'entreprise, et un inconnu à qui on dit « courriel non envoyé » apprend une mauvaise
+  configuration sur laquelle il ne peut rien.
+
+Une offre peut aussi porter **jusqu'à douze documents ou images** — la description de poste en PDF,
+une photo du chantier. Le téléversement passe par les routes média comme tout autre fichier, donc
+les limites de taille, le quota et la compression se décident à un seul endroit. Les liens publics
+sont signés à chaque chargement de page : le seau n'est jamais public. Retirer un document le
+décroche de l'offre sans supprimer le fichier de la bibliothèque — il peut être sur une autre
+offre, et supprimer des octets est une décision de la bibliothèque.
+
+**Ce qui n'est pas fait :** un candidat ne peut pas **téléverser** de fichier (un CV) depuis la page
+publique. Le constructeur de formulaires n'a pas de type « fichier », et en ajouter un ouvrirait
+le téléversement anonyme vers le seau partagé — une décision de sécurité à prendre exprès, pas en
+passant. Le champ « Pour postuler » continue de dire où envoyer un CV.
+
+---
+
+### Fournisseurs : chercher, rapprocher, inviter
+
+**Ajouter un fournisseur commence par une recherche.** Le champ « Déjà sur Vexta ? » cherche parmi
+les entreprises de la plateforme et remplit la fiche. Deux limites volontaires :
+
+- Seules les entreprises **qui ont publié leur page publique** apparaissent. Leur nom et leur
+  adresse sont déjà lisibles par n'importe qui à `/e/{slug}` : les offrir ici ne divulgue rien de
+  neuf, alors que lister toutes les entreprises de Vexta donnerait à chacune l'annuaire des
+  autres.
+- C'est une **recherche, jamais un parcours** : deux caractères minimum, dix résultats, rien pour
+  une requête vide. On peut confirmer une entreprise qu'on a déjà en tête ; on ne peut pas
+  dérouler la liste.
+
+La recherche ignore les accents : « beton » trouve « Béton ». Elle filtre en mémoire sur
+l'ensemble borné des entreprises à page publiée, parce qu'aucune extension Postgres ne peut être
+supposée présente pour le faire en SQL ; le commentaire dans le code dit quoi faire si cet
+ensemble cesse d'être petit (un nom normalisé stocké, avec un index).
+
+**L'adresse du fournisseur est obligatoire**, parce que c'est elle qui le reconnaîtra le jour où
+il s'inscrira. Un fournisseur sans adresse ne pourra jamais être rapproché. Une fiche qui n'en
+avait pas déjà reste modifiable sans en ajouter une — on ne va pas arrêter quelqu'un qui corrige
+un numéro de téléphone pour lui faire chercher un code postal.
+
+**Le rapprochement à l'inscription.** Quand une entreprise s'inscrit, on cherche dans les listes
+de fournisseurs de tous les autres locataires celles qui lui correspondent. La règle tient en deux
+tests, et les deux doivent passer :
+
+1. **L'adresse** : code postal + numéro et nom de rue, normalisés (minuscules, accents retirés,
+   ponctuation retirée). La ville et la province sont volontairement exclues de la clé — ce sont
+   les parties que les gens écrivent de travers, alors qu'un code postal et un numéro civique sont
+   déjà précis à un côté de rue près. Une adresse incomplète ne donne pas de clé et ne correspond
+   donc jamais : la moitié d'une adresse ne suffit pas à affirmer que deux entreprises sont la
+   même.
+2. **Le nom**, comparé **mot par mot**. Chaque mot du nom le plus court doit se retrouver dans
+   l'autre, un mot de quatre lettres ou plus correspondant aussi à un mot plus long qui commence
+   pareil — c'est ce qui fait que « beton » retrouve « betons ». Et au moins un des mots qui
+   correspondent doit réellement identifier l'entreprise : deux Construction quelque chose à la
+   même adresse ne sont pas la même entreprise.
+
+Une paire qui partage l'adresse mais échoue sur le nom est **laissée tranquille**. Deux entreprises
+à une même adresse, c'est ordinaire — un centre commercial, un parc industriel, un propriétaire et
+son locataire — et une adresse n'est pas une identité. Rien n'est perdu à refuser : l'entreprise
+reste trouvable par son nom dans l'annuaire.
+
+La comparaison était d'abord écrite sur les chaînes entières. Le pluriel de « Les **Bétons** Lévis
+inc. » contre « Beton Levis » suffisait à la casser, et c'est le test de bout en bout qui l'a
+montré — pas la relecture.
+
+**Ce qui traverse, et ce qui ne traverse pas.** L'entreprise qui arrive reçoit **ses clients** :
+une fiche client par entreprise qui l'avait inscrite comme fournisseur, avec le nom, l'adresse et
+les coordonnées que cette entreprise publie, et une note sur la fiche qui explique d'où elle
+vient. Rien d'autre. Pas le numéro de compte, pas les notes de son client sur elle, pas une
+commande, pas une réception. Une entreprise qui note un fournisseur a divulgué qui elle est pour
+être livrée et facturée ; elle n'a pas accepté de montrer ses dossiers.
+
+Dans l'autre sens, sur la fiche du fournisseur chez son client, seuls le lien et les champs
+**vides** sont remplis (courriel, téléphone, ville). Le **nom est laissé tel que son client l'a
+tapé** : « la cour à bois » est son étiquette à lui, et la réécrire ressemblerait à l'application
+qui change ses données dans son dos. Le numéro de compte et les notes sont la relation, pas
+l'entreprise, et ne sont jamais touchés.
+
+Le rapprochement tourne **après** que le compte est créé et enregistré, et avale ses propres
+erreurs. Personne ne doit se faire refuser un compte parce que la plateforme n'a pas réussi à
+deviner qui sont ses clients.
+
+**Inviter un fournisseur.** Un courriel qui dit que Vexta existe, envoyé **au nom de l'entreprise**
+qui le demande — le fournisseur connaît son client et n'a jamais entendu parler de nous. Ce n'est
+pas un accès : il n'y a rien à quoi se connecter dans l'espace de son client, et un message
+construit comme une invitation à un compte promettrait un accès qui n'existe pas. Une par jour au
+maximum, rien pour un fournisseur déjà sur Vexta, rien sans courriel sur la fiche. Si Mailgun n'est
+pas configuré, l'écran le dit et **aucune date n'est inscrite** : une date écrite laisserait
+quelqu'un attendre un courriel qui n'allait jamais partir.
+
+### Le slug avalait les lettres accentuées
+
+Corrigé en passant, parce que le test l'a mis sous le nez : « Les Bétons Lévis inc. » donnait
+`les-b-tons-l-vis-inc`. La génération mettait le nom en minuscules puis supprimait tout ce qui
+n'était pas `[a-z0-9]` — ce qui efface chaque lettre accentuée au lieu de la translittérer. C'est
+l'adresse web publique de l'entreprise, avec des trous dedans. Elle donne maintenant
+`les-betons-levis-inc`.
+
+**Les slugs existants ne sont pas recalculés** : ils sont dans des liens que des gens ont déjà
+enregistrés, et ça vaut plus que leur orthographe.
+
+---
+
 ---
 
 ## 7. Compression des fichiers R2

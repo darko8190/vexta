@@ -22,27 +22,13 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
+import { CountrySelect, SubdivisionField } from "@/components/addresses/country-field";
 import { useCreateClient, useUpdateClient } from "@/hooks/use-clients";
+import { defaultCountryName, isKnownSubdivision, subdivisionLabel } from "@/lib/geo";
 import { ApiError } from "@/lib/api";
 import { clientStatusLabels } from "@/lib/labels";
 import { formatClientNumber, type ClientRecord, type ClientStatus } from "@/lib/types";
 import { ex } from "@/lib/placeholders";
-
-const PROVINCES = [
-  "Québec",
-  "Ontario",
-  "Nouveau-Brunswick",
-  "Nouvelle-Écosse",
-  "Île-du-Prince-Édouard",
-  "Terre-Neuve-et-Labrador",
-  "Manitoba",
-  "Saskatchewan",
-  "Alberta",
-  "Colombie-Britannique",
-  "Yukon",
-  "Territoires du Nord-Ouest",
-  "Nunavut",
-];
 
 const formSchema = z
   .object({
@@ -101,7 +87,7 @@ function toFormValues(client?: ClientRecord): FormValues {
     city: client?.primaryAddress?.city ?? "",
     postalCode: client?.primaryAddress?.postalCode ?? "",
     province: client?.primaryAddress?.province ?? "Québec",
-    country: client?.primaryAddress?.country ?? "Canada",
+    country: client?.primaryAddress?.country ?? defaultCountryName,
     isTaxExempt: client?.isTaxExempt ?? false,
     // Client, not Prospect: most records are typed in because work is about to start, and a
     // default that has to be corrected on nine files out of ten is the wrong default.
@@ -136,6 +122,8 @@ export function ClientFormSheet({
   }, [open, client, form]);
 
   const type = useWatch({ control: form.control, name: "type" });
+  // The province field below is a list for some countries and a text box for the others.
+  const country = useWatch({ control: form.control, name: "country" });
 
   async function onSubmit(values: FormValues) {
     const payload = {
@@ -154,7 +142,7 @@ export function ClientFormSheet({
             city: values.city,
             province: values.province || null,
             postalCode: values.postalCode,
-            country: values.country || "Canada",
+            country: values.country || defaultCountryName,
           }
         : null,
     };
@@ -384,36 +372,42 @@ export function ClientFormSheet({
                 )}
               />
               <Controller
-                name="province"
+                name="country"
                 control={form.control}
-                render={({ field }) => (
-                  <Field>
-                    <FieldLabel htmlFor="client-province">Province</FieldLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger id="client-province" className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PROVINCES.map((province) => (
-                          <SelectItem key={province} value={province}>
-                            {province}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="client-country">Pays</FieldLabel>
+                    <CountrySelect
+                      id="client-country"
+                      value={field.value}
+                      onChange={(next) => {
+                        field.onChange(next);
+                        // The province list belongs to the country, so a province the new one
+                        // does not have cannot be allowed to stay behind on the record.
+                        if (!isKnownSubdivision(next, form.getValues("province"))) {
+                          form.setValue("province", "");
+                        }
+                      }}
+                      invalid={fieldState.invalid}
+                    />
+                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}
               />
             </div>
 
             <Controller
-              name="country"
+              name="province"
               control={form.control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="client-country">Pays</FieldLabel>
-                  <Input {...field} id="client-country" placeholder={ex("Canada")} aria-invalid={fieldState.invalid} />
-                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel htmlFor="client-province">{subdivisionLabel(country)}</FieldLabel>
+                  <SubdivisionField
+                    id="client-province"
+                    value={field.value}
+                    onChange={field.onChange}
+                    countryName={country}
+                  />
                 </Field>
               )}
             />

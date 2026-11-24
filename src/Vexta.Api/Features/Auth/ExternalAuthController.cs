@@ -188,7 +188,8 @@ public class ExternalAuthController(
             pending.LastName,
             pending.Email,
             password: null,
-            externalLogin: new UserLoginInfo(pending.Provider, pending.ProviderKey, pending.ProviderDisplayName));
+            externalLogin: new UserLoginInfo(pending.Provider, pending.ProviderKey, pending.ProviderDisplayName),
+            profile: request.Profile);
 
         if (!result.Succeeded) return BadRequest(new { message = result.Error });
 

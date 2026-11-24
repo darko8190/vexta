@@ -28,6 +28,30 @@ export function useSaveJobPosting() {
   });
 }
 
+/**
+ * Hangs a file already in the library on a posting.
+ *
+ * The posting comes back whole rather than just the document: the row shows how many files are
+ * attached, and a response carrying only the new one would leave the screen counting.
+ */
+export function useAddJobPostingDocument() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, mediaAssetId, label }: { id: string; mediaAssetId: string; label?: string | null }) =>
+      api.post<JobPosting>(`offres-emplois/${id}/documents`, { mediaAssetId, label: label ?? null }),
+    onSuccess: () => invalidate(queryClient),
+  });
+}
+
+export function useRemoveJobPostingDocument() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, documentId }: { id: string; documentId: string }) =>
+      api.delete<JobPosting>(`offres-emplois/${id}/documents/${documentId}`),
+    onSuccess: () => invalidate(queryClient),
+  });
+}
+
 export function useDeleteJobPosting() {
   const queryClient = useQueryClient();
   return useMutation({

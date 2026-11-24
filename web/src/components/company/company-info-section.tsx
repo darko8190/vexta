@@ -31,6 +31,7 @@ const formSchema = z.object({
     .max(256)
     .refine((v) => v === "" || z.string().email().safeParse(v).success, "Courriel invalide."),
   phone: z.string().trim().max(40, "40 caractères maximum."),
+  businessNumber: z.string().trim().max(40, "40 caractères maximum."),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -41,6 +42,7 @@ function toFormValues(profile?: CompanyProfile): FormValues {
     description: profile?.description ?? "",
     contactEmail: profile?.contactEmail ?? "",
     phone: profile?.phone ?? "",
+    businessNumber: profile?.businessNumber ?? "",
   };
 }
 
@@ -197,6 +199,7 @@ export function CompanyInfoSection({ profile, canEdit }: { profile: CompanyProfi
         description: values.description || null,
         contactEmail: values.contactEmail || null,
         phone: values.phone || null,
+        businessNumber: values.businessNumber || null,
         // Carried through unchanged: this form is the identity card, and the colour has its own.
         brandColor: profile.brandColor ?? null,
       });
@@ -294,6 +297,27 @@ export function CompanyInfoSection({ profile, canEdit }: { profile: CompanyProfi
                   )}
                 />
               </div>
+
+              <Controller
+                name="businessNumber"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="company-neq">Numéro d&apos;entreprise</FieldLabel>
+                    <Input
+                      {...field}
+                      id="company-neq"
+                      disabled={!canEdit}
+                      placeholder={ex("1234567890")}
+                      aria-invalid={fieldState.invalid}
+                    />
+                    <FieldDescription>
+                      Le NEQ au Québec. Vide si l&apos;entreprise n&apos;en a pas.
+                    </FieldDescription>
+                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  </Field>
+                )}
+              />
             </FieldGroup>
           </CardContent>
 

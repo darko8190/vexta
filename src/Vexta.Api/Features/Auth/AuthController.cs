@@ -56,7 +56,8 @@ public class AuthController(
             request.LastName,
             request.Email,
             request.Password,
-            externalLogin: null);
+            externalLogin: null,
+            profile: request.Profile);
 
         if (!result.Succeeded) return BadRequest(new { message = result.Error });
 

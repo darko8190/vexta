@@ -12,6 +12,7 @@ import type {
   SavePurchaseOrderValues,
   SaveSupplierValues,
   Supplier,
+  SupplierDirectoryEntry,
 } from "@/lib/types";
 
 /**
@@ -47,6 +48,29 @@ export function useSaveSupplier() {
   return useMutation({
     mutationFn: ({ id, values }: { id: string | null; values: SaveSupplierValues }) =>
       id ? api.put<Supplier>(`fournisseurs/${id}`, values) : api.post<Supplier>("fournisseurs", values),
+    onSuccess: refresh,
+  });
+}
+
+/**
+ * Companies on Vexta whose name matches what is being typed.
+ *
+ * Disabled under two characters, which is also what the server enforces: this is a lookup to
+ * confirm a company somebody already has in mind, not a directory to browse.
+ */
+export function useSupplierDirectoryQuery(query: string) {
+  const term = query.trim();
+  return useQuery({
+    queryKey: [...KEY, "annuaire", term],
+    queryFn: () => api.get<SupplierDirectoryEntry[]>(`fournisseurs/annuaire?q=${encodeURIComponent(term)}`),
+    enabled: term.length >= 2,
+  });
+}
+
+export function useInviteSupplier() {
+  const refresh = useRefresh();
+  return useMutation({
+    mutationFn: (id: string) => api.post<Supplier>(`fournisseurs/${id}/invitation`),
     onSuccess: refresh,
   });
 }

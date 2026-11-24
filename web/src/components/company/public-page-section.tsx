@@ -19,6 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ToggleSwitch } from "@/components/company/toggle-switch";
 import { usePublicPageQuery, useSavePublicPage } from "@/hooks/use-public-page";
 import { ApiError } from "@/lib/api";
+import { publicPageStyleOptions } from "@/lib/public-page-style";
 import { cn } from "@/lib/utils";
 import type { PublicPageSettings } from "@/lib/types";
 import { ex } from "@/lib/placeholders";
@@ -29,6 +30,7 @@ const formSchema = z.object({
   contactNote: z.string().trim().max(1000, "1000 caractères maximum."),
   showProducts: z.boolean(),
   showJobs: z.boolean(),
+  style: z.enum(["Classique", "Chantier", "Epure", "Vitrine"]),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -40,6 +42,7 @@ function toFormValues(settings?: PublicPageSettings): FormValues {
     contactNote: settings?.contactNote ?? "",
     showProducts: settings?.showProducts ?? true,
     showJobs: settings?.showJobs ?? true,
+    style: settings?.style ?? "Classique",
   };
 }
 
@@ -63,6 +66,9 @@ function PublishCard({ settings }: { settings: PublicPageSettings }) {
         contactNote: settings.contactNote,
         showProducts: settings.showProducts,
         showJobs: settings.showJobs,
+        // Carried through unchanged: this switch publishes the page, and leaving the style out
+        // would reset the company's choice every time it went online.
+        style: settings.style,
       });
       toast.success(isPublished ? "Votre page est en ligne." : "Votre page est hors ligne.");
     } catch (error) {
@@ -158,6 +164,7 @@ function ContentCard({ settings }: { settings: PublicPageSettings }) {
         contactNote: values.contactNote || null,
         showProducts: values.showProducts,
         showJobs: values.showJobs,
+        style: values.style,
       });
       toast.success("Page publique mise à jour.");
     } catch (error) {
@@ -274,6 +281,38 @@ function ContentCard({ settings }: { settings: PublicPageSettings }) {
                 Une section décochée est masquée sans être vidée.
               </FieldDescription>
             </div>
+
+            <Controller
+              name="style"
+              control={form.control}
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel>Style visuel</FieldLabel>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {publicPageStyleOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => field.onChange(option.value)}
+                        aria-pressed={field.value === option.value}
+                        className={cn(
+                          "rounded-lg border p-3 text-left transition-colors",
+                          field.value === option.value
+                            ? "border-primary bg-primary/5"
+                            : "border-border hover:bg-accent",
+                        )}
+                      >
+                        <span className="block text-sm font-medium text-foreground">{option.label}</span>
+                        <span className="mt-0.5 block text-xs text-muted-foreground">{option.hint}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <FieldDescription>
+                    Les quatre utilisent votre couleur et votre logo. Seule la mise en page change.
+                  </FieldDescription>
+                </Field>
+              )}
+            />
           </FieldGroup>
         </CardContent>
 

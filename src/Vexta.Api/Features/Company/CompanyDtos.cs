@@ -18,6 +18,8 @@ public record CompanyProfileDto(
     string? LogoETag,
     /// <summary>The company's chosen colour as #RRGGBB, or null for Vexta's blue.</summary>
     string? BrandColor,
+    /// <summary>The NEQ or equivalent. Asked at sign-up, never required, editable here.</summary>
+    string? BusinessNumber,
     CompanyAddressDto? Address);
 
 public record CompanyAddressDto(
@@ -35,7 +37,8 @@ public record SaveCompanyProfileRequest(
     string? ContactEmail,
     string? Phone,
     /// <summary>#RRGGBB, or null/blank to go back to Vexta's blue.</summary>
-    string? BrandColor);
+    string? BrandColor,
+    string? BusinessNumber = null);
 
 /// <summary>Base64 rather than multipart, for the same reason as the platform branding upload.</summary>
 public record UploadCompanyLogoRequest(string ContentType, byte[] Content, int Width, int Height);
@@ -53,6 +56,7 @@ public record PublicPageSettingsDto(
     string? ContactNote,
     bool ShowProducts,
     bool ShowJobs,
+    PublicPageStyle Style,
     string Slug,
     /// <summary>Null while nothing has ever been saved — the page is defaults, not a record.</summary>
     DateTimeOffset? UpdatedAt);
@@ -63,7 +67,8 @@ public record SavePublicPageRequest(
     string? About,
     string? ContactNote,
     bool ShowProducts,
-    bool ShowJobs);
+    bool ShowJobs,
+    PublicPageStyle Style);
 
 /// <summary>
 /// A position on the shop window. Deliberately not the row the company reads: a posting also
@@ -79,4 +84,22 @@ public record PublicJobDto(
     EmploymentType EmploymentType,
     string? Compensation,
     string? ApplyTo,
+    /// <summary>
+    /// Whether there is a form to fill. The questions themselves are fetched only when somebody
+    /// presses Postuler: most visitors read a posting and never apply.
+    /// </summary>
+    bool HasForm,
+    List<PublicJobDocumentDto> Documents,
     DateTimeOffset CreatedAt);
+
+/// <summary>
+/// A file the company hung on a posting. The link is a signed URL minted for this response, as
+/// everywhere else -- the bucket is never public.
+/// </summary>
+public record PublicJobDocumentDto(
+    Guid Id,
+    string Label,
+    string ContentType,
+    long SizeBytes,
+    /// <summary>Null when storage could not be reached. The posting still belongs on the page.</summary>
+    string? Url);

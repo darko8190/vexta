@@ -1,11 +1,14 @@
 import { cache, Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Building2, BriefcaseBusiness, Mail, MapPin, Phone } from "lucide-react";
+import { Building2, BriefcaseBusiness, FileText, Mail, MapPin, Phone } from "lucide-react";
 import { BrandTheme } from "@/components/layout/brand-theme";
+import { JobApplicationDialog } from "@/components/public/job-application-dialog";
 import { apiFetch } from "@/lib/api-server";
 import { employmentTypeLabels } from "@/lib/labels";
+import { styleTokensFor } from "@/lib/public-page-style";
 import type { PublicCompany } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 const money = new Intl.NumberFormat("fr-CA", { style: "currency", currency: "CAD" });
 
@@ -117,20 +120,25 @@ async function CompanyPageContent({ params }: Pick<PageProps<"/e/[slug]">, "para
   // its name, and one honest line instead of a screen of empty headings.
   const isBare = !hasAbout && !hasProducts && !hasJobs && !hasContact;
 
+  // Which of the four arrangements this company chose. Resolved once: every class name below
+  // comes from it, and a style this build does not recognise falls back rather than failing.
+  const s = styleTokensFor(company.style);
+
   return (
     <>
       {/* Before anything else, so the first paint is already in the company's colour. */}
       <BrandTheme color={company.brandColor} />
 
       <div className="min-h-screen bg-background">
-        {/* A single band of the company's colour, which is the whole of the branding: enough to
-            make the page theirs, not enough to make the text hard to read. */}
-        <div className="h-1.5 w-full bg-primary" aria-hidden="true" />
+        {/* A band of the company's colour, which is the whole of the branding: enough to make
+            the page theirs, not enough to make the text hard to read. Its weight is the one
+            thing the chosen arrangement changes about it. */}
+        <div className={s.accentBar} aria-hidden="true" />
 
-        <header className="border-b border-border">
-          <div className="mx-auto w-full max-w-4xl px-4 py-10 sm:px-6 sm:py-14">
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:gap-6">
-              <div className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-card">
+        <header className={s.header}>
+          <div className={cn(s.container, "py-10 sm:py-14")}>
+            <div className={s.headerInner}>
+              <div className={s.logoFrame}>
                 {company.logoETag ? (
                   /* Not next/image: the bytes come from our own anonymous logo route with an
                      ETag that already busts the cache. */
@@ -145,14 +153,14 @@ async function CompanyPageContent({ params }: Pick<PageProps<"/e/[slug]">, "para
                 )}
               </div>
 
-              <div className="min-w-0">
-                <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+              <div className={s.headerText}>
+                <h1 className={s.title}>
                   {company.name}
                 </h1>
                 {/* No fallback line here: the accroche is what the name is not, and when there
                     is none the h1 above is already the one thing across the top. */}
                 {company.headline?.trim() && (
-                  <p className="mt-2 text-base text-muted-foreground sm:text-lg">
+                  <p className={s.headline}>
                     {company.headline.trim()}
                   </p>
                 )}
@@ -161,17 +169,17 @@ async function CompanyPageContent({ params }: Pick<PageProps<"/e/[slug]">, "para
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-4xl px-4 py-10 sm:px-6 sm:py-14">
+        <main className={cn(s.container, "py-10 sm:py-14")}>
           {isBare && (
             <p className="text-base text-muted-foreground">
               {company.name} n&apos;a encore rien publié sur cette page. Revenez bientôt.
             </p>
           )}
 
-          <div className="space-y-12 sm:space-y-16">
+          <div className={s.sectionGap}>
             {hasAbout && (
               <section>
-                <h2 className="text-lg font-semibold text-foreground">À propos</h2>
+                <h2 className={s.sectionTitle}>À propos</h2>
                 {/* whitespace-pre-line: the paragraphs are typed in a textarea, and the line
                     breaks the owner put there are the only structure the text has. */}
                 <p className="mt-3 max-w-prose whitespace-pre-line text-base leading-relaxed text-muted-foreground">
@@ -182,14 +190,11 @@ async function CompanyPageContent({ params }: Pick<PageProps<"/e/[slug]">, "para
 
             {hasProducts && (
               <section>
-                <h2 className="text-lg font-semibold text-foreground">Produits et services</h2>
+                <h2 className={s.sectionTitle}>Produits et services</h2>
 
-                <ul className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <ul className={cn("mt-4", s.productGrid)}>
                   {company.products.map((product) => (
-                    <li
-                      key={product.id}
-                      className="flex flex-col overflow-hidden rounded-xl border border-border bg-card"
-                    >
+                    <li key={product.id} className={cn("flex flex-col overflow-hidden", s.card)}>
                       {product.imageUrl && (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
@@ -225,14 +230,14 @@ async function CompanyPageContent({ params }: Pick<PageProps<"/e/[slug]">, "para
 
             {hasJobs && (
               <section>
-                <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+                <h2 className={cn("flex items-center gap-2", s.sectionTitle)}>
                   <BriefcaseBusiness className="size-5 shrink-0" aria-hidden="true" />
                   Nous embauchons
                 </h2>
 
                 <ul className="mt-4 space-y-4">
                   {company.jobs.map((job) => (
-                    <li key={job.id} className="rounded-xl border border-border bg-card p-4 sm:p-5">
+                    <li key={job.id} className={cn(s.card, "p-4 sm:p-5")}>
                       <h3 className="text-base font-medium text-foreground">{job.title}</h3>
 
                       <p className="mt-1 text-sm text-muted-foreground">
@@ -247,11 +252,46 @@ async function CompanyPageContent({ params }: Pick<PageProps<"/e/[slug]">, "para
                         </p>
                       )}
 
-                      {job.applyTo && (
-                        <p className="mt-3 text-sm text-foreground">
-                          <span className="text-muted-foreground">Pour postuler : </span>
-                          {job.applyTo}
-                        </p>
+                      {job.documents.length > 0 && (
+                        <ul className="mt-3 flex flex-wrap gap-2">
+                          {job.documents.map((document) => (
+                            <li key={document.id}>
+                              {document.url ? (
+                                <a
+                                  href={document.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-sm text-foreground hover:bg-accent"
+                                >
+                                  <FileText className="size-4 shrink-0" aria-hidden="true" />
+                                  {document.label}
+                                </a>
+                              ) : (
+                                /* Storage could not be reached. The attachment is named rather
+                                   than hidden: a visitor who was told about a document and
+                                   cannot find it is better served than one who never saw it. */
+                                <span className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-border px-2.5 py-1.5 text-sm text-muted-foreground">
+                                  <FileText className="size-4 shrink-0" aria-hidden="true" />
+                                  {document.label}
+                                </span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+
+                      {/* The form when there is one, and the line saying where to write when
+                          there is not. Never both: two ways to apply on one posting is how half
+                          the applications end up somewhere nobody reads. */}
+                      {job.hasForm ? (
+                        <JobApplicationDialog slug={company.slug} jobId={job.id} jobTitle={job.title} />
+                      ) : (
+                        job.applyTo && (
+                          <p className="mt-3 text-sm text-foreground">
+                            <span className="text-muted-foreground">Pour postuler : </span>
+                            {job.applyTo}
+                          </p>
+                        )
                       )}
                     </li>
                   ))}
@@ -261,7 +301,7 @@ async function CompanyPageContent({ params }: Pick<PageProps<"/e/[slug]">, "para
 
             {hasContact && (
               <section>
-                <h2 className="text-lg font-semibold text-foreground">Nous joindre</h2>
+                <h2 className={s.sectionTitle}>Nous joindre</h2>
 
                 {company.contactNote?.trim() && (
                   <p className="mt-3 max-w-prose whitespace-pre-line text-base leading-relaxed text-muted-foreground">
@@ -323,7 +363,7 @@ async function CompanyPageContent({ params }: Pick<PageProps<"/e/[slug]">, "para
         </main>
 
         <footer className="border-t border-border">
-          <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6">
+          <div className={cn(s.container, "py-6")}>
             <p className="text-sm text-muted-foreground">{company.name}</p>
           </div>
         </footer>

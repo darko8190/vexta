@@ -28,6 +28,13 @@ public class Supplier
     public string? Province { get; set; }
     public string? PostalCode { get; set; }
 
+    /// <summary>
+    /// Nullable here while it is required on every other address in the application, because
+    /// these rows predate the field: a supplier already on file has no country and the office
+    /// cannot be made to stop and fill one in before it can correct a telephone number.
+    /// </summary>
+    public string? Country { get; set; }
+
     public string? Notes { get; set; }
 
     /// <summary>
@@ -35,6 +42,37 @@ public class Supplier
     /// to appear on the orders that were placed with them.
     /// </summary>
     public bool IsActive { get; set; } = true;
+
+    /// <summary>
+    /// The company on Vexta this supplier turned out to be, once it signed up and was recognised
+    /// by its address and its name. Null for the great majority, who are not on Vexta.
+    ///
+    /// SetNull if that company is deleted: the supplier is still who the company buys from, and
+    /// losing the row would lose the orders hanging off it.
+    /// </summary>
+    public Guid? LinkedTenantId { get; set; }
+    public Tenant? LinkedTenant { get; set; }
+
+    /// <summary>When the link was made. Shown rather than inferred, so it can be explained.</summary>
+    public DateTimeOffset? LinkedAt { get; set; }
+
+    /// <summary>
+    /// The normalised postal code and street line, which is what a company signing up is matched
+    /// against. Stored rather than computed on the fly so the match is an indexed lookup instead
+    /// of a scan of every supplier on the platform; written in the one place a supplier is saved.
+    ///
+    /// Null when the address is incomplete, which is every supplier created before an address was
+    /// required. Those simply never match, which is the right answer: half an address is not
+    /// enough to say two companies are the same.
+    /// </summary>
+    public string? AddressKey { get; set; }
+
+    /// <summary>
+    /// When an invitation to join Vexta was last emailed to them. Not an <c>IInvitable</c>: that
+    /// interface grants somebody an account inside this company's space, and a supplier is not
+    /// being given access to anything here -- they are being told the platform exists.
+    /// </summary>
+    public DateTimeOffset? InvitationSentAt { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;

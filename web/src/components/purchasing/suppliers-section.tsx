@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Building2, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { BadgeCheck, Building2, MoreHorizontal, Pencil, Plus, Send, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,9 +21,10 @@ import { SearchInput } from "@/components/layout/search-input";
 import { WorkbookMenu } from "@/components/import-export/workbook-menu";
 import { SupplierFormSheet } from "@/components/purchasing/supplier-form-sheet";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
-import { useDeleteSupplier, useSuppliersQuery } from "@/hooks/use-suppliers";
+import { useDeleteSupplier, useInviteSupplier, useSuppliersQuery } from "@/hooks/use-suppliers";
 import { useIsOwner } from "@/hooks/use-can-create";
 import { ApiError } from "@/lib/api";
+import { formatDateOnly } from "@/lib/dates";
 import type { Supplier } from "@/lib/types";
 
 /** Pattern 1 — List / Index. Who the company buys from. */
@@ -34,6 +35,7 @@ export function SuppliersSection() {
 
   const { data, isLoading, isError, error, refetch } = useSuppliersQuery(debounced, showInactive);
   const remove = useDeleteSupplier();
+  const invite = useInviteSupplier();
   const isOwner = useIsOwner();
 
   const [formOpen, setFormOpen] = useState(false);
@@ -41,6 +43,22 @@ export function SuppliersSection() {
   const [deleteTarget, setDeleteTarget] = useState<Supplier | undefined>(undefined);
 
   const formKey = `${editing?.id ?? "nouveau"}-${formOpen}`;
+
+  /**
+   * Sends the supplier an invitation to open their own space.
+   *
+   * The failures are worth saying out loud rather than swallowing: Mailgun unconfigured, no
+   * address on the card, one already sent today. Each one is something the person can act on,
+   * and a button that silently does nothing is the worst of the three.
+   */
+  async function onInvite(supplier: Supplier) {
+    try {
+      await invite.mutateAsync(supplier.id);
+      toast.success(`Invitation envoyée à ${supplier.name}.`);
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Impossible d'envoyer l'invitation.");
+    }
+  }
 
   async function confirmDelete() {
     if (!deleteTarget) return;
@@ -141,6 +159,12 @@ export function SuppliersSection() {
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium text-foreground">{supplier.name}</span>
+                  {supplier.isOnVexta && (
+                    <Badge variant="outline" className="gap-1">
+                      <BadgeCheck className="size-3.5" aria-hidden="true" />
+                      Sur Vexta
+                    </Badge>
+                  )}
                   {!supplier.isActive && <Badge variant="secondary">Inactif</Badge>}
                   {supplier.openOrderCount > 0 && (
                     <Badge variant="outline">
@@ -160,6 +184,14 @@ export function SuppliersSection() {
                 {supplier.accountNumber && (
                   <p className="mt-0.5 text-sm text-muted-foreground">
                     Compte {supplier.accountNumber}
+                  </p>
+                )}
+
+                {/* Said on the row rather than hidden in the menu: the reason the menu item
+                    reads "Renvoyer" has to be visible without opening it. */}
+                {!supplier.isOnVexta && supplier.invitationSentAt && (
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    Invitation envoyée le {formatDateOnly(supplier.invitationSentAt)}
                   </p>
                 )}
               </div>
@@ -182,6 +214,17 @@ export function SuppliersSection() {
                     <Pencil />
                     Modifier
                   </DropdownMenuItem>
+                  {/* Nothing to tell a company that is already here, and nothing to send
+                      somebody whose card has no address. */}
+                  {!supplier.isOnVexta && supplier.email && (
+                    <DropdownMenuItem
+                      disabled={invite.isPending}
+                      onClick={() => void onInvite(supplier)}
+                    >
+                      <Send />
+                      {supplier.invitationSentAt ? "Renvoyer l'invitation" : "Inviter sur Vexta"}
+                    </DropdownMenuItem>
+                  )}
                   {isOwner && (
                     <DropdownMenuItem variant="destructive" onClick={() => setDeleteTarget(supplier)}>
                       <Trash2 />

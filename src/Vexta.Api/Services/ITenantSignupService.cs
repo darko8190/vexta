@@ -23,6 +23,24 @@ public record TenantSignupResult(
     public static TenantSignupResult Failed(string error) => new(false, Error: error);
 }
 
+/// <summary>
+/// What a company must say about itself to open a space: where it is, and its registration
+/// number when it has one.
+///
+/// The address is required for a company and absent for a personal space. A company invoices,
+/// and an invoice without the issuer's address on it is not a document anybody can use -- so it
+/// is collected once at sign-up rather than left for a settings page nobody visits until the
+/// first invoice is already going out wrong.
+/// </summary>
+public record CompanySignupProfile(
+    string Line1,
+    string? Line2,
+    string City,
+    string? Province,
+    string PostalCode,
+    string Country,
+    string? BusinessNumber);
+
 public interface ITenantSignupService
 {
     /// <summary>
@@ -39,6 +57,7 @@ public interface ITenantSignupService
         string email,
         string? password,
         UserLoginInfo? externalLogin,
+        CompanySignupProfile? profile = null,
         CancellationToken ct = default);
 }
 
@@ -46,9 +65,14 @@ public class TenantSignupService(
     UserManager<ApplicationUser> userManager,
     VextaDbContext db,
     IStripeService stripeService,
+    ISupplierLinkService supplierLinks,
     IConfiguration configuration,
     ILogger<TenantSignupService> logger) : ITenantSignupService
 {
+    /// <summary>An empty box and an absent answer are the same thing here.</summary>
+    private static string? Trimmed(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
     public async Task<TenantSignupResult> CreateAsync(
         string spaceName,
         TenantKind kind,
@@ -58,6 +82,7 @@ public class TenantSignupService(
         string email,
         string? password,
         UserLoginInfo? externalLogin,
+        CompanySignupProfile? profile = null,
         CancellationToken ct = default)
     {
         email = email.Trim();
@@ -65,6 +90,21 @@ public class TenantSignupService(
         if (await userManager.FindByEmailAsync(email) is not null)
         {
             return TenantSignupResult.Failed("Un compte existe déjà avec ce courriel.");
+        }
+
+        // Checked before the account is made rather than after: a tenant and a user created
+        // and then abandoned because the address was missing would hold the email address
+        // hostage, and the second attempt would be told the account already exists.
+        if (kind == TenantKind.Business)
+        {
+            if (profile is null
+                || string.IsNullOrWhiteSpace(profile.Line1)
+                || string.IsNullOrWhiteSpace(profile.City)
+                || string.IsNullOrWhiteSpace(profile.PostalCode)
+                || string.IsNullOrWhiteSpace(profile.Country))
+            {
+                return TenantSignupResult.Failed("L'adresse de l'entreprise est requise.");
+            }
         }
 
         Plan? plan = null;
@@ -85,7 +125,14 @@ public class TenantSignupService(
 
         // SubscriptionStatus is left alone: it describes a Stripe subscription, and a personal
         // space has none. Access is granted on Kind, not by pretending it pays.
-        var tenant = new Tenant { Name = spaceName.Trim(), Slug = slug, Kind = kind, PlanId = plan?.Id };
+        var tenant = new Tenant
+        {
+            Name = spaceName.Trim(),
+            Slug = slug,
+            Kind = kind,
+            PlanId = plan?.Id,
+            BusinessNumber = Trimmed(profile?.BusinessNumber)
+        };
 
         // A plan that grants a trial opens the space on it: no Stripe customer, no checkout, no
         // card. The banner in the header counts the days down and sends them to Paramètres to
@@ -129,6 +176,26 @@ public class TenantSignupService(
             }
         }
 
+        if (kind == TenantKind.Business && profile is not null)
+        {
+            // The address becomes the company's first location, flagged primary, rather than a
+            // set of columns on the tenant. There is already one place in the model for "a place
+            // the company occupies", and a second one would mean two answers to what goes at the
+            // top of an invoice.
+            db.CompanyLocations.Add(new CompanyLocation
+            {
+                TenantId = tenant.Id,
+                Label = "Siège social",
+                IsPrimary = true,
+                Line1 = profile.Line1.Trim(),
+                Line2 = Trimmed(profile.Line2),
+                City = profile.City.Trim(),
+                Province = Trimmed(profile.Province),
+                PostalCode = profile.PostalCode.Trim(),
+                Country = profile.Country.Trim()
+            });
+        }
+
         if (kind == TenantKind.Business)
         {
             // The person who opened the company works there. Without this row they are absent
@@ -148,6 +215,14 @@ public class TenantSignupService(
         }
 
         await db.SaveChangesAsync(ct);
+
+        // After the account exists and is saved, never as part of it. This looks outside the new
+        // company -- into the supplier lists its future customers keep -- and it must not be able
+        // to cost somebody their sign-up. It swallows its own failures and returns zero.
+        if (kind == TenantKind.Business)
+        {
+            await supplierLinks.LinkOnSignupAsync(tenant.Id, ct);
+        }
 
         if (kind == TenantKind.Personal)
         {

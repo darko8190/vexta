@@ -9,6 +9,7 @@ export interface SaveCompanyValues {
   phone: string | null;
   /** #RRGGBB, or null to go back to Vexta's blue. */
   brandColor: string | null;
+  businessNumber: string | null;
 }
 
 export function useCompanyProfileQuery() {

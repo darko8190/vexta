@@ -60,6 +60,7 @@ export function BrandColorCard({ profile }: { profile: CompanyProfile }) {
         description: profile.description,
         contactEmail: profile.contactEmail,
         phone: profile.phone,
+        businessNumber: profile.businessNumber,
         brandColor: next,
       });
 

@@ -238,8 +238,28 @@ public record JobPostingDto(
     int Applications,
     /// <summary>Whether it is on the public page. Follows the status; never set on its own.</summary>
     bool IsPublished,
+    /// <summary>The form an applicant fills, when one is attached.</summary>
+    Guid? FormTemplateId,
+    /// <summary>Its title, so the row can name it without a second request.</summary>
+    string? FormTemplateTitle,
+    /// <summary>
+    /// False when a form is attached but is still a draft. The posting then asks nothing, and
+    /// the screen has to be able to say so rather than show a form nobody can fill.
+    /// </summary>
+    bool FormIsPublished,
+    List<JobPostingDocumentDto> Documents,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
+
+/// <summary>A file hung on a posting. The URL is minted on demand, like every other asset.</summary>
+public record JobPostingDocumentDto(
+    Guid Id,
+    Guid MediaAssetId,
+    string FileName,
+    string ContentType,
+    long SizeBytes,
+    string? Label,
+    int SortOrder);
 
 public record SaveJobPostingRequest(
     string Title,
@@ -252,7 +272,12 @@ public record SaveJobPostingRequest(
     int Openings,
     JobPostingStatus Status,
     DateOnly? PostedOn,
-    DateOnly? ClosesOn);
+    DateOnly? ClosesOn,
+    /// <summary>The form to ask applicants to fill, or null to only say where to write.</summary>
+    Guid? FormTemplateId = null);
+
+/// <summary>What to hang on a posting, and what to call it.</summary>
+public record AddJobPostingDocumentRequest(Guid MediaAssetId, string? Label);
 
 /// <summary>What the new employee record gets. The candidate keeps everything it already had.</summary>
 public record HireCandidateRequest(string Email, string? JobTitle);

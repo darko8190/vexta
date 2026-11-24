@@ -71,6 +71,7 @@ builder.Services.AddScoped<IPlatformSettingsService, PlatformSettingsService>();
 builder.Services.AddScoped<IMailgunService, MailgunService>();
 builder.Services.AddScoped<IStripeService, StripeService>();
 builder.Services.AddScoped<ITenantSignupService, TenantSignupService>();
+builder.Services.AddScoped<ISupplierLinkService, SupplierLinkService>();
 builder.Services.AddScoped<IR2StorageService, R2StorageService>();
 builder.Services.AddScoped<IBrandingService, BrandingService>();
 builder.Services.AddScoped<IEmployeeAccessService, EmployeeAccessService>();

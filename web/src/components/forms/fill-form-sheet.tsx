@@ -171,7 +171,15 @@ export function FillFormSheet({
 }
 
 /** One question, drawn as whatever its type asks for. */
-function AnswerField({
+/**
+ * One question, drawn for whoever is answering it.
+ *
+ * Exported because the same questions are now answered from two places: by staff in this
+ * sheet, and by a stranger applying for a job on the company's public page. Two renderers
+ * would mean a checkbox here and a dropdown there for the same field type, and a company that
+ * tested its form inside the application would not be seeing what an applicant sees.
+ */
+export function AnswerField({
   field,
   value,
   onChange,

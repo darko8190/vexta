@@ -760,6 +760,8 @@ export interface CompanyProfile {
   logoETag: string | null;
   /** The company's chosen colour as #RRGGBB, or null for Vexta's blue. */
   brandColor: string | null;
+  /** The NEQ or equivalent. Never required: not every company has one. */
+  businessNumber: string | null;
   address: CompanyAddress | null;
 }
 
@@ -1260,8 +1262,25 @@ export interface JobPosting {
   /** How many people answered it. Counted from the candidates, never stored. */
   applications: number;
   isPublished: boolean;
+  /** The form an applicant fills, when one is attached. */
+  formTemplateId: string | null;
+  formTemplateTitle: string | null;
+  /** False when the attached form is still a draft: the posting then asks nothing. */
+  formIsPublished: boolean;
+  documents: JobPostingDocument[];
   createdAt: string;
   updatedAt: string;
+}
+
+/** A file hung on a posting. The bytes live in the library; this is the link. */
+export interface JobPostingDocument {
+  id: string;
+  mediaAssetId: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  label: string | null;
+  sortOrder: number;
 }
 
 export interface SaveJobPostingValues {
@@ -1276,6 +1295,8 @@ export interface SaveJobPostingValues {
   status: JobPostingStatus;
   postedOn: string | null;
   closesOn: string | null;
+  /** The form to ask applicants to fill, or null to only say where to write. */
+  formTemplateId: string | null;
 }
 
 /** The same position as a visitor reads it: the advertisement, and nothing the company keeps. */
@@ -1287,8 +1308,45 @@ export interface PublicJob {
   employmentType: EmploymentType;
   compensation: string | null;
   applyTo: string | null;
+  /** Whether there is a form to fill. The questions are fetched only when it is opened. */
+  hasForm: boolean;
+  documents: PublicJobDocument[];
   createdAt: string;
 }
+
+/** A file the company hung on a posting, with a link signed for this page load. */
+export interface PublicJobDocument {
+  id: string;
+  label: string;
+  contentType: string;
+  sizeBytes: number;
+  /** Null when storage could not be reached. The posting still shows. */
+  url: string | null;
+}
+
+/** The questions on a posting's form, as a visitor is shown them. */
+export interface PublicJobForm {
+  jobTitle: string;
+  formTitle: string;
+  formDescription: string | null;
+  fields: PublicFormField[];
+}
+
+export interface PublicFormField {
+  id: string;
+  label: string;
+  helpText: string | null;
+  type: FormFieldType;
+  isRequired: boolean;
+  /** The offered answers for a Choix or MultiChoix, one per line. */
+  options: string | null;
+}
+
+/**
+ * One of four arrangements of the public page. Not a theme: the colour always comes from the
+ * company's own brand colour, so no choice here can make the page unreadable.
+ */
+export type PublicPageStyle = "Classique" | "Chantier" | "Epure" | "Vitrine";
 
 /** What the company writes on its public page, as its owner edits it. */
 export interface PublicPageSettings {
@@ -1298,6 +1356,7 @@ export interface PublicPageSettings {
   contactNote: string | null;
   showProducts: boolean;
   showJobs: boolean;
+  style: PublicPageStyle;
   /** Where the page lives: /e/{slug}. */
   slug: string;
   updatedAt: string | null;
@@ -1315,6 +1374,8 @@ export interface PublicCompany {
   logoETag: string | null;
   tenantId: string;
   brandColor: string | null;
+  /** Which of the four arrangements the page is drawn with. */
+  style: PublicPageStyle;
   address: CompanyAddress | null;
   products: PublicProduct[];
   jobs: PublicJob[];
@@ -1933,8 +1994,14 @@ export interface Supplier {
   city: string | null;
   province: string | null;
   postalCode: string | null;
+  country: string | null;
   notes: string | null;
   isActive: boolean;
+  /** True once this supplier turned out to be a company on Vexta. */
+  isOnVexta: boolean;
+  linkedAt: string | null;
+  /** When an invitation to join Vexta was last sent to them. */
+  invitationSentAt: string | null;
   orderCount: number;
   /** Placed but not fully received. What somebody is chasing. */
   openOrderCount: number;
@@ -1951,8 +2018,28 @@ export interface SaveSupplierValues {
   city: string | null;
   province: string | null;
   postalCode: string | null;
+  country: string | null;
   notes: string | null;
   isActive: boolean;
+}
+
+/**
+ * A company already on Vexta, offered while a supplier is being added.
+ *
+ * Only companies that published their public page appear, so everything here is already
+ * readable by anyone at /e/{slug}.
+ */
+export interface SupplierDirectoryEntry {
+  name: string;
+  email: string | null;
+  phone: string | null;
+  line1: string | null;
+  city: string | null;
+  province: string | null;
+  postalCode: string | null;
+  country: string | null;
+  /** Where its public page is, so the person adding it can go and look. */
+  slug: string;
 }
 
 export interface PurchaseOrderLine {

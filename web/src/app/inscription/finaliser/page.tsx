@@ -14,7 +14,10 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VextaLogo } from "@/components/brand/vexta-logo";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { useAuth } from "@/lib/auth-context";
+import { CompanyAddressFields } from "@/components/addresses/company-address-fields";
 import { usePublicPlansQuery } from "@/hooks/use-catalog";
+import { checkCompanyAddress, companyProfileFrom, emptyCompanyAddress } from "@/lib/company-signup";
+import { defaultCountryName } from "@/lib/geo";
 import { formatCents } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { ex } from "@/lib/placeholders";
@@ -24,6 +27,13 @@ const formSchema = z
     accountType: z.enum(["business", "personal"]),
     companyName: z.string(),
     planId: z.string(),
+    line1: z.string(),
+    line2: z.string(),
+    city: z.string(),
+    province: z.string(),
+    postalCode: z.string(),
+    country: z.string(),
+    businessNumber: z.string(),
   })
   // A travailleur autonome has no company name to give; their space is named after them.
   .refine((values) => values.accountType === "personal" || values.planId.length > 0, {
@@ -33,7 +43,8 @@ const formSchema = z
   .refine((values) => values.accountType === "personal" || values.companyName.trim().length >= 2, {
     message: "Le nom de l'entreprise est requis.",
     path: ["companyName"],
-  });
+  })
+  .superRefine(checkCompanyAddress);
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -59,7 +70,12 @@ function CompanyStep() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: { accountType: "business", companyName: "", planId: "" },
+    defaultValues: {
+      accountType: "business",
+      companyName: "",
+      planId: "",
+      ...emptyCompanyAddress(defaultCountryName),
+    },
   });
 
   const accountType = useWatch({ control: form.control, name: "accountType" });
@@ -102,6 +118,7 @@ function CompanyStep() {
           ticket,
           companyName: values.accountType === "personal" ? null : values.companyName,
           planId: values.accountType === "personal" ? null : values.planId,
+          profile: companyProfileFrom(values, values.accountType === "personal"),
         }),
       });
       const data = await response.json().catch(() => null);
@@ -189,6 +206,8 @@ function CompanyStep() {
               )}
             />
           )}
+
+          {!isPersonal && <CompanyAddressFields form={form} idPrefix="fin" />}
 
           {!isPersonal && (
             <Controller

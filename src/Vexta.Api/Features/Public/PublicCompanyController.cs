@@ -66,15 +66,7 @@ public class PublicCompanyController(VextaDbContext db, IR2StorageService storag
 
         var products = page.ShowProducts ? await ProductsAsync(tenant.Id, ct) : [];
 
-        var jobs = page.ShowJobs
-            ? await db.JobPostings.AsNoTracking()
-                .Where(j => j.TenantId == tenant.Id && j.IsPublished)
-                .OrderByDescending(j => j.CreatedAt)
-                .Select(j => new PublicJobDto(
-                    j.Id, j.Title, j.Description, j.Location, j.EmploymentType,
-                    j.Compensation, j.ApplyTo, j.CreatedAt))
-                .ToListAsync(ct)
-            : [];
+        var jobs = page.ShowJobs ? await JobsAsync(tenant.Id, ct) : [];
 
         return Ok(new PublicCompanyDto(
             tenant.Name,
@@ -87,9 +79,85 @@ public class PublicCompanyController(VextaDbContext db, IR2StorageService storag
             tenant.LogoETag,
             tenant.Id,
             tenant.BrandColor,
+            page.Style,
             address,
             products,
             jobs));
+    }
+
+    /// <summary>
+    /// The positions on the public page, each with whatever the company hung on it.
+    ///
+    /// A posting whose form is still a draft reports no form rather than a form that cannot be
+    /// filled: the visitor is shown where to write instead, which is what the posting said
+    /// before a form was ever attached.
+    /// </summary>
+    private async Task<List<PublicJobDto>> JobsAsync(Guid tenantId, CancellationToken ct)
+    {
+        var rows = await db.JobPostings.IgnoreQueryFilters().AsNoTracking()
+            .Where(j => j.TenantId == tenantId && j.IsPublished)
+            .OrderByDescending(j => j.CreatedAt)
+            .Select(j => new
+            {
+                j.Id,
+                j.Title,
+                j.Description,
+                j.Location,
+                j.EmploymentType,
+                j.Compensation,
+                j.ApplyTo,
+                HasForm = j.FormTemplateId != null && j.FormTemplate!.IsPublished,
+                j.CreatedAt,
+                Documents = j.Documents
+                    .OrderBy(d => d.SortOrder)
+                    .Select(d => new
+                    {
+                        d.Id,
+                        d.Label,
+                        d.MediaAsset!.ObjectKey,
+                        d.MediaAsset!.FileName,
+                        d.MediaAsset!.ContentType,
+                        d.MediaAsset!.SizeBytes
+                    })
+                    .ToList()
+            })
+            .ToListAsync(ct);
+
+        var jobs = new List<PublicJobDto>(rows.Count);
+
+        foreach (var row in rows)
+        {
+            var documents = new List<PublicJobDocumentDto>(row.Documents.Count);
+
+            foreach (var document in row.Documents)
+            {
+                string? url = null;
+                try
+                {
+                    url = await storage.CreateDownloadUrlAsync(document.ObjectKey, document.FileName, ct);
+                }
+                catch (InvalidOperationException)
+                {
+                    // Storage is not configured, or its credentials are wrong. The posting still
+                    // belongs on the page; the attachment simply cannot be opened.
+                }
+
+                documents.Add(new PublicJobDocumentDto(
+                    document.Id,
+                    // The company's own label when it gave one, the file's name otherwise: a
+                    // visitor should never be shown an object key or a bare id.
+                    string.IsNullOrWhiteSpace(document.Label) ? document.FileName : document.Label!,
+                    document.ContentType,
+                    document.SizeBytes,
+                    url));
+            }
+
+            jobs.Add(new PublicJobDto(
+                row.Id, row.Title, row.Description, row.Location, row.EmploymentType,
+                row.Compensation, row.ApplyTo, row.HasForm, documents, row.CreatedAt));
+        }
+
+        return jobs;
     }
 
     /// <summary>
@@ -162,6 +230,8 @@ public record PublicCompanyDto(
     /// <summary>Only so the page can build the logo URL, which is anonymous by design.</summary>
     Guid TenantId,
     string? BrandColor,
+    /// <summary>Which of the four arrangements the page is drawn with.</summary>
+    PublicPageStyle Style,
     CompanyAddressDto? Address,
     List<PublicProductDto> Products,
     List<PublicJobDto> Jobs);

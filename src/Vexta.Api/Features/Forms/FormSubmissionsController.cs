@@ -87,7 +87,7 @@ public class FormSubmissionsController(
         foreach (var field in fields)
         {
             given.TryGetValue(field.Id, out var value);
-            if (Problem(field, value) is { } problem) return BadRequest(new { message = problem });
+            if (FormAnswerRules.Problem(field, value) is { } problem) return BadRequest(new { message = problem });
         }
 
         var submission = new FormSubmission
@@ -206,74 +206,4 @@ public class FormSubmissionsController(
 
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    /// <summary>
-    /// Whether an answer can be accepted for its question. The message names the question, so
-    /// somebody who scrolled past it knows which one to go back to.
-    /// </summary>
-    private static string? Problem(FormField field, string? value)
-    {
-        var answer = value?.Trim();
-
-        if (string.IsNullOrWhiteSpace(answer))
-        {
-            return field.IsRequired ? $"« {field.Label} » est obligatoire." : null;
-        }
-
-        if (answer.Length > 4000) return $"La réponse à « {field.Label} » est trop longue.";
-
-        switch (field.Type)
-        {
-            case FormFieldType.Nombre:
-                // Both separators: a Québec keyboard types 12,5 and a form filled on a phone
-                // keypad types 12.5, and refusing either would be refusing the right answer.
-                if (!decimal.TryParse(answer.Replace(',', '.'), NumberStyles.Number, CultureInfo.InvariantCulture, out _))
-                {
-                    return $"« {field.Label} » attend un nombre.";
-                }
-                break;
-
-            case FormFieldType.Date:
-                if (!DateOnly.TryParse(answer, CultureInfo.InvariantCulture, out _))
-                {
-                    return $"« {field.Label} » attend une date.";
-                }
-                break;
-
-            case FormFieldType.Courriel:
-                // Loose on purpose. A strict pattern refuses real addresses, and the only true
-                // test of an address is sending something to it.
-                if (!answer.Contains('@') || answer.StartsWith('@') || answer.EndsWith('@'))
-                {
-                    return $"« {field.Label} » attend une adresse courriel.";
-                }
-                break;
-
-            case FormFieldType.Choix:
-                if (!field.OptionList().Contains(answer, StringComparer.OrdinalIgnoreCase))
-                {
-                    return $"« {answer} » n'est pas un choix offert pour « {field.Label} ».";
-                }
-                break;
-
-            case FormFieldType.MultiChoix:
-                var offered = field.OptionList();
-                var chosen = answer.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-                var unknown = chosen.FirstOrDefault(c => !offered.Contains(c, StringComparer.OrdinalIgnoreCase));
-                if (unknown is not null)
-                {
-                    return $"« {unknown} » n'est pas un choix offert pour « {field.Label} ».";
-                }
-                break;
-
-            case FormFieldType.OuiNon:
-                if (!answer.Equals("Oui", StringComparison.OrdinalIgnoreCase)
-                    && !answer.Equals("Non", StringComparison.OrdinalIgnoreCase))
-                {
-                    return $"« {field.Label} » attend oui ou non.";
-                }
-                break;
-        }
-
-        return null;
-    }
 }

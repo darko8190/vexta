@@ -5,6 +5,17 @@ import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import type { User } from "@/lib/types";
 
+/** Where the company is, and its registration number. Null for a personal space. */
+export interface CompanySignupProfile {
+  line1: string;
+  line2: string | null;
+  city: string;
+  province: string | null;
+  postalCode: string;
+  country: string;
+  businessNumber: string | null;
+}
+
 interface RegisterTenantInput {
   companyName: string;
   firstName: string;
@@ -14,6 +25,8 @@ interface RegisterTenantInput {
   kind: "Business" | "Personal";
   /** Null for a personal space: it is free and has no plan. */
   planId: string | null;
+  /** Required by the API for a company, refused as empty. Null for a personal space. */
+  profile: CompanySignupProfile | null;
 }
 
 /** A business sign-up goes to Stripe; a free personal one comes back already signed in. */

@@ -1,6 +1,32 @@
 namespace Vexta.Api.Domain;
 
 /// <summary>
+/// How the company's public page looks.
+///
+/// Four arrangements of the same content, not a theme editor. Every one of them derives its
+/// colour from the company's own brand colour and its spacing from the application's scale, so
+/// whichever is picked the page stays legible -- which is the whole reason the choice is a short
+/// list rather than a stylesheet. A company that can produce an unreadable page will, and it is
+/// its name on the result.
+///
+/// Stored as numbers, so new arrangements are appended.
+/// </summary>
+public enum PublicPageStyle
+{
+    /// <summary>What every page looked like before there was a choice.</summary>
+    Classique = 0,
+
+    /// <summary>Heavier: a dark masthead, wider measure, uppercase headings. Reads as a trade.</summary>
+    Chantier = 1,
+
+    /// <summary>Narrow, quiet, no rules or frames. For a page that is mostly words.</summary>
+    Epure = 2,
+
+    /// <summary>Products first and larger, the text secondary. For a page that is a catalogue.</summary>
+    Vitrine = 3
+}
+
+/// <summary>
 /// The company's own page on Vexta, at /e/{slug}.
 ///
 /// It is off until someone turns it on. A company that has not written a word should not have a
@@ -28,7 +54,36 @@ public class PublicPage
     public bool ShowProducts { get; set; } = true;
     public bool ShowJobs { get; set; } = true;
 
+    public PublicPageStyle Style { get; set; } = PublicPageStyle.Classique;
+
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
+/// <summary>
+/// A file hung on a posting: the job description as a PDF, a photograph of the site, the
+/// collective agreement.
+///
+/// Its own row rather than a column on the posting, because the point of the request was more
+/// than one. The bytes live in the shared bucket like every other upload; this is only the
+/// link, plus the order they were put in.
+/// </summary>
+public class JobPostingDocument
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid TenantId { get; set; }
+
+    public Guid JobPostingId { get; set; }
+    public JobPosting? JobPosting { get; set; }
+
+    public Guid MediaAssetId { get; set; }
+    public MediaAsset? MediaAsset { get; set; }
+
+    /// <summary>What to call it on the page. Falls back to the uploaded file's own name.</summary>
+    public string? Label { get; set; }
+
+    public int SortOrder { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
 /// <summary>
@@ -77,6 +132,20 @@ public class JobPosting
 
     /// <summary>Where to apply. An address, a telephone number, a link.</summary>
     public string? ApplyTo { get; set; }
+
+    /// <summary>
+    /// The form somebody fills to apply, when the company built one. Null means the posting
+    /// says where to write and nothing more, which is how every posting worked before this.
+    ///
+    /// A reference to a form the company already owns rather than a set of questions on the
+    /// posting: a company hiring two carpenters and a driver asks the same things each time,
+    /// and a form per posting would be the same questions retyped and then edited in only one
+    /// of three places.
+    /// </summary>
+    public Guid? FormTemplateId { get; set; }
+    public FormTemplate? FormTemplate { get; set; }
+
+    public List<JobPostingDocument> Documents { get; set; } = [];
 
     /// <summary>
     /// How many people are wanted. One by default, because that is the usual answer and a

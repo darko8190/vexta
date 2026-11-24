@@ -47,10 +47,11 @@ public class PublicPageController(VextaDbContext db, ICurrentUserService current
             .FirstOrDefaultAsync(p => p.TenantId == tenantId, ct);
 
         return Ok(page is null
-            ? new PublicPageSettingsDto(false, null, null, null, true, true, slug, null)
+            ? new PublicPageSettingsDto(
+                false, null, null, null, true, true, PublicPageStyle.Classique, slug, null)
             : new PublicPageSettingsDto(
                 page.IsPublished, page.Headline, page.About, page.ContactNote,
-                page.ShowProducts, page.ShowJobs, slug, page.UpdatedAt));
+                page.ShowProducts, page.ShowJobs, page.Style, slug, page.UpdatedAt));
     }
 
     [HttpPut("public-page")]
@@ -79,6 +80,7 @@ public class PublicPageController(VextaDbContext db, ICurrentUserService current
         page.ContactNote = Clean(request.ContactNote);
         page.ShowProducts = request.ShowProducts;
         page.ShowJobs = request.ShowJobs;
+        page.Style = Enum.IsDefined(request.Style) ? request.Style : PublicPageStyle.Classique;
         page.UpdatedAt = DateTimeOffset.UtcNow;
 
         await db.SaveChangesAsync(ct);

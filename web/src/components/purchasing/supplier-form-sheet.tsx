@@ -17,7 +17,11 @@ import {
 } from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { RequiredMark } from "@/components/ui/required-mark";
+import { CountrySelect, SubdivisionField } from "@/components/addresses/country-field";
+import { SupplierDirectorySearch } from "@/components/purchasing/supplier-directory-search";
 import { useSaveSupplier } from "@/hooks/use-suppliers";
+import { defaultCountryName, isKnownSubdivision, subdivisionLabel } from "@/lib/geo";
 import { ApiError } from "@/lib/api";
 import { ex } from "@/lib/placeholders";
 import type { Supplier } from "@/lib/types";
@@ -49,6 +53,7 @@ export function SupplierFormSheet({
   const [line1, setLine1] = useState(supplier?.line1 ?? "");
   const [city, setCity] = useState(supplier?.city ?? "");
   const [province, setProvince] = useState(supplier?.province ?? "Québec");
+  const [country, setCountry] = useState(supplier?.country ?? defaultCountryName);
   const [postalCode, setPostalCode] = useState(supplier?.postalCode ?? "");
   const [notes, setNotes] = useState(supplier?.notes ?? "");
   const [isActive, setIsActive] = useState(supplier?.isActive ?? true);
@@ -56,6 +61,16 @@ export function SupplierFormSheet({
   async function onSubmit() {
     if (!name.trim()) {
       toast.error("Le nom du fournisseur est obligatoire.");
+      return;
+    }
+
+    // The address is what connects this supplier to its own Vexta account the day it signs up,
+    // so it is required rather than nice to have. Checked here as well as on the server so the
+    // answer is immediate; an existing card that never had one is left alone, which is the rule
+    // the server applies too.
+    const addressRequired = !isEditing || Boolean(supplier?.line1);
+    if (addressRequired && (!line1.trim() || !city.trim() || !postalCode.trim() || !country.trim())) {
+      toast.error("L'adresse du fournisseur est obligatoire.");
       return;
     }
 
@@ -73,6 +88,7 @@ export function SupplierFormSheet({
           city: city.trim() || null,
           province: province.trim() || null,
           postalCode: postalCode.trim() || null,
+          country: country.trim() || null,
           notes: notes.trim() || null,
           isActive,
         },
@@ -96,8 +112,30 @@ export function SupplierFormSheet({
 
         <div className="flex-1 overflow-y-auto px-4">
           <FieldGroup>
+            {/* Only when adding. On an existing card the fields are the record, and a search
+                that overwrote them would undo work somebody did on purpose. */}
+            {!isEditing && (
+              <SupplierDirectorySearch
+                onPick={(entry) => {
+                  setName(entry.name);
+                  // Only the empty ones for the contact details: somebody who typed a direct
+                  // line before searching meant that number.
+                  setEmail((current) => current || entry.email || "");
+                  setPhone((current) => current || entry.phone || "");
+                  setLine1(entry.line1 ?? "");
+                  setCity(entry.city ?? "");
+                  setProvince(entry.province ?? "");
+                  setPostalCode(entry.postalCode ?? "");
+                  setCountry(entry.country ?? defaultCountryName);
+                }}
+              />
+            )}
+
             <Field>
-              <FieldLabel htmlFor="supplier-name">Nom</FieldLabel>
+              <FieldLabel htmlFor="supplier-name">
+                Nom
+                <RequiredMark />
+              </FieldLabel>
               <Input
                 id="supplier-name"
                 value={name}
@@ -161,7 +199,10 @@ export function SupplierFormSheet({
             </Field>
 
             <Field>
-              <FieldLabel htmlFor="supplier-line1">Adresse</FieldLabel>
+              <FieldLabel htmlFor="supplier-line1">
+                Adresse
+                <RequiredMark />
+              </FieldLabel>
               <Input
                 id="supplier-line1"
                 value={line1}
@@ -170,9 +211,12 @@ export function SupplierFormSheet({
               />
             </Field>
 
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2">
               <Field>
-                <FieldLabel htmlFor="supplier-city">Ville</FieldLabel>
+                <FieldLabel htmlFor="supplier-city">
+                  Ville
+                  <RequiredMark />
+                </FieldLabel>
                 <Input
                   id="supplier-city"
                   value={city}
@@ -181,16 +225,32 @@ export function SupplierFormSheet({
                 />
               </Field>
               <Field>
-                <FieldLabel htmlFor="supplier-province">Province</FieldLabel>
-                <Input
-                  id="supplier-province"
-                  value={province}
-                  onChange={(event) => setProvince(event.target.value)}
-                  placeholder={ex("Québec")}
+                <FieldLabel htmlFor="supplier-country">Pays</FieldLabel>
+                <CountrySelect
+                  id="supplier-country"
+                  value={country}
+                  onChange={(next) => {
+                    setCountry(next);
+                    // A province the new country does not have cannot stay behind: this address
+                    // is what a supplier will be recognised by when they join Vexta themselves.
+                    if (!isKnownSubdivision(next, province)) setProvince("");
+                  }}
                 />
               </Field>
               <Field>
-                <FieldLabel htmlFor="supplier-postal">Code postal</FieldLabel>
+                <FieldLabel htmlFor="supplier-province">{subdivisionLabel(country)}</FieldLabel>
+                <SubdivisionField
+                  id="supplier-province"
+                  value={province}
+                  onChange={setProvince}
+                  countryName={country}
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="supplier-postal">
+                  Code postal
+                  <RequiredMark />
+                </FieldLabel>
                 <Input
                   id="supplier-postal"
                   value={postalCode}

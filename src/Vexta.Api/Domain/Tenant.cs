@@ -42,6 +42,15 @@ public class Tenant
     public string? Phone { get; set; }
 
     /// <summary>
+    /// The company's registration number -- the NEQ in Québec, a BN elsewhere.
+    ///
+    /// Asked for at sign-up but never required. A company registers before it has the number in
+    /// hand, and a sole proprietor operating under their own name never gets one at all: making
+    /// it mandatory would be refusing the account of somebody who is perfectly legitimate.
+    /// </summary>
+    public string? BusinessNumber { get; set; }
+
+    /// <summary>
     /// The company's own colour, as #RRGGBB, or null to keep Vexta's blue.
     ///
     /// One colour rather than a palette: it is the only one a company can choose without being

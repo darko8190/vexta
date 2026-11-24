@@ -17,7 +17,10 @@ import { SocialButtons } from "@/components/auth/social-buttons";
 import { VextaLogo } from "@/components/brand/vexta-logo";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { useAuth } from "@/lib/auth-context";
+import { CompanyAddressFields } from "@/components/addresses/company-address-fields";
 import { usePublicPlansQuery } from "@/hooks/use-catalog";
+import { defaultCountryName } from "@/lib/geo";
+import { checkCompanyAddress, companyProfileFrom, emptyCompanyAddress } from "@/lib/company-signup";
 import { formatCents } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { ex } from "@/lib/placeholders";
@@ -31,6 +34,13 @@ const formSchema = z
     lastName: z.string().min(1, "Nom requis."),
     email: z.string().min(1, "Le courriel est requis.").email("Courriel invalide."),
     password: passwordSchema,
+    line1: z.string(),
+    line2: z.string(),
+    city: z.string(),
+    province: z.string(),
+    postalCode: z.string(),
+    country: z.string(),
+    businessNumber: z.string(),
   })
   // A travailleur autonome has no company name to give; their space is named after them.
   .refine((values) => values.accountType === "personal" || values.companyName.trim().length >= 2, {
@@ -40,7 +50,8 @@ const formSchema = z
   .refine((values) => values.accountType === "personal" || values.planId.length > 0, {
     message: "Choisissez un forfait.",
     path: ["planId"],
-  });
+  })
+  .superRefine(checkCompanyAddress);
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -85,6 +96,7 @@ function RegisterForm({ initialPlanId }: { initialPlanId: string }) {
       lastName: "",
       email: "",
       password: "",
+      ...emptyCompanyAddress(defaultCountryName),
     },
   });
 
@@ -112,6 +124,7 @@ function RegisterForm({ initialPlanId }: { initialPlanId: string }) {
         password: values.password,
         kind: values.accountType === "personal" ? "Personal" : "Business",
         planId: values.accountType === "personal" ? null : values.planId,
+        profile: companyProfileFrom(values, values.accountType === "personal"),
       });
 
       // Free spaces skip Stripe entirely and land straight in the app.
@@ -187,6 +200,8 @@ function RegisterForm({ initialPlanId }: { initialPlanId: string }) {
                 )}
               />
             )}
+
+            {!isPersonal && <CompanyAddressFields form={form} idPrefix="reg" />}
 
             {!isPersonal && (
               <Controller

@@ -35,6 +35,7 @@ public class CompanyController(VextaDbContext db, ICurrentUserService currentUse
             .Select(t => new
             {
                 t.Id, t.Name, t.Slug, t.Kind, t.Description, t.ContactEmail, t.Phone, t.BrandColor,
+                t.BusinessNumber,
                 LogoETag = t.Logo!.ETag
             })
             .FirstOrDefaultAsync(ct);
@@ -49,7 +50,7 @@ public class CompanyController(VextaDbContext db, ICurrentUserService currentUse
         return Ok(new CompanyProfileDto(
             tenant.Id, tenant.Name, tenant.Slug, tenant.Kind.ToString(),
             tenant.Description, tenant.ContactEmail, tenant.Phone, tenant.LogoETag,
-            tenant.BrandColor, address));
+            tenant.BrandColor, tenant.BusinessNumber, address));
     }
 
     [HttpPut("profile")]
@@ -82,6 +83,7 @@ public class CompanyController(VextaDbContext db, ICurrentUserService currentUse
         tenant.ContactEmail = Clean(request.ContactEmail);
         tenant.Phone = Clean(request.Phone);
         tenant.BrandColor = brandColor;
+        tenant.BusinessNumber = Clean(request.BusinessNumber);
 
         await db.SaveChangesAsync(ct);
         return await Profile(ct);

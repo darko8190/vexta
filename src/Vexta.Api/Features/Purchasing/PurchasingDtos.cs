@@ -17,8 +17,17 @@ public record SupplierDto(
     string? City,
     string? Province,
     string? PostalCode,
+    string? Country,
     string? Notes,
     bool IsActive,
+    /// <summary>
+    /// True once this supplier turned out to be a company on Vexta. Deliberately a flag and not
+    /// the other tenant's id: the screen needs to say so, and nothing here needs to address it.
+    /// </summary>
+    bool IsOnVexta,
+    DateTimeOffset? LinkedAt,
+    /// <summary>When an invitation to join Vexta was last sent, so it is not sent twice a day.</summary>
+    DateTimeOffset? InvitationSentAt,
     /// <summary>How many orders have been placed with them, open or not.</summary>
     int OrderCount,
     /// <summary>Orders placed but not fully received. The number somebody is chasing.</summary>
@@ -35,8 +44,28 @@ public record SaveSupplierRequest(
     string? City,
     string? Province,
     string? PostalCode,
+    string? Country,
     string? Notes,
     bool IsActive);
+
+/// <summary>
+/// A company already on Vexta, offered while a supplier is being added.
+///
+/// Only what a company already publishes about itself: its name, where it is and how to reach
+/// it. A company appears here only if it has published its public page, so everything in this
+/// shape is already readable by anyone on the internet at /e/{slug}.
+/// </summary>
+public record SupplierDirectoryEntryDto(
+    string Name,
+    string? Email,
+    string? Phone,
+    string? Line1,
+    string? City,
+    string? Province,
+    string? PostalCode,
+    string? Country,
+    /// <summary>Where its public page is, so the person adding it can go and look.</summary>
+    string Slug);
 
 // ---- Commandes ----
 

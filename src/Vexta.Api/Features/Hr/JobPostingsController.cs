@@ -61,6 +61,10 @@ public class JobPostingsController(VextaDbContext db, ICurrentUserService curren
     {
         if (currentUser.TenantId is not { } tenantId) return Forbid();
         if (Problem(request) is { } problem) return BadRequest(new { message = problem });
+        if (await FormProblemAsync(request.FormTemplateId, tenantId, ct) is { } formProblem)
+        {
+            return BadRequest(new { message = formProblem });
+        }
 
         var job = new JobPosting { TenantId = tenantId, Title = request.Title.Trim() };
         Apply(job, request);
@@ -68,7 +72,7 @@ public class JobPostingsController(VextaDbContext db, ICurrentUserService curren
         db.JobPostings.Add(job);
         await db.SaveChangesAsync(ct);
 
-        return Ok(ToDtoValue(job, 0));
+        return Ok(await ReadBackAsync(job.Id, ct));
     }
 
     [HttpPut("{id:guid}")]
@@ -77,6 +81,10 @@ public class JobPostingsController(VextaDbContext db, ICurrentUserService curren
     {
         if (currentUser.TenantId is not { } tenantId) return Forbid();
         if (Problem(request) is { } problem) return BadRequest(new { message = problem });
+        if (await FormProblemAsync(request.FormTemplateId, tenantId, ct) is { } formProblem)
+        {
+            return BadRequest(new { message = formProblem });
+        }
 
         var job = await db.JobPostings.FirstOrDefaultAsync(j => j.Id == id && j.TenantId == tenantId, ct);
         if (job is null) return NotFound();
@@ -87,8 +95,76 @@ public class JobPostingsController(VextaDbContext db, ICurrentUserService curren
 
         await db.SaveChangesAsync(ct);
 
-        var applications = await db.Candidates.CountAsync(c => c.JobPostingId == id, ct);
-        return Ok(ToDtoValue(job, applications));
+        return Ok(await ReadBackAsync(job.Id, ct));
+    }
+
+    /// <summary>
+    /// Hangs a file already in the company's library on a posting.
+    ///
+    /// Takes an asset id rather than bytes: uploading goes through the media routes like every
+    /// other file in the application, so the size limits, the quota and the compression are
+    /// decided in one place instead of two.
+    /// </summary>
+    [HttpPost("{id:guid}/documents")]
+    public async Task<ActionResult<JobPostingDto>> AddDocument(
+        Guid id, AddJobPostingDocumentRequest request, CancellationToken ct)
+    {
+        if (currentUser.TenantId is not { } tenantId) return Forbid();
+
+        var job = await db.JobPostings
+            .Include(j => j.Documents)
+            .FirstOrDefaultAsync(j => j.Id == id && j.TenantId == tenantId, ct);
+        if (job is null) return NotFound();
+
+        // Twelve files on a job advertisement is already more than anybody reads, and every one
+        // of them is bytes the company pays to store.
+        if (job.Documents.Count >= 12)
+        {
+            return BadRequest(new { message = "Douze documents au maximum par offre." });
+        }
+
+        var asset = await db.MediaAssets.AsNoTracking()
+            .FirstOrDefaultAsync(a => a.Id == request.MediaAssetId && a.TenantId == tenantId, ct);
+        if (asset is null) return BadRequest(new { message = "Ce fichier n'existe plus." });
+
+        if (job.Documents.Any(d => d.MediaAssetId == asset.Id))
+        {
+            return BadRequest(new { message = "Ce fichier est déjà joint à cette offre." });
+        }
+
+        db.JobPostingDocuments.Add(new JobPostingDocument
+        {
+            TenantId = tenantId,
+            JobPostingId = job.Id,
+            MediaAssetId = asset.Id,
+            Label = Clean(request.Label),
+            SortOrder = job.Documents.Count == 0 ? 0 : job.Documents.Max(d => d.SortOrder) + 1
+        });
+
+        job.UpdatedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(ct);
+
+        return Ok(await ReadBackAsync(job.Id, ct));
+    }
+
+    /// <summary>
+    /// Unhooks the file from the posting. The file itself stays in the library: it may be on
+    /// another posting, and deleting bytes is the library's decision, not this screen's.
+    /// </summary>
+    [HttpDelete("{id:guid}/documents/{documentId:guid}")]
+    public async Task<ActionResult<JobPostingDto>> RemoveDocument(
+        Guid id, Guid documentId, CancellationToken ct)
+    {
+        if (currentUser.TenantId is not { } tenantId) return Forbid();
+
+        var document = await db.JobPostingDocuments
+            .FirstOrDefaultAsync(d => d.Id == documentId && d.JobPostingId == id && d.TenantId == tenantId, ct);
+        if (document is null) return NotFound();
+
+        db.JobPostingDocuments.Remove(document);
+        await db.SaveChangesAsync(ct);
+
+        return Ok(await ReadBackAsync(id, ct));
     }
 
     /// <summary>
@@ -136,6 +212,7 @@ public class JobPostingsController(VextaDbContext db, ICurrentUserService curren
             : request.PostedOn ?? job.PostedOn ?? BusinessDay.Today;
 
         job.IsPublished = request.Status == JobPostingStatus.Publiee;
+        job.FormTemplateId = request.FormTemplateId;
     }
 
     private static string? Problem(SaveJobPostingRequest request)
@@ -163,6 +240,21 @@ public class JobPostingsController(VextaDbContext db, ICurrentUserService curren
         return Enum.IsDefined(request.Status) ? null : "Cet état n'existe pas.";
     }
 
+    /// <summary>
+    /// Whether that form may be attached. Checked against the tenant by hand: FormTemplate does
+    /// carry a query filter, but the id arrives from the browser and a posting pointing at
+    /// another company's form would publish its questions on this company's page.
+    /// </summary>
+    private async Task<string?> FormProblemAsync(Guid? formTemplateId, Guid tenantId, CancellationToken ct)
+    {
+        if (formTemplateId is not { } formId) return null;
+
+        var exists = await db.FormTemplates.IgnoreQueryFilters()
+            .AnyAsync(f => f.Id == formId && f.TenantId == tenantId, ct);
+
+        return exists ? null : "Ce formulaire n'existe plus.";
+    }
+
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     /// <summary>
@@ -174,10 +266,23 @@ public class JobPostingsController(VextaDbContext db, ICurrentUserService curren
         j => new JobPostingDto(
             j.Id, j.Title, j.Description, j.Location, j.EmploymentType,
             j.Compensation, j.ApplyTo, j.Notes, j.Openings, j.Status,
-            j.PostedOn, j.ClosesOn, j.Candidates.Count, j.IsPublished, j.CreatedAt, j.UpdatedAt);
+            j.PostedOn, j.ClosesOn, j.Candidates.Count, j.IsPublished,
+            j.FormTemplateId,
+            j.FormTemplate == null ? null : j.FormTemplate.Title,
+            j.FormTemplate != null && j.FormTemplate.IsPublished,
+            j.Documents
+                .OrderBy(d => d.SortOrder)
+                .Select(d => new JobPostingDocumentDto(
+                    d.Id, d.MediaAssetId, d.MediaAsset!.FileName, d.MediaAsset.ContentType,
+                    d.MediaAsset.SizeBytes, d.Label, d.SortOrder))
+                .ToList(),
+            j.CreatedAt, j.UpdatedAt);
 
-    private static JobPostingDto ToDtoValue(JobPosting j, int applications) =>
-        new(j.Id, j.Title, j.Description, j.Location, j.EmploymentType,
-            j.Compensation, j.ApplyTo, j.Notes, j.Openings, j.Status,
-            j.PostedOn, j.ClosesOn, applications, j.IsPublished, j.CreatedAt, j.UpdatedAt);
+    /// <summary>
+    /// Re-read rather than built from the entity in hand, so a create or an update answers with
+    /// the same shape as the list -- including the form's title and the documents, which the
+    /// tracked entity has not loaded.
+    /// </summary>
+    private async Task<JobPostingDto> ReadBackAsync(Guid id, CancellationToken ct) =>
+        await db.JobPostings.AsNoTracking().Where(j => j.Id == id).Select(ToDto()).FirstAsync(ct);
 }

@@ -71,6 +71,7 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
     public DbSet<PricePolicyTier> PricePolicyTiers => Set<PricePolicyTier>();
     public DbSet<PublicPage> PublicPages => Set<PublicPage>();
     public DbSet<JobPosting> JobPostings => Set<JobPosting>();
+    public DbSet<JobPostingDocument> JobPostingDocuments => Set<JobPostingDocument>();
     public DbSet<ProjectTask> ProjectTasks => Set<ProjectTask>();
     public DbSet<Report> Reports => Set<Report>();
     public DbSet<ClientAsset> ClientAssets => Set<ClientAsset>();
@@ -566,6 +567,17 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.Property(s => s.City).HasMaxLength(100);
             e.Property(s => s.Province).HasMaxLength(60);
             e.Property(s => s.PostalCode).HasMaxLength(20);
+            e.Property(s => s.Country).HasMaxLength(80);
+            e.Property(s => s.AddressKey).HasMaxLength(260);
+
+            // The platform-wide index behind supplier matching: when a company signs up, this is
+            // the one query that has to find its records in every other tenant at once.
+            e.HasIndex(s => s.AddressKey);
+
+            // SetNull, not cascade: deleting the company that turned out to be this supplier must
+            // not delete the supplier, nor the orders placed with it.
+            e.HasOne(s => s.LinkedTenant).WithMany()
+                .HasForeignKey(s => s.LinkedTenantId).OnDelete(DeleteBehavior.SetNull);
             e.Property(s => s.Notes).HasMaxLength(4000);
 
             e.HasIndex(s => new { s.TenantId, s.Name });
@@ -1020,8 +1032,32 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.HasIndex(j => new { j.TenantId, j.CreatedAt });
             e.HasIndex(j => new { j.TenantId, j.Status });
 
+            // SetNull, not cascade: deleting a form must not delete the positions that were
+            // advertised with it. The posting stays up and simply stops asking questions.
+            e.HasOne(j => j.FormTemplate).WithMany()
+                .HasForeignKey(j => j.FormTemplateId).OnDelete(DeleteBehavior.SetNull);
+
             // No query filter, for the same reason as the page it appears on. Every staff query
             // scopes by tenant explicitly.
+        });
+
+        builder.Entity<JobPostingDocument>(e =>
+        {
+            e.Property(d => d.Label).HasMaxLength(200);
+
+            // Cascade from the posting: a file hung on a position that no longer exists is not
+            // a file anybody will ever open again.
+            e.HasOne(d => d.JobPosting).WithMany(j => j.Documents)
+                .HasForeignKey(d => d.JobPostingId).OnDelete(DeleteBehavior.Cascade);
+
+            // Cascade from the asset too: the row points at bytes, and a row pointing at bytes
+            // that are gone is a broken link on a public page.
+            e.HasOne(d => d.MediaAsset).WithMany()
+                .HasForeignKey(d => d.MediaAssetId).OnDelete(DeleteBehavior.Cascade);
+
+            e.HasIndex(d => new { d.JobPostingId, d.SortOrder });
+
+            // No query filter, to match the posting it belongs to.
         });
 
         builder.Entity<PlatformSetting>(e =>
@@ -1142,6 +1178,7 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.Property(t => t.Phone).HasMaxLength(40);
             // #RRGGBB, validated on the way in.
             e.Property(t => t.BrandColor).HasMaxLength(7);
+            e.Property(t => t.BusinessNumber).HasMaxLength(40);
         });
 
         // Platform-wide branding, like Plan and Module: no tenant query filter, because every

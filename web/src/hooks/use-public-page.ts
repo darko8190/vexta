@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { PublicPageSettings } from "@/lib/types";
+import type { PublicPageSettings, PublicPageStyle } from "@/lib/types";
 
 export interface PublicPageValues {
   isPublished: boolean;
@@ -9,6 +9,7 @@ export interface PublicPageValues {
   contactNote: string | null;
   showProducts: boolean;
   showJobs: boolean;
+  style: PublicPageStyle;
 }
 
 export function usePublicPageQuery() {

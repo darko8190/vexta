@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import * as z from "zod";
 import { MapPin, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -32,7 +32,9 @@ import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { LoadErrorState } from "@/components/layout/load-error-state";
 import { EmptyState } from "@/components/layout/empty-state";
 import { useDeleteLocation, useLocationsQuery, useSaveLocation } from "@/hooks/use-hr";
+import { CountrySelect, SubdivisionField } from "@/components/addresses/country-field";
 import { ApiError } from "@/lib/api";
+import { defaultCountryName, isKnownSubdivision, subdivisionLabel } from "@/lib/geo";
 import type { CompanyLocation } from "@/lib/types";
 import { ex } from "@/lib/placeholders";
 
@@ -58,7 +60,7 @@ function toFormValues(location?: CompanyLocation): FormValues {
     city: location?.city ?? "",
     province: location?.province ?? "Québec",
     postalCode: location?.postalCode ?? "",
-    country: location?.country ?? "Canada",
+    country: location?.country ?? defaultCountryName,
     phone: location?.phone ?? "",
     isPrimary: location?.isPrimary ?? false,
   };
@@ -81,6 +83,10 @@ function LocationFormSheet({
     defaultValues: toFormValues(location),
   });
 
+  // Watched rather than read once: the province field is a list for some countries and a
+  // plain box for the others, and it has to change the moment the country does.
+  const country = useWatch({ control: form.control, name: "country" });
+
   useEffect(() => {
     if (open) form.reset(toFormValues(location));
   }, [open, location, form]);
@@ -97,7 +103,7 @@ function LocationFormSheet({
           city: values.city,
           province: values.province || null,
           postalCode: values.postalCode,
-          country: values.country || "Canada",
+          country: values.country || defaultCountryName,
           phone: values.phone || null,
         },
       });
@@ -191,12 +197,24 @@ function LocationFormSheet({
                 )}
               />
               <Controller
-                name="province"
+                name="country"
                 control={form.control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="location-province">Province</FieldLabel>
-                    <Input {...field} id="location-province" placeholder={ex("Québec")} aria-invalid={fieldState.invalid} />
+                    <FieldLabel htmlFor="location-country">Pays</FieldLabel>
+                    <CountrySelect
+                      id="location-country"
+                      value={field.value}
+                      onChange={(next) => {
+                        field.onChange(next);
+                        // A province the new country does not have cannot stay behind on the
+                        // record: it would print an address that reads as a mistake.
+                        if (!isKnownSubdivision(next, form.getValues("province"))) {
+                          form.setValue("province", "");
+                        }
+                      }}
+                      invalid={fieldState.invalid}
+                    />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}
@@ -205,12 +223,18 @@ function LocationFormSheet({
 
             <div className="grid gap-4 sm:grid-cols-2">
               <Controller
-                name="country"
+                name="province"
                 control={form.control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="location-country">Pays</FieldLabel>
-                    <Input {...field} id="location-country" placeholder={ex("Canada")} aria-invalid={fieldState.invalid} />
+                    <FieldLabel htmlFor="location-province">{subdivisionLabel(country)}</FieldLabel>
+                    <SubdivisionField
+                      id="location-province"
+                      value={field.value}
+                      onChange={field.onChange}
+                      countryName={country}
+                      invalid={fieldState.invalid}
+                    />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}

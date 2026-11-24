@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Vexta.Api.Common;
 
 namespace Vexta.Api.Domain;
 
@@ -9,7 +10,14 @@ public static class TenantSlug
 {
     public static string For(string name)
     {
-        var lowered = name.Trim().ToLowerInvariant();
+        // Accented letters are turned into their plain equivalents before anything is dropped.
+        // Written without that step, "Les Bétons Lévis" became les-b-tons-l-vis: the regex below
+        // deleted every accented letter outright, and the result is the company's own public web
+        // address with holes in it.
+        //
+        // Only new slugs are affected. An existing one is never recomputed -- it is in links
+        // people have already saved, and that is worth more than its spelling.
+        var lowered = CompanyIdentity.Normalize(name);
         var cleaned = Regex.Replace(lowered, "[^a-z0-9]+", "-").Trim('-');
         return string.IsNullOrEmpty(cleaned) ? Guid.NewGuid().ToString("N")[..8] : cleaned;
     }

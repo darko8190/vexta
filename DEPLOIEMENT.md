@@ -1590,6 +1590,131 @@ enregistrés, et ça vaut plus que leur orthographe.
 
 ---
 
+### Le menu ne défile plus avec la page
+
+La coque fait maintenant exactement la hauteur de la fenêtre et ne défile pas ; seule la zone de
+contenu défile. Le rail de gauche, la barre du haut et la bannière d'essai restent donc à l'écran.
+Le rail est le seul contrôle qui répond à « où suis-je », et défiler un long tableau le faisait
+disparaître précisément au moment où quelqu'un voulait en sortir.
+
+`h-dvh` et non `h-screen` : avec `vh`, la coque est haute comme la fenêtre **sans** les barres du
+navigateur mobile, et la dernière ligne de chaque page se retrouvait dessous.
+
+Le rail des sous-onglets est `sticky` lui aussi, et `self-start` pour ne pas s'étirer à la hauteur
+d'un tableau de deux cents lignes. Les sous-onglets sont de la navigation eux aussi : un rail qui
+part avec le contenu oblige à remonter pour changer de section.
+
+### Le toggle de la page publique en mode sombre
+
+Il était invisible. La piste éteinte était une surface translucide — une forme sombre sur une
+carte sombre, avec un bouton sombre dessus — et, pire, `dark:bg-input` était écrit **après**
+`data-checked:bg-primary`, donc en thème sombre le toggle allumé n'était pas allumé non plus. Sur
+le seul réglage qui décide si la page de l'entreprise est sur Internet.
+
+Maintenant : piste pleine avec sa propre bordure dans les deux thèmes, variante sombre répétée
+après l'état coché pour qu'elle ne gagne pas, bouton blanc dans les deux thèmes (contre une piste
+sombre, c'est le bouton qui doit être la chose claire). Et **l'état est écrit en mots** à côté —
+« En ligne » / « Hors ligne » : un interrupteur ne se lit que par celui qui sait déjà de quel côté
+est allumé.
+
+### Type de réponse « fichier / image » dans les formulaires
+
+Une question peut maintenant demander un fichier. Le téléversement passe par les routes média
+comme tout autre fichier, donc la limite de taille, le quota et la compression restent décidés à
+un seul endroit. Le fichier part **au moment où il est choisi**, pas à l'envoi : téléverser à
+l'envoi voudrait dire un formulaire qui échoue tard, quand la personne a déjà tourné la page.
+
+La réponse garde **le nom du fichier comme texte** et pointe vers l'asset. Deux conséquences
+voulues : supprimer le fichier de la bibliothèque ne supprime pas la réponse (elle dit encore ce
+qui a été envoyé), et le nom est lu depuis l'asset vérifié, jamais depuis ce que l'appelant a
+tapé — sinon une soumission pourrait prétendre qu'un fichier s'appelle n'importe quoi. Les assets
+sont vérifiés contre la bibliothèque **du locataire** avant toute écriture : les identifiants
+viennent du navigateur, et une réponse pointant vers le fichier d'une autre entreprise mettrait
+son nom et un lien vers lui sur la soumission de celle-ci.
+
+**La page publique anonyme refuse** un formulaire qui contient une question fichier, avec une
+phrase qui le dit. Téléverser demande un compte, et ouvrir les routes média à quiconque atteint
+une page publique est une décision à prendre exprès, pas un effet de bord de l'ajout d'un type de
+champ. Une candidature déposée sans le CV qu'on lui demandait serait pire qu'une candidature
+refusée, parce que personne ne s'en apercevrait.
+
+### Trois styles de page publique de plus, et le pied retiré
+
+**Journal** (mesure large, texte aéré, titres réduits à des étiquettes), **Panneau** (tout en
+panneaux encadrés, se lit comme une fiche produit) et **Affiche** (une colonne, le nom très grand
+et centré). Sept en tout, et aucun ne choisit de couleur.
+
+Le bloc du bas qui répétait le nom de l'entreprise est retiré : il est déjà en haut de la page.
+
+---
+
+### Comptes personnels : le CV appartient à la personne
+
+Un compte personnel a maintenant un **CV**, et c'est la décision structurante de tout ce qui
+suit. La table est clé par `UserId`, sans `TenantId` et **sans filtre de locataire** — c'est le
+seul enregistrement de l'application qui appartient à une personne plutôt qu'à une entreprise.
+Un homme de métier répond à trois entreprises par saison ; un CV rangé dans l'espace d'une
+entreprise devrait être retapé pour chacune et disparaîtrait avec n'importe laquelle. Toutes les
+requêtes nomment donc l'utilisateur explicitement : il n'y a aucun filtre derrière elles.
+
+Postuler ne donne **jamais** cette ligne à l'entreprise. Ça fabrique un `Candidate` dans
+l'espace de l'entreprise, copié depuis le CV, exactement comme une candidature arrivée par
+courriel. L'entreprise possède ensuite ce qu'elle a reçu, et la personne peut modifier ou
+supprimer son CV ensuite sans réécrire l'histoire à l'intérieur du commerce de quelqu'un
+d'autre. Vérifié en base : `PersonalProfiles` n'a **pas de colonne TenantId**, et une entreprise
+ne voit zéro ligne d'expérience d'un postulant.
+
+**Ce qui compte comme « CV rempli »** : un numéro de téléphone, et un récit de ce qu'on a fait —
+soit un emploi inscrit, soit un document téléversé. Deux choses, pas plus. En demander davantage
+transformerait une candidature en exercice de paperasse et coûterait à l'entreprise les
+candidats qu'elle veut le plus ; en demander moins lui enverrait un nom sans rien pour agir. La
+règle est calculée, jamais stockée, et lue aussi bien par l'écran qui réclame que par l'endpoint
+qui refuse — avec, dans les deux cas, **la liste de ce qui manque**, parce qu'« incomplet » sans
+dire quoi est le seul message sur lequel personne ne peut agir.
+
+**Ce que l'entreprise reçoit** : le CV écrit en texte, figé au moment de la candidature, dans sa
+propre colonne (`ApplicationSummary`) et non dans `Notes` — une candidature et l'opinion qu'on
+s'en fait sont deux choses, et écrire la première dans la seconde écraserait ce que le bureau
+avait déjà tapé. Si la personne avait téléversé un document, il est **copié** sous le préfixe de
+l'entreprise (copie serveur à serveur dans R2, rien n'est téléchargé). Aucune ligne de l'espace
+de l'entreprise ne pointe vers celui du postulant, et ses routes média restent strictement
+locataires.
+
+**Une candidature par compte et par offre**, tenue par un index unique partiel en base et pas
+seulement par l'endpoint : un bouton pressé deux fois est la façon ordinaire dont ça arrive, et
+la deuxième ligne se lirait comme une deuxième personne.
+
+Sur la page publique : la barre de compte en haut (se connecter / s'inscrire, ou qui vous êtes),
+et **chaque** offre publiée peut être postulée — avec ou sans formulaire attaché, puisque le CV
+*est* la candidature et que le formulaire n'est que les questions supplémentaires de
+l'entreprise. La ligne « écrivez à » reste à côté, parce que certains préféreront téléphoner,
+mais ce n'est plus la seule porte. La connexion et l'inscription portent un chemin de retour
+validé (relatif, jamais `//`), pour ramener la personne à l'offre qu'elle lisait.
+
+### Deux défauts trouvés par le test, pas par la relecture
+
+**Un espace personnel en double.** `WorkspaceService.EnsureAsync` lit les adhésions une fois,
+ajoute celle de l'espace d'accueil **au contexte** et non à la liste, puis demande à la liste
+périmée si la personne a déjà un espace personnel. Elle répondait non pour quelqu'un qui venait
+d'en ouvrir un : chaque inscription personnelle recevait donc un **deuxième** espace vide à sa
+première connexion, et le sélecteur d'espaces affichait deux fois le même nom.
+
+**Un espace sans nom.** Le formulaire web calcule le nom d'un espace personnel à partir du nom
+de la personne, mais l'endpoint est joignable sans lui : un nom vide créait un locataire **sans
+nom**, avec un slug aléatoire — un enregistrement que personne ne reconnaît, à une adresse
+publique que personne ne peut lire. L'API retombe maintenant sur le nom de la personne, et
+refuse si même ça est vide.
+
+**Et un index que le générateur voulait supprimer.** En ajoutant l'index unique partiel sur
+`(JobPostingId, ApplicantUserId)`, EF a retiré `IX_Candidates_JobPostingId` en le croyant
+redondant. Il ne l'est pas : le nouveau est **partiel** et ne couvre rien pour un candidat sans
+compte — c'est-à-dire chaque CV arrivé par courriel et chaque personne saisie à la main. La
+requête « combien de gens ont répondu à cette offre » tourne à chaque chargement de l'écran
+d'embauche et serait tombée en balayage de table. L'index est déclaré explicitement pour que le
+générateur ne puisse plus le retirer.
+
+---
+
 ---
 
 ## 7. Compression des fichiers R2

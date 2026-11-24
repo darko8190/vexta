@@ -80,13 +80,35 @@ public class FormSubmissionsController(
 
         var given = (request.Answers ?? [])
             .GroupBy(a => a.FieldId)
-            .ToDictionary(g => g.Key, g => g.Last().Value);
+            .ToDictionary(g => g.Key, g => g.Last());
+
+        // Checked against this tenant's own library before anything is written. The ids arrive
+        // from the browser, and an answer pointing at another company's file would put that
+        // file's name -- and a link to it -- on this company's submission.
+        var wantedAssets = given.Values
+            .Select(a => a.MediaAssetId)
+            .OfType<Guid>()
+            .Distinct()
+            .ToList();
+
+        var assets = wantedAssets.Count == 0
+            ? []
+            : await db.MediaAssets.AsNoTracking()
+                .Where(m => wantedAssets.Contains(m.Id) && m.TenantId == tenantId)
+                .Select(m => new { m.Id, m.FileName })
+                .ToDictionaryAsync(m => m.Id, m => m.FileName, ct);
+
+        if (assets.Count != wantedAssets.Count)
+        {
+            return BadRequest(new { message = "Un des fichiers joints n'existe plus." });
+        }
 
         // Validated against the questions rather than against what was sent: a field left out
         // of the payload altogether is a field left empty, and a required one has to say so.
         foreach (var field in fields)
         {
-            given.TryGetValue(field.Id, out var value);
+            given.TryGetValue(field.Id, out var answer);
+            var value = TextOf(field, answer, assets);
             if (FormAnswerRules.Problem(field, value) is { } problem) return BadRequest(new { message = problem });
         }
 
@@ -103,7 +125,7 @@ public class FormSubmissionsController(
         for (var index = 0; index < fields.Count; index++)
         {
             var field = fields[index];
-            given.TryGetValue(field.Id, out var value);
+            given.TryGetValue(field.Id, out var answer);
 
             db.FormAnswers.Add(new FormAnswer
             {
@@ -114,7 +136,8 @@ public class FormSubmissionsController(
                 // what was answered today.
                 Label = field.Label,
                 Type = field.Type,
-                Value = Clean(value),
+                Value = Clean(TextOf(field, answer, assets)),
+                MediaAssetId = field.Type == FormFieldType.Fichier ? answer?.MediaAssetId : null,
                 SortOrder = index
             });
         }
@@ -164,7 +187,8 @@ public class FormSubmissionsController(
         db.FormAnswers.AsNoTracking()
             .Where(a => a.SubmissionId == submissionId)
             .OrderBy(a => a.SortOrder)
-            .Select(a => new FormAnswerDto(a.Id, a.FormFieldId, a.Label, a.Type, a.Value, a.SortOrder))
+            .Select(a => new FormAnswerDto(
+                a.Id, a.FormFieldId, a.Label, a.Type, a.Value, a.MediaAssetId, a.SortOrder))
             .ToListAsync(ct);
 
     private static System.Linq.Expressions.Expression<Func<FormSubmission, FormSubmissionDto>> Fields() =>
@@ -202,6 +226,25 @@ public class FormSubmissionsController(
         if (account is null) return null;
 
         return $"{account.FirstName} {account.LastName}".Trim() is { Length: > 0 } name ? name : account.Email;
+    }
+
+    /// <summary>
+    /// The text to store for an answer.
+    ///
+    /// For a Fichier it is the uploaded file's own name, read from the asset we just verified
+    /// and never from what the caller typed: otherwise a submission could claim a file is
+    /// called whatever its sender wanted it to say.
+    /// </summary>
+    private static string? TextOf(
+        FormField field,
+        SubmitFormAnswer? answer,
+        IReadOnlyDictionary<Guid, string> assets)
+    {
+        if (field.Type != FormFieldType.Fichier) return answer?.Value;
+
+        return answer?.MediaAssetId is { } assetId && assets.TryGetValue(assetId, out var fileName)
+            ? fileName
+            : null;
     }
 
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

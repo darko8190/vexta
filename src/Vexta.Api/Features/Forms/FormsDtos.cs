@@ -83,7 +83,16 @@ public record SaveFormActionsRequest(IReadOnlyList<SaveFormActionRequest> Action
 
 // ---- Filled copies ----
 
-public record FormAnswerDto(Guid Id, Guid? FormFieldId, string Label, FormFieldType Type, string? Value, int SortOrder);
+public record FormAnswerDto(
+    Guid Id,
+    Guid? FormFieldId,
+    string Label,
+    FormFieldType Type,
+    /// <summary>The answer as text. For a Fichier, the uploaded file's name.</summary>
+    string? Value,
+    /// <summary>The uploaded file, for a Fichier. Null once it has been deleted from the library.</summary>
+    Guid? MediaAssetId,
+    int SortOrder);
 
 public record FormSubmissionDto(
     Guid Id,
@@ -103,7 +112,15 @@ public record FormSubmissionDetailDto(FormSubmissionDto Submission, IReadOnlyLis
 /// The answer as text, whatever the type. A MultiChoix sends its chosen labels joined by a
 /// comma, which is how it is stored and how it is e-mailed on.
 /// </param>
-public record SubmitFormAnswer(Guid FieldId, string? Value);
+public record SubmitFormAnswer(
+    Guid FieldId,
+    string? Value,
+    /// <summary>
+    /// For a Fichier question: a file already uploaded through the media routes. The file's
+    /// name is read from the asset rather than taken from <see cref="Value"/>, so the caller
+    /// cannot label somebody else's file whatever it likes.
+    /// </summary>
+    Guid? MediaAssetId = null);
 
 public record SubmitFormRequest(IReadOnlyList<SubmitFormAnswer> Answers);
 

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { Building2, BriefcaseBusiness, FileText, Mail, MapPin, Phone } from "lucide-react";
 import { BrandTheme } from "@/components/layout/brand-theme";
 import { JobApplicationDialog } from "@/components/public/job-application-dialog";
+import { PublicAccountBar } from "@/components/public/public-account-bar";
 import { apiFetch } from "@/lib/api-server";
 import { employmentTypeLabels } from "@/lib/labels";
 import { styleTokensFor } from "@/lib/public-page-style";
@@ -136,6 +137,12 @@ async function CompanyPageContent({ params }: Pick<PageProps<"/e/[slug]">, "para
         <div className={s.accentBar} aria-hidden="true" />
 
         <header className={s.header}>
+          {/* Above the company's own header and outside it: this belongs to Vexta, not to the
+              company, and it must not take on whichever arrangement the company chose. */}
+          <div className={cn(s.container, "flex items-center justify-end gap-2 pt-3")}>
+            <PublicAccountBar slug={company.slug} />
+          </div>
+
           <div className={cn(s.container, "py-10 sm:py-14")}>
             <div className={s.headerInner}>
               <div className={s.logoFrame}>
@@ -153,7 +160,7 @@ async function CompanyPageContent({ params }: Pick<PageProps<"/e/[slug]">, "para
                 )}
               </div>
 
-              <div className={s.headerText}>
+              <div className={cn(s.headerText, "flex-1")}>
                 <h1 className={s.title}>
                   {company.name}
                 </h1>
@@ -280,18 +287,17 @@ async function CompanyPageContent({ params }: Pick<PageProps<"/e/[slug]">, "para
                         </ul>
                       )}
 
-                      {/* The form when there is one, and the line saying where to write when
-                          there is not. Never both: two ways to apply on one posting is how half
-                          the applications end up somewhere nobody reads. */}
-                      {job.hasForm ? (
-                        <JobApplicationDialog slug={company.slug} jobId={job.id} jobTitle={job.title} />
-                      ) : (
-                        job.applyTo && (
-                          <p className="mt-3 text-sm text-foreground">
-                            <span className="text-muted-foreground">Pour postuler : </span>
-                            {job.applyTo}
-                          </p>
-                        )
+                      {/* Offered on every published posting, with or without a form attached:
+                          the CV is the application, and the form is only the company's extra
+                          questions. The line the company wrote stays beside it, because some
+                          people would rather telephone -- but it is no longer the only way in. */}
+                      <JobApplicationDialog slug={company.slug} jobId={job.id} jobTitle={job.title} />
+
+                      {job.applyTo && (
+                        <p className="mt-3 text-sm text-foreground">
+                          <span className="text-muted-foreground">Ou écrivez à : </span>
+                          {job.applyTo}
+                        </p>
                       )}
                     </li>
                   ))}
@@ -362,11 +368,6 @@ async function CompanyPageContent({ params }: Pick<PageProps<"/e/[slug]">, "para
           </div>
         </main>
 
-        <footer className="border-t border-border">
-          <div className={cn(s.container, "py-6")}>
-            <p className="text-sm text-muted-foreground">{company.name}</p>
-          </div>
-        </footer>
       </div>
     </>
   );

@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Inbox, Trash2 } from "lucide-react";
+import { Inbox, Paperclip, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
 import { LoadErrorState } from "@/components/layout/load-error-state";
@@ -16,6 +17,7 @@ import {
   useFormSubmissionsQuery,
 } from "@/hooks/use-forms";
 import { useIsOwner } from "@/hooks/use-can-create";
+import { useMediaLink } from "@/hooks/use-media";
 import { ApiError } from "@/lib/api";
 import { formatMoment } from "@/lib/dates";
 import type { FormSubmission } from "@/lib/types";
@@ -168,9 +170,47 @@ function AnswerList({ formId, submissionId }: { formId: string; submissionId: st
       {data.answers.map((answer) => (
         <div key={answer.id}>
           <dt className="text-muted-foreground">{answer.label}</dt>
-          <dd className="whitespace-pre-wrap text-foreground">{answer.value ?? "—"}</dd>
+          <dd className="whitespace-pre-wrap text-foreground">
+            {/* A file answer is its own name plus a way to open it. The name alone is still
+                shown when the file has since been deleted from the library: the submission has
+                to keep saying what was sent, which is why the answer survives the asset. */}
+            {answer.mediaAssetId ? (
+              <AnswerFileLink assetId={answer.mediaAssetId} fileName={answer.value} />
+            ) : (
+              answer.value ?? "—"
+            )}
+          </dd>
         </div>
       ))}
     </dl>
+  );
+}
+
+/**
+ * Opens a file that was sent as an answer.
+ *
+ * The link is minted on the press rather than with the page: these URLs are signed and expire,
+ * and a list of twenty submissions would be twenty signatures nobody clicked.
+ */
+function AnswerFileLink({ assetId, fileName }: { assetId: string; fileName: string | null }) {
+  const link = useMediaLink();
+
+  return (
+    <button
+      type="button"
+      className="inline-flex items-center gap-1.5 text-primary hover:underline"
+      disabled={link.isPending}
+      onClick={async () => {
+        try {
+          const { url } = await link.mutateAsync(assetId);
+          window.open(url, "_blank", "noopener,noreferrer");
+        } catch {
+          toast.error("Impossible d'ouvrir ce fichier.");
+        }
+      }}
+    >
+      {link.isPending ? <Spinner className="size-3.5" /> : <Paperclip className="size-3.5" />}
+      {fileName ?? "Fichier"}
+    </button>
   );
 }

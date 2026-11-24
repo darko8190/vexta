@@ -114,7 +114,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (!user) return null;
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    // h-dvh and overflow-hidden, not min-h-screen: the page itself no longer scrolls, only
+    // the content area below does. That is what keeps the rail, the top bar and the trial
+    // banner on screen -- the rail is the one control that answers "where am I", and scrolling
+    // a long table used to take it away exactly when somebody needed to leave the table.
+    //
+    // dvh rather than vh because of the phone: with vh the shell is as tall as the viewport
+    // *without* the browser's own bars, so the last row of every page sat under them.
+    <div className="flex h-dvh flex-col overflow-hidden bg-background">
       {user.isImpersonating && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-primary/30 bg-primary/10 px-4 py-2 md:px-6">
           <Eye className="size-4 shrink-0 text-primary" />
@@ -243,7 +250,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <ThemeToggle />
           <UserAvatarMenu />
         </header>
-        <main className="flex-1 overflow-x-hidden px-4 py-6 md:px-8 md:py-8">
+        {/* The only thing on the screen that scrolls. Everything a person navigates with --
+            the rail, the bar, the banner -- is outside it and therefore stays. */}
+        <main className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-6 md:px-8 md:py-8">
           {/* No width cap: the tables are the point of most of these screens, and a column
               that has to truncate on a wide monitor is a column nobody can read. Forms keep
               their own max-width, so text lines stay short where it matters. */}

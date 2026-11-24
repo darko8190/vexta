@@ -39,6 +39,20 @@ export const api = {
   delete: <T,>(path: string) => request<T>(path, { method: "DELETE" }),
 };
 
+/**
+ * A path this application may send somebody back to after they sign in.
+ *
+ * Only a relative path of our own, and never one starting with "//" -- a browser reads that as
+ * another host, which is how a sign-in page becomes a way of sending somebody somewhere else
+ * while they are looking at our name.
+ */
+export function safeReturnPath(value: string | null | undefined): string | null {
+  if (!value) return null;
+  if (!value.startsWith("/")) return null;
+  if (value.startsWith("//")) return null;
+  return value;
+}
+
 export function buildQuery(params: Record<string, string | number | boolean | undefined | null>): string {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {

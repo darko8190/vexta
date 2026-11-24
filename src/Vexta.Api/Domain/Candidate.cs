@@ -57,7 +57,31 @@ public class Candidate
     public Guid? ResumeMediaAssetId { get; set; }
     public MediaAsset? ResumeMediaAsset { get; set; }
 
+    /// <summary>
+    /// The Vexta account that applied, for an application made from a public page. Null for
+    /// everybody else -- a CV that arrived by email, somebody entered by hand.
+    ///
+    /// Kept so the same person cannot file four applications on one posting, and so they can be
+    /// shown what they have applied to. Deliberately not a way for the company to read their
+    /// profile: what the company has is this card, copied at the moment they applied.
+    /// </summary>
+    public Guid? ApplicantUserId { get; set; }
+
+    /// <summary>The company's own notes on them. Never written by anything but the company.</summary>
     public string? Notes { get; set; }
+
+    /// <summary>
+    /// The CV as the applicant sent it, frozen at the moment they applied.
+    ///
+    /// Its own column rather than <see cref="Notes"/>, which belongs to the company: an
+    /// application and an opinion about it are two different things, and writing the first into
+    /// the second would overwrite whatever the office had already typed.
+    ///
+    /// A snapshot and not a link to the person's profile, for the same reason the whole card is
+    /// a copy: they will edit their CV next month, and what this company received must not
+    /// change under it afterwards.
+    /// </summary>
+    public string? ApplicationSummary { get; set; }
 
     /// <summary>
     /// The employee created when they were hired. Set once, and what stops the same person

@@ -45,8 +45,12 @@ export function SectionNav({
         // Phone: a scrollable row, with the page gutter bled through so the first and last
         // items are not glued to the screen edge.
         "-mx-4 flex gap-1 overflow-x-auto px-4 pb-2",
-        // md and up: a fixed rail that stays put while the section beside it scrolls.
+        // md and up: a rail that stays put while the section beside it scrolls. Sticky rather
+        // than merely tall, and self-start so it does not stretch to the height of a long
+        // table: the sub-tabs are navigation too, and a rail that scrolls away with the content
+        // means scrolling back up to change section.
         "md:mx-0 md:w-64 md:shrink-0 md:flex-col md:overflow-visible md:px-0 md:pb-0",
+        "md:sticky md:top-0 md:self-start",
       )}
     >
       {sections.map((section) => {

@@ -7,6 +7,7 @@
   ClipboardPen,
   Clock,
   FileText,
+  FileUser,
   FolderKanban,
   LayoutDashboard,
   ListChecks,
@@ -83,13 +84,14 @@ const tenantAdminNav: NavItem[] = [
 ];
 
 /**
- * A personal space holds nothing yet. Clients, projects and invoices belong to a company, and
- * offering them here would open three screens whose only content is an invitation to buy a
- * business plan. What goes in a personal space is still being decided; until then the space is
- * honestly empty rather than furnished with other people's furniture.
+ * A personal space holds what belongs to the person rather than to a company: their CV, and the
+ * applications it has sent. Clients, projects and invoices are still absent on purpose -- they
+ * belong to a company, and offering them here would open screens whose only content is an
+ * invitation to buy a business plan.
  */
 const personalNav: NavItem[] = [
   { href: "/tableau-de-bord", label: "Tableau de bord", icon: LayoutDashboard },
+  { href: "/mon-cv", label: "Mon CV", icon: FileUser },
 ];
 
 /**

@@ -23,7 +23,22 @@ public enum PublicPageStyle
     Epure = 2,
 
     /// <summary>Products first and larger, the text secondary. For a page that is a catalogue.</summary>
-    Vitrine = 3
+    Vitrine = 3,
+
+    /// <summary>
+    /// Editorial: a wide measure, generous leading, headings reduced to small labels. For a
+    /// company whose page is an argument rather than a list.
+    /// </summary>
+    Journal = 4,
+
+    /// <summary>Everything in framed panels with a little lift. Reads as a product sheet.</summary>
+    Panneau = 5,
+
+    /// <summary>
+    /// A poster. One column, the name very large and centred, nothing competing with it. For a
+    /// trade whose page exists to be the name and a telephone number.
+    /// </summary>
+    Affiche = 6
 }
 
 /// <summary>

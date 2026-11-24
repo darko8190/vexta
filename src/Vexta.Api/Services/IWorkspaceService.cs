@@ -106,6 +106,13 @@ public class WorkspaceService(VextaDbContext db, UserManager<ApplicationUser> us
 
         var changed = false;
 
+        // Tracked separately from the list, because the list is read once and the block below
+        // adds to the context rather than to it. Asked of the stale list, the question "does
+        // this person already have a personal space" answered no for somebody who had just
+        // opened one -- so every personal sign-up was given a second, empty personal space on
+        // its first sign-in, and the space switcher showed the same name twice.
+        var hasPersonal = memberships.Any(m => m.Tenant?.Kind == TenantKind.Personal);
+
         if (user.TenantId is { } homeTenantId && memberships.All(m => m.TenantId != homeTenantId))
         {
             db.TenantMemberships.Add(new TenantMembership
@@ -115,9 +122,18 @@ public class WorkspaceService(VextaDbContext db, UserManager<ApplicationUser> us
                 Role = user.Role
             });
             changed = true;
+
+            // The home space counts: for somebody who signed up personally, it is the personal
+            // space, and creating another would be creating a duplicate of it.
+            var homeKind = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
+                .Where(t => t.Id == homeTenantId)
+                .Select(t => t.Kind)
+                .FirstOrDefaultAsync(ct);
+
+            if (homeKind == TenantKind.Personal) hasPersonal = true;
         }
 
-        if (!memberships.Any(m => m.Tenant?.Kind == TenantKind.Personal))
+        if (!hasPersonal)
         {
             var name = $"{user.FirstName} {user.LastName}".Trim();
             if (string.IsNullOrWhiteSpace(name)) name = user.Email ?? "Espace personnel";

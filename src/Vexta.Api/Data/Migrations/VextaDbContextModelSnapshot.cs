@@ -468,6 +468,13 @@ namespace Vexta.Api.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("ApplicantUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ApplicationSummary")
+                        .HasMaxLength(8000)
+                        .HasColumnType("character varying(8000)");
+
                     b.Property<DateOnly>("AppliedOn")
                         .HasColumnType("date");
 
@@ -529,6 +536,10 @@ namespace Vexta.Api.Data.Migrations
                     b.HasIndex("JobPostingId");
 
                     b.HasIndex("ResumeMediaAssetId");
+
+                    b.HasIndex("JobPostingId", "ApplicantUserId")
+                        .IsUnique()
+                        .HasFilter("\"ApplicantUserId\" IS NOT NULL AND \"JobPostingId\" IS NOT NULL");
 
                     b.HasIndex("TenantId", "Status");
 
@@ -1367,6 +1378,9 @@ namespace Vexta.Api.Data.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
 
+                    b.Property<Guid?>("MediaAssetId")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("SortOrder")
                         .HasColumnType("integer");
 
@@ -1386,6 +1400,8 @@ namespace Vexta.Api.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("FormFieldId");
+
+                    b.HasIndex("MediaAssetId");
 
                     b.HasIndex("SubmissionId", "SortOrder");
 
@@ -2073,6 +2089,135 @@ namespace Vexta.Api.Data.Migrations
                     b.HasIndex("SortOrder");
 
                     b.ToTable("Modules");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.PersonalEducation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("CompletedYear")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Program")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("School")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "SortOrder");
+
+                    b.ToTable("PersonalEducation");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.PersonalExperience", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("Employer")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateOnly?>("EndedOn")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Location")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly?>("StartedOn")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "SortOrder");
+
+                    b.ToTable("PersonalExperiences");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.PersonalProfile", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly?>("AvailableFrom")
+                        .HasColumnType("date");
+
+                    b.Property<string>("City")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Country")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Headline")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("Province")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<Guid?>("ResumeMediaAssetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Skills")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("Summary")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("UserId");
+
+                    b.HasIndex("ResumeMediaAssetId");
+
+                    b.ToTable("PersonalProfiles");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.Plan", b =>
@@ -3875,6 +4020,11 @@ namespace Vexta.Api.Data.Migrations
                         .HasForeignKey("FormFieldId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("Vexta.Api.Domain.MediaAsset", "MediaAsset")
+                        .WithMany()
+                        .HasForeignKey("MediaAssetId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Vexta.Api.Domain.FormSubmission", "Submission")
                         .WithMany("Answers")
                         .HasForeignKey("SubmissionId")
@@ -3882,6 +4032,8 @@ namespace Vexta.Api.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("FormField");
+
+                    b.Navigation("MediaAsset");
 
                     b.Navigation("Submission");
                 });
@@ -4087,6 +4239,46 @@ namespace Vexta.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("ParentModule");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.PersonalEducation", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.PersonalProfile", "Profile")
+                        .WithMany("Education")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Profile");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.PersonalExperience", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.PersonalProfile", "Profile")
+                        .WithMany("Experiences")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Profile");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.PersonalProfile", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.MediaAsset", "ResumeMediaAsset")
+                        .WithMany()
+                        .HasForeignKey("ResumeMediaAssetId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Vexta.Api.Domain.ApplicationUser", "User")
+                        .WithOne()
+                        .HasForeignKey("Vexta.Api.Domain.PersonalProfile", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ResumeMediaAsset");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.PricePolicyTier", b =>
@@ -4576,6 +4768,13 @@ namespace Vexta.Api.Data.Migrations
             modelBuilder.Entity("Vexta.Api.Domain.Module", b =>
                 {
                     b.Navigation("Children");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.PersonalProfile", b =>
+                {
+                    b.Navigation("Education");
+
+                    b.Navigation("Experiences");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.Plan", b =>

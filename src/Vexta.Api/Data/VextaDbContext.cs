@@ -71,6 +71,12 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
     public DbSet<PricePolicyTier> PricePolicyTiers => Set<PricePolicyTier>();
     public DbSet<PublicPage> PublicPages => Set<PublicPage>();
     public DbSet<JobPosting> JobPostings => Set<JobPosting>();
+
+    // Keyed by the user and carrying no tenant: these belong to a person, not a company. Every
+    // query against them names the user, because there is no filter that could.
+    public DbSet<PersonalProfile> PersonalProfiles => Set<PersonalProfile>();
+    public DbSet<PersonalExperience> PersonalExperiences => Set<PersonalExperience>();
+    public DbSet<PersonalEducation> PersonalEducation => Set<PersonalEducation>();
     public DbSet<JobPostingDocument> JobPostingDocuments => Set<JobPostingDocument>();
     public DbSet<ProjectTask> ProjectTasks => Set<ProjectTask>();
     public DbSet<Report> Reports => Set<Report>();
@@ -548,6 +554,24 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.Property(c => c.DesiredJobTitle).HasMaxLength(150);
             e.Property(c => c.Source).HasMaxLength(150);
             e.Property(c => c.Notes).HasMaxLength(4000);
+            e.Property(c => c.ApplicationSummary).HasMaxLength(8000);
+
+            // One application per account per posting, enforced by the database rather than only
+            // by the endpoint: a double-pressed button is the ordinary way this happens, and the
+            // second row would read to the company as a second person. Filtered, so the rows
+            // without an account -- a CV that arrived by email, somebody entered by hand -- are
+            // not forced to be unique on anything.
+            e.HasIndex(c => new { c.JobPostingId, c.ApplicantUserId })
+                .IsUnique()
+                .HasFilter("\"ApplicantUserId\" IS NOT NULL AND \"JobPostingId\" IS NOT NULL");
+
+            // Declared on purpose, and it is not redundant with the one above. That one is a
+            // partial index: it covers nothing for a candidate with no account, which is every
+            // CV that arrived by email and everybody entered by hand. The query this serves --
+            // how many people answered this posting -- runs on every load of the hiring screen
+            // and would fall back to a table scan without it. Left implicit, the model generator
+            // reads the composite as covering it and drops it.
+            e.HasIndex(c => c.JobPostingId);
 
             e.HasIndex(c => new { c.TenantId, c.Status });
             e.HasQueryFilter(c => c.TenantId == CurrentTenantId);
@@ -720,6 +744,11 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             // They carry their own copy of the label, so they stay readable without it.
             e.HasOne(a => a.FormField).WithMany()
                 .HasForeignKey(a => a.FormFieldId).OnDelete(DeleteBehavior.SetNull);
+
+            // SetNull again: deleting the file from the library must not delete the answer.
+            // It keeps the file's name as its text, so the submission still says what was sent.
+            e.HasOne(a => a.MediaAsset).WithMany()
+                .HasForeignKey(a => a.MediaAssetId).OnDelete(DeleteBehavior.SetNull);
 
             e.Property(a => a.Label).HasMaxLength(300);
             e.Property(a => a.Value).HasMaxLength(4000);
@@ -1058,6 +1087,55 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.HasIndex(d => new { d.JobPostingId, d.SortOrder });
 
             // No query filter, to match the posting it belongs to.
+        });
+
+        builder.Entity<PersonalProfile>(e =>
+        {
+            e.HasKey(p => p.UserId);
+
+            // Cascade from the account: a CV is the person's, and it goes when the account does.
+            e.HasOne(p => p.User).WithOne()
+                .HasForeignKey<PersonalProfile>(p => p.UserId).OnDelete(DeleteBehavior.Cascade);
+
+            // SetNull: the uploaded document can be deleted from the library without taking the
+            // rest of the CV with it.
+            e.HasOne(p => p.ResumeMediaAsset).WithMany()
+                .HasForeignKey(p => p.ResumeMediaAssetId).OnDelete(DeleteBehavior.SetNull);
+
+            e.Property(p => p.Phone).HasMaxLength(40);
+            e.Property(p => p.Headline).HasMaxLength(200);
+            e.Property(p => p.Summary).HasMaxLength(4000);
+            e.Property(p => p.City).HasMaxLength(100);
+            e.Property(p => p.Province).HasMaxLength(80);
+            e.Property(p => p.Country).HasMaxLength(80);
+            e.Property(p => p.Skills).HasMaxLength(2000);
+
+            // No query filter: there is no tenant on this row. See PersonalProfile.
+        });
+
+        builder.Entity<PersonalExperience>(e =>
+        {
+            e.HasOne(x => x.Profile).WithMany(p => p.Experiences)
+                .HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+
+            e.Property(x => x.Title).HasMaxLength(200);
+            e.Property(x => x.Employer).HasMaxLength(200);
+            e.Property(x => x.Location).HasMaxLength(200);
+            e.Property(x => x.Description).HasMaxLength(2000);
+
+            e.HasIndex(x => new { x.UserId, x.SortOrder });
+        });
+
+        builder.Entity<PersonalEducation>(e =>
+        {
+            e.HasOne(x => x.Profile).WithMany(p => p.Education)
+                .HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+
+            e.Property(x => x.Program).HasMaxLength(200);
+            e.Property(x => x.School).HasMaxLength(200);
+            e.Property(x => x.Notes).HasMaxLength(1000);
+
+            e.HasIndex(x => new { x.UserId, x.SortOrder });
         });
 
         builder.Entity<PlatformSetting>(e =>

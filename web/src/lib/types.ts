@@ -1324,6 +1324,104 @@ export interface PublicJobDocument {
   url: string | null;
 }
 
+// ---- Un compte personnel : son CV, et ce qu'il a envoyé ----
+
+/**
+ * Somebody's own CV. Belongs to the person, not to a company: it follows them from one
+ * application to the next.
+ */
+export interface PersonalProfile {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string | null;
+  headline: string | null;
+  summary: string | null;
+  city: string | null;
+  province: string | null;
+  country: string | null;
+  availableFrom: string | null;
+  /** Tickets and licences, one per line. */
+  skills: string | null;
+  resumeMediaAssetId: string | null;
+  resumeFileName: string | null;
+  experiences: PersonalExperience[];
+  education: PersonalEducation[];
+  /** Whether this is enough of a CV to apply with. */
+  isComplete: boolean;
+  /** What is still missing, in French, ready to show. */
+  missing: string[];
+  updatedAt: string | null;
+}
+
+export interface PersonalExperience {
+  id: string;
+  title: string;
+  employer: string | null;
+  location: string | null;
+  startedOn: string | null;
+  /** Null means still there, which is what a blank end date means on a CV. */
+  endedOn: string | null;
+  description: string | null;
+  sortOrder: number;
+}
+
+export interface PersonalEducation {
+  id: string;
+  program: string;
+  school: string | null;
+  completedYear: number | null;
+  notes: string | null;
+  sortOrder: number;
+}
+
+export interface SavePersonalProfileValues {
+  phone: string | null;
+  headline: string | null;
+  summary: string | null;
+  city: string | null;
+  province: string | null;
+  country: string | null;
+  availableFrom: string | null;
+  skills: string | null;
+  resumeMediaAssetId: string | null;
+  experiences: {
+    title: string;
+    employer: string | null;
+    location: string | null;
+    startedOn: string | null;
+    endedOn: string | null;
+    description: string | null;
+  }[];
+  education: {
+    program: string;
+    school: string | null;
+    completedYear: number | null;
+    notes: string | null;
+  }[];
+}
+
+/** One position this person applied to, from their own side. */
+export interface MyApplication {
+  candidateId: string;
+  jobPostingId: string | null;
+  jobTitle: string;
+  companyName: string;
+  companySlug: string | null;
+  status: CandidateStatus;
+  appliedOn: string;
+}
+
+/** What an account would send to a posting, and whether it may. */
+export interface ApplicationEligibility {
+  jobTitle: string;
+  canApply: boolean;
+  missing: string[];
+  alreadyApplied: boolean;
+  /** Whether the company attached questions beyond the CV. */
+  hasForm: boolean;
+}
+
 /** The questions on a posting's form, as a visitor is shown them. */
 export interface PublicJobForm {
   jobTitle: string;
@@ -1346,7 +1444,14 @@ export interface PublicFormField {
  * One of four arrangements of the public page. Not a theme: the colour always comes from the
  * company's own brand colour, so no choice here can make the page unreadable.
  */
-export type PublicPageStyle = "Classique" | "Chantier" | "Epure" | "Vitrine";
+export type PublicPageStyle =
+  | "Classique"
+  | "Chantier"
+  | "Epure"
+  | "Vitrine"
+  | "Journal"
+  | "Panneau"
+  | "Affiche";
 
 /** What the company writes on its public page, as its owner edits it. */
 export interface PublicPageSettings {
@@ -1571,7 +1676,8 @@ export type FormFieldType =
   | "MultiChoix"
   | "OuiNon"
   | "Courriel"
-  | "Telephone";
+  | "Telephone"
+  | "Fichier";
 
 /** Which field of a new client an answer fills, when the form is set to create one. */
 export type FormFieldTarget =
@@ -1661,7 +1767,10 @@ export interface FormAnswer {
   /** A copy taken when it was answered: renaming the question must not rewrite the answer. */
   label: string;
   type: FormFieldType;
+  /** The answer as text. For a Fichier, the uploaded file's name. */
   value: string | null;
+  /** The uploaded file, for a Fichier. Null once it has been deleted from the library. */
+  mediaAssetId: string | null;
   sortOrder: number;
 }
 

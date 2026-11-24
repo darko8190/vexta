@@ -35,6 +35,19 @@ public interface IR2StorageService
 
     Task DeleteAsync(string objectKey, CancellationToken ct = default);
 
+    /// <summary>
+    /// Copies an object inside the bucket, server side: nothing is downloaded and nothing is
+    /// re-uploaded.
+    ///
+    /// It exists for one case, and the case is the reason it is a copy rather than a shared
+    /// reference. When somebody applies for a job, the CV they uploaded under their own prefix
+    /// is copied under the company's. The company then owns what it received and can open it
+    /// through its own tenant-scoped routes, with no endpoint anywhere reading across tenants --
+    /// and the applicant can delete their own copy later without erasing the application the
+    /// company already has in its hands.
+    /// </summary>
+    Task CopyAsync(string sourceObjectKey, string destinationObjectKey, CancellationToken ct = default);
+
     /// <summary>Throws with a readable reason when the credentials or bucket are wrong.</summary>
     Task CheckConnectionAsync(CancellationToken ct = default);
 }
@@ -198,6 +211,23 @@ public class R2StorageService(IPlatformSettingsService settings) : IR2StorageSer
 
         await client.DeleteObjectAsync(
             new DeleteObjectRequest { BucketName = config.Bucket, Key = objectKey }, ct);
+    }
+
+    public async Task CopyAsync(
+        string sourceObjectKey, string destinationObjectKey, CancellationToken ct = default)
+    {
+        var config = await RequireConfigurationAsync(ct);
+        using var client = CreateClient(config);
+
+        await client.CopyObjectAsync(
+            new CopyObjectRequest
+            {
+                SourceBucket = config.Bucket,
+                SourceKey = sourceObjectKey,
+                DestinationBucket = config.Bucket,
+                DestinationKey = destinationObjectKey
+            },
+            ct);
     }
 
     public async Task CheckConnectionAsync(CancellationToken ct = default)

@@ -88,6 +88,7 @@ export const formFieldTypeLabels: Record<FormFieldType, string> = {
   OuiNon: "Oui / Non",
   Courriel: "Courriel",
   Telephone: "Téléphone",
+  Fichier: "Fichier / image",
 };
 
 /** The line under each type in the list, so nobody has to try one to find out. */
@@ -101,6 +102,7 @@ export const formFieldTypeHints: Record<FormFieldType, string> = {
   OuiNon: "Une case à cocher.",
   Courriel: "Une adresse courriel.",
   Telephone: "Un numéro de téléphone.",
+  Fichier: "Un fichier ou une image à téléverser.",
 };
 
 /** Which field of a client an answer fills, when the form is set to create one. */

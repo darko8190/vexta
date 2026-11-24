@@ -87,6 +87,20 @@ public class TenantSignupService(
     {
         email = email.Trim();
 
+        // A personal space takes the person's name when none was given. The browser works this
+        // out too, but the endpoint is reachable without it, and a blank name produced a tenant
+        // with no name at all and a random slug -- a record nobody can recognise, at a public
+        // address nobody can read.
+        if (string.IsNullOrWhiteSpace(spaceName) && kind == TenantKind.Personal)
+        {
+            spaceName = $"{firstName} {lastName}".Trim();
+        }
+
+        if (string.IsNullOrWhiteSpace(spaceName))
+        {
+            return TenantSignupResult.Failed("Le nom de l'espace est requis.");
+        }
+
         if (await userManager.FindByEmailAsync(email) is not null)
         {
             return TenantSignupResult.Failed("Un compte existe déjà avec ce courriel.");

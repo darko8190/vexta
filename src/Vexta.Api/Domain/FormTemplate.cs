@@ -27,7 +27,14 @@ public enum FormFieldType
     OuiNon = 6,
 
     Courriel = 7,
-    Telephone = 8
+    Telephone = 8,
+
+    /// <summary>
+    /// A file or an image, uploaded through the media routes like every other file in the
+    /// application. The answer keeps the file's name as its text and points at the asset, so a
+    /// submission still says what was attached after the file itself is deleted.
+    /// </summary>
+    Fichier = 9
 }
 
 /// <summary>
@@ -224,10 +231,18 @@ public class FormAnswer
 
     /// <summary>
     /// The answer as text, whatever the type: a date as yyyy-MM-dd, a number as it was typed, a
-    /// MultiChoix as its chosen labels joined by ", ". One column because nothing computes on
-    /// these — they are read by people and e-mailed on.
+    /// MultiChoix as its chosen labels joined by ", ". For a Fichier it is the file's name.
+    /// One column because nothing computes on these -- they are read by people and e-mailed on.
     /// </summary>
     public string? Value { get; set; }
+
+    /// <summary>
+    /// The uploaded file, for a Fichier answer. SetNull when the file is deleted from the
+    /// library: the answer still names what was sent, which is worth more than a row that
+    /// vanishes and leaves a question looking unanswered.
+    /// </summary>
+    public Guid? MediaAssetId { get; set; }
+    public MediaAsset? MediaAsset { get; set; }
 
     public int SortOrder { get; set; }
 }

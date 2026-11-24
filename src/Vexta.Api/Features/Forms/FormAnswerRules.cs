@@ -72,6 +72,12 @@ public static class FormAnswerRules
                 }
                 break;
 
+            case FormFieldType.Fichier:
+                // The text of a file answer is the file's name, which the caller does not
+                // choose: the controller writes it from the asset it just verified. Nothing to
+                // check here beyond the answer being present, which is handled above.
+                break;
+
             case FormFieldType.OuiNon:
                 if (!answer.Equals("Oui", StringComparison.OrdinalIgnoreCase)
                     && !answer.Equals("Non", StringComparison.OrdinalIgnoreCase))

@@ -96,11 +96,69 @@ const vitrine: PublicPageStyleTokens = {
   sectionGap: "space-y-10 sm:space-y-14",
 };
 
+/**
+ * Editorial. A wide measure and generous leading, with headings reduced to labels so the text
+ * is the loudest thing on the page -- which is the point for a company whose page is an
+ * argument rather than a list.
+ */
+const journal: PublicPageStyleTokens = {
+  accentBar: "h-px w-full bg-foreground/20",
+  header: "border-b-2 border-foreground",
+  headerInner: "flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between",
+  headerText: "min-w-0",
+  container: "mx-auto w-full max-w-3xl px-4 sm:px-6",
+  title: "text-3xl font-semibold tracking-tight text-foreground sm:text-4xl",
+  headline: "mt-2 text-lg leading-relaxed text-muted-foreground",
+  sectionTitle: "border-b border-border pb-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground",
+  card: "rounded-none border-0 border-b border-border bg-transparent",
+  productGrid: "grid gap-6 sm:grid-cols-2",
+  logoFrame: "flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-sm border border-border bg-card",
+  sectionGap: "space-y-14 sm:space-y-20",
+};
+
+/** Framed panels with a little lift. Reads as a product sheet. */
+const panneau: PublicPageStyleTokens = {
+  accentBar: "h-2 w-full bg-primary",
+  header: "border-b border-border bg-card",
+  headerInner: "flex flex-col gap-5 sm:flex-row sm:items-center sm:gap-6",
+  headerText: "min-w-0",
+  container: "mx-auto w-full max-w-5xl px-4 sm:px-6",
+  title: "text-2xl font-semibold tracking-tight text-foreground sm:text-3xl",
+  headline: "mt-2 text-base text-muted-foreground sm:text-lg",
+  sectionTitle: "text-lg font-semibold text-foreground",
+  card: "rounded-xl border border-border bg-card shadow-sm ring-1 ring-foreground/5",
+  productGrid: "grid gap-5 sm:grid-cols-2 lg:grid-cols-3",
+  logoFrame: "flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-background shadow-sm",
+  sectionGap: "space-y-8 sm:space-y-12",
+};
+
+/**
+ * A poster: one column, the name very large and centred, nothing competing with it. For a trade
+ * whose page exists to be the name and a telephone number.
+ */
+const affiche: PublicPageStyleTokens = {
+  accentBar: "h-3 w-full bg-primary",
+  header: "border-b border-border",
+  headerInner: "flex flex-col items-center gap-5 text-center",
+  headerText: "min-w-0 text-center",
+  container: "mx-auto w-full max-w-2xl px-4 sm:px-6",
+  title: "text-4xl font-bold tracking-tight text-foreground sm:text-5xl",
+  headline: "mt-3 text-lg text-muted-foreground sm:text-xl",
+  sectionTitle: "text-center text-xl font-semibold text-foreground",
+  card: "rounded-xl border border-border bg-card",
+  productGrid: "grid gap-4 sm:grid-cols-2",
+  logoFrame: "flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-border bg-card",
+  sectionGap: "space-y-12 sm:space-y-16",
+};
+
 const tokens: Record<PublicPageStyle, PublicPageStyleTokens> = {
   Classique: classique,
   Chantier: chantier,
   Epure: epure,
   Vitrine: vitrine,
+  Journal: journal,
+  Panneau: panneau,
+  Affiche: affiche,
 };
 
 /** Falls back to Classique for a value this build does not know -- a page always draws. */
@@ -114,4 +172,7 @@ export const publicPageStyleOptions: { value: PublicPageStyle; label: string; hi
   { value: "Chantier", label: "Chantier", hint: "Bandeau foncé, titres en majuscules. Se lit comme une enseigne." },
   { value: "Epure", label: "Épuré", hint: "Étroit et calme, sans cadres. Pour une page de texte." },
   { value: "Vitrine", label: "Vitrine", hint: "Produits en premier et plus grands. Pour un catalogue." },
+  { value: "Journal", label: "Journal", hint: "Mesure large, texte aéré, titres discrets. Pour une page qui argumente." },
+  { value: "Panneau", label: "Panneau", hint: "Tout en panneaux encadrés. Se lit comme une fiche produit." },
+  { value: "Affiche", label: "Affiche", hint: "Une colonne, le nom très grand et centré. Pour un métier." },
 ];

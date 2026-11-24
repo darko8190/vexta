@@ -108,7 +108,9 @@ export function useFormSubmissionQuery(formId: string | undefined, id: string | 
 export function useSubmitForm(id: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (answers: { fieldId: string; value: string | null }[]) =>
+    mutationFn: (
+      answers: { fieldId: string; value: string | null; mediaAssetId?: string | null }[],
+    ) =>
       api.post<SubmitFormResult>(`formulaires/${id}/reponses`, { answers }),
     onSuccess: () => {
       invalidate(queryClient);

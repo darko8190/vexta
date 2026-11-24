@@ -16,6 +16,7 @@ import { SocialButtons } from "@/components/auth/social-buttons";
 import { VextaLogo } from "@/components/brand/vexta-logo";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { useAuth } from "@/lib/auth-context";
+import { safeReturnPath } from "@/lib/api";
 import { ex } from "@/lib/placeholders";
 
 const formSchema = z.object({
@@ -57,6 +58,21 @@ function ExternalError() {
 }
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageWithParams />
+    </Suspense>
+  );
+}
+
+function LoginPageWithParams() {
+  // Where to go afterwards. Set when somebody was reading a company's public page and pressed
+  // Postuler: sending them to a dashboard instead would lose the posting they were looking at.
+  const retour = safeReturnPath(useSearchParams().get("retour"));
+  return <LoginForm retour={retour} />;
+}
+
+function LoginForm({ retour }: { retour: string | null }) {
   const { login } = useAuth();
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -70,7 +86,7 @@ export default function LoginPage() {
     setServerError(null);
     try {
       await login(values.email, values.password);
-      router.push("/tableau-de-bord");
+      router.push(retour ?? "/tableau-de-bord");
     } catch (error) {
       setServerError(error instanceof Error ? error.message : "Une erreur est survenue.");
     }

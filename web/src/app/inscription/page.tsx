@@ -18,6 +18,7 @@ import { VextaLogo } from "@/components/brand/vexta-logo";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { useAuth } from "@/lib/auth-context";
 import { CompanyAddressFields } from "@/components/addresses/company-address-fields";
+import { safeReturnPath } from "@/lib/api";
 import { usePublicPlansQuery } from "@/hooks/use-catalog";
 import { defaultCountryName } from "@/lib/geo";
 import { checkCompanyAddress, companyProfileFrom, emptyCompanyAddress } from "@/lib/company-signup";
@@ -76,11 +77,25 @@ export default function RegisterPage() {
 }
 
 function RegisterPageWithParams() {
-  const initialPlanId = useSearchParams().get("forfait") ?? "";
-  return <RegisterForm initialPlanId={initialPlanId} />;
+  const params = useSearchParams();
+  const initialPlanId = params.get("forfait") ?? "";
+  // Opened on the personal tab when somebody arrived from a job posting: they are not here to
+  // buy a business plan, and landing on that tab reads as the wrong door.
+  const initialKind = params.get("type") === "personnel" ? "personal" : "business";
+  const retour = safeReturnPath(params.get("retour"));
+
+  return <RegisterForm initialPlanId={initialPlanId} initialKind={initialKind} retour={retour} />;
 }
 
-function RegisterForm({ initialPlanId }: { initialPlanId: string }) {
+function RegisterForm({
+  initialPlanId,
+  initialKind,
+  retour,
+}: {
+  initialPlanId: string;
+  initialKind: "business" | "personal";
+  retour: string | null;
+}) {
   const { registerTenant } = useAuth();
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -89,7 +104,7 @@ function RegisterForm({ initialPlanId }: { initialPlanId: string }) {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      accountType: "business",
+      accountType: initialKind,
       companyName: "",
       planId: initialPlanId,
       firstName: "",
@@ -131,7 +146,7 @@ function RegisterForm({ initialPlanId }: { initialPlanId: string }) {
       if (result.checkoutUrl) {
         window.location.assign(result.checkoutUrl);
       } else {
-        router.push("/tableau-de-bord");
+        router.push(retour ?? "/tableau-de-bord");
       }
     } catch (error) {
       setServerError(error instanceof Error ? error.message : "Une erreur est survenue.");

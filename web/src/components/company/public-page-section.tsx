@@ -30,7 +30,7 @@ const formSchema = z.object({
   contactNote: z.string().trim().max(1000, "1000 caractères maximum."),
   showProducts: z.boolean(),
   showJobs: z.boolean(),
-  style: z.enum(["Classique", "Chantier", "Epure", "Vitrine"]),
+  style: z.enum(["Classique", "Chantier", "Epure", "Vitrine", "Journal", "Panneau", "Affiche"]),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -101,8 +101,19 @@ function PublishCard({ settings }: { settings: PublicPageSettings }) {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             {save.isPending && <Spinner className="size-4" />}
+            {/* Said in words as well as by the knob's position. A switch is only readable to
+                somebody who already knows which side is on, and this one decides whether the
+                company has a page on the internet. */}
+            <span
+              className={cn(
+                "text-sm font-medium",
+                settings.isPublished ? "text-foreground" : "text-muted-foreground",
+              )}
+            >
+              {settings.isPublished ? "En ligne" : "Hors ligne"}
+            </span>
             <ToggleSwitch
               id="public-page-published"
               checked={settings.isPublished}

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CheckCircle2, Send } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,23 +13,26 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { FieldGroup } from "@/components/ui/field";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
 import { AnswerField } from "@/components/forms/fill-form-sheet";
+import { CompleteCvToApply, SignInToApply } from "@/components/public/public-account-bar";
+import { useApplicationEligibilityQuery, useApplyToJob } from "@/hooks/use-personal-profile";
+import { useAuth } from "@/lib/auth-context";
+import { ApiError } from "@/lib/api";
 import type { FormField, PublicJobForm } from "@/lib/types";
 
 /**
- * Applying for a position from the company's public page.
+ * Applying for a position from a company's public page.
  *
- * The questions are fetched when the dialog opens rather than with the page: most visitors read
- * a posting and never apply, and a page carrying five forms of a dozen questions would be paid
- * for by all of them.
+ * Four states, and the dialog is honest about which one it is in rather than offering a button
+ * that will be refused: not signed in, signed in with an unfinished CV, already applied, ready.
+ * Each one says what to do next, because each one has a different next thing.
  *
- * Nothing is validated here beyond what the browser does for free. The server checks every
- * answer against the question -- required, a number, one of the offered choices -- and it is
- * the only check that counts, since this page can be called with anything. Showing its message
- * is honest; duplicating its rules would be a second set to keep in step.
+ * Nothing about the CV is typed here. It was written once on Mon CV and is sent from there,
+ * which is the whole reason applying needs an account: the company receives a name, a telephone
+ * number and an account of what somebody has done, instead of a form it has to chase.
  */
 export function JobApplicationDialog({
   slug,
@@ -39,68 +43,71 @@ export function JobApplicationDialog({
   jobId: string;
   jobTitle: string;
 }) {
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState<PublicJobForm | null>(null);
+  const [coverNote, setCoverNote] = useState("");
   const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(false);
-  const [sending, setSending] = useState(false);
+  const [files, setFiles] = useState<Record<string, string>>({});
+  const [form, setForm] = useState<PublicJobForm | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
 
-  const base = `/api/public/offres/${encodeURIComponent(slug)}/${encodeURIComponent(jobId)}`;
+  // Asked only once the dialog is open, and only for a signed-in reader: there is nothing to
+  // ask on behalf of somebody with no account.
+  const eligibility = useApplicationEligibilityQuery(slug, open && user ? jobId : null);
+  const apply = useApplyToJob();
 
   async function onOpenChange(next: boolean) {
     setOpen(next);
     if (!next) return;
 
-    // Reset on every opening: somebody who sent one application and opens another posting must
-    // not find the first one's answers already typed in.
     setError(null);
     setDone(null);
+    setCoverNote("");
     setAnswers({});
+    setFiles({});
     setForm(null);
-    setLoading(true);
 
+    // The questions the company attached, if any. Fetched here rather than with the page: most
+    // readers of a posting never apply.
     try {
-      const response = await fetch(base, { cache: "no-store" });
-      if (!response.ok) throw new Error();
-      setForm((await response.json()) as PublicJobForm);
+      const response = await fetch(
+        `/api/public/offres/${encodeURIComponent(slug)}/${encodeURIComponent(jobId)}`,
+        { cache: "no-store" },
+      );
+      if (response.ok) setForm((await response.json()) as PublicJobForm);
     } catch {
-      setError("Le formulaire n'a pas pu être chargé. Réessayez dans un moment.");
-    } finally {
-      setLoading(false);
+      // A posting with no form answers 404 here, which is not an error: it simply asks nothing
+      // beyond the CV. A real failure shows up when sending, where it can be said properly.
     }
   }
 
   async function send() {
-    if (!form) return;
-
-    setSending(true);
     setError(null);
 
     try {
-      const response = await fetch(base, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          answers: form.fields.map((field) => ({ fieldId: field.id, value: answers[field.id] ?? null })),
-        }),
+      const result = await apply.mutateAsync({
+        slug,
+        jobPostingId: jobId,
+        coverNote: coverNote.trim() || null,
+        answers: (form?.fields ?? []).map((field) => ({
+          fieldId: field.id,
+          value: answers[field.id] ?? null,
+          mediaAssetId: files[field.id] ?? null,
+        })),
       });
 
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        setError(data?.message ?? "Votre candidature n'a pas pu être envoyée.");
-        return;
-      }
-
-      setDone(data?.message ?? "Merci, votre candidature est envoyée.");
-    } catch {
-      setError("Votre candidature n'a pas pu être envoyée. Réessayez dans un moment.");
-    } finally {
-      setSending(false);
+      setDone(result.message);
+    } catch (err) {
+      setError(
+        err instanceof ApiError || err instanceof Error
+          ? err.message
+          : "Votre candidature n'a pas pu être envoyée.",
+      );
     }
   }
+
+  const ready = Boolean(user) && eligibility.data?.canApply && !eligibility.data.alreadyApplied;
 
   return (
     <Dialog open={open} onOpenChange={(next) => void onOpenChange(next)}>
@@ -111,37 +118,57 @@ export function JobApplicationDialog({
 
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{form?.formTitle ?? "Postuler"}</DialogTitle>
+          <DialogTitle>Postuler — {jobTitle}</DialogTitle>
           <DialogDescription>
-            {form?.formDescription?.trim() || jobTitle}
+            {user
+              ? "Votre CV est envoyé avec votre candidature."
+              : "Il faut un compte Vexta pour postuler."}
           </DialogDescription>
         </DialogHeader>
 
         <div className="max-h-[60vh] overflow-y-auto px-4">
-          {loading && (
-            <p className="py-6 text-sm text-muted-foreground">Chargement du formulaire…</p>
-          )}
-
-          {done && (
+          {done ? (
             <Alert>
               <CheckCircle2 />
               <AlertDescription>{done}</AlertDescription>
             </Alert>
-          )}
-
-          {error && !done && (
-            <Alert variant="destructive" className="mb-4">
-              <AlertDescription>{error}</AlertDescription>
+          ) : !user ? (
+            <SignInToApply slug={slug} />
+          ) : eligibility.isLoading ? (
+            <p className="py-4 text-sm text-muted-foreground">Un instant…</p>
+          ) : eligibility.data?.alreadyApplied ? (
+            <Alert>
+              <CheckCircle2 />
+              <AlertDescription>
+                Vous avez déjà postulé à cette offre. L&apos;entreprise a votre CV.
+              </AlertDescription>
             </Alert>
-          )}
-
-          {form && !done && (
+          ) : !eligibility.data?.canApply ? (
+            <CompleteCvToApply missing={eligibility.data?.missing ?? []} />
+          ) : (
             <FieldGroup>
-              {form.fields.map((field) => (
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              <Field>
+                <FieldLabel htmlFor="apply-note">Un mot à l&apos;employeur</FieldLabel>
+                <Textarea
+                  id="apply-note"
+                  rows={4}
+                  value={coverNote}
+                  onChange={(event) => setCoverNote(event.target.value)}
+                />
+                <FieldDescription>
+                  Optionnel, et souvent la première chose qui est lue.
+                </FieldDescription>
+              </Field>
+
+              {(form?.fields ?? []).map((field) => (
                 <AnswerField
                   key={field.id}
-                  // The public shape keeps the options as the lines they were typed as, which is
-                  // what the server stores; the shared renderer wants them split.
                   field={
                     {
                       id: field.id,
@@ -159,6 +186,15 @@ export function JobApplicationDialog({
                   }
                   value={answers[field.id] ?? ""}
                   onChange={(value) => setAnswers((current) => ({ ...current, [field.id]: value }))}
+                  onFile={(asset) => {
+                    setFiles((current) => {
+                      const nextFiles = { ...current };
+                      if (asset) nextFiles[field.id] = asset.id;
+                      else delete nextFiles[field.id];
+                      return nextFiles;
+                    });
+                    setAnswers((current) => ({ ...current, [field.id]: asset?.fileName ?? "" }));
+                  }}
                   invalid={false}
                 />
               ))}
@@ -167,16 +203,16 @@ export function JobApplicationDialog({
         </div>
 
         <DialogFooter>
-          {done ? (
-            <DialogClose render={<Button type="button" />}>Fermer</DialogClose>
-          ) : (
+          {ready && !done ? (
             <>
-              <Button type="button" onClick={() => void send()} disabled={sending || !form}>
-                {sending && <Spinner />}
+              <Button type="button" onClick={() => void send()} disabled={apply.isPending}>
+                {apply.isPending && <Spinner />}
                 Envoyer ma candidature
               </Button>
               <DialogClose render={<Button type="button" variant="outline" />}>Annuler</DialogClose>
             </>
+          ) : (
+            <DialogClose render={<Button type="button" variant="outline" />}>Fermer</DialogClose>
           )}
         </DialogFooter>
       </DialogContent>

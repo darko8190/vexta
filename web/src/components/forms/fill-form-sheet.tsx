@@ -21,6 +21,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { AnswerFileInput } from "@/components/forms/answer-file-input";
 import { useFormQuery, useSubmitForm } from "@/hooks/use-forms";
 import { ApiError } from "@/lib/api";
 import type { FormField } from "@/lib/types";
@@ -60,11 +61,25 @@ export function FillFormSheet({
   const submit = useSubmitForm(formId);
 
   const [answers, setAnswers] = useState<Answers>({});
+  // Kept beside the answers rather than inside them: a file answer has two parts, the asset
+  // the server must be given and the name a person reads, and the required check below works
+  // on the name like every other type.
+  const [files, setFiles] = useState<Record<string, string>>({});
   const [missing, setMissing] = useState<string[]>([]);
 
   function set(fieldId: string, value: string) {
     setAnswers((current) => ({ ...current, [fieldId]: value }));
     setMissing((current) => current.filter((id) => id !== fieldId));
+  }
+
+  function setFile(fieldId: string, asset: { id: string; fileName: string } | null) {
+    setFiles((current) => {
+      const next = { ...current };
+      if (asset) next[fieldId] = asset.id;
+      else delete next[fieldId];
+      return next;
+    });
+    set(fieldId, asset?.fileName ?? "");
   }
 
   async function send() {
@@ -86,7 +101,11 @@ export function FillFormSheet({
 
     try {
       const result = await submit.mutateAsync(
-        fields.map((field) => ({ fieldId: field.id, value: answers[field.id] ?? null })),
+        fields.map((field) => ({
+          fieldId: field.id,
+          value: answers[field.id] ?? null,
+          mediaAssetId: files[field.id] ?? null,
+        })),
       );
 
       toast.success(result.successMessage, {
@@ -147,6 +166,7 @@ export function FillFormSheet({
                   field={field}
                   value={answers[field.id] ?? ""}
                   onChange={(value) => set(field.id, value)}
+                  onFile={(asset) => setFile(field.id, asset)}
                   invalid={missing.includes(field.id)}
                 />
               ))}
@@ -183,11 +203,18 @@ export function AnswerField({
   field,
   value,
   onChange,
+  onFile,
   invalid,
 }: {
   field: FormField;
   value: string;
   onChange: (value: string) => void;
+  /**
+   * Hands back the uploaded file, for a Fichier question. Absent where uploading is not
+   * possible -- the public page, which has no account to upload under -- and the field then
+   * says so instead of offering a button that cannot work.
+   */
+  onFile?: (asset: { id: string; fileName: string } | null) => void;
   invalid: boolean;
 }) {
   const id = `answer-${field.id}`;
@@ -200,6 +227,22 @@ export function AnswerField({
   );
 
   const help = field.helpText ? <FieldDescription>{field.helpText}</FieldDescription> : null;
+
+  if (field.type === "Fichier") {
+    return (
+      <Field data-invalid={invalid}>
+        {label}
+        {onFile ? (
+          <AnswerFileInput id={id} fileName={value} onFile={onFile} invalid={invalid} />
+        ) : (
+          <FieldDescription>
+            Ce formulaire demande un fichier, ce qui n&apos;est pas encore possible ici.
+          </FieldDescription>
+        )}
+        {help}
+      </Field>
+    );
+  }
 
   if (field.type === "OuiNon") {
     return (

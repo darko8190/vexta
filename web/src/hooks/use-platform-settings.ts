@@ -11,6 +11,8 @@ export interface UpdatePlatformSettingsValues {
   stripeSecretKey?: string;
   stripePublishableKey?: string;
   stripeWebhookSecret?: string;
+  /** The Connect endpoint's secret, which is not the same one as above. */
+  stripeConnectWebhookSecret?: string;
   r2AccountId?: string;
   r2AccessKeyId?: string;
   r2SecretAccessKey?: string;

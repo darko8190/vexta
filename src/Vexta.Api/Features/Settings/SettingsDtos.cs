@@ -8,6 +8,13 @@ public record PlatformSettingsDto(
     string MailgunRegion,
     bool StripeConfigured,
     string? StripePublishableKey,
+    /// <summary>
+    /// The Connect endpoint's own signing secret is entered, so account verifications and
+    /// payments taken on the companies' own accounts are heard about. Reported separately from
+    /// <see cref="StripeConfigured"/> because it is a different endpoint at Stripe with a
+    /// different secret, and the subscriptions work perfectly well without it.
+    /// </summary>
+    bool StripeConnectConfigured,
     bool R2Configured,
     string? R2AccountId,
     string? R2Bucket,
@@ -28,6 +35,7 @@ public record UpdatePlatformSettingsRequest(
     string? StripeSecretKey,
     string? StripePublishableKey,
     string? StripeWebhookSecret,
+    string? StripeConnectWebhookSecret,
     string? R2AccountId,
     string? R2AccessKeyId,
     string? R2SecretAccessKey,

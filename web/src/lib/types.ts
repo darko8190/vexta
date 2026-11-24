@@ -483,6 +483,12 @@ export interface PlatformSettings {
   mailgunRegion: string;
   stripeConfigured: boolean;
   stripePublishableKey: string | null;
+  /**
+   * The Connect endpoint's own signing secret is entered, so a company's account being cleared
+   * to take cards and a payment taken on it are heard about. A separate endpoint at Stripe with
+   * a separate secret from the one above, and the subscriptions work fine without it.
+   */
+  stripeConnectConfigured: boolean;
   r2Configured: boolean;
   r2AccountId: string | null;
   r2Bucket: string | null;
@@ -2340,4 +2346,47 @@ export interface ProjectExtraCharge {
   chargedOn: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * Where a company stands with its own Stripe account, read by its settings screen.
+ *
+ * Four separate truths rather than one "connected" flag, because each one has a different thing
+ * to say to the person reading it: the plan does not include it, Vexta has no Stripe keys, the
+ * company has not started, or Stripe has it and is still looking at it.
+ */
+export interface OnlinePaymentsState {
+  /** The feature is on the company's plan. */
+  included: boolean;
+  /** Vexta has a Stripe secret key. Nothing here works without it. */
+  platformReady: boolean;
+  /** The Connect endpoint's secret is entered on the platform. */
+  webhookConfigured: boolean;
+  canManage: boolean;
+  /** No address with a country Stripe can be told. Said before the button, never after. */
+  addressMissing: boolean;
+  connected: boolean;
+  /** Money can arrive. The only flag that gates anything. */
+  chargesEnabled: boolean;
+  payoutsEnabled: boolean;
+  detailsSubmitted: boolean;
+  checkedAt: string | null;
+}
+
+/** One invoice as the customer holding its payment link reads it. */
+export interface PublicInvoice {
+  companyName: string;
+  companyBrandColor: string | null;
+  number: string;
+  currency: string;
+  issueDate: string;
+  dueDate: string;
+  total: number;
+  paid: number;
+  /** What is still owed. Zero once it is settled. */
+  outstanding: number;
+  isPaid: boolean;
+  isCancelled: boolean;
+  /** The company can take a card right now, for this invoice. */
+  canPayOnline: boolean;
 }

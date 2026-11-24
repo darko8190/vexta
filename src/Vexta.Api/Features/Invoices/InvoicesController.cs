@@ -24,8 +24,12 @@ public class InvoicesController(
     IInvoicePdfService pdf,
     IMailgunService mailgun,
     IR2StorageService storage,
-    IHttpClientFactory httpClientFactory) : ControllerBase
+    IHttpClientFactory httpClientFactory,
+    IFeatureService features,
+    IConfiguration configuration) : ControllerBase
 {
+    private string FrontendUrl => configuration["Frontend:BaseUrl"]?.TrimEnd('/') ?? "http://localhost:3000";
+
     /// <summary>
     /// Mailgun refuses a message over about 25 MB, and it refuses the whole of it — the invoice
     /// itself would not go out. Stopped short of that, here, where the answer can name the
@@ -442,6 +446,17 @@ public class InvoicesController(
             attachments.Add(new EmailAttachment(file.FileName, file.ContentType, content));
         }
 
+        // The "payer en ligne" button, appended to the message rather than offered as a field
+        // the template could carry.
+        //
+        // A company that has written its own wording would otherwise have to go and edit it to
+        // start being paid by card, and a field it placed itself is a field it can place twice.
+        // Appending means every company gets the button the day the feature is switched on and
+        // none of them gets two. The token is created here and saved with the rest below, so an
+        // invoice only ever has one and every reminder carries the same link.
+        var payment = await PaymentBlockAsync(invoice, ct);
+        if (payment is not null) body += payment;
+
         try
         {
             await mailgun.SendWithAttachmentsAsync(
@@ -487,6 +502,82 @@ public class InvoicesController(
         await db.SaveChangesAsync(ct);
 
         return Ok(new InvoiceSentDto(to, invoice.SentAt.Value, invoice.Status));
+    }
+
+    /// <summary>
+    /// The payment link for one invoice, for a company that wants to hand it over itself — in a
+    /// text message, over the counter, or pasted into a reminder written somewhere else.
+    ///
+    /// Returns null rather than refusing when online payment is not available: the screen asks
+    /// this to decide whether to offer a copy button, and a 400 for the ordinary case of a
+    /// company that has not connected Stripe is an error about nothing.
+    /// </summary>
+    [HttpGet("{id:guid}/lien-paiement")]
+    [StaffOnly]
+    public async Task<ActionResult<object>> PayLink(Guid id, CancellationToken ct)
+    {
+        var invoice = await db.Invoices.FirstOrDefaultAsync(i => i.Id == id, ct);
+        if (invoice is null) return NotFound();
+
+        var url = await PayLinkAsync(invoice, ct);
+
+        // Saved because the call may have created the token. Nothing else on the invoice moved.
+        if (url is not null) await db.SaveChangesAsync(ct);
+
+        return Ok(new { url });
+    }
+
+    /// <summary>
+    /// The URL a customer pays this invoice at, or null when they cannot pay it online.
+    ///
+    /// Four reasons for null, and each one of them is an ordinary state rather than a fault: the
+    /// plan does not include payments, the company has not connected its Stripe account, Stripe
+    /// has not cleared it to take cards yet, or there is nothing left to pay. Creates the token
+    /// on the invoice as a side effect — the caller saves.
+    /// </summary>
+    private async Task<string?> PayLinkAsync(Invoice invoice, CancellationToken ct)
+    {
+        if (invoice.Status is InvoiceStatus.Annulee or InvoiceStatus.Payee) return null;
+        if (!await features.IsEnabledAsync(FeatureKeys.Payments, ct)) return null;
+
+        var account = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
+            .Where(t => t.Id == invoice.TenantId)
+            .Select(t => new { t.StripeAccountId, t.StripeChargesEnabled })
+            .FirstOrDefaultAsync(ct);
+
+        if (account?.StripeAccountId is null || !account.StripeChargesEnabled) return null;
+
+        return InvoicePayLink.Url(FrontendUrl, InvoicePayLink.EnsureToken(invoice));
+    }
+
+    /// <summary>
+    /// The button appended to the email, in the company's own colour when it has one.
+    ///
+    /// Inline styles and a table-free layout, because that is the only thing every mail client
+    /// agrees on. The colour is checked against the pattern it is stored in rather than trusted:
+    /// it ends up inside a style attribute, and a column that is validated on the way in is
+    /// still a column somebody could write to another way.
+    /// </summary>
+    private async Task<string?> PaymentBlockAsync(Invoice invoice, CancellationToken ct)
+    {
+        var url = await PayLinkAsync(invoice, ct);
+        if (url is null) return null;
+
+        var brand = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
+            .Where(t => t.Id == invoice.TenantId)
+            .Select(t => t.BrandColor)
+            .FirstOrDefaultAsync(ct);
+
+        var colour = brand is not null && System.Text.RegularExpressions.Regex.IsMatch(brand, "^#[0-9a-fA-F]{6}$")
+            ? brand
+            : "#1d4ed8";
+
+        return $"""
+            <p style="margin:24px 0 8px">
+              <a href="{url}" style="display:inline-block;padding:11px 20px;border-radius:8px;background:{colour};color:#ffffff;text-decoration:none;font-weight:600">Payer en ligne</a>
+            </p>
+            <p style="margin:0;color:#666666;font-size:13px">Paiement par carte, traité par Stripe. Vous pouvez aussi régler comme à l'habitude.</p>
+            """;
     }
 
     // Reading is open to the customer this record belongs to — the query filter already

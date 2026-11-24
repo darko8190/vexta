@@ -39,6 +39,7 @@ public record ConfirmCheckoutRequest(string SessionId);
 [Route("api/billing")]
 public class BillingController(
     IStripeService stripeService,
+    IStripeConnectService connectService,
     VextaDbContext db,
     ICurrentUserService currentUser,
     IConfiguration configuration,
@@ -354,6 +355,45 @@ public class BillingController(
             // No signing secret configured yet. A 400 tells Stripe to retry, which is right:
             // the deliveries queue up and go through once the secret is entered.
             logger.LogWarning(ex, "Webhook Stripe reçu sans secret de signature configuré.");
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// The Connect endpoint: what happens on the companies' own Stripe accounts.
+    ///
+    /// A second endpoint and not a branch of the one above, because Stripe signs the two streams
+    /// with different secrets. An account being cleared to take cards and Vexta's own
+    /// subscriptions arrive at different URLs, and verifying one with the other's secret fails
+    /// every delivery with an error that reads exactly like a forged signature.
+    ///
+    /// Register it in Stripe as the Connect endpoint, listening for <c>account.updated</c> and
+    /// <c>checkout.session.completed</c>.
+    /// </summary>
+    [HttpPost("webhook/connect")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ConnectWebhook()
+    {
+        var payload = await new StreamReader(Request.Body).ReadToEndAsync();
+        var signature = Request.Headers["Stripe-Signature"];
+
+        try
+        {
+            var stripeEvent = await connectService.ConstructEventAsync(payload, signature!);
+            await connectService.ApplyEventAsync(stripeEvent, db, HttpContext.RequestAborted);
+            return Ok();
+        }
+        catch (StripeException ex)
+        {
+            logger.LogWarning(ex, "Webhook Stripe Connect refusé.");
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            // No Connect signing secret yet. A 400 has Stripe queue the deliveries and retry,
+            // which is what should happen: a payment recorded by the page the customer landed on
+            // is already written, and the account updates arrive once the secret is entered.
+            logger.LogWarning(ex, "Webhook Stripe Connect reçu sans secret de signature configuré.");
             return BadRequest(new { message = ex.Message });
         }
     }

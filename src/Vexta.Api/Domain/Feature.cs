@@ -52,4 +52,15 @@ public static class FeatureKeys
 
     /// <summary>The assistant, and the button in the header that opens it.</summary>
     public const string Ai = "ia";
+
+    /// <summary>
+    /// Taking money from the company's own customers: a Stripe account connected to the
+    /// company, a payment link on the invoices it sends, and later a checkout on its public
+    /// page.
+    ///
+    /// Sold rather than given because it is the one feature that puts Vexta between a company
+    /// and its revenue. A company that has it expects the money to arrive, and that is a
+    /// promise a cheap tier should be allowed not to make.
+    /// </summary>
+    public const string Payments = "paiements";
 }

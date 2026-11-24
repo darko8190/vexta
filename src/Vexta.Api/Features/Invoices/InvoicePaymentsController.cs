@@ -166,21 +166,12 @@ public class InvoicePaymentsController(VextaDbContext db, ICurrentUserService cu
     /// Only ever moves between Envoyée, En retard and Payée. A cancelled invoice stays
     /// cancelled, and a draft never gets here — and "paid" is decided by the arithmetic rather
     /// than by somebody remembering to change a dropdown.
+    ///
+    /// The rule itself lives in <see cref="InvoiceStatusRules"/>, shared with the online payment
+    /// that arrives without anybody pressing anything.
     /// </summary>
-    private static void ApplyStatus(Invoice invoice, decimal paid, decimal total)
-    {
-        if (invoice.Status == InvoiceStatus.Annulee || invoice.Status == InvoiceStatus.Brouillon) return;
-
-        invoice.Status = paid >= total && total > 0
-            ? InvoiceStatus.Payee
-            // Back to what it was before it was paid: sent, or late if its due date has passed.
-            // An invoice whose payment is undone must not stay green.
-            : invoice.DueDate < DateOnly.FromDateTime(DateTime.Now)
-                ? InvoiceStatus.EnRetard
-                : InvoiceStatus.Envoyee;
-
-        invoice.UpdatedAt = DateTimeOffset.UtcNow;
-    }
+    private static void ApplyStatus(Invoice invoice, decimal paid, decimal total) =>
+        InvoiceStatusRules.ApplyPaid(invoice, paid, total);
 
     private Task<Invoice?> LoadInvoiceAsync(Guid invoiceId, CancellationToken ct) => db.Invoices
         .Include(i => i.Client)

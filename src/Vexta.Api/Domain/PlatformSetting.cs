@@ -22,6 +22,17 @@ public static class PlatformSettingKeys
     // The Stripe product every plan's price hangs off. Created once, then reused.
     public const string StripeProductId = "Stripe:ProductId";
 
+    /// <summary>
+    /// The signing secret of the Connect endpoint, which is a different endpoint at Stripe with
+    /// a different secret from <see cref="StripeWebhookSecret"/>.
+    ///
+    /// Two secrets rather than one because Stripe signs the two streams separately: account
+    /// events about connected companies arrive at the Connect endpoint, Vexta's own subscription
+    /// events at the account endpoint. Verifying one with the other's secret fails the signature
+    /// on every single delivery, and the failure reads exactly like an attack.
+    /// </summary>
+    public const string StripeConnectWebhookSecret = "Stripe:ConnectWebhookSecret";
+
     // Cloudflare R2: one bucket for the whole platform, each tenant under its own key prefix.
     public const string R2AccountId = "R2:AccountId";
     public const string R2AccessKeyId = "R2:AccessKeyId";

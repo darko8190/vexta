@@ -36,6 +36,21 @@ public class Invoice
     /// <summary>When it was emailed to the client, or null if it never was.</summary>
     public DateTimeOffset? SentAt { get; set; }
 
+    /// <summary>
+    /// What the "payer en ligne" link in the email carries, or null for an invoice that has
+    /// never been sent with one.
+    ///
+    /// A token rather than the invoice's id, and a long random one, because this is the whole
+    /// credential: anybody holding the link reads the invoice and may pay it. That is the point
+    /// — the client was emailed the invoice and must not be made to open an account to settle
+    /// it — but it means the link has to be unguessable, so it is 32 random bytes and not
+    /// something anybody could arrive at by counting.
+    ///
+    /// Never expires. An invoice paid three months late is still that invoice, and a dead link
+    /// turns a client who finally sat down to pay into a phone call.
+    /// </summary>
+    public string? PayToken { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 

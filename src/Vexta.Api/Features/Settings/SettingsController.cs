@@ -27,6 +27,7 @@ public class SettingsController(
             PlatformSettingKeys.StripeSecretKey,
             PlatformSettingKeys.StripePublishableKey,
             PlatformSettingKeys.StripeWebhookSecret,
+            PlatformSettingKeys.StripeConnectWebhookSecret,
             PlatformSettingKeys.R2AccountId,
             PlatformSettingKeys.R2AccessKeyId,
             PlatformSettingKeys.R2SecretAccessKey,
@@ -46,6 +47,7 @@ public class SettingsController(
             MailgunRegion: values[PlatformSettingKeys.MailgunRegion] ?? "us",
             StripeConfigured: HasValue(PlatformSettingKeys.StripeSecretKey) && HasValue(PlatformSettingKeys.StripeWebhookSecret),
             StripePublishableKey: values[PlatformSettingKeys.StripePublishableKey],
+            StripeConnectConfigured: HasValue(PlatformSettingKeys.StripeConnectWebhookSecret),
             R2Configured: HasValue(PlatformSettingKeys.R2AccountId)
                 && HasValue(PlatformSettingKeys.R2AccessKeyId)
                 && HasValue(PlatformSettingKeys.R2SecretAccessKey)
@@ -69,6 +71,7 @@ public class SettingsController(
             [PlatformSettingKeys.StripeSecretKey] = request.StripeSecretKey,
             [PlatformSettingKeys.StripePublishableKey] = request.StripePublishableKey,
             [PlatformSettingKeys.StripeWebhookSecret] = request.StripeWebhookSecret,
+            [PlatformSettingKeys.StripeConnectWebhookSecret] = request.StripeConnectWebhookSecret,
             [PlatformSettingKeys.R2AccountId] = request.R2AccountId,
             [PlatformSettingKeys.R2AccessKeyId] = request.R2AccessKeyId,
             [PlatformSettingKeys.R2SecretAccessKey] = request.R2SecretAccessKey,

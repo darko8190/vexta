@@ -71,3 +71,4 @@ export function useHasFeature(key: string) {
 /** The keys the application itself checks. Mirrors FeatureKeys on the server. */
 export const FEATURE_OCR = "ocr";
 export const FEATURE_AI = "ia";
+export const FEATURE_PAYMENTS = "paiements";

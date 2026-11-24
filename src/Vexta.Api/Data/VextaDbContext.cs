@@ -357,6 +357,12 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.HasOne(i => i.Project).WithMany(p => p.Invoices).HasForeignKey(i => i.ProjectId).OnDelete(DeleteBehavior.SetNull);
             e.HasIndex(i => new { i.TenantId, i.Number }).IsUnique();
 
+            // The whole credential in the payment link. Unique across the platform and not per
+            // tenant: it is looked up with no tenant in hand, so a collision between two
+            // companies would hand one of them the other's invoice.
+            e.Property(i => i.PayToken).HasMaxLength(64);
+            e.HasIndex(i => i.PayToken).IsUnique();
+
             // SetNull: retiring a policy must not take the invoices priced with it.
             e.HasOne(i => i.PricePolicy).WithMany()
                 .HasForeignKey(i => i.PricePolicyId).OnDelete(DeleteBehavior.SetNull);
@@ -1257,6 +1263,13 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             // #RRGGBB, validated on the way in.
             e.Property(t => t.BrandColor).HasMaxLength(7);
             e.Property(t => t.BusinessNumber).HasMaxLength(40);
+
+            // acct_ plus 16 characters today, with room for Stripe to grow it.
+            e.Property(t => t.StripeAccountId).HasMaxLength(64);
+            // Not unique by a constraint: a connected account forgotten by RefreshAsync and
+            // reopened would otherwise collide with its own abandoned row if one ever survived
+            // elsewhere. Looked up often enough to earn the index.
+            e.HasIndex(t => t.StripeAccountId);
         });
 
         // Platform-wide branding, like Plan and Module: no tenant query filter, because every

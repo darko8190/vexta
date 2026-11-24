@@ -73,6 +73,9 @@ public static class CatalogSeeder
         new(FeatureKeys.Ai, "Assistant IA",
             "Un bouton dans la barre du haut qui ouvre une conversation avec l'assistant. L'entreprise branche sa propre clé Claude ou ChatGPT.",
             "Sparkles"),
+        new(FeatureKeys.Payments, "Paiements en ligne",
+            "L'entreprise branche son propre compte Stripe et se fait payer par carte : un lien de paiement sur les factures qu'elle envoie, et la caisse de sa page publique. L'argent va dans son compte, pas dans celui de Vexta.",
+            "CreditCard"),
     ];
 
     public static async Task SeedAsync(IServiceProvider services, ILogger logger)

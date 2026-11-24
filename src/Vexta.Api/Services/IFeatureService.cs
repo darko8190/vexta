@@ -13,6 +13,15 @@ public interface IFeatureService
 {
     Task<bool> IsEnabledAsync(string key, CancellationToken ct = default);
 
+    /// <summary>
+    /// The same question about a named company rather than about whoever is signed in.
+    ///
+    /// For the handful of callers that have no session to resolve a tenant from: a webhook, and
+    /// a public page answering a stranger who is holding a payment link. Everything with a
+    /// signed-in user uses the overload above, so a tenant id cannot be passed in from a request.
+    /// </summary>
+    Task<bool> IsEnabledAsync(string key, Guid tenantId, CancellationToken ct = default);
+
     /// <summary>The keys in force for the current space, for a browser deciding what to draw.</summary>
     Task<IReadOnlyList<string>> ActiveKeysAsync(CancellationToken ct = default);
 }
@@ -22,10 +31,14 @@ public class FeatureService(VextaDbContext db, ICurrentUserService currentUser) 
     public async Task<bool> IsEnabledAsync(string key, CancellationToken ct = default) =>
         (await ActiveKeysAsync(ct)).Contains(key, StringComparer.Ordinal);
 
-    public async Task<IReadOnlyList<string>> ActiveKeysAsync(CancellationToken ct = default)
-    {
-        if (currentUser.TenantId is not { } tenantId) return [];
+    public async Task<bool> IsEnabledAsync(string key, Guid tenantId, CancellationToken ct = default) =>
+        (await KeysForAsync(tenantId, ct)).Contains(key, StringComparer.Ordinal);
 
+    public async Task<IReadOnlyList<string>> ActiveKeysAsync(CancellationToken ct = default) =>
+        currentUser.TenantId is { } tenantId ? await KeysForAsync(tenantId, ct) : [];
+
+    private async Task<IReadOnlyList<string>> KeysForAsync(Guid tenantId, CancellationToken ct)
+    {
         var planId = await db.Tenants.AsNoTracking()
             .Where(t => t.Id == tenantId)
             .Select(t => t.PlanId)

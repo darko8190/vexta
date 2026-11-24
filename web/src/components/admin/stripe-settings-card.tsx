@@ -20,6 +20,7 @@ const formSchema = z.object({
   stripePublishableKey: z.string().optional(),
   stripeSecretKey: z.string().optional(),
   stripeWebhookSecret: z.string().optional(),
+  stripeConnectWebhookSecret: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -32,6 +33,7 @@ export function StripeSettingsCard({ settings }: { settings: PlatformSettings })
       stripePublishableKey: settings.stripePublishableKey ?? "",
       stripeSecretKey: "",
       stripeWebhookSecret: "",
+      stripeConnectWebhookSecret: "",
     },
   });
 
@@ -40,6 +42,7 @@ export function StripeSettingsCard({ settings }: { settings: PlatformSettings })
       stripePublishableKey: settings.stripePublishableKey ?? "",
       stripeSecretKey: "",
       stripeWebhookSecret: "",
+      stripeConnectWebhookSecret: "",
     });
   }, [settings, form]);
 
@@ -49,6 +52,7 @@ export function StripeSettingsCard({ settings }: { settings: PlatformSettings })
       toast.success("Passerelle Stripe enregistrée.");
       form.setValue("stripeSecretKey", "");
       form.setValue("stripeWebhookSecret", "");
+      form.setValue("stripeConnectWebhookSecret", "");
     } catch {
       toast.error("Impossible d'enregistrer la configuration Stripe.");
     }
@@ -66,7 +70,10 @@ export function StripeSettingsCard({ settings }: { settings: PlatformSettings })
             {settings.stripeConfigured ? "Configuré" : "Non configuré"}
           </Badge>
         </div>
-        <CardDescription>Utilisé pour l&apos;abonnement mensuel payant des locataires de Vexta.</CardDescription>
+        <CardDescription>
+          L&apos;abonnement mensuel des entreprises à Vexta, et — avec le second secret ci-dessous —
+          les comptes Stripe que les entreprises branchent pour encaisser leurs propres clients.
+        </CardDescription>
       </CardHeader>
 
       <form id="stripe-form" onSubmit={form.handleSubmit(onSubmit)}>
@@ -114,6 +121,28 @@ export function StripeSettingsCard({ settings }: { settings: PlatformSettings })
                   />
                   <FieldDescription>
                     À configurer sur l&apos;endpoint <code>/api/billing/webhook</code> dans Stripe.
+                  </FieldDescription>
+                </Field>
+              )}
+            />
+            <Controller
+              name="stripeConnectWebhookSecret"
+              control={form.control}
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel htmlFor="stripe-connect-webhook">Secret du webhook Connect</FieldLabel>
+                  <Input
+                    {...field}
+                    id="stripe-connect-webhook"
+                    type="password"
+                    autoComplete="off"
+                    placeholder={settings.stripeConnectConfigured ? "••••••••••••••••" : "whsec_…"}
+                  />
+                  <FieldDescription>
+                    Un second endpoint dans Stripe, de type Connect, sur{" "}
+                    <code>/api/billing/webhook/connect</code> : <code>account.updated</code> et{" "}
+                    <code>checkout.session.completed</code>. C&apos;est lui qui apprend qu&apos;une
+                    entreprise est autorisée à encaisser, et qu&apos;une facture a été payée.
                   </FieldDescription>
                 </Field>
               )}

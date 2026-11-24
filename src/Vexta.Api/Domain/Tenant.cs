@@ -35,6 +35,50 @@ public class Tenant
     /// </summary>
     public bool CancelAtPeriodEnd { get; set; }
 
+    // ---- The company's own Stripe account, for charging its own customers ----
+    //
+    // Nothing above this line is about this. StripeCustomerId and StripeSubscriptionId are the
+    // company paying Vexta; the four below are the company being paid, through a connected
+    // account of its own that Vexta never holds the money in. Keeping both on one row is
+    // deliberate — they are both "this company's relationship with Stripe" — but they are read
+    // by different code and must never be confused: charging a customer with the subscription
+    // id would be billing the wrong party entirely.
+
+    /// <summary>
+    /// The connected account, <c>acct_…</c>, or null for a company that has never started.
+    ///
+    /// Set the moment the account is created at Stripe, before any of the onboarding is done:
+    /// an account that exists but is not usable yet is exactly the state the company is in
+    /// while it fills Stripe's forms, and losing the id would make it start over.
+    /// </summary>
+    public string? StripeAccountId { get; set; }
+
+    /// <summary>
+    /// Stripe says this account may take card payments. The only flag that decides whether a
+    /// payment link goes out, because it is the only one that answers "will the money arrive".
+    ///
+    /// Stripe's answer, cached. Asking Stripe on every invoice send would make sending depend
+    /// on their API being up, and the webhook keeps this in step.
+    /// </summary>
+    public bool StripeChargesEnabled { get; set; }
+
+    /// <summary>
+    /// Stripe may pay out to the company's bank. Shown, never enforced: an account can take
+    /// payments before payouts are released, and refusing to collect in the meantime would
+    /// hold up money that is already the company's.
+    /// </summary>
+    public bool StripePayoutsEnabled { get; set; }
+
+    /// <summary>
+    /// The company finished Stripe's forms. Distinguishes "has not started" from "started and
+    /// Stripe is still reviewing", which are the same thing to <see cref="StripeChargesEnabled"/>
+    /// and completely different things to say to somebody.
+    /// </summary>
+    public bool StripeDetailsSubmitted { get; set; }
+
+    /// <summary>When the three flags above were last taken from Stripe.</summary>
+    public DateTimeOffset? StripeAccountCheckedAt { get; set; }
+
     // ---- The company's own profile, shown on its documents and filled in by its owner ----
 
     public string? Description { get; set; }

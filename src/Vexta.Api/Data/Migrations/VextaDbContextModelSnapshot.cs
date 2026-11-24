@@ -1706,6 +1706,10 @@ namespace Vexta.Api.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("PayToken")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<Guid?>("PricePolicyId")
                         .HasColumnType("uuid");
 
@@ -1727,6 +1731,9 @@ namespace Vexta.Api.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ClientId");
+
+                    b.HasIndex("PayToken")
+                        .IsUnique();
 
                     b.HasIndex("PricePolicyId");
 
@@ -3481,8 +3488,24 @@ namespace Vexta.Api.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<DateTimeOffset?>("StripeAccountCheckedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("StripeAccountId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<bool>("StripeChargesEnabled")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("StripeCustomerId")
                         .HasColumnType("text");
+
+                    b.Property<bool>("StripeDetailsSubmitted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("StripePayoutsEnabled")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("StripeSubscriptionId")
                         .HasColumnType("text");
@@ -3499,6 +3522,8 @@ namespace Vexta.Api.Data.Migrations
 
                     b.HasIndex("Slug")
                         .IsUnique();
+
+                    b.HasIndex("StripeAccountId");
 
                     b.ToTable("Tenants");
                 });

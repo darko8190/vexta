@@ -220,7 +220,20 @@ migrations en même temps peuvent entrer en conflit.
      passent le locataire en impayé, `active` et `trialing` le réactivent.
    - `customer.subscription.deleted` — abonnement résilié : le locataire passe en annulé.
 3. Reportez le secret de signature dans **Intégrations**.
-4. Créez vos forfaits dans **Forfaits**. Vexta crée le prix dans Stripe à l'enregistrement ; un
+4. **Si vous vendez les paiements en ligne** (les entreprises qui encaissent leurs propres
+   clients), activez **Connect** dans Stripe, puis créez un **second** webhook, de type
+   *Connect*, vers `https://api.vexta.ca/api/billing/webhook/connect`
+   (`https://api-qa.vexta.ca/api/billing/webhook/connect` en QA), abonné à deux événements :
+   - `account.updated` — Stripe a autorisé (ou suspendu) une entreprise ; c'est ce qui allume
+     le bouton « Payer en ligne » sur ses factures.
+   - `checkout.session.completed` — un client a payé une facture : le paiement est inscrit et
+     la facture passe à *Payée*.
+
+   Reportez son secret dans **Intégrations → Secret du webhook Connect**. C'est un secret
+   **différent** de celui de l'étape 3 : Stripe signe les deux flux séparément, et vérifier
+   l'un avec le secret de l'autre fait échouer *toutes* les livraisons avec une erreur qui
+   ressemble exactement à une signature falsifiée.
+5. Créez vos forfaits dans **Forfaits**. Vexta crée le prix dans Stripe à l'enregistrement ; un
    forfait sans prix Stripe ne peut pas être publié. Chaque forfait porte aussi un **nombre
    d'utilisateurs** — voir la section Équipe plus bas.
 
@@ -1714,6 +1727,55 @@ d'embauche et serait tombée en balayage de table. L'index est déclaré explici
 générateur ne puisse plus le retirer.
 
 ---
+
+### Paiements en ligne : l'entreprise encaisse ses propres clients
+
+C'est l'inverse de tout ce qui précède sur Stripe. Les sections plus haut parlent de Vexta qui
+facture les entreprises ; celle-ci parle de l'entreprise qui se fait payer par **ses** clients,
+avec de l'argent qui ne touche jamais le compte de Vexta.
+
+**Comment c'est branché.** Chaque entreprise ouvre son propre compte Stripe, depuis
+**Paramètres → Paiements**. Stripe lui demande son numéro d'entreprise, une pièce d'identité et
+le compte bancaire où déposer l'argent — Vexta ne voit rien de tout cela et ne le stocke nulle
+part. Ce sont des *charges directes* : l'entreprise est le commerçant, le paiement apparaît sur
+le relevé du client sous le nom de l'entreprise, l'entreprise paie les frais de Stripe, et Vexta
+ne prend aucune commission.
+
+**Il faut cocher la fonctionnalité.** « Paiements en ligne » est une fonctionnalité de forfait,
+comme l'OCR et l'assistant : **Fonctionnalités** la liste, et c'est en la cochant sur un forfait
+dans **Forfaits** qu'une entreprise y a droit. Sans la coche, la carte Paiements s'affiche mais
+tout y est refusé.
+
+**Le pays ne se change pas.** Stripe fixe le pays d'un compte à sa création et ne le change
+jamais. Vexta le prend donc sur l'adresse de l'entreprise, et refuse de commencer tant qu'il n'y
+en a pas — avec un message qui le dit. Une entreprise sans adresse doit d'abord la remplir dans
+**Entreprise**.
+
+**Sur les factures.** Dès que Stripe autorise l'entreprise à encaisser, un bouton
+**Payer en ligne** s'ajoute au bas des courriels de facture. Il est *ajouté* au message, pas
+offert comme champ de gabarit : une entreprise qui a écrit son propre texte n'a rien à modifier,
+et personne ne peut se retrouver avec deux boutons. Le lien mène à `/facture/<jeton>`, une page
+Vexta sans connexion : le client qui a reçu la facture ne doit pas avoir à s'ouvrir un compte
+pour la régler.
+
+Le jeton est 32 octets aléatoires et **ne périme pas** — une facture payée trois mois plus tard
+est toujours la même facture. Il est créé une fois et le même lien part dans tous les rappels.
+Une entreprise peut aussi le récupérer seule : `GET /api/invoices/{id}/lien-paiement`.
+
+**Ce que la page publique dit.** Le nom de l'entreprise, sa couleur, le numéro de la facture,
+les deux dates, le total, ce qui a déjà été payé et ce qui reste. Rien d'autre : ni les lignes,
+ni le projet, ni les autres factures du client.
+
+**Quand le paiement arrive**, il est inscrit comme un paiement par carte, sans nom d'employé
+dessus — personne chez l'entreprise ne l'a saisi — et la facture passe à *Payée* par la même
+règle que les paiements au comptoir. Deux chemins l'enregistrent, la page de retour et le
+webhook, et ils se courent après volontairement : l'identifiant du paiement Stripe fait que le
+second reconnaît la ligne du premier au lieu d'en ajouter une deuxième.
+
+**Sans le webhook Connect**, tout fonctionne quand même : la page où le client atterrit inscrit
+le paiement. Ce qui manque, c'est l'avertissement automatique quand Stripe autorise une
+entreprise du jour au lendemain — la carte Paiements a un bouton **Actualiser** pour ça, et le
+dit.
 
 ---
 

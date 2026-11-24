@@ -64,6 +64,10 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
     public DbSet<Product> Products => Set<Product>();
     public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
     public DbSet<ProductSubCategory> ProductSubCategories => Set<ProductSubCategory>();
+    public DbSet<ProjectCategory> ProjectCategories => Set<ProjectCategory>();
+    public DbSet<ProjectSubCategory> ProjectSubCategories => Set<ProjectSubCategory>();
+    public DbSet<WageClassification> WageClassifications => Set<WageClassification>();
+    public DbSet<WageClassificationStep> WageClassificationSteps => Set<WageClassificationStep>();
     public DbSet<ProductImage> ProductImages => Set<ProductImage>();
     public DbSet<ProductPriceEntry> ProductPriceEntries => Set<ProductPriceEntry>();
     public DbSet<ProductStockEntry> ProductStockEntries => Set<ProductStockEntry>();
@@ -402,6 +406,15 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             // SetNull: selling the car must not delete the jobs done on it.
             e.HasOne(p => p.ClientAsset).WithMany()
                 .HasForeignKey(p => p.ClientAssetId).OnDelete(DeleteBehavior.SetNull);
+
+            // SetNull, all three: tidying a list of categories or retiring a classification
+            // must never take a job with it. The job simply stops being filed there.
+            e.HasOne(p => p.Category).WithMany(c => c.Projects)
+                .HasForeignKey(p => p.CategoryId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(p => p.SubCategory).WithMany(c => c.Projects)
+                .HasForeignKey(p => p.SubCategoryId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(p => p.WageClassification).WithMany(c => c.Projects)
+                .HasForeignKey(p => p.WageClassificationId).OnDelete(DeleteBehavior.SetNull);
             e.HasQueryFilter(p => p.TenantId == CurrentTenantId
                 && (CurrentClientId == null || p.ClientId == CurrentClientId));
         });
@@ -1181,6 +1194,48 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
 
             e.HasIndex(c => new { c.CategoryId, c.Name }).IsUnique();
             e.HasQueryFilter(c => c.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<ProjectCategory>(e =>
+        {
+            e.Property(c => c.Name).HasMaxLength(100);
+            e.HasIndex(c => new { c.TenantId, c.Name }).IsUnique();
+            e.HasQueryFilter(c => c.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<ProjectSubCategory>(e =>
+        {
+            e.Property(c => c.Name).HasMaxLength(100);
+
+            // Cascade: a sub-category has no meaning without its category, and the jobs filed
+            // under it keep their own category.
+            e.HasOne(c => c.Category).WithMany(c => c.SubCategories)
+                .HasForeignKey(c => c.CategoryId).OnDelete(DeleteBehavior.Cascade);
+
+            e.HasIndex(c => new { c.CategoryId, c.Name }).IsUnique();
+            e.HasQueryFilter(c => c.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<WageClassification>(e =>
+        {
+            e.Property(c => c.Name).HasMaxLength(100);
+            e.HasIndex(c => new { c.TenantId, c.Name }).IsUnique();
+            e.HasQueryFilter(c => c.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<WageClassificationStep>(e =>
+        {
+            e.Property(s => s.Name).HasMaxLength(100);
+            e.Property(s => s.Wage).HasPrecision(10, 2);
+            e.Property(s => s.Cost).HasPrecision(10, 2);
+            e.Property(s => s.Selling).HasPrecision(10, 2);
+
+            // Cascade: a step is a row of its classification's table and nothing else.
+            e.HasOne(s => s.Classification).WithMany(c => c.Steps)
+                .HasForeignKey(s => s.ClassificationId).OnDelete(DeleteBehavior.Cascade);
+
+            e.HasIndex(s => new { s.ClassificationId, s.SortOrder });
+            e.HasQueryFilter(s => s.TenantId == CurrentTenantId);
         });
 
         builder.Entity<Product>(e =>

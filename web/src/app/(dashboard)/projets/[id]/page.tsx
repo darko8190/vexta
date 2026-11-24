@@ -248,6 +248,23 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                   </div>
                 )}
 
+                {/* Same rule as the asset: shown only when the job has one. */}
+                {project.categoryName && (
+                  <div>
+                    <dt className="text-muted-foreground">Catégorie</dt>
+                    <dd className="text-foreground">
+                      {project.categoryName}
+                      {project.subCategoryName && ` › ${project.subCategoryName}`}
+                    </dd>
+                  </div>
+                )}
+                {project.wageClassificationName && (
+                  <div>
+                    <dt className="text-muted-foreground">Classement</dt>
+                    <dd className="text-foreground">{project.wageClassificationName}</dd>
+                  </div>
+                )}
+
                 <AddressBlock label="Adresse de facturation" lines={billing} />
                 <AddressBlock
                   label="Adresse des travaux"

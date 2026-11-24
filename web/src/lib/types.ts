@@ -343,6 +343,58 @@ export interface ProjectRecord {
   invoiceCount: number;
   createdAt: string;
   updatedAt: string;
+  /** How the company files this job. */
+  categoryId: string | null;
+  categoryName: string | null;
+  subCategoryId: string | null;
+  subCategoryName: string | null;
+  /** The pay classification the hours on this job are counted under. */
+  wageClassificationId: string | null;
+  wageClassificationName: string | null;
+}
+
+/** One of the company's own categories for its jobs, separate from the catalogue's. */
+export interface ProjectCategory {
+  id: string;
+  name: string;
+  projectCount: number;
+  subCategories: ProjectSubCategory[];
+}
+
+export interface ProjectSubCategory {
+  id: string;
+  categoryId: string;
+  name: string;
+  projectCount: number;
+}
+
+/** One step of a pay classification: Apprenti 1 … Compagnon. All three rates are hourly. */
+export interface WageClassificationStep {
+  id: string;
+  name: string;
+  sortOrder: number;
+  /** What the worker is paid. */
+  wage: number | null;
+  /** What the hour really costs the company. */
+  cost: number | null;
+  /** What the client is billed for it. */
+  selling: number | null;
+}
+
+/** A pay classification: a title ("Commercial") and the steps a worker climbs under it. */
+export interface WageClassification {
+  id: string;
+  name: string;
+  sortOrder: number;
+  projectCount: number;
+  steps: WageClassificationStep[];
+}
+
+export interface SaveWageClassificationValues {
+  name: string;
+  sortOrder: number;
+  /** The whole table in climbing order; it replaces the stored one. */
+  steps: { id: string | null; name: string; wage: number | null; cost: number | null; selling: number | null }[];
 }
 
 /** P-0001. Padded so the column sorts and scans cleanly. */

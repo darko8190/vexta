@@ -27,6 +27,8 @@ import { Spinner } from "@/components/ui/spinner";
 import { AddressPicker } from "@/components/addresses/address-picker";
 import { ClientAssetPicker } from "@/components/assets/client-asset-picker";
 import { ClientPicker } from "@/components/clients/client-picker";
+import { ProjectCategoryFields } from "@/components/projects/project-category-fields";
+import { useWageClassificationsQuery } from "@/hooks/use-wage-classifications";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FieldDescription } from "@/components/ui/field";
 import { useClientQuery } from "@/hooks/use-clients";
@@ -41,6 +43,7 @@ const statuses = Object.keys(projectStatusLabels) as ProjectStatus[];
 
 /** Base UI needs a value for every item, and "" is not one. */
 const NO_POLICY = "aucune";
+const NO_CLASSIFICATION = "aucun";
 
 const formSchema = z.object({
   clientId: z.string().min(1, "Le client est requis."),
@@ -56,6 +59,9 @@ const formSchema = z.object({
   isTaxExempt: z.boolean(),
   pricePolicyId: z.string().optional().or(z.literal("")),
   clientAssetId: z.string().optional().or(z.literal("")),
+  categoryId: z.string(),
+  subCategoryId: z.string(),
+  wageClassificationId: z.string(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -83,6 +89,9 @@ function toFormValues(project?: ProjectRecord, defaultClientId?: string): FormVa
     isTaxExempt: project?.isTaxExempt ?? false,
     pricePolicyId: project?.pricePolicyId ?? "",
     clientAssetId: project?.clientAssetId ?? "",
+    categoryId: project?.categoryId ?? "",
+    subCategoryId: project?.subCategoryId ?? "",
+    wageClassificationId: project?.wageClassificationId ?? "",
   };
 }
 
@@ -108,6 +117,9 @@ function storedValues(project: ProjectRecord): ProjectFormValues {
     isTaxExempt: project.isTaxExempt,
     pricePolicyId: project.pricePolicyId,
     clientAssetId: project.clientAssetId,
+    categoryId: project.categoryId,
+    subCategoryId: project.subCategoryId,
+    wageClassificationId: project.wageClassificationId,
   };
 }
 
@@ -154,6 +166,9 @@ export function ProjectFormSheet({
       isTaxExempt: values.isTaxExempt,
       pricePolicyId: values.pricePolicyId || null,
       clientAssetId: values.clientAssetId || null,
+      categoryId: values.categoryId || null,
+      subCategoryId: values.categoryId ? values.subCategoryId || null : null,
+      wageClassificationId: values.wageClassificationId || null,
     };
 
     try {
@@ -196,6 +211,9 @@ export function ProjectFormSheet({
   // render, and the repo already follows this convention elsewhere.
   const clientId = useWatch({ control: form.control, name: "clientId" });
   const sameAddress = useWatch({ control: form.control, name: "sameAddressAsClient" });
+  const categoryId = useWatch({ control: form.control, name: "categoryId" });
+  const subCategoryId = useWatch({ control: form.control, name: "subCategoryId" });
+  const { data: classifications, isLoading: classificationsLoading } = useWageClassificationsQuery();
 
   // Shares its cache with the settings screen that manages them; this form only reads.
   const { data: policies } = useQuery({
@@ -301,6 +319,60 @@ export function ProjectFormSheet({
                 <Field>
                   <FieldLabel htmlFor="project-description">Description</FieldLabel>
                   <Textarea {...field} id="project-description" rows={3} />
+                </Field>
+              )}
+            />
+
+            <ProjectCategoryFields
+              categoryId={categoryId}
+              subCategoryId={subCategoryId}
+              onCategoryChange={(id) => form.setValue("categoryId", id, { shouldDirty: true })}
+              onSubCategoryChange={(id) => form.setValue("subCategoryId", id, { shouldDirty: true })}
+            />
+
+            <Controller
+              name="wageClassificationId"
+              control={form.control}
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel htmlFor="project-classification">Classement</FieldLabel>
+                  <Select
+                    value={field.value || null}
+                    onValueChange={(value: string | null) =>
+                      field.onChange(!value || value === NO_CLASSIFICATION ? "" : value)
+                    }
+                  >
+                    <SelectTrigger id="project-classification" className="w-full">
+                      <SelectValue>
+                        {(value: string) =>
+                          !value
+                            ? classificationsLoading
+                              ? "Chargement…"
+                              : "Aucun classement"
+                            : (classifications?.find((item) => item.id === value)?.name ?? "Chargement…")
+                        }
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_CLASSIFICATION}>Aucun classement</SelectItem>
+                      {(classifications ?? []).map((item) => (
+                        <SelectItem key={item.id} value={item.id}>
+                          {item.name}
+                          {item.steps.length > 0 && (
+                            <span className="text-muted-foreground">
+                              {" "}
+                              — {item.steps.length} échelon{item.steps.length > 1 ? "s" : ""}
+                            </span>
+                          )}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FieldDescription>
+                    {classifications && classifications.length === 0
+                      ? "Aucun classement encore : ils se créent dans Paramètres → Taux."
+                      : "Les taux du secteur de ce projet. Ils se gèrent dans Paramètres → Taux."}
+                  </FieldDescription>
                 </Field>
               )}
             />

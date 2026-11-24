@@ -21,6 +21,7 @@ import { InvoiceEmailCard } from "@/components/settings/invoice-email-card";
 import { MarginModeCard } from "@/components/settings/margin-mode-card";
 import { OnlinePaymentsCard } from "@/components/settings/online-payments-card";
 import { PricePoliciesCard } from "@/components/settings/price-policies-card";
+import { WageClassificationsCard } from "@/components/settings/wage-classifications-card";
 import { useBillingStateQuery, type BillingState } from "@/hooks/use-billing";
 import { usePublicPlansQuery } from "@/hooks/use-catalog";
 import { usePricePoliciesQuery } from "@/hooks/use-price-policies";
@@ -390,7 +391,12 @@ export default function SettingsPage() {
             {active === "facturation" && <BillingSettingsCard />}
             {active === "courriel" && <InvoiceEmailCard />}
             {active === "paiements" && <OnlinePaymentsCard />}
-            {active === "taux" && <HourlyRateCard />}
+            {active === "taux" && (
+              <div className="space-y-6">
+                <HourlyRateCard />
+                <WageClassificationsCard />
+              </div>
+            )}
             {active === "assistant" && <AiAssistantCard />}
             {active === "marge" && (
               <div className="space-y-6">

@@ -200,6 +200,10 @@ public class TenantsController(
                 .ExecuteUpdateAsync(set => set.SetProperty(x => x.ParentProductId, (Guid?)null), ct);
             await Wipe(db.Products.Where(x => x.TenantId == id));
             await Wipe(db.ProductSubCategories.Where(x => x.TenantId == id));
+            await Wipe(db.ProjectSubCategories.Where(x => x.TenantId == id));
+            await Wipe(db.ProjectCategories.Where(x => x.TenantId == id));
+            await Wipe(db.WageClassificationSteps.Where(x => x.TenantId == id));
+            await Wipe(db.WageClassifications.Where(x => x.TenantId == id));
             await Wipe(db.ProductCategories.Where(x => x.TenantId == id));
 
             // A submission points at the client it created, and an answer at its question, so

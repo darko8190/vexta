@@ -25,6 +25,10 @@ export interface ProjectFormValues {
   siteAddressId?: string | null;
   /** Which of the client's assets the job is on. Has to be one of theirs — the server checks. */
   clientAssetId?: string | null;
+  categoryId?: string | null;
+  /** Has to sit under categoryId; dropped by the server without one. */
+  subCategoryId?: string | null;
+  wageClassificationId?: string | null;
 }
 
 export function useProjectsQuery(page: number, search: string, clientId?: string, status?: ProjectStatus) {

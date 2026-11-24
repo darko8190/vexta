@@ -203,6 +203,7 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
 
         if (await InvalidAddressesAsync(request) is { } addressError) return BadRequest(new { message = addressError });
         if (await InvalidAssetAsync(request) is { } assetError) return BadRequest(new { message = assetError });
+        if (await InvalidFilingAsync(request) is { } filingError) return BadRequest(new { message = filingError });
 
         var tenantId = currentUser.TenantId!.Value;
         var project = new Project
@@ -222,6 +223,8 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
             PricePolicyId = request.PricePolicyId,
             ClientAssetId = request.ClientAssetId
         };
+
+        ApplyFiling(project, request);
 
         ApplyAddresses(project, request);
         db.Projects.Add(project);
@@ -249,6 +252,7 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
 
         if (await InvalidAddressesAsync(request) is { } addressError) return BadRequest(new { message = addressError });
         if (await InvalidAssetAsync(request) is { } assetError) return BadRequest(new { message = assetError });
+        if (await InvalidFilingAsync(request) is { } filingError) return BadRequest(new { message = filingError });
 
         project.ClientId = request.ClientId;
         project.ClientAssetId = request.ClientAssetId;
@@ -263,6 +267,7 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
         project.UpdatedAt = DateTimeOffset.UtcNow;
 
         ApplyAddresses(project, request);
+        ApplyFiling(project, request);
 
         await db.SaveChangesAsync();
         return Ok(await GetDtoAsync(id));
@@ -349,6 +354,42 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
     }
 
     /// <summary>
+    /// The category, the sub-category and the classification have to be this company's own,
+    /// and the sub-category has to sit under the category. Checked rather than trusted: the
+    /// ids come from the browser. The query filters scope each lookup to the company.
+    /// </summary>
+    private async Task<string?> InvalidFilingAsync(UpsertProjectRequest request)
+    {
+        if (request.CategoryId is { } categoryId
+            && !await db.ProjectCategories.AnyAsync(c => c.Id == categoryId))
+        {
+            return "Cette catégorie n'existe plus.";
+        }
+
+        if (request.CategoryId is not null && request.SubCategoryId is { } subCategoryId
+            && !await db.ProjectSubCategories.AnyAsync(s => s.Id == subCategoryId && s.CategoryId == request.CategoryId))
+        {
+            return "Cette sous-catégorie n'appartient pas à la catégorie choisie.";
+        }
+
+        if (request.WageClassificationId is { } classificationId
+            && !await db.WageClassifications.AnyAsync(c => c.Id == classificationId))
+        {
+            return "Ce classement n'existe plus.";
+        }
+
+        return null;
+    }
+
+    /// <summary>A sub-category without its category is dropped rather than kept dangling.</summary>
+    private static void ApplyFiling(Project project, UpsertProjectRequest request)
+    {
+        project.CategoryId = request.CategoryId;
+        project.SubCategoryId = request.CategoryId is null ? null : request.SubCategoryId;
+        project.WageClassificationId = request.WageClassificationId;
+    }
+
+    /// <summary>
     /// When the site is the billing address, the site address is cleared rather than copied.
     /// A copy would go stale the moment the client's address changes, and nothing would say so.
     /// </summary>
@@ -392,5 +433,11 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
                 p.SiteAddress.City, p.SiteAddress.Province, p.SiteAddress.PostalCode),
         p.Invoices.Count,
         p.CreatedAt,
-        p.UpdatedAt);
+        p.UpdatedAt,
+        p.CategoryId,
+        p.Category == null ? null : p.Category.Name,
+        p.SubCategoryId,
+        p.SubCategory == null ? null : p.SubCategory.Name,
+        p.WageClassificationId,
+        p.WageClassification == null ? null : p.WageClassification.Name);
 }

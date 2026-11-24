@@ -3000,6 +3000,9 @@ namespace Vexta.Api.Data.Migrations
                         .HasPrecision(14, 2)
                         .HasColumnType("numeric(14,2)");
 
+                    b.Property<Guid?>("CategoryId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("ClientAddressId")
                         .HasColumnType("uuid");
 
@@ -3043,13 +3046,21 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
+                    b.Property<Guid?>("SubCategoryId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("WageClassificationId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("CategoryId");
 
                     b.HasIndex("ClientAddressId");
 
@@ -3061,10 +3072,39 @@ namespace Vexta.Api.Data.Migrations
 
                     b.HasIndex("SiteAddressId");
 
+                    b.HasIndex("SubCategoryId");
+
+                    b.HasIndex("WageClassificationId");
+
                     b.HasIndex("TenantId", "Number")
                         .IsUnique();
 
                     b.ToTable("Projects");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.ProjectCategory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("ProjectCategories");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.ProjectDocument", b =>
@@ -3339,6 +3379,34 @@ namespace Vexta.Api.Data.Migrations
                     b.HasIndex("ProjectId", "CreatedAt");
 
                     b.ToTable("ProjectNotes");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.ProjectSubCategory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CategoryId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("ProjectSubCategories");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.ProjectTask", b =>
@@ -4125,6 +4193,76 @@ namespace Vexta.Api.Data.Migrations
                     b.HasIndex("ProjectId", "StartDate");
 
                     b.ToTable("TimesheetEntries");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.WageClassification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("WageClassifications");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.WageClassificationStep", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ClassificationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("Cost")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<decimal?>("Selling")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("Wage")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClassificationId", "SortOrder");
+
+                    b.ToTable("WageClassificationSteps");
                 });
 
             modelBuilder.Entity("EmployeeTeam", b =>
@@ -4934,6 +5072,11 @@ namespace Vexta.Api.Data.Migrations
 
             modelBuilder.Entity("Vexta.Api.Domain.Project", b =>
                 {
+                    b.HasOne("Vexta.Api.Domain.ProjectCategory", "Category")
+                        .WithMany("Projects")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Vexta.Api.Domain.Address", "ClientAddress")
                         .WithMany()
                         .HasForeignKey("ClientAddressId")
@@ -4960,6 +5103,18 @@ namespace Vexta.Api.Data.Migrations
                         .HasForeignKey("SiteAddressId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("Vexta.Api.Domain.ProjectSubCategory", "SubCategory")
+                        .WithMany("Projects")
+                        .HasForeignKey("SubCategoryId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Vexta.Api.Domain.WageClassification", "WageClassification")
+                        .WithMany("Projects")
+                        .HasForeignKey("WageClassificationId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Category");
+
                     b.Navigation("Client");
 
                     b.Navigation("ClientAddress");
@@ -4969,6 +5124,10 @@ namespace Vexta.Api.Data.Migrations
                     b.Navigation("PricePolicy");
 
                     b.Navigation("SiteAddress");
+
+                    b.Navigation("SubCategory");
+
+                    b.Navigation("WageClassification");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.ProjectDocument", b =>
@@ -5087,6 +5246,17 @@ namespace Vexta.Api.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Project");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.ProjectSubCategory", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.ProjectCategory", "Category")
+                        .WithMany("SubCategories")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Category");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.ProjectTask", b =>
@@ -5313,6 +5483,17 @@ namespace Vexta.Api.Data.Migrations
                     b.Navigation("ProjectTask");
                 });
 
+            modelBuilder.Entity("Vexta.Api.Domain.WageClassificationStep", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.WageClassification", "Classification")
+                        .WithMany("Steps")
+                        .HasForeignKey("ClassificationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Classification");
+                });
+
             modelBuilder.Entity("Vexta.Api.Domain.ApplicationUser", b =>
                 {
                     b.Navigation("Memberships");
@@ -5448,9 +5629,21 @@ namespace Vexta.Api.Data.Migrations
                     b.Navigation("Timesheets");
                 });
 
+            modelBuilder.Entity("Vexta.Api.Domain.ProjectCategory", b =>
+                {
+                    b.Navigation("Projects");
+
+                    b.Navigation("SubCategories");
+                });
+
             modelBuilder.Entity("Vexta.Api.Domain.ProjectExpense", b =>
                 {
                     b.Navigation("Photos");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.ProjectSubCategory", b =>
+                {
+                    b.Navigation("Projects");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.PurchaseOrder", b =>
@@ -5477,6 +5670,13 @@ namespace Vexta.Api.Data.Migrations
                     b.Navigation("Logo");
 
                     b.Navigation("Users");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.WageClassification", b =>
+                {
+                    b.Navigation("Projects");
+
+                    b.Navigation("Steps");
                 });
 #pragma warning restore 612, 618
         }

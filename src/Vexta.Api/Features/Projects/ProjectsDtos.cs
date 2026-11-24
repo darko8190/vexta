@@ -34,7 +34,15 @@ public record ProjectDto(
     ProjectAddressDto? SiteAddress,
     int InvoiceCount,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    /// <summary>How the company files this job, with the names so a list never resolves them.</summary>
+    Guid? CategoryId = null,
+    string? CategoryName = null,
+    Guid? SubCategoryId = null,
+    string? SubCategoryName = null,
+    /// <summary>The pay classification the hours on this job are counted under.</summary>
+    Guid? WageClassificationId = null,
+    string? WageClassificationName = null);
 
 public record UpsertProjectRequest(
     Guid ClientId,
@@ -53,7 +61,11 @@ public record UpsertProjectRequest(
     /// <summary>Ignored when SameAddressAsClient is true.</summary>
     Guid? SiteAddressId,
     /// <summary>Which of the client's assets this job is on. Has to be one of theirs.</summary>
-    Guid? ClientAssetId = null);
+    Guid? ClientAssetId = null,
+    Guid? CategoryId = null,
+    /// <summary>Has to sit under CategoryId; ignored without one.</summary>
+    Guid? SubCategoryId = null,
+    Guid? WageClassificationId = null);
 
 // ---- What the project's own page needs beyond the record itself ----
 

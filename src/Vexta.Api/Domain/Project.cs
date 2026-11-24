@@ -66,6 +66,23 @@ public class Project
     public Guid? SiteAddressId { get; set; }
     public Address? SiteAddress { get; set; }
 
+    /// <summary>
+    /// How the company files this job. Both optional and both SetNull on delete: tidying the
+    /// list of categories must never take a job with it.
+    /// </summary>
+    public Guid? CategoryId { get; set; }
+    public ProjectCategory? Category { get; set; }
+
+    public Guid? SubCategoryId { get; set; }
+    public ProjectSubCategory? SubCategory { get; set; }
+
+    /// <summary>
+    /// The pay classification the hours on this job are counted under — the sector decides the
+    /// rates, and the sector is a property of the job. SetNull on delete, like the categories.
+    /// </summary>
+    public Guid? WageClassificationId { get; set; }
+    public WageClassification? WageClassification { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 

@@ -80,4 +80,4 @@ public record SaveQuoteLineRequest(
     string? Unit = null);
 
 /// <summary>The rows behind each section, and the money, in the project's cost-table shape.</summary>
-public record QuoteSummaryDto(int Tasks, int Materials, int ExtraCharges, ProjectCostTableDto Costs);
+public record QuoteSummaryDto(int Tasks, int Materials, int ExtraCharges, int DocumentsAndNotes, ProjectCostTableDto Costs);

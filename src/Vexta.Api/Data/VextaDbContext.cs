@@ -70,6 +70,8 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
     public DbSet<WageClassificationStep> WageClassificationSteps => Set<WageClassificationStep>();
     public DbSet<Quote> Quotes => Set<Quote>();
     public DbSet<QuoteLine> QuoteLines => Set<QuoteLine>();
+    public DbSet<QuoteDocument> QuoteDocuments => Set<QuoteDocument>();
+    public DbSet<QuoteNote> QuoteNotes => Set<QuoteNote>();
     public DbSet<ProductImage> ProductImages => Set<ProductImage>();
     public DbSet<ProductPriceEntry> ProductPriceEntries => Set<ProductPriceEntry>();
     public DbSet<ProductStockEntry> ProductStockEntries => Set<ProductStockEntry>();
@@ -1252,6 +1254,28 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
 
             e.HasQueryFilter(q => q.TenantId == CurrentTenantId
                 && (CurrentClientId == null || q.ClientId == CurrentClientId));
+        });
+
+        builder.Entity<QuoteDocument>(e =>
+        {
+            e.Property(d => d.Title).HasMaxLength(200);
+            e.Property(d => d.Category).HasMaxLength(100);
+            e.HasOne(d => d.Quote).WithMany(q => q.Documents).HasForeignKey(d => d.QuoteId).OnDelete(DeleteBehavior.Cascade);
+            // Cascade, like a project's documents: removing the file from the library removes the
+            // rows that pointed at it, rather than leaving a document with nothing to open.
+            e.HasOne(d => d.MediaAsset).WithMany().HasForeignKey(d => d.MediaAssetId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(d => new { d.QuoteId, d.CreatedAt });
+            e.HasQueryFilter(d => d.TenantId == CurrentTenantId
+                && (CurrentClientId == null || d.Quote!.ClientId == CurrentClientId));
+        });
+
+        builder.Entity<QuoteNote>(e =>
+        {
+            e.Property(n => n.Body).HasMaxLength(4000);
+            e.HasOne(n => n.Quote).WithMany(q => q.Notes).HasForeignKey(n => n.QuoteId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(n => new { n.QuoteId, n.CreatedAt });
+            e.HasQueryFilter(n => n.TenantId == CurrentTenantId
+                && (CurrentClientId == null || n.Quote!.ClientId == CurrentClientId));
         });
 
         builder.Entity<QuoteLine>(e =>

@@ -86,6 +86,8 @@ public class Quote
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public List<QuoteLine> Lines { get; set; } = [];
+    public List<QuoteDocument> Documents { get; set; } = [];
+    public List<QuoteNote> Notes { get; set; } = [];
 }
 
 /// <summary>
@@ -117,6 +119,50 @@ public class QuoteLine
     public decimal UnitPrice { get; set; }
 
     public int SortOrder { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
+/// <summary>
+/// A file filed against a quote: the plan the price was built from, the photos of the site, the
+/// client's own request. Carried onto the project when the quote is accepted — the same file,
+/// pointed at twice, never copied.
+/// </summary>
+public class QuoteDocument
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid TenantId { get; set; }
+
+    public Guid QuoteId { get; set; }
+    public Quote? Quote { get; set; }
+
+    public required string Title { get; set; }
+    public string? Category { get; set; }
+
+    public Guid MediaAssetId { get; set; }
+    public MediaAsset? MediaAsset { get; set; }
+
+    public Guid? UploadedById { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
+/// <summary>
+/// One dated entry in the quote's internal thread: what the client asked for at the visit, why
+/// the price was cut. Carried onto the project on acceptance, so the crew reads what was promised.
+/// </summary>
+public class QuoteNote
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid TenantId { get; set; }
+
+    public Guid QuoteId { get; set; }
+    public Quote? Quote { get; set; }
+
+    public required string Body { get; set; }
+
+    public Guid? CreatedById { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;

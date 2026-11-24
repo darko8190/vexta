@@ -76,6 +76,9 @@ public class QuotesController(VextaDbContext db, ICurrentUserService currentUser
         var quote = await db.Quotes.AsNoTracking().Include(q => q.Lines).FirstOrDefaultAsync(q => q.Id == id);
         if (quote is null) return NotFound();
 
+        var documentsAndNotes = await db.QuoteDocuments.CountAsync(d => d.QuoteId == id)
+            + await db.QuoteNotes.CountAsync(n => n.QuoteId == id);
+
         var settings = await db.BillingSettings.AsNoTracking()
             .FirstOrDefaultAsync(b => b.TenantId == currentUser.TenantId);
 
@@ -111,6 +114,7 @@ public class QuotesController(VextaDbContext db, ICurrentUserService currentUser
             quote.Lines.Count(l => l.Kind == QuoteLineKind.Tache),
             quote.Lines.Count(l => l.Kind == QuoteLineKind.Materiel),
             quote.Lines.Count(l => l.Kind == QuoteLineKind.Frais),
+            documentsAndNotes,
             costs));
     }
 
@@ -276,7 +280,12 @@ public class QuotesController(VextaDbContext db, ICurrentUserService currentUser
     [RequireBusinessTenant]
     public async Task<ActionResult<QuoteDto>> Convert(Guid id)
     {
-        var quote = await db.Quotes.Include(q => q.Lines).Include(q => q.Client).FirstOrDefaultAsync(q => q.Id == id);
+        var quote = await db.Quotes
+            .Include(q => q.Lines)
+            .Include(q => q.Documents)
+            .Include(q => q.Notes)
+            .Include(q => q.Client)
+            .FirstOrDefaultAsync(q => q.Id == id);
         if (quote is null) return NotFound();
         if (quote.ProjectId is not null) return BadRequest(new { message = "Cette soumission est déjà devenue un projet." });
         if (quote.Status is QuoteStatus.Refusee or QuoteStatus.Expiree)
@@ -346,6 +355,34 @@ public class QuotesController(VextaDbContext db, ICurrentUserService currentUser
                 Name = Truncate(line.Description, 200),
                 Cost = line.UnitCost is { } cost ? Round(cost * line.Quantity) : null,
                 SellingPrice = LineTotal(line),
+            });
+        }
+
+        // The paperwork and the thread follow the job: the documents point at the same files,
+        // and the notes keep their author and their date, so the crew reads what was promised
+        // in the order it was said.
+        foreach (var document in quote.Documents)
+        {
+            project.Documents.Add(new ProjectDocument
+            {
+                TenantId = tenantId,
+                Title = document.Title,
+                Category = document.Category,
+                MediaAssetId = document.MediaAssetId,
+                UploadedById = document.UploadedById,
+                CreatedAt = document.CreatedAt,
+            });
+        }
+
+        foreach (var note in quote.Notes)
+        {
+            project.Notes.Add(new ProjectNote
+            {
+                TenantId = tenantId,
+                Body = note.Body,
+                CreatedById = note.CreatedById,
+                CreatedAt = note.CreatedAt,
+                UpdatedAt = note.UpdatedAt,
             });
         }
 

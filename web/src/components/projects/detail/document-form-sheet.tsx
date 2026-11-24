@@ -20,7 +20,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
-import { useSaveProjectDocument } from "@/hooks/use-project-files";
+import { useSaveProjectDocument, type FileOwner } from "@/hooks/use-project-files";
 import { MAX_UPLOAD_BYTES, useUploadMedia } from "@/hooks/use-media";
 import { ApiError } from "@/lib/api";
 import type { ProjectDocument } from "@/lib/types";
@@ -49,7 +49,7 @@ export function DocumentFormSheet({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  projectId: string;
+  projectId: string | FileOwner;
   document?: ProjectDocument;
 }) {
   const isEditing = Boolean(document);

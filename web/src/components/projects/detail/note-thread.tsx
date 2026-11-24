@@ -20,6 +20,7 @@ import {
   useDeleteProjectNote,
   useProjectNotesQuery,
   useSaveProjectNote,
+  type FileOwner,
 } from "@/hooks/use-project-files";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -34,7 +35,8 @@ const MAX_BODY_LENGTH = 4000;
  * project, unlike the documents above it — the warranty call and the deficiency reported in
  * March are exactly what a closed job gets written on.
  */
-export function NoteThread({ projectId }: { projectId: string }) {
+export function NoteThread({ projectId }: { projectId: string | FileOwner }) {
+  const noun = typeof projectId === "string" || projectId.kind === "projects" ? "projet" : "soumission";
   const { user } = useAuth();
   // A failed read is not a thread nobody wrote in. Showing an unread thread as empty is worse
   // here than in a table: the box above invites a note, so somebody writes down what they were
@@ -141,7 +143,7 @@ export function NoteThread({ projectId }: { projectId: string }) {
         <LoadErrorState
           error={loadError}
           title="Notes indisponibles"
-          fallback="Les notes de ce projet n'ont pas pu être chargées."
+          fallback={`Les notes de ${noun === "projet" ? "ce projet" : "cette soumission"} n'ont pas pu être chargées.`}
           onRetry={() => refetch()}
         />
       ) : notes.length === 0 ? (
@@ -238,7 +240,7 @@ export function NoteThread({ projectId }: { projectId: string }) {
         open={Boolean(deleteId)}
         onOpenChange={(open) => !open && setDeleteId(undefined)}
         title="Supprimer cette note ?"
-        description="Elle quittera le journal du projet. Personne ne pourra la remettre."
+        description={`Elle quittera le journal ${noun === "projet" ? "du projet" : "de la soumission"}. Personne ne pourra la remettre.`}
         onConfirm={confirmDelete}
         pending={remove.isPending}
       />

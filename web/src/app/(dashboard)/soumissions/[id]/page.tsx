@@ -8,6 +8,7 @@ import {
   ArrowRightLeft,
   ClipboardPen,
   FolderKanban,
+  FolderOpen,
   HardHat,
   Info,
   ListChecks,
@@ -33,6 +34,7 @@ import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
 import { SectionNav, type NavSection } from "@/components/layout/section-nav";
 import { ProjectCostTable } from "@/components/projects/detail/project-cost-table";
+import { ProjectDocumentsSection } from "@/components/projects/detail/project-documents-section";
 import { QuoteFormSheet } from "@/components/quotes/quote-form-sheet";
 import { QuoteLinesSection } from "@/components/quotes/quote-lines-section";
 import {
@@ -97,6 +99,12 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
     { key: "taches", label: "Tâches", count: summary?.tasks ?? 0, icon: ListChecks },
     { key: "materiaux", label: "Matériaux", count: summary?.materials ?? 0, icon: HardHat },
     { key: "frais", label: "Frais supplémentaires", count: summary?.extraCharges ?? 0, icon: Plus },
+    {
+      key: "documents",
+      label: "Documents et notes",
+      count: summary?.documentsAndNotes ?? 0,
+      icon: FolderOpen,
+    },
   ];
 
   async function onConvert() {
@@ -221,6 +229,11 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
               locked={locked}
               wageClassificationId={quote.wageClassificationId}
             />
+          )}
+          {/* The same tab as a project's, pointed at the quote: they are carried over together
+              when it is accepted. */}
+          {section === "documents" && (
+            <ProjectDocumentsSection projectId={{ kind: "soumissions", id: quote.id }} />
           )}
           {section === "frais" && (
             <QuoteLinesSection

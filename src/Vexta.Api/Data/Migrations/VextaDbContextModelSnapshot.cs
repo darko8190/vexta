@@ -3787,6 +3787,45 @@ namespace Vexta.Api.Data.Migrations
                     b.ToTable("Quotes");
                 });
 
+            modelBuilder.Entity("Vexta.Api.Domain.QuoteDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("MediaAssetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("QuoteId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid?>("UploadedById")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MediaAssetId");
+
+                    b.HasIndex("QuoteId", "CreatedAt");
+
+                    b.ToTable("QuoteDocuments");
+                });
+
             modelBuilder.Entity("Vexta.Api.Domain.QuoteLine", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3846,6 +3885,39 @@ namespace Vexta.Api.Data.Migrations
                     b.HasIndex("QuoteId", "Kind", "SortOrder");
 
                     b.ToTable("QuoteLines");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.QuoteNote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("QuoteId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("QuoteId", "CreatedAt");
+
+                    b.ToTable("QuoteNotes");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.ReceiptScan", b =>
@@ -5586,6 +5658,25 @@ namespace Vexta.Api.Data.Migrations
                     b.Navigation("WageClassification");
                 });
 
+            modelBuilder.Entity("Vexta.Api.Domain.QuoteDocument", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.MediaAsset", "MediaAsset")
+                        .WithMany()
+                        .HasForeignKey("MediaAssetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Vexta.Api.Domain.Quote", "Quote")
+                        .WithMany("Documents")
+                        .HasForeignKey("QuoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("MediaAsset");
+
+                    b.Navigation("Quote");
+                });
+
             modelBuilder.Entity("Vexta.Api.Domain.QuoteLine", b =>
                 {
                     b.HasOne("Vexta.Api.Domain.Product", "Product")
@@ -5600,6 +5691,17 @@ namespace Vexta.Api.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Product");
+
+                    b.Navigation("Quote");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.QuoteNote", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.Quote", "Quote")
+                        .WithMany("Notes")
+                        .HasForeignKey("QuoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("Quote");
                 });
@@ -5923,7 +6025,11 @@ namespace Vexta.Api.Data.Migrations
 
             modelBuilder.Entity("Vexta.Api.Domain.Quote", b =>
                 {
+                    b.Navigation("Documents");
+
                     b.Navigation("Lines");
+
+                    b.Navigation("Notes");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.Supplier", b =>

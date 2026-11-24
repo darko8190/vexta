@@ -19,7 +19,7 @@ import { LoadErrorState } from "@/components/layout/load-error-state";
 import { DocumentFormSheet } from "@/components/projects/detail/document-form-sheet";
 import { formatFileSize } from "@/components/projects/detail/document-file-size";
 import { NoteThread } from "@/components/projects/detail/note-thread";
-import { useDeleteProjectDocument, useProjectDocumentsQuery } from "@/hooks/use-project-files";
+import { useDeleteProjectDocument, useProjectDocumentsQuery, type FileOwner } from "@/hooks/use-project-files";
 import { useIsClientUser } from "@/hooks/use-can-create";
 import { ApiError } from "@/lib/api";
 import { formatDateOnly } from "@/lib/dates";
@@ -35,7 +35,9 @@ import { rowOpenClassName, rowOpenProps } from "@/components/layout/row-open";
  * the same. The files are the customer's own paperwork and they can read them; the notes are
  * the company's, and the API refuses them outright to a client account.
  */
-export function ProjectDocumentsSection({ projectId }: { projectId: string }) {
+export function ProjectDocumentsSection({ projectId }: { projectId: string | FileOwner }) {
+  // A quote files and discusses its paperwork the same way; only the noun changes.
+  const noun = typeof projectId === "string" || projectId.kind === "projects" ? "ce projet" : "cette soumission";
   // A customer reads the files and nothing else here: no filing, no thread. The API says the
   // same thing twice over — [StaffOnly] on the writes, and on the notes entirely — and this
   // keeps the interface from offering a button and a half-page that would both be refused.
@@ -108,7 +110,7 @@ export function ProjectDocumentsSection({ projectId }: { projectId: string }) {
         <LoadErrorState
           error={loadError}
           title="Documents indisponibles"
-          fallback="Les documents de ce projet n'ont pas pu être chargés."
+          fallback={`Les documents de ${noun} n'ont pas pu être chargés.`}
           onRetry={() => refetch()}
         />
       ) : documents.length === 0 ? (
@@ -232,7 +234,7 @@ export function ProjectDocumentsSection({ projectId }: { projectId: string }) {
         open={Boolean(deleteTarget)}
         onOpenChange={(open) => !open && setDeleteTarget(undefined)}
         title="Retirer ce document ?"
-        description={`« ${deleteTarget?.title} » quittera le projet. Le fichier reste dans votre bibliothèque.`}
+        description={`« ${deleteTarget?.title} » quittera ${noun}. Le fichier reste dans votre bibliothèque.`}
         onConfirm={confirmDelete}
         pending={remove.isPending}
       />

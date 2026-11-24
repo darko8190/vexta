@@ -3082,5 +3082,6 @@ export interface QuoteSummary {
   tasks: number;
   materials: number;
   extraCharges: number;
+  documentsAndNotes: number;
   costs: ProjectCostTable;
 }

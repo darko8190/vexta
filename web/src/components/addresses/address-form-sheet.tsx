@@ -101,7 +101,12 @@ export function AddressFormSheet({
         await updateAddress.mutateAsync({ id: address.id, values: payload });
         toast.success("Adresse mise à jour.");
       } else {
-        onCreated?.(await createAddress.mutateAsync(payload));
+        // Saved first and handed over after, on two lines on purpose. Written as
+        // onCreated?.(await ...), the optional call skips evaluating its argument when no
+        // callback was passed -- so the record was never sent, and the success message showed
+        // anyway. That is every create from outside a picker.
+        const created = await createAddress.mutateAsync(payload);
+        onCreated?.(created);
         toast.success("Adresse créée.");
       }
       onOpenChange(false);

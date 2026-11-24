@@ -106,6 +106,12 @@ public class Tenant
 
     public TenantLogo? Logo { get; set; }
 
+    /// <summary>
+    /// When the company's starting forms were made, or null if they have not been yet. A flag
+    /// rather than a lookup so that a form the company deleted stays deleted — see BaseForms.
+    /// </summary>
+    public DateTimeOffset? BaseFormsCreatedAt { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public List<ApplicationUser> Users { get; set; } = [];

@@ -563,6 +563,9 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<string>("AccountBlockedReason")
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("BillingContactId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("BlockedReason")
                         .HasColumnType("text");
 
@@ -636,6 +639,8 @@ namespace Vexta.Api.Data.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("BillingContactId");
 
                     b.HasIndex("UserId");
 
@@ -1676,6 +1681,9 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<int>("Kind")
                         .HasColumnType("integer");
 
+                    b.Property<bool>("RequiresIdentification")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("ShowOnPublicPage")
                         .HasColumnType("boolean");
 
@@ -2568,12 +2576,20 @@ namespace Vexta.Api.Data.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
 
+                    b.Property<string>("SpokenLanguages")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<string>("Summary")
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("WrittenLanguages")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.HasKey("UserId");
 
@@ -3945,6 +3961,9 @@ namespace Vexta.Api.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset?>("BaseFormsCreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("BrandColor")
                         .HasMaxLength(7)
                         .HasColumnType("character varying(7)");
@@ -4444,6 +4463,11 @@ namespace Vexta.Api.Data.Migrations
 
             modelBuilder.Entity("Vexta.Api.Domain.Client", b =>
                 {
+                    b.HasOne("Vexta.Api.Domain.ClientContact", "BillingContact")
+                        .WithMany()
+                        .HasForeignKey("BillingContactId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Vexta.Api.Domain.Tenant", "Tenant")
                         .WithMany("Clients")
                         .HasForeignKey("TenantId")
@@ -4454,6 +4478,8 @@ namespace Vexta.Api.Data.Migrations
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("BillingContact");
 
                     b.Navigation("Tenant");
 

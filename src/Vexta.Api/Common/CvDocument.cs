@@ -138,6 +138,31 @@ public class CvDocument(CvModel cv) : IDocument
             Section(column, CvModel.SkillsHeading);
             column.Item().Element(Skills);
         }
+
+        if (cv.SpokenLanguages.Count > 0 || cv.WrittenLanguages.Count > 0)
+        {
+            Section(column, CvModel.LanguagesHeading);
+            column.Item().PreventPageBreak().Column(languages =>
+            {
+                if (cv.SpokenLanguages.Count > 0)
+                {
+                    languages.Item().Text(text =>
+                    {
+                        text.Span($"{CvModel.SpokenLabel} : ").SemiBold();
+                        text.Span(string.Join(", ", cv.SpokenLanguages));
+                    });
+                }
+
+                if (cv.WrittenLanguages.Count > 0)
+                {
+                    languages.Item().PaddingTop(2).Text(text =>
+                    {
+                        text.Span($"{CvModel.WrittenLabel} : ").SemiBold();
+                        text.Span(string.Join(", ", cv.WrittenLanguages));
+                    });
+                }
+            });
+        }
     });
 
     /// <summary>

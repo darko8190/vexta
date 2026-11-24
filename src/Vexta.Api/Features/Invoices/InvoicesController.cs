@@ -748,6 +748,16 @@ public class InvoicesController(
             // something they can already see from the list they are reading.
             string.IsNullOrWhiteSpace(c.Role) ? null : c.Role.Trim())));
 
+        // The client named somebody to look after the bills: that person goes first, which is
+        // what the send form preselects. Labelled as such, because it is why they are on top.
+        if (invoice.Client?.BillingContactId is { } billingId
+            && recipients.FindIndex(r => r.Id == billingId) is var index and > 0)
+        {
+            var billing = recipients[index];
+            recipients.RemoveAt(index);
+            recipients.Insert(0, billing with { Role = "Responsable facturation" });
+        }
+
         return recipients;
     }
 

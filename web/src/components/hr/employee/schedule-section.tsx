@@ -28,6 +28,8 @@ import { formatDateOnly, todayIso } from "@/lib/dates";
 import { ex } from "@/lib/placeholders";
 import { formatProjectNumber } from "@/lib/types";
 import type { ScheduleShift } from "@/lib/types";
+import { rowOpenClassName, rowOpenProps } from "@/components/layout/row-open";
+import { cn } from "@/lib/utils";
 
 /** The Monday of the week a day falls in — the week a Québec payroll runs on. */
 function mondayOf(iso: string): string {
@@ -297,7 +299,8 @@ export function ScheduleSection({ employeeId, canEdit }: { employeeId?: string; 
                 {dayShifts.map((shift) => (
                   <li
                     key={shift.id}
-                    className="flex items-start justify-between gap-3 rounded-lg border border-border bg-card p-3"
+                    {...(canEdit ? rowOpenProps(() => { setEditing(shift); setSheetOpen(true); }, "Ouvrir la fiche") : {})}
+                    className={cn("flex items-start justify-between gap-3 rounded-lg border border-border bg-card p-3", canEdit && rowOpenClassName)}
                   >
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">

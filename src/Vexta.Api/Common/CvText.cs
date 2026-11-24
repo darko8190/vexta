@@ -82,6 +82,13 @@ public static class CvText
             }
         }
 
+        if (cv.SpokenLanguages.Count > 0 || cv.WrittenLanguages.Count > 0)
+        {
+            Section(CvModel.LanguagesHeading);
+            if (cv.SpokenLanguages.Count > 0) lines.AppendLine($"{CvModel.SpokenLabel} : {string.Join(", ", cv.SpokenLanguages)}");
+            if (cv.WrittenLanguages.Count > 0) lines.AppendLine($"{CvModel.WrittenLabel} : {string.Join(", ", cv.WrittenLanguages)}");
+        }
+
         var text = lines.ToString().TrimEnd();
 
         // The column is 8000; a CV past that has been pasted rather than written, and the cut is

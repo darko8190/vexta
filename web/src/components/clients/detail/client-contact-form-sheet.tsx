@@ -19,7 +19,10 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
-import { useSaveClientContact } from "@/hooks/use-clients";
+import { ClientAccessControls } from "@/components/clients/client-access-controls";
+import { CreatableSelect } from "@/components/layout/creatable-select";
+import { FieldDescription } from "@/components/ui/field";
+import { useContactRolesQuery, useSaveClientContact } from "@/hooks/use-clients";
 import { ApiError } from "@/lib/api";
 import type { ClientContact } from "@/lib/types";
 import { ex } from "@/lib/placeholders";
@@ -63,6 +66,7 @@ export function ClientContactFormSheet({
 }) {
   const isEditing = Boolean(contact);
   const save = useSaveClientContact(clientId);
+  const { data: roles } = useContactRolesQuery();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -139,7 +143,15 @@ export function ClientContactFormSheet({
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor="contact-role">Rôle</FieldLabel>
-                  <Input {...field} id="contact-role" placeholder={ex("Comptabilité")} aria-invalid={fieldState.invalid} />
+                  <CreatableSelect
+                    id="contact-role"
+                    value={field.value}
+                    onChange={field.onChange}
+                    options={roles ?? []}
+                    emptyLabel="Aucun rôle"
+                    addLabel="Ajouter un rôle"
+                    addPlaceholder={ex("Surintendant")}
+                  />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                 </Field>
               )}
@@ -183,6 +195,28 @@ export function ClientContactFormSheet({
             />
           </FieldGroup>
         </form>
+
+        {/* Outside the form on purpose: these buttons act on their own, at once, and inside the
+            form they would also submit it. Only for a contact that exists — there is nobody to
+            invite before the contact is saved. */}
+        {contact && (
+          <div className="space-y-2 px-4 pb-2">
+            <Field>
+              <FieldLabel>Accès au portail</FieldLabel>
+              <ClientAccessControls
+                clientId={clientId}
+                contactId={contact.id}
+                email={contact.email}
+                name={`${contact.firstName} ${contact.lastName}`}
+                access={contact.access}
+              />
+              <FieldDescription>
+                Un contact invité devient utilisateur : il se connecte pour voir les projets et les
+                factures de ce client, et rien d&apos;autre. Son courriel sert d&apos;identifiant.
+              </FieldDescription>
+            </Field>
+          </div>
+        )}
 
         <SheetFooter>
           <Button type="submit" form="client-contact-form" disabled={save.isPending}>

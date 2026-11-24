@@ -14,7 +14,8 @@ public record PublicFormContext(
     string Title,
     string? Description,
     FormKind Kind,
-    string? SuccessMessage);
+    string? SuccessMessage,
+    bool RequiresIdentification = false);
 
 /// <summary>
 /// The one gate every public form route passes through, written once because reading a form and
@@ -36,7 +37,7 @@ public static class PublicFormGate
             .Where(f => f.TenantId == tenantId && f.ShowOnPublicPage && f.IsPublished)
             .OrderBy(f => f.SortOrder).ThenBy(f => f.Title)
             .Select(f => new PublicFormContext(
-                f.TenantId, f.Id, f.Title, f.Description, f.Kind, f.SuccessMessage))
+                f.TenantId, f.Id, f.Title, f.Description, f.Kind, f.SuccessMessage, f.RequiresIdentification))
             .ToListAsync(ct);
 
     public static async Task<PublicFormContext?> ResolveAsync(
@@ -50,7 +51,7 @@ public static class PublicFormGate
         return await db.FormTemplates.IgnoreQueryFilters().AsNoTracking()
             .Where(f => f.Id == formId && f.TenantId == id && f.ShowOnPublicPage && f.IsPublished)
             .Select(f => new PublicFormContext(
-                f.TenantId, f.Id, f.Title, f.Description, f.Kind, f.SuccessMessage))
+                f.TenantId, f.Id, f.Title, f.Description, f.Kind, f.SuccessMessage, f.RequiresIdentification))
             .FirstOrDefaultAsync(ct);
     }
 

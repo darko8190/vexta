@@ -18,7 +18,9 @@ public record FormTemplateDto(
     int FieldCount,
     int ActionCount,
     int SubmissionCount,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    /// <summary>A visitor must sign in to fill it on the public page.</summary>
+    bool RequiresIdentification = false);
 
 public record FormFieldDto(
     Guid Id,
@@ -57,7 +59,8 @@ public record SaveFormTemplateRequest(
     FormKind Kind = FormKind.Defaut,
     bool IsPublished = false,
     bool ShowOnPublicPage = false,
-    int SortOrder = 0);
+    int SortOrder = 0,
+    bool RequiresIdentification = false);
 
 /// <param name="Id">
 /// The question being kept, or null for a new one. A question that was on the form and is not in

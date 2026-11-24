@@ -35,6 +35,8 @@ const formSchema = z.object({
   country: z.string().trim().max(80, "80 caractères maximum."),
   availableFrom: z.string(),
   skills: z.string().trim().max(2000, "2000 caractères maximum."),
+  spokenLanguages: z.string().trim().max(500, "500 caractères maximum."),
+  writtenLanguages: z.string().trim().max(500, "500 caractères maximum."),
   resumeMediaAssetId: z.string().nullable(),
   resumeFileName: z.string(),
   experiences: z
@@ -78,6 +80,8 @@ function toFormValues(profile?: PersonalProfile): FormValues {
     country: profile?.country ?? defaultCountryName,
     availableFrom: profile?.availableFrom ?? "",
     skills: profile?.skills ?? "",
+    spokenLanguages: profile?.spokenLanguages ?? "",
+    writtenLanguages: profile?.writtenLanguages ?? "",
     resumeMediaAssetId: profile?.resumeMediaAssetId ?? null,
     resumeFileName: profile?.resumeFileName ?? "",
     experiences:
@@ -138,6 +142,8 @@ export function CvSection() {
         country: values.country || null,
         availableFrom: values.availableFrom || null,
         skills: values.skills || null,
+        spokenLanguages: values.spokenLanguages || null,
+        writtenLanguages: values.writtenLanguages || null,
         resumeMediaAssetId: values.resumeMediaAssetId,
         experiences: values.experiences.map((x) => ({
           title: x.title,
@@ -362,6 +368,43 @@ export function CvSection() {
                 </Field>
               )}
             />
+
+            {/* Two lists, not a level per language: "peut parler au client" and "peut écrire
+                le rapport" are different questions, and plenty of people answer only one. */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Controller
+                name="spokenLanguages"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="cv-spoken">Langues parlées</FieldLabel>
+                    <Input
+                      {...field}
+                      id="cv-spoken"
+                      placeholder={ex("Français, Anglais")}
+                      aria-invalid={fieldState.invalid}
+                    />
+                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  </Field>
+                )}
+              />
+              <Controller
+                name="writtenLanguages"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="cv-written">Langues écrites</FieldLabel>
+                    <Input
+                      {...field}
+                      id="cv-written"
+                      placeholder={ex("Français")}
+                      aria-invalid={fieldState.invalid}
+                    />
+                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  </Field>
+                )}
+              />
+            </div>
           </FieldGroup>
         </CardContent>
       </Card>

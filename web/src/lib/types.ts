@@ -103,6 +103,10 @@ export interface ClientRecord {
   access: ClientAccess;
   createdAt: string;
   updatedAt: string;
+  /** The contact who looks after the bills, or null for the person on the record. */
+  billingContactId: string | null;
+  /** Who that is, worked out either way. */
+  billingContactName: string | null;
 }
 
 /**
@@ -1424,6 +1428,9 @@ export interface PersonalProfile {
   availableFrom: string | null;
   /** Tickets and licences, one per line. */
   skills: string | null;
+  /** Languages they speak, and the ones they write — one per line or separated by commas. */
+  spokenLanguages: string | null;
+  writtenLanguages: string | null;
   resumeMediaAssetId: string | null;
   resumeFileName: string | null;
   experiences: PersonalExperience[];
@@ -1467,6 +1474,8 @@ export interface SavePersonalProfileValues {
   country: string | null;
   availableFrom: string | null;
   skills: string | null;
+  spokenLanguages: string | null;
+  writtenLanguages: string | null;
   resumeMediaAssetId: string | null;
   experiences: {
     title: string;
@@ -1797,6 +1806,8 @@ export interface PublicForm {
   description: string | null;
   kind: FormKind;
   fields: PublicFormField[];
+  /** The visitor has to be signed in to send it: it files on their own customer record. */
+  requiresIdentification: boolean;
 }
 
 export interface PublicProduct {
@@ -2043,6 +2054,8 @@ export interface FormTemplate {
   actionCount: number;
   submissionCount: number;
   updatedAt: string;
+  /** A visitor must sign in to fill it on the public page. */
+  requiresIdentification: boolean;
 }
 
 export interface FormField {

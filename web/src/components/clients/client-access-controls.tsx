@@ -13,9 +13,8 @@ import { ApiError } from "@/lib/api";
 import type { ClientAccess, InvitationGrant } from "@/lib/types";
 
 /**
- * NOT CURRENTLY MOUNTED. The client record no longer offers access, by request; the API
- * endpoints behind this are still there and still work. Kept whole rather than deleted so
- * putting it back is a matter of deciding where, not of writing it again.
+ * Mounted on a contact's own panel: a contact can be made a user of the customer portal. The
+ * client record itself no longer offers access, by request.
  *
  * Giving a customer a way into their own file. The same three actions serve a particulier
  * invited on their own record and a contact invited on theirs — pass contactId for the second.

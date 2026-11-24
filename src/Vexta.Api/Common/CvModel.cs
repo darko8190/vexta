@@ -26,7 +26,9 @@ public record CvModel(
     string? Summary,
     IReadOnlyList<CvRole> Roles,
     IReadOnlyList<CvStudy> Studies,
-    IReadOnlyList<string> Skills)
+    IReadOnlyList<string> Skills,
+    IReadOnlyList<string> SpokenLanguages,
+    IReadOnlyList<string> WrittenLanguages)
 {
     // The section titles, shared rather than typed twice. The text rendering upper-cases them;
     // the document sets them in small type above a rule. Same words either way.
@@ -35,6 +37,9 @@ public record CvModel(
     public const string ExperienceHeading = "Expérience";
     public const string EducationHeading = "Formation";
     public const string SkillsHeading = "Cartes et compétences";
+    public const string LanguagesHeading = "Langues";
+    public const string SpokenLabel = "Parlées";
+    public const string WrittenLabel = "Écrites";
 
     private static readonly CultureInfo Culture = CultureInfo.GetCultureInfo("fr-CA");
 
@@ -63,9 +68,14 @@ public record CvModel(
             Heading: Join(education.Program, education.School),
             Year: education.CompletedYear?.ToString(CultureInfo.InvariantCulture),
             Notes: Clean(education.Notes))).ToList(),
-        Skills: (profile.Skills ?? "")
-            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .ToList());
+        Skills: Lines(profile.Skills),
+        SpokenLanguages: Lines(profile.SpokenLanguages),
+        WrittenLanguages: Lines(profile.WrittenLanguages));
+
+    /// <summary>One entry per line, blanks dropped. Commas too for the languages, which people type on one line.</summary>
+    private static List<string> Lines(string? value) => (value ?? "")
+        .Split(['\n', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .ToList();
 
     /// <summary>Whether there is anything here beyond a name, which is all a blank account has.</summary>
     public bool HasContent =>
@@ -73,7 +83,9 @@ public record CvModel(
         || Summary is not null
         || Roles.Count > 0
         || Studies.Count > 0
-        || Skills.Count > 0;
+        || Skills.Count > 0
+        || SpokenLanguages.Count > 0
+        || WrittenLanguages.Count > 0;
 
     private static string? Place(PersonalProfile profile)
     {

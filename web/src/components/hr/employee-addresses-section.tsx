@@ -42,6 +42,8 @@ import { ApiError } from "@/lib/api";
 import { defaultCountryName, isKnownSubdivision, subdivisionLabel } from "@/lib/geo";
 import { ex } from "@/lib/placeholders";
 import type { EmployeeAddress } from "@/lib/types";
+import { rowOpenClassName, rowOpenProps } from "@/components/layout/row-open";
+import { cn } from "@/lib/utils";
 
 const formSchema = z.object({
   employeeId: z.string().min(1, "Choisissez à qui cette adresse appartient."),
@@ -379,7 +381,8 @@ export function EmployeeAddressesSection({ employeeId }: { employeeId?: string }
           {items.map((address) => (
             <li
               key={address.id}
-              className="flex items-start justify-between gap-3 rounded-lg border border-border bg-card p-3"
+              {...rowOpenProps(() => { setEditing(address); setFormOpen(true); }, "Ouvrir la fiche")}
+              className={cn("flex items-start justify-between gap-3 rounded-lg border border-border bg-card p-3", rowOpenClassName)}
             >
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">

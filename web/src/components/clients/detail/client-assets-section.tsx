@@ -26,6 +26,7 @@ import {
 import { ApiError } from "@/lib/api";
 import type { ClientAsset } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { rowOpenClassName, rowOpenProps } from "@/components/layout/row-open";
 
 /** The two numbers it is known by, on one line, so a clerk can match what the customer says. */
 function identifiers(asset: ClientAsset): string[] {
@@ -145,9 +146,11 @@ export function ClientAssetsSection({ clientId }: { clientId: string }) {
           {assets.map((asset) => (
             <div
               key={asset.id}
+              {...(canManage ? rowOpenProps(() => openEdit(asset), `Ouvrir l'actif ${asset.label}`) : {})}
               className={cn(
                 "flex items-start gap-3 rounded-lg border border-border bg-card p-3",
                 !asset.isActive && "opacity-60",
+                canManage && rowOpenClassName,
               )}
             >
               <div className="min-w-0 flex-1">

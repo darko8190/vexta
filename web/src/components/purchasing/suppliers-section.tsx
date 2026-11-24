@@ -26,6 +26,8 @@ import { useIsOwner } from "@/hooks/use-can-create";
 import { ApiError } from "@/lib/api";
 import { formatDateOnly } from "@/lib/dates";
 import type { Supplier } from "@/lib/types";
+import { rowOpenClassName, rowOpenProps } from "@/components/layout/row-open";
+import { cn } from "@/lib/utils";
 
 /** Pattern 1 — List / Index. Who the company buys from. */
 export function SuppliersSection() {
@@ -154,7 +156,8 @@ export function SuppliersSection() {
           {items.map((supplier) => (
             <li
               key={supplier.id}
-              className="flex items-start justify-between gap-3 rounded-lg border border-border bg-card p-3"
+              {...rowOpenProps(() => { setEditing(supplier); setFormOpen(true); }, "Ouvrir la fiche")}
+              className={cn("flex items-start justify-between gap-3 rounded-lg border border-border bg-card p-3", rowOpenClassName)}
             >
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">

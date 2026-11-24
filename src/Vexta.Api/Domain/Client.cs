@@ -110,6 +110,18 @@ public class Client : IInvitable
     public DateTimeOffset? InvitationExpiresAt { get; set; }
     public DateTimeOffset? InvitationSentAt { get; set; }
 
+    /// <summary>
+    /// Who looks after the bills at this client, when it is somebody other than the person on
+    /// the record. Null means that person: the particulier themselves, or the main contact of
+    /// an entreprise — which is what a new client defaults to, because the one person typed in
+    /// is the only one there is yet.
+    ///
+    /// SetNull when that contact is deleted, which falls back to the person on the record
+    /// rather than to nobody.
+    /// </summary>
+    public Guid? BillingContactId { get; set; }
+    public ClientContact? BillingContact { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 

@@ -51,6 +51,17 @@ public class PersonalProfile
     public string? Skills { get; set; }
 
     /// <summary>
+    /// The languages they speak, and the ones they write, one per line like the skills.
+    ///
+    /// Two lists rather than one with a level on each: on a site the question is "peut-il
+    /// parler au client anglophone" and in the office it is "peut-il écrire le rapport", and
+    /// plenty of people answer yes to the first and no to the second. A level scale would ask
+    /// them to grade themselves, which nobody does honestly and nobody reads.
+    /// </summary>
+    public string? SpokenLanguages { get; set; }
+    public string? WrittenLanguages { get; set; }
+
+    /// <summary>
     /// A CV the person uploaded themselves, when they would rather send their own document than
     /// fill in the fields. Either this or one experience is enough to count as a CV; see
     /// <see cref="IsComplete"/>.

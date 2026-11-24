@@ -37,6 +37,8 @@ import { ApiError } from "@/lib/api";
 import { defaultCountryName, isKnownSubdivision, subdivisionLabel } from "@/lib/geo";
 import type { CompanyLocation } from "@/lib/types";
 import { ex } from "@/lib/placeholders";
+import { rowOpenClassName, rowOpenProps } from "@/components/layout/row-open";
+import { cn } from "@/lib/utils";
 
 const formSchema = z.object({
   label: z.string().trim().min(1, "Le nom du lieu est requis.").max(100, "100 caractères maximum."),
@@ -358,7 +360,7 @@ export function LocationsSection() {
       ) : (
         <ul className="space-y-2">
           {data.map((location) => (
-            <li key={location.id} className="flex items-start gap-3 rounded-lg border border-border bg-card p-3">
+            <li key={location.id} {...rowOpenProps(() => { setEditing(location); setFormOpen(true); }, "Ouvrir la fiche")} className={cn("flex items-start gap-3 rounded-lg border border-border bg-card p-3", rowOpenClassName)}>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium text-foreground">{location.label}</span>

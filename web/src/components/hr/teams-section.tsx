@@ -38,6 +38,8 @@ import { useTeamQuery } from "@/hooks/use-team";
 import { ApiError } from "@/lib/api";
 import type { TeamRecord } from "@/lib/types";
 import { ex } from "@/lib/placeholders";
+import { rowOpenClassName, rowOpenProps } from "@/components/layout/row-open";
+import { cn } from "@/lib/utils";
 
 const NO_LEAD = "aucun";
 
@@ -311,7 +313,7 @@ export function TeamsSection() {
       ) : (
         <ul className="space-y-2">
           {data.map((team) => (
-            <li key={team.id} className="flex items-start gap-3 rounded-lg border border-border bg-card p-3">
+            <li key={team.id} {...rowOpenProps(() => { setEditing(team); setFormOpen(true); }, "Ouvrir la fiche")} className={cn("flex items-start gap-3 rounded-lg border border-border bg-card p-3", rowOpenClassName)}>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-baseline gap-x-2">
                   <span className="font-medium text-foreground">{team.name}</span>

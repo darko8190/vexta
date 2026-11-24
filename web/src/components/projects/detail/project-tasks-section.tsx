@@ -41,6 +41,7 @@ import { formatDateOnly } from "@/lib/dates";
 import { taskPriorityLabels, taskStatusBadgeVariant, taskStatusLabels } from "@/lib/labels";
 import type { ProjectTask, ProjectTaskStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { rowOpenClassName, rowOpenProps } from "@/components/layout/row-open";
 
 const statuses: ProjectTaskStatus[] = ["AFaire", "EnCours", "Bloquee", "Terminee"];
 
@@ -188,8 +189,10 @@ export function ProjectTasksSection({ projectId }: { projectId: string }) {
               return (
                 <div
                   key={task.id}
+                  {...(canManage ? rowOpenProps(() => openEdit(task), `Ouvrir la tâche ${task.title}`) : {})}
                   className={cn(
                     "flex items-start gap-3 rounded-lg border border-border bg-card p-3",
+                    canManage && rowOpenClassName,
                     // Finished work stays on the list — it is the record of what was done —
                     // but it stops competing for attention with what is still open.
                     done && "opacity-60",

@@ -3,7 +3,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Vexta.Api.Data;
 using Vexta.Api.Domain;
+using Vexta.Api.Features.Clients;
 using Vexta.Api.Features.Forms;
+using Vexta.Api.Common;
 using Vexta.Api.Services;
 
 namespace Vexta.Api.Features.Public;
@@ -32,7 +34,8 @@ namespace Vexta.Api.Features.Public;
 public class PublicFormsController(
     VextaDbContext db,
     IFormActionRunner actions,
-    IPublicSubmissionLimiter limiter) : ControllerBase
+    IPublicSubmissionLimiter limiter,
+    ICurrentUserService currentUser) : ControllerBase
 {
     /// <summary>
     /// The questions to fill.
@@ -54,7 +57,8 @@ public class PublicFormsController(
         if (fields.Count == 0) return NotFound();
 
         return Ok(new PublicFormDto(
-            context.FormId, context.Title, context.Description, context.Kind, fields));
+            context.FormId, context.Title, context.Description, context.Kind, fields,
+            context.RequiresIdentification));
     }
 
     [HttpPost("{formId:guid}")]
@@ -101,14 +105,39 @@ public class PublicFormsController(
             }
         }
 
+        // Signed in or not, read from the token the visitor's browser sent along. Only a form
+        // that asks for it insists; any other form simply has no use for who it was.
+        Client? client = null;
+        var userId = currentUser.UserId;
+
+        if (context.RequiresIdentification)
+        {
+            if (userId is not { } signedIn)
+            {
+                return StatusCode(StatusCodes.Status401Unauthorized, new
+                {
+                    message = "Connectez-vous à votre compte Vexta pour remplir ce formulaire : il s'ajoute à votre dossier."
+                });
+            }
+
+            client = await ClientFiles.FindForUserAsync(db, context.TenantId, signedIn, ct)
+                ?? await ClientFiles.OpenForUserAsync(db, context.TenantId, signedIn, $"le formulaire « {context.Title} »", ct);
+
+            if (client is null) return StatusCode(StatusCodes.Status401Unauthorized, new { message = "Votre compte est introuvable. Reconnectez-vous." });
+
+            if (client.WorkRefusal() is { } barred) return BadRequest(new { message = barred });
+        }
+
         var submission = new FormSubmission
         {
             TenantId = context.TenantId,
             FormTemplateId = context.FormId,
-            // No account, so no user id. The name is taken from the answers themselves below,
-            // which is the only name there is.
-            SubmittedByUserId = null,
-            SubmittedByName = NameFrom(fields, given),
+            // The account when the form asked for one; otherwise nobody, and the name is taken
+            // from the answers themselves below, which is the only name there is.
+            SubmittedByUserId = client is not null ? userId : null,
+            SubmittedByName = client?.Name ?? NameFrom(fields, given),
+            // The file it belongs to, which is what the asset action attaches to.
+            CreatedClientId = client?.Id,
             FromPublicPage = true
         };
 
@@ -196,7 +225,9 @@ public record PublicFormDto(
     string Title,
     string? Description,
     FormKind Kind,
-    List<PublicFormFieldDto> Fields);
+    List<PublicFormFieldDto> Fields,
+    /// <summary>The visitor has to be signed in to send it.</summary>
+    bool RequiresIdentification = false);
 
 /// <summary>
 /// A form on the public page, before anybody opens it. The questions are not here: see

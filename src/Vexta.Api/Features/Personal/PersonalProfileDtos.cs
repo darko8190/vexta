@@ -35,7 +35,9 @@ public record PersonalProfileDto(
     /// the first time one of them changed.
     /// </summary>
     bool HasContent,
-    DateTimeOffset? UpdatedAt);
+    DateTimeOffset? UpdatedAt,
+    string? SpokenLanguages = null,
+    string? WrittenLanguages = null);
 
 public record PersonalExperienceDto(
     Guid Id,
@@ -73,7 +75,9 @@ public record SavePersonalProfileRequest(
     string? Skills,
     Guid? ResumeMediaAssetId,
     List<SavePersonalExperienceRequest>? Experiences,
-    List<SavePersonalEducationRequest>? Education);
+    List<SavePersonalEducationRequest>? Education,
+    string? SpokenLanguages = null,
+    string? WrittenLanguages = null);
 
 public record SavePersonalExperienceRequest(
     string Title,

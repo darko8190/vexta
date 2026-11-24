@@ -44,7 +44,11 @@ public record ClientDto(
     /// <summary>Whether this particulier can sign in to see their own files, and where they are.</summary>
     ClientAccessDto Access,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    /// <summary>The contact responsible for billing, or null for the person on the record.</summary>
+    Guid? BillingContactId = null,
+    /// <summary>Who that is, worked out either way, so a screen never has to.</summary>
+    string? BillingContactName = null);
 
 /// <summary>
 /// The state of one person's access, in the three forms it can take: none, invited but never
@@ -95,7 +99,9 @@ public record UpsertClientRequest(
     /// Defaults to Client when a caller says nothing, which is what the form does for a record
     /// typed in because work is about to start — the common case.
     /// </summary>
-    ClientStatus Status = ClientStatus.Client);
+    ClientStatus Status = ClientStatus.Client,
+    /// <summary>One of this client's contacts, or null for the person on the record.</summary>
+    Guid? BillingContactId = null);
 
 // ---- Contacts attached to a client ----
 

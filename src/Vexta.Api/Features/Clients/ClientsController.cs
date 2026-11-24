@@ -123,6 +123,14 @@ public class ClientsController(
         // The address is the sign-in name once access exists, so changing it here would leave
         // them signing in with one address and listed under another. Same for the type: a
         // particulier who becomes an entreprise has nobody left to be the account holder.
+        // One of this client's own contacts, checked rather than trusted: the id comes from the
+        // browser, and a contact of another client would put a stranger on these invoices.
+        if (request.BillingContactId is { } billingId
+            && !await db.ClientContacts.AnyAsync(c => c.Id == billingId && c.ClientId == id))
+        {
+            return BadRequest(new { message = "Ce contact n'appartient pas à ce client." });
+        }
+
         if (client.UserId is not null)
         {
             if (!string.Equals(Clean(request.Email), client.Email, StringComparison.OrdinalIgnoreCase))
@@ -147,6 +155,7 @@ public class ClientsController(
         client.Notes = Clean(request.Notes);
         client.IsTaxExempt = request.IsTaxExempt;
         client.Status = request.Status;
+        client.BillingContactId = request.BillingContactId;
         client.UpdatedAt = DateTimeOffset.UtcNow;
 
         ApplyPrimaryAddress(client, request.PrimaryAddress, client.TenantId);
@@ -221,6 +230,31 @@ public class ClientsController(
         reason?.Trim().Length > 300 ? "La raison ne peut pas dépasser 300 caractères." : null;
 
     // ---- Contacts ----
+
+    /// <summary>
+    /// The roles this company's contacts already have, to fill the dropdown on a contact.
+    ///
+    /// Read from the contacts rather than kept in a list of their own: the list is whatever the
+    /// company has typed, and a role typed once is offered from then on. Grouped ignoring case
+    /// so "comptabilité" and "Comptabilité" are one entry, written the way most people wrote it.
+    /// </summary>
+    [HttpGet("contact-roles")]
+    public async Task<ActionResult<List<string>>> ContactRoles()
+    {
+        var used = await db.ClientContacts.AsNoTracking()
+            .Where(c => c.Role != null && c.Role != "")
+            .Select(c => c.Role!)
+            .ToListAsync();
+
+        var roles = used
+            .Select(r => r.Trim())
+            .GroupBy(r => r.ToLowerInvariant())
+            .Select(g => g.GroupBy(r => r).OrderByDescending(x => x.Count()).First().Key)
+            .OrderBy(r => r, StringComparer.Create(System.Globalization.CultureInfo.GetCultureInfo("fr-CA"), true))
+            .ToList();
+
+        return Ok(roles);
+    }
 
     [HttpGet("{id:guid}/contacts")]
     public async Task<ActionResult<List<ClientContactDto>>> Contacts(Guid id)
@@ -515,7 +549,13 @@ public class ClientsController(
             c.InvitationExpiresAt,
             c.InvitationSentAt),
         c.CreatedAt,
-        c.UpdatedAt);
+        c.UpdatedAt,
+        c.BillingContactId,
+        c.BillingContact != null
+            ? c.BillingContact.FirstName + " " + c.BillingContact.LastName
+            : ((c.FirstName ?? "") + " " + (c.LastName ?? "")).Trim() == ""
+                ? null
+                : ((c.FirstName ?? "") + " " + (c.LastName ?? "")).Trim());
 
     private static System.Linq.Expressions.Expression<Func<ClientContact, ClientContactDto>> ContactToDto() =>
         c => new ClientContactDto(

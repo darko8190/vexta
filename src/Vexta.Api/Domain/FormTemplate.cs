@@ -166,6 +166,16 @@ public class FormTemplate
     /// </summary>
     public bool ShowOnPublicPage { get; set; }
 
+    /// <summary>
+    /// Whether a visitor must sign in before filling it on the public page.
+    ///
+    /// For the forms that file something on a customer's own record — an asset, a request for
+    /// a quote. Without it the only clue to whose record is an email address typed into a box,
+    /// and anybody can type anybody's. Signed in, the answers land on the file of the account
+    /// that sent them, opened for them if they have none here yet.
+    /// </summary>
+    public bool RequiresIdentification { get; set; }
+
     public int SortOrder { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;

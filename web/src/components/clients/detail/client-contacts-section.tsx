@@ -18,6 +18,8 @@ import { ClientContactFormSheet } from "@/components/clients/detail/client-conta
 import { useClientContactsQuery, useDeleteClientContact } from "@/hooks/use-clients";
 import { ApiError } from "@/lib/api";
 import type { ClientContact } from "@/lib/types";
+import { rowOpenClassName, rowOpenProps } from "@/components/layout/row-open";
+import { cn } from "@/lib/utils";
 
 export function ClientContactsSection({ clientId }: { clientId: string }) {
   const { data, isLoading, isError, isPlaceholderData, error: loadError, refetch } = useClientContactsQuery(clientId);
@@ -93,7 +95,8 @@ export function ClientContactsSection({ clientId }: { clientId: string }) {
           {data.map((contact) => (
             <li
               key={contact.id}
-              className="flex items-start gap-3 rounded-lg border border-border bg-card p-3"
+              {...rowOpenProps(() => { setEditing(contact); setFormOpen(true); }, "Ouvrir la fiche")}
+              className={cn("flex items-start gap-3 rounded-lg border border-border bg-card p-3", rowOpenClassName)}
             >
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-baseline gap-x-2">

@@ -78,6 +78,8 @@ public class PersonalProfileController(VextaDbContext db, ICurrentUserService cu
         profile.Country = Clean(request.Country);
         profile.AvailableFrom = request.AvailableFrom;
         profile.Skills = Clean(request.Skills);
+        profile.SpokenLanguages = Clean(request.SpokenLanguages);
+        profile.WrittenLanguages = Clean(request.WrittenLanguages);
         profile.ResumeMediaAssetId = asset;
         profile.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -272,7 +274,9 @@ public class PersonalProfileController(VextaDbContext db, ICurrentUserService cu
             missing.Count == 0,
             missing,
             profile is not null && CvModel.From(firstName, lastName, email, profile, null).HasContent,
-            profile?.UpdatedAt);
+            profile?.UpdatedAt,
+            profile?.SpokenLanguages,
+            profile?.WrittenLanguages);
     }
 
     private static string? Problem(SavePersonalProfileRequest r)
@@ -281,6 +285,10 @@ public class PersonalProfileController(VextaDbContext db, ICurrentUserService cu
         if (r.Headline is { Length: > 200 }) return "Le titre ne peut pas dépasser 200 caractères.";
         if (r.Summary is { Length: > 4000 }) return "Le résumé ne peut pas dépasser 4000 caractères.";
         if (r.Skills is { Length: > 2000 }) return "Les compétences ne peuvent pas dépasser 2000 caractères.";
+        if (r.SpokenLanguages is { Length: > 500 } || r.WrittenLanguages is { Length: > 500 })
+        {
+            return "La liste des langues ne peut pas dépasser 500 caractères.";
+        }
 
         // Twenty jobs and ten diplomas is already a long career written out in full. Past that
         // it is a paste, and every row is storage somebody else pays for.

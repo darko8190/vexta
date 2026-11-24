@@ -48,6 +48,7 @@ import {
 } from "@/lib/labels";
 import type { EmploymentType, JobPosting, JobPostingStatus } from "@/lib/types";
 import { ex } from "@/lib/placeholders";
+import { ClickableRow } from "@/components/layout/clickable-row";
 
 const employmentTypes: EmploymentType[] = ["TempsPlein", "TempsPartiel", "Contrat", "Saisonnier", "Stage"];
 const statuses: JobPostingStatus[] = ["Brouillon", "Publiee", "Pourvue", "Fermee"];
@@ -525,7 +526,14 @@ export function JobPostingsSection({
             </TableHeader>
             <TableBody>
               {items.map((job) => (
-                <TableRow key={job.id}>
+                <ClickableRow
+                  key={job.id}
+                  label={`Ouvrir l'offre ${job.title}`}
+                  onOpen={() => {
+                    setEditing(job);
+                    setFormOpen(true);
+                  }}
+                >
                   <TableCell>
                     <p className="font-medium text-foreground">{job.title}</p>
                     <p className="text-xs text-muted-foreground">
@@ -589,7 +597,7 @@ export function JobPostingsSection({
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
-                </TableRow>
+                </ClickableRow>
               ))}
             </TableBody>
           </Table>

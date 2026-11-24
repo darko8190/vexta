@@ -54,6 +54,8 @@ import { formatDateOnly, todayIso } from "@/lib/dates";
 import { ex } from "@/lib/placeholders";
 import { useJobPostingsQuery } from "@/hooks/use-job-postings";
 import type { Candidate, CandidateStatus } from "@/lib/types";
+import { rowOpenClassName, rowOpenProps } from "@/components/layout/row-open";
+import { cn } from "@/lib/utils";
 
 /** Embauché is never chosen: it is what hiring does, and offering it would make it a claim. */
 const choosableStatuses: CandidateStatus[] = ["Nouveau", "Entrevue", "Offre", "Refuse", "Retire"];
@@ -564,7 +566,8 @@ export function CandidatesSection({
           {items.map((candidate) => (
             <li
               key={candidate.id}
-              className="flex items-start justify-between gap-3 rounded-lg border border-border bg-card p-3"
+              {...rowOpenProps(() => { setEditing(candidate); setFormOpen(true); }, "Ouvrir la fiche")}
+              className={cn("flex items-start justify-between gap-3 rounded-lg border border-border bg-card p-3", rowOpenClassName)}
             >
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">

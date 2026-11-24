@@ -41,6 +41,8 @@ import { credentialExpiryLabel, credentialKindLabels } from "@/lib/labels";
 import { formatDateOnly } from "@/lib/dates";
 import { ex } from "@/lib/placeholders";
 import type { CredentialKind, EmployeeCredential } from "@/lib/types";
+import { rowOpenClassName, rowOpenProps } from "@/components/layout/row-open";
+import { cn } from "@/lib/utils";
 
 const kinds = Object.keys(credentialKindLabels) as CredentialKind[];
 
@@ -370,7 +372,8 @@ export function CredentialsSection({ employeeId }: { employeeId?: string }) {
             return (
               <li
                 key={credential.id}
-                className="flex items-start justify-between gap-3 rounded-lg border border-border bg-card p-3"
+                {...rowOpenProps(() => { setEditing(credential); setFormOpen(true); }, "Ouvrir la fiche")}
+                className={cn("flex items-start justify-between gap-3 rounded-lg border border-border bg-card p-3", rowOpenClassName)}
               >
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">

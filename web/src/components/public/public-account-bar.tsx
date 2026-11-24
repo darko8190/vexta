@@ -85,6 +85,16 @@ export function SignInToOrder({ slug }: { slug: string }) {
   );
 }
 
+/** A form that files on the visitor's own customer record, and so needs to know who they are. */
+export function SignInToFill({ slug }: { slug: string }) {
+  return (
+    <SignInPrompt slug={slug}>
+      Ce formulaire s&apos;ajoute à votre dossier client : connectez-vous avec votre compte Vexta
+      — gratuit — pour que l&apos;entreprise sache qu&apos;il vient de vous.
+    </SignInPrompt>
+  );
+}
+
 /**
  * The two buttons, with whatever reason the caller has for showing them.
  *

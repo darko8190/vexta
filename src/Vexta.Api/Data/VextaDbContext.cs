@@ -208,6 +208,11 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
         builder.Entity<Client>(e =>
         {
             e.HasOne(c => c.Tenant).WithMany(t => t.Clients).HasForeignKey(c => c.TenantId).OnDelete(DeleteBehavior.Cascade);
+
+            // WithMany() and not the client's own Contacts list: that list is the contacts the
+            // client owns, and this is one of them being pointed at for another reason.
+            e.HasOne(c => c.BillingContact).WithMany()
+                .HasForeignKey(c => c.BillingContactId).OnDelete(DeleteBehavior.SetNull);
             e.Property(c => c.CompanyName).HasMaxLength(200);
             e.Property(c => c.FirstName).HasMaxLength(100);
             e.Property(c => c.LastName).HasMaxLength(100);
@@ -1374,6 +1379,8 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.Property(p => p.Province).HasMaxLength(80);
             e.Property(p => p.Country).HasMaxLength(80);
             e.Property(p => p.Skills).HasMaxLength(2000);
+            e.Property(p => p.SpokenLanguages).HasMaxLength(500);
+            e.Property(p => p.WrittenLanguages).HasMaxLength(500);
 
             // No query filter: there is no tenant on this row. See PersonalProfile.
         });

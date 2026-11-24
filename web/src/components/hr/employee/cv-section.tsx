@@ -35,6 +35,8 @@ import { cvEntryKindLabels } from "@/lib/labels";
 import { formatDateOnly } from "@/lib/dates";
 import { ex } from "@/lib/placeholders";
 import type { CvEntryKind, EmployeeCvEntry } from "@/lib/types";
+import { rowOpenClassName, rowOpenProps } from "@/components/layout/row-open";
+import { cn } from "@/lib/utils";
 
 const kinds = Object.keys(cvEntryKindLabels) as CvEntryKind[];
 
@@ -261,7 +263,8 @@ export function CvSection({ employeeId }: { employeeId: string }) {
           {items.map((entry) => (
             <li
               key={entry.id}
-              className="flex items-start justify-between gap-3 rounded-lg border border-border bg-card p-3"
+              {...rowOpenProps(() => { setEditing(entry); setOpen(true); }, "Ouvrir la fiche")}
+              className={cn("flex items-start justify-between gap-3 rounded-lg border border-border bg-card p-3", rowOpenClassName)}
             >
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">

@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
 import { CountrySelect, SubdivisionField } from "@/components/addresses/country-field";
-import { useCreateClient, useUpdateClient } from "@/hooks/use-clients";
+import { useClientContactsQuery, useCreateClient, useUpdateClient } from "@/hooks/use-clients";
 import { defaultCountryName, isKnownSubdivision, subdivisionLabel } from "@/lib/geo";
 import { ApiError } from "@/lib/api";
 import { clientStatusLabels } from "@/lib/labels";
@@ -46,6 +46,7 @@ const formSchema = z
     country: z.string().trim().max(80, "80 caractères maximum."),
     isTaxExempt: z.boolean(),
     status: z.enum(["Prospect", "Client", "Ancien"]),
+    billingContactId: z.string(),
   })
   // A company has to be named; a person does not.
   .refine((v) => v.type !== "Entreprise" || v.companyName.length > 0, {
@@ -92,8 +93,13 @@ function toFormValues(client?: ClientRecord): FormValues {
     // Client, not Prospect: most records are typed in because work is about to start, and a
     // default that has to be corrected on nine files out of ten is the wrong default.
     status: client?.status ?? "Client",
+    // Empty is the person on the record: the particulier, or the main contact typed in above.
+    billingContactId: client?.billingContactId ?? "",
   };
 }
+
+/** Base UI needs a value for every item, and "" is not one. */
+const MAIN_PERSON = "fiche";
 
 export function ClientFormSheet({
   open,
@@ -124,6 +130,13 @@ export function ClientFormSheet({
   const type = useWatch({ control: form.control, name: "type" });
   // The province field below is a list for some countries and a text box for the others.
   const country = useWatch({ control: form.control, name: "country" });
+  const firstName = useWatch({ control: form.control, name: "firstName" });
+  const lastName = useWatch({ control: form.control, name: "lastName" });
+
+  // The other people at this client, once it exists. A new client has none yet, so the only
+  // choice is the person typed in on this form — which is the default the field starts on.
+  const { data: contacts } = useClientContactsQuery(client?.id ?? "");
+  const mainPerson = `${firstName} ${lastName}`.trim();
 
   async function onSubmit(values: FormValues) {
     const payload = {
@@ -135,6 +148,7 @@ export function ClientFormSheet({
       phone: values.phone || null,
       isTaxExempt: values.isTaxExempt,
       status: values.status,
+      billingContactId: values.billingContactId || null,
       primaryAddress: values.line1
         ? {
             line1: values.line1,
@@ -151,7 +165,12 @@ export function ClientFormSheet({
       if (client) {
         await update.mutateAsync({ id: client.id, values: payload });
       } else {
-        onCreated?.(await create.mutateAsync(payload));
+        // Saved first and handed over after, on two lines on purpose. Written as
+        // onCreated?.(await ...), the optional call skips evaluating its argument when no
+        // callback was passed -- so the record was never sent, and the success message showed
+        // anyway. That is every create from outside a picker.
+        const created = await create.mutateAsync(payload);
+        onCreated?.(created);
       }
       toast.success(isEditing ? "Client mis à jour." : "Client créé.");
       onOpenChange(false);
@@ -315,6 +334,54 @@ export function ClientFormSheet({
                 )}
               />
             </div>
+
+            <Controller
+              name="billingContactId"
+              control={form.control}
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel htmlFor="client-billing">Responsable facturation</FieldLabel>
+                  <Select
+                    value={field.value || MAIN_PERSON}
+                    onValueChange={(value: string | null) =>
+                      field.onChange(!value || value === MAIN_PERSON ? "" : value)
+                    }
+                  >
+                    <SelectTrigger id="client-billing" className="w-full">
+                      <SelectValue>
+                        {(value: string) =>
+                          value === MAIN_PERSON
+                            ? mainPerson || (type === "Entreprise" ? "Le contact principal" : "Le client")
+                            : (() => {
+                                const contact = contacts?.find((c) => c.id === value);
+                                return contact ? `${contact.firstName} ${contact.lastName}` : "Chargement…";
+                              })()
+                        }
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={MAIN_PERSON}>
+                        {mainPerson || (type === "Entreprise" ? "Le contact principal" : "Le client")}
+                        <span className="text-muted-foreground">
+                          {type === "Entreprise" ? " — contact principal" : " — le client"}
+                        </span>
+                      </SelectItem>
+                      {(contacts ?? []).map((contact) => (
+                        <SelectItem key={contact.id} value={contact.id}>
+                          {contact.firstName} {contact.lastName}
+                          {contact.role && <span className="text-muted-foreground"> — {contact.role}</span>}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FieldDescription>
+                    {isEditing
+                      ? "La personne à qui vont les factures. Elle est proposée en premier à l'envoi."
+                      : "Par défaut, la personne inscrite ci-dessus. Les autres contacts s'ajoutent depuis la fiche, et peuvent ensuite être choisis ici."}
+                  </FieldDescription>
+                </Field>
+              )}
+            />
 
             <Separator />
 

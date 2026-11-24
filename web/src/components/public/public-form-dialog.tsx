@@ -16,6 +16,8 @@ import {
 import { FieldGroup } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
 import { AnswerField } from "@/components/forms/fill-form-sheet";
+import { SignInToFill } from "@/components/public/public-account-bar";
+import { useAuth } from "@/lib/auth-context";
 import type { FormField, PublicForm, PublicPageForm } from "@/lib/types";
 
 /**
@@ -41,6 +43,12 @@ export function PublicFormDialog({ slug, form }: { slug: string; form: PublicPag
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  const [requiresIdentification, setRequiresIdentification] = useState(false);
+  const { user, loading: authLoading } = useAuth();
+
+  // Asked before any question is shown: filling a whole form and only then being told to sign
+  // in loses the answers on the way to the sign-in page.
+  const mustSignIn = requiresIdentification && !authLoading && !user;
 
   async function onOpenChange(next: boolean) {
     setOpen(next);
@@ -68,6 +76,7 @@ export function PublicFormDialog({ slug, form }: { slug: string; form: PublicPag
       }
 
       const loaded = (await response.json()) as PublicForm;
+      setRequiresIdentification(Boolean(loaded.requiresIdentification));
 
       // The public shape carries the options as one string per line, which is how they are
       // stored; AnswerField wants them split, like the staff shape it was written for.
@@ -153,6 +162,10 @@ export function PublicFormDialog({ slug, form }: { slug: string; form: PublicPag
             </Alert>
           ) : loading ? (
             <p className="py-4 text-sm text-muted-foreground">Un instant…</p>
+          ) : mustSignIn ? (
+            <div className="py-2">
+              <SignInToFill slug={slug} />
+            </div>
           ) : (
             <FieldGroup>
               {error && (
@@ -175,7 +188,7 @@ export function PublicFormDialog({ slug, form }: { slug: string; form: PublicPag
         </div>
 
         <DialogFooter>
-          {!done && fields && fields.length > 0 ? (
+          {!done && !mustSignIn && fields && fields.length > 0 ? (
             <>
               <Button type="button" onClick={() => void send()} disabled={sending}>
                 {sending && <Spinner />}

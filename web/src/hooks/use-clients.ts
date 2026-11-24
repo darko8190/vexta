@@ -106,6 +106,25 @@ export function useClientContactsQuery(clientId: string) {
   });
 }
 
+/**
+ * The roles the company's contacts already have, plus the usual ones, to fill the role
+ * dropdown. The usual ones are offered so the first contact of a new company is not typed from
+ * nothing; anything the company types joins the list from then on.
+ */
+const COMMON_ROLES = ["Achats", "Comptabilité", "Contremaître", "Gérant de projet", "Propriétaire"];
+
+export function useContactRolesQuery() {
+  return useQuery({
+    queryKey: ["clients", "contact-roles"],
+    queryFn: async () => {
+      const used = await api.get<string[]>("clients/contact-roles");
+      const seen = new Set(used.map((role) => role.toLocaleLowerCase("fr-CA")));
+      return [...used, ...COMMON_ROLES.filter((role) => !seen.has(role.toLocaleLowerCase("fr-CA")))];
+    },
+    staleTime: 60_000,
+  });
+}
+
 export function useSaveClientContact(clientId: string) {
   const queryClient = useQueryClient();
   return useMutation({

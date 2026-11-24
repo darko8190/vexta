@@ -25,6 +25,9 @@ public class FormsController(VextaDbContext db, ICurrentUserService currentUser)
     [HttpGet]
     public async Task<ActionResult<List<FormTemplateDto>>> List(CancellationToken ct)
     {
+        // The starting forms, made the first time anybody at the company opens the list.
+        if (currentUser.TenantId is { } tenantId) await BaseForms.EnsureAsync(db, tenantId, ct);
+
         var forms = await db.FormTemplates.AsNoTracking()
             .OrderBy(f => f.SortOrder).ThenBy(f => f.Title)
             .Select(Fields())
@@ -98,7 +101,8 @@ public class FormsController(VextaDbContext db, ICurrentUserService currentUser)
             // Nor on the public page, for the same reason: it has no questions yet, and the
             // page would be offering strangers a form that asks nothing.
             ShowOnPublicPage = false,
-            SortOrder = request.SortOrder
+            SortOrder = request.SortOrder,
+            RequiresIdentification = request.RequiresIdentification
         };
 
         db.FormTemplates.Add(form);
@@ -141,6 +145,7 @@ public class FormsController(VextaDbContext db, ICurrentUserService currentUser)
         form.IsPublished = request.IsPublished;
         form.ShowOnPublicPage = request.ShowOnPublicPage;
         form.SortOrder = request.SortOrder;
+        form.RequiresIdentification = request.RequiresIdentification;
         form.UpdatedAt = DateTimeOffset.UtcNow;
 
         await db.SaveChangesAsync(ct);
@@ -391,7 +396,8 @@ public class FormsController(VextaDbContext db, ICurrentUserService currentUser)
             f.Fields.Count,
             f.Actions.Count(a => a.IsActive),
             f.Submissions.Count,
-            f.UpdatedAt);
+            f.UpdatedAt,
+            f.RequiresIdentification);
 
     // ---- validation ----
 

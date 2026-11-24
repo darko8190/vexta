@@ -37,6 +37,7 @@ const formSchema = z.object({
   kind: z.enum(["Defaut", "Actif", "Client", "Soumission"]),
   isPublished: z.boolean(),
   showOnPublicPage: z.boolean(),
+  requiresIdentification: z.boolean(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -49,6 +50,7 @@ function toFormValues(template?: FormTemplate): FormValues {
     kind: template?.kind ?? "Defaut",
     isPublished: template?.isPublished ?? false,
     showOnPublicPage: template?.showOnPublicPage ?? false,
+    requiresIdentification: template?.requiresIdentification ?? false,
   };
 }
 
@@ -93,6 +95,7 @@ export function FormTemplateSheet({
       kind: values.kind,
       isPublished: values.isPublished,
       showOnPublicPage: values.showOnPublicPage,
+      requiresIdentification: values.requiresIdentification,
       sortOrder: 0,
     };
 
@@ -279,6 +282,30 @@ export function FormTemplateSheet({
                 )}
               />
             )}
+
+            <Controller
+              name="requiresIdentification"
+              control={form.control}
+              render={({ field }) => (
+                <Field>
+                  <div className="flex items-center gap-3">
+                    <Checkbox
+                      id="form-identified"
+                      checked={field.value}
+                      onCheckedChange={(checked) => field.onChange(checked === true)}
+                    />
+                    <FieldLabel htmlFor="form-identified" className="font-normal">
+                      Le client doit s&apos;identifier
+                    </FieldLabel>
+                  </div>
+                  <FieldDescription>
+                    Sur la page publique, le visiteur se connecte avec son compte Vexta avant
+                    d&apos;envoyer. Ce qu&apos;il remplit va dans son dossier client — ouvert pour
+                    lui s&apos;il n&apos;en a pas encore. Pour un actif ou une demande de soumission.
+                  </FieldDescription>
+                </Field>
+              )}
+            />
           </FieldGroup>
         </form>
 

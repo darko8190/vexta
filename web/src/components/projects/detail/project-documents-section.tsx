@@ -25,6 +25,7 @@ import { ApiError } from "@/lib/api";
 import { formatDateOnly } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 import type { ProjectDocument } from "@/lib/types";
+import { rowOpenClassName, rowOpenProps } from "@/components/layout/row-open";
 
 /**
  * One tab, two halves: the job's files, then the thread written about it.
@@ -126,7 +127,8 @@ export function ProjectDocumentsSection({ projectId }: { projectId: string }) {
           {documents.map((document) => (
             <li
               key={document.id}
-              className="flex items-start gap-3 rounded-lg border border-border bg-card p-3"
+              {...rowOpenProps(() => { setEditing(document); setFormOpen(true); }, "Ouvrir la fiche")}
+              className={cn("flex items-start gap-3 rounded-lg border border-border bg-card p-3", rowOpenClassName)}
             >
               <FileText className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
               <div className="min-w-0 flex-1">

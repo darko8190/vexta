@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Building2, Globe, MapPin } from "lucide-react";
+import { Building2, Globe, Images, LayoutTemplate, MapPin } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/layout/page-header";
 import { SectionNav, type NavSection } from "@/components/layout/section-nav";
 import { CompanyInfoSection } from "@/components/company/company-info-section";
 import { LocationsSection } from "@/components/hr/locations-section";
+import { GalleriesSection } from "@/components/company/galleries-section";
+import { PageBuilderSection } from "@/components/company/page-builder-section";
 import { PublicPageSection } from "@/components/company/public-page-section";
 import { useCompanyProfileQuery } from "@/hooks/use-company";
 import { useLocationsQuery } from "@/hooks/use-hr";
@@ -40,6 +42,10 @@ export default function CompanyPage() {
     { key: "informations", label: "Informations", icon: Building2 },
     { key: "lieux", label: "Lieux", count: locations?.length, icon: MapPin },
     { key: "page-publique", label: "Page publique", count: canEdit ? publishedJobs : undefined, icon: Globe },
+    // Beside the page rather than under Outils: a gallery exists to be placed on the page, and
+    // the builder is the page. Somebody doing one is about to do the other.
+    { key: "galeries", label: "Galeries", icon: Images },
+    { key: "constructeur", label: "Constructeur de page", icon: LayoutTemplate },
   ];
 
   if (isLoading) {
@@ -87,6 +93,8 @@ export default function CompanyPage() {
         <div className="min-w-0 flex-1">
           {section === "informations" && <CompanyInfoSection profile={profile} canEdit={canEdit} />}
           {section === "lieux" && <LocationsSection />}
+          {section === "galeries" && <GalleriesSection canEdit={canEdit} />}
+          {section === "constructeur" && <PageBuilderSection canEdit={canEdit} />}
           {section === "page-publique" &&
             (canEdit ? (
               <PublicPageSection />

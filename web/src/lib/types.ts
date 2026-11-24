@@ -1514,6 +1514,106 @@ export interface PublicCompany {
   jobs: PublicJob[];
   /** Titles only. The questions are fetched when a visitor opens one. */
   forms: PublicPageForm[];
+  /**
+   * The bands the company arranged, in order. Empty for a company that never opened the
+   * builder, and the page is then drawn the way it always was.
+   */
+  sections: PublicSection[];
+}
+
+/** What one band of a built page holds. */
+export type PublicPageSectionKind =
+  | "Texte"
+  | "Galerie"
+  | "Produits"
+  | "Emplois"
+  | "Formulaires"
+  | "Image";
+
+/** One band of a built page, with its content already resolved by the API. */
+export interface PublicSection {
+  id: string;
+  kind: PublicPageSectionKind;
+  title: string | null;
+  text: string | null;
+  /** One, two or three across. What it arranges depends on the kind. */
+  columns: number;
+  /** The photographs, for a Galerie. Signed for this response. */
+  images: PublicGalleryImage[];
+  /** The single photograph, for an Image. */
+  imageUrl: string | null;
+}
+
+export interface PublicGalleryImage {
+  id: string;
+  caption: string | null;
+  url: string | null;
+}
+
+// ---- Galeries et constructeur de page ----
+
+export interface Gallery {
+  id: string;
+  name: string;
+  description: string | null;
+  sortOrder: number;
+  imageCount: number;
+  /** The first photograph. Null for an empty set, or when storage could not be reached. */
+  coverUrl: string | null;
+  updatedAt: string;
+}
+
+export interface GalleryImage {
+  id: string;
+  mediaAssetId: string;
+  fileName: string;
+  caption: string | null;
+  url: string | null;
+  sortOrder: number;
+}
+
+export interface GalleryDetail {
+  gallery: Gallery;
+  images: GalleryImage[];
+}
+
+export interface SaveGalleryValues {
+  name: string;
+  description: string | null;
+  sortOrder: number;
+}
+
+/** Null id for a new placement. One left out of the list is removed; the file stays. */
+export interface SaveGalleryImageValues {
+  id: string | null;
+  mediaAssetId: string;
+  caption: string | null;
+}
+
+export interface PageSection {
+  id: string;
+  kind: PublicPageSectionKind;
+  title: string | null;
+  text: string | null;
+  galleryId: string | null;
+  galleryName: string | null;
+  mediaAssetId: string | null;
+  imageUrl: string | null;
+  columns: number;
+  isVisible: boolean;
+  sortOrder: number;
+}
+
+/** Null id for a new section. One left out of the list is deleted. */
+export interface SavePageSectionValues {
+  id: string | null;
+  kind: PublicPageSectionKind;
+  title: string | null;
+  text: string | null;
+  galleryId: string | null;
+  mediaAssetId: string | null;
+  columns: number;
+  isVisible: boolean;
 }
 
 /** A form on a company's public page, before anybody opens it. */

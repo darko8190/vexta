@@ -1,4 +1,4 @@
-﻿﻿﻿using Microsoft.AspNetCore.Http;
+﻿﻿﻿﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -84,6 +84,9 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
     public DbSet<ClientAccountEntry> ClientAccountEntries => Set<ClientAccountEntry>();
     public DbSet<InvoicePayment> InvoicePayments => Set<InvoicePayment>();
     public DbSet<ClientAssetType> ClientAssetTypes => Set<ClientAssetType>();
+    public DbSet<Gallery> Galleries => Set<Gallery>();
+    public DbSet<GalleryImage> GalleryImages => Set<GalleryImage>();
+    public DbSet<PublicPageSection> PublicPageSections => Set<PublicPageSection>();
     public DbSet<CustomerOrder> CustomerOrders => Set<CustomerOrder>();
     public DbSet<CustomerOrderLine> CustomerOrderLines => Set<CustomerOrderLine>();
     public DbSet<FormTemplate> FormTemplates => Set<FormTemplate>();
@@ -689,6 +692,55 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             // for the same reason: two names for one kind is two people filing in two places.
             e.HasIndex(t => new { t.TenantId, t.Name }).IsUnique();
             e.HasQueryFilter(t => t.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<Gallery>(e =>
+        {
+            e.Property(g => g.Name).HasMaxLength(120);
+            e.Property(g => g.Description).HasMaxLength(500);
+
+            // One list per company with no two sets of the same name: two galleries called
+            // "Toitures" is two places to put a photograph and one of them forgotten.
+            e.HasIndex(g => new { g.TenantId, g.Name }).IsUnique();
+            e.HasIndex(g => new { g.TenantId, g.SortOrder });
+
+            e.HasQueryFilter(g => g.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<GalleryImage>(e =>
+        {
+            e.HasOne(i => i.Gallery).WithMany(g => g.Images)
+                .HasForeignKey(i => i.GalleryId).OnDelete(DeleteBehavior.Cascade);
+
+            // Cascade, unlike a form answer that keeps the name of a file it lost: a photograph
+            // that is gone is nothing to look at, and the row would be a hole in a grid.
+            e.HasOne(i => i.MediaAsset).WithMany()
+                .HasForeignKey(i => i.MediaAssetId).OnDelete(DeleteBehavior.Cascade);
+
+            e.Property(i => i.Caption).HasMaxLength(300);
+
+            e.HasIndex(i => new { i.GalleryId, i.SortOrder });
+            e.HasQueryFilter(i => i.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<PublicPageSection>(e =>
+        {
+            // SetNull for both: losing a gallery or a photograph must not take the arrangement
+            // with it. The page skips a section with nothing in it, and the builder shows the
+            // owner an empty slot they can fill or remove.
+            e.HasOne(s => s.Gallery).WithMany()
+                .HasForeignKey(s => s.GalleryId).OnDelete(DeleteBehavior.SetNull);
+
+            e.HasOne(s => s.MediaAsset).WithMany()
+                .HasForeignKey(s => s.MediaAssetId).OnDelete(DeleteBehavior.SetNull);
+
+            e.Property(s => s.Title).HasMaxLength(200);
+            e.Property(s => s.Text).HasMaxLength(8000);
+
+            // What the public page asks for on every visit: this company's bands, in order.
+            e.HasIndex(s => new { s.TenantId, s.SortOrder });
+
+            e.HasQueryFilter(s => s.TenantId == CurrentTenantId);
         });
 
         builder.Entity<CustomerOrder>(e =>

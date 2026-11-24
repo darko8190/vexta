@@ -1,4 +1,4 @@
-﻿﻿﻿# Déploiement de Vexta sur Dokploy
+﻿﻿﻿﻿# Déploiement de Vexta sur Dokploy
 
 Deux environnements, deux branches, deux fichiers compose :
 
@@ -1900,6 +1900,58 @@ coup. Ce que vous facturez va sur la facture, qui est à vous.
 Rien n'est payé en ligne à cette étape. Les paiements par carte restent sur les factures — voir
 *Paiements en ligne* plus haut — et les deux fonctionnent ensemble : la commande devient une
 facture, la facture porte un lien de paiement.
+
+### Galeries et constructeur de page
+
+Une entreprise peut maintenant ranger ses photos par série et arranger elle-même le milieu de sa
+page publique.
+
+**Une galerie est une série nommée**, pas un tas de photos accrochées à une page. C'est tout
+l'intérêt de la nommer : « Toitures 2026 » se monte une fois et se place où on veut, ce printemps
+et l'an prochain. Les galeries se montent dans **Entreprise → Galeries** ; on y ajoute des photos,
+on les réordonne, on les légende. Retirer une photo d'une galerie ne la supprime pas de la
+bibliothèque — elle sert peut-être ailleurs.
+
+Deux galeries ne peuvent pas porter le même nom, **la casse ne comptant pas** : « Toitures » et
+« toitures » seraient deux endroits où classer la même photo et un des deux oublié. Supprimer une
+galerie laisse les fichiers en place.
+
+**Le constructeur arrange le milieu, jamais les deux bouts.** L'en-tête — la couleur, le logo, le
+nom, l'accroche — et le pied — l'adresse, le téléphone, le courriel — sont fixes. Ce sont les deux
+choses que tout visiteur vient chercher, et un constructeur qui permettrait de les enterrer
+serait un constructeur qui laisse une entreprise rater le seul travail de sa page.
+
+Six types de bande : **Texte**, **Galerie de photos**, **Mes produits**, **Mes offres d'emploi**,
+**Mes formulaires**, **Une photo pleine largeur**. Une liste courte plutôt qu'un éditeur de blocs,
+pour la même raison que la page a sept styles plutôt qu'une feuille de style : une entreprise
+capable de produire une page illisible le fera, et c'est son nom dessus.
+
+**Les colonnes n'arrangent que le contenu d'une bande** — une galerie trois de front, un texte en
+deux colonnes. Il n'y a pas de grille à comprendre et aucune façon de mettre deux choses sans
+rapport côte à côte, qui est l'endroit précis où tous les constructeurs de page commencent à
+produire des pages illisibles au téléphone. **Sur un téléphone, tout revient à une colonne**, quel
+que soit le réglage.
+
+**Tant que vous n'ajoutez aucune section, rien ne change.** Une entreprise qui n'ouvre jamais le
+constructeur garde exactement la page que Vexta a toujours dessinée — à propos, produits, offres,
+formulaires, dans cet ordre. C'est ce qui rend la chose sûre à livrer : aucune page existante ne
+bouge tant que quelqu'un n'a pas décidé d'en construire une.
+
+Une section peut être **masquée sans être supprimée**, le temps d'essayer autre chose. Et une
+section qui a perdu ce qu'elle montrait — galerie supprimée, fichier effacé — est **écartée de la
+page** plutôt qu'affichée vide : un titre au-dessus de rien n'apprend rien à un visiteur. Le
+propriétaire, lui, voit la case vide dans le constructeur, qui est l'endroit où ça se répare.
+
+Le constructeur refuse ce qui ne peut pas s'afficher, là où ça se corrige : un texte sans texte,
+une galerie non choisie, une photo non choisie. Une page avec un trou silencieux est une page que
+le propriétaire n'a aucun moyen de diagnostiquer — il a arrangé cinq bandes et quatre sont
+apparues.
+
+**Un mot sur le stockage.** Les liens des photos sont signés pour chaque réponse, le seau
+n'étant jamais public. Si R2 est injoignable, une galerie montre ses cadres sans ses photos — ce
+qui reste une information — mais une bande « photo pleine largeur » disparaît, parce qu'elle
+n'est rien d'autre que sa photo. Dans les deux cas la page tient debout : un seau mal configuré
+ne doit jamais emporter la page d'une entreprise avec lui.
 
 ---
 

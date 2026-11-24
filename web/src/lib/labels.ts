@@ -10,6 +10,7 @@ import type {
   FormActionKind,
   FormFieldTarget,
   FormKind,
+  PublicPageSectionKind,
   FormFieldType,
   InvoiceLineKind,
   InvoiceStatus,
@@ -172,6 +173,26 @@ export const customerOrderStatusBadgeVariant: Record<
   Prete: "secondary",
   Livree: "outline",
   Annulee: "destructive",
+};
+
+/** What a band of the public page holds, in the words of somebody arranging one. */
+export const pageSectionKindLabels: Record<PublicPageSectionKind, string> = {
+  Texte: "Texte",
+  Galerie: "Galerie de photos",
+  Produits: "Mes produits",
+  Emplois: "Mes offres d'emploi",
+  Formulaires: "Mes formulaires",
+  Image: "Une photo pleine largeur",
+};
+
+/** The line under the choice: what placing this band actually does. */
+export const pageSectionKindHints: Record<PublicPageSectionKind, string> = {
+  Texte: "Un titre et des paragraphes. Celui qui porte tout ce que les autres ne portent pas.",
+  Galerie: "Une de vos galeries, en grille. Le nombre de colonnes dit combien de photos par rangée.",
+  Produits: "Les produits cochés comme publics, avec leur prix et le panier s'il est activé.",
+  Emplois: "Les offres publiées, avec le bouton Postuler.",
+  Formulaires: "Les formulaires cochés « sur la page publique ».",
+  Image: "Une seule photo, sur toute la largeur. Un chantier, une équipe, une toiture finie.",
 };
 
 export const formActionKindLabels: Record<FormActionKind, string> = {

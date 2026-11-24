@@ -70,6 +70,11 @@ public class PublicCompanyController(VextaDbContext db, IR2StorageService storag
 
         // Titles only. The questions are fetched when somebody opens one, like a posting's:
         // most visitors read a page and fill nothing.
+        // How the company arranged its own page, when it has. Empty means it never opened the
+        // builder, and the web app then draws the arrangement it has always drawn -- which is
+        // what makes the builder safe to have: no page changes until somebody builds one.
+        var sections = await SectionsAsync(tenant.Id, ct);
+
         var forms = page.ShowForms
             ? (await PublicFormGate.ListAsync(db, tenant.Id, ct))
                 .Select(f => new PublicPageFormDto(f.FormId, f.Title, f.Description, f.Kind))
@@ -94,7 +99,8 @@ public class PublicCompanyController(VextaDbContext db, IR2StorageService storag
             address,
             products,
             jobs,
-            forms));
+            forms,
+            sections));
     }
 
     /// <summary>
@@ -170,6 +176,106 @@ public class PublicCompanyController(VextaDbContext db, IR2StorageService storag
         }
 
         return jobs;
+    }
+
+    /// <summary>
+    /// The bands the company arranged, with their photographs already signed.
+    ///
+    /// A band that lost what it pointed at is dropped rather than printed empty: the gallery
+    /// was deleted or the file was, and a heading over nothing tells a visitor nothing. The
+    /// owner still sees the empty slot in the builder, which is where it can be fixed.
+    /// </summary>
+    private async Task<List<PublicSectionDto>> SectionsAsync(Guid tenantId, CancellationToken ct)
+    {
+        var rows = await db.PublicPageSections.IgnoreQueryFilters().AsNoTracking()
+            .Where(s => s.TenantId == tenantId && s.IsVisible)
+            .OrderBy(s => s.SortOrder)
+            .Select(s => new
+            {
+                s.Id,
+                s.Kind,
+                s.Title,
+                s.Text,
+                s.Columns,
+                s.GalleryId,
+                ImageKey = s.MediaAsset == null ? null : s.MediaAsset.ObjectKey,
+                ImageName = s.MediaAsset == null ? null : s.MediaAsset.FileName
+            })
+            .ToListAsync(ct);
+
+        if (rows.Count == 0) return [];
+
+        // One read for every gallery on the page rather than one per band: a page showing the
+        // same gallery twice would otherwise pay for it twice.
+        var galleryIds = rows.Select(r => r.GalleryId).OfType<Guid>().Distinct().ToList();
+
+        var galleryImages = galleryIds.Count == 0
+            ? []
+            : await db.GalleryImages.IgnoreQueryFilters().AsNoTracking()
+                .Where(i => galleryIds.Contains(i.GalleryId) && i.TenantId == tenantId)
+                .OrderBy(i => i.SortOrder)
+                .Select(i => new
+                {
+                    i.Id,
+                    i.GalleryId,
+                    i.Caption,
+                    i.MediaAsset!.ObjectKey,
+                    i.MediaAsset!.FileName
+                })
+                .ToListAsync(ct);
+
+        var sections = new List<PublicSectionDto>(rows.Count);
+
+        foreach (var row in rows)
+        {
+            var images = new List<PublicGalleryImageDto>();
+            string? imageUrl = null;
+
+            if (row.Kind == PublicPageSectionKind.Galerie)
+            {
+                if (row.GalleryId is not { } galleryId) continue;
+
+                foreach (var image in galleryImages.Where(i => i.GalleryId == galleryId))
+                {
+                    images.Add(new PublicGalleryImageDto(
+                        image.Id, image.Caption, await UrlOrNullAsync(image.ObjectKey, image.FileName, ct)));
+                }
+
+                // An empty gallery is a heading over nothing.
+                if (images.Count == 0) continue;
+            }
+
+            if (row.Kind == PublicPageSectionKind.Image)
+            {
+                if (row.ImageKey is null || row.ImageName is null) continue;
+                imageUrl = await UrlOrNullAsync(row.ImageKey, row.ImageName, ct);
+
+                // Unlike a gallery whose pictures merely fail to load, an Image band is nothing
+                // but its picture: without a link there is no band.
+                if (imageUrl is null) continue;
+            }
+
+            sections.Add(new PublicSectionDto(
+                row.Id, row.Kind, row.Title, row.Text, row.Columns, images, imageUrl));
+        }
+
+        return sections;
+    }
+
+    /// <summary>
+    /// A signed link, or null when storage cannot be reached. Never an exception: an unreachable
+    /// bucket must not take a company's whole page down with it.
+    /// </summary>
+    private async Task<string?> UrlOrNullAsync(string objectKey, string fileName, CancellationToken ct)
+    {
+        try
+        {
+            return await storage.CreateDownloadUrlAsync(objectKey, fileName, ct);
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
     }
 
     /// <summary>
@@ -252,7 +358,32 @@ public record PublicCompanyDto(
     List<PublicProductDto> Products,
     List<PublicJobDto> Jobs,
     /// <summary>The forms the company offers its visitors. Empty unless the page shows them.</summary>
-    List<PublicPageFormDto> Forms);
+    List<PublicPageFormDto> Forms,
+    /// <summary>
+    /// The bands the company arranged, in order. Empty for a company that never opened the
+    /// builder, and the page is then drawn the way it always was.
+    /// </summary>
+    List<PublicSectionDto> Sections);
+
+/// <summary>
+/// One band of a built page, with its content already resolved.
+///
+/// Resolved here rather than by the page: a visitor's browser must not be told a gallery's id
+/// and then allowed to ask for its contents, because that would be a second route into the
+/// company's library with its own rules to get right. Everything a band needs arrives with it.
+/// </summary>
+public record PublicSectionDto(
+    Guid Id,
+    PublicPageSectionKind Kind,
+    string? Title,
+    string? Text,
+    int Columns,
+    /// <summary>The photographs, for a Galerie. Signed for this response.</summary>
+    List<PublicGalleryImageDto> Images,
+    /// <summary>The single photograph, for an Image. Null when storage could not be reached.</summary>
+    string? ImageUrl);
+
+public record PublicGalleryImageDto(Guid Id, string? Caption, string? Url);
 
 /// <summary>A product on the shop window. The selling price is the only figure on it.</summary>
 public record PublicProductDto(

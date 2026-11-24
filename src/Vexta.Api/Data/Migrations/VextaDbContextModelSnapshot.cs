@@ -1680,6 +1680,77 @@ namespace Vexta.Api.Data.Migrations
                     b.ToTable("FormTemplates");
                 });
 
+            modelBuilder.Entity("Vexta.Api.Domain.Gallery", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Name")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "SortOrder");
+
+                    b.ToTable("Galleries");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.GalleryImage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Caption")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("GalleryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("MediaAssetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MediaAssetId");
+
+                    b.HasIndex("GalleryId", "SortOrder");
+
+                    b.ToTable("GalleryImages");
+                });
+
             modelBuilder.Entity("Vexta.Api.Domain.GoodsReceipt", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3245,6 +3316,58 @@ namespace Vexta.Api.Data.Migrations
                     b.ToTable("PublicPages");
                 });
 
+            modelBuilder.Entity("Vexta.Api.Domain.PublicPageSection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Columns")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("GalleryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsVisible")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("MediaAssetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Text")
+                        .HasMaxLength(8000)
+                        .HasColumnType("character varying(8000)");
+
+                    b.Property<string>("Title")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GalleryId");
+
+                    b.HasIndex("MediaAssetId");
+
+                    b.HasIndex("TenantId", "SortOrder");
+
+                    b.ToTable("PublicPageSections");
+                });
+
             modelBuilder.Entity("Vexta.Api.Domain.PurchaseOrder", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4325,6 +4448,25 @@ namespace Vexta.Api.Data.Migrations
                     b.Navigation("FormTemplate");
                 });
 
+            modelBuilder.Entity("Vexta.Api.Domain.GalleryImage", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.Gallery", "Gallery")
+                        .WithMany("Images")
+                        .HasForeignKey("GalleryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Vexta.Api.Domain.MediaAsset", "MediaAsset")
+                        .WithMany()
+                        .HasForeignKey("MediaAssetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Gallery");
+
+                    b.Navigation("MediaAsset");
+                });
+
             modelBuilder.Entity("Vexta.Api.Domain.GoodsReceipt", b =>
                 {
                     b.HasOne("Vexta.Api.Domain.PurchaseOrder", "PurchaseOrder")
@@ -4812,6 +4954,23 @@ namespace Vexta.Api.Data.Migrations
                     b.Navigation("Tenant");
                 });
 
+            modelBuilder.Entity("Vexta.Api.Domain.PublicPageSection", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.Gallery", "Gallery")
+                        .WithMany()
+                        .HasForeignKey("GalleryId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Vexta.Api.Domain.MediaAsset", "MediaAsset")
+                        .WithMany()
+                        .HasForeignKey("MediaAssetId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Gallery");
+
+                    b.Navigation("MediaAsset");
+                });
+
             modelBuilder.Entity("Vexta.Api.Domain.PurchaseOrder", b =>
                 {
                     b.HasOne("Vexta.Api.Domain.Project", "Project")
@@ -5037,6 +5196,11 @@ namespace Vexta.Api.Data.Migrations
                     b.Navigation("Fields");
 
                     b.Navigation("Submissions");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.Gallery", b =>
+                {
+                    b.Navigation("Images");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.GoodsReceipt", b =>

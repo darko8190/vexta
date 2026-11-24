@@ -768,6 +768,12 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.HasOne(x => x.Project).WithMany(p => p.Expenses)
                 .HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
 
+            // SetNull: removing a task from the plan must not take the hours or the money
+            // spent while it existed. The line stays on the job, attached to nothing.
+            e.HasOne(x => x.ProjectTask).WithMany()
+                .HasForeignKey(x => x.ProjectTaskId).OnDelete(DeleteBehavior.SetNull);
+            e.HasIndex(x => x.ProjectTaskId);
+
             // Restrict: a category still in use cannot be deleted out from under its expenses,
             // which would leave rows claiming a type that no longer exists.
             e.HasOne(x => x.ExpenseType).WithMany(t => t.Expenses)
@@ -791,6 +797,12 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.HasOne(x => x.Project).WithMany(p => p.ExtraCharges)
                 .HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
 
+            // SetNull: removing a task from the plan must not take the hours or the money
+            // spent while it existed. The line stays on the job, attached to nothing.
+            e.HasOne(x => x.ProjectTask).WithMany()
+                .HasForeignKey(x => x.ProjectTaskId).OnDelete(DeleteBehavior.SetNull);
+            e.HasIndex(x => x.ProjectTaskId);
+
             e.Property(x => x.Name).HasMaxLength(200);
             e.Property(x => x.Description).HasMaxLength(2000);
             e.Property(x => x.Cost).HasPrecision(14, 2);
@@ -808,6 +820,12 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
         {
             e.HasOne(m => m.Project).WithMany(p => p.Materials)
                 .HasForeignKey(m => m.ProjectId).OnDelete(DeleteBehavior.Cascade);
+
+            // SetNull: removing a task from the plan must not take the hours or the money
+            // spent while it existed. The line stays on the job, attached to nothing.
+            e.HasOne(x => x.ProjectTask).WithMany()
+                .HasForeignKey(x => x.ProjectTaskId).OnDelete(DeleteBehavior.SetNull);
+            e.HasIndex(x => x.ProjectTaskId);
 
             // SetNull: what a job consumed outlives the catalogue entry it was taken from.
             e.HasOne(m => m.Product).WithMany()
@@ -875,6 +893,12 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
         {
             e.HasOne(t => t.Project).WithMany(p => p.Timesheets)
                 .HasForeignKey(t => t.ProjectId).OnDelete(DeleteBehavior.Cascade);
+
+            // SetNull: removing a task from the plan must not take the hours or the money
+            // spent while it existed. The line stays on the job, attached to nothing.
+            e.HasOne(x => x.ProjectTask).WithMany()
+                .HasForeignKey(x => x.ProjectTaskId).OnDelete(DeleteBehavior.SetNull);
+            e.HasIndex(x => x.ProjectTaskId);
 
             // SetNull: taking someone off the payroll must not delete the hours billed for
             // them. The entry then reads as hours with no name, which is the truth.

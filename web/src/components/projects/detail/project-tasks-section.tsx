@@ -29,6 +29,7 @@ import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
 import { LoadErrorState } from "@/components/layout/load-error-state";
 import { TaskFormSheet } from "@/components/projects/detail/task-form-sheet";
+import { TaskTotalsTable } from "@/components/projects/detail/task-totals-table";
 import { useCanManage } from "@/hooks/use-can-create";
 import {
   useChangeTaskStatus,
@@ -148,6 +149,14 @@ export function ProjectTasksSection({ projectId }: { projectId: string }) {
           <TriangleAlert className="size-4 shrink-0" />
           {late === 1 ? "Une tâche a dépassé son échéance." : `${late} tâches ont dépassé leur échéance.`}
         </p>
+      )}
+
+      {/* Only for those who may read a margin, which is the same list the endpoint enforces.
+          An employee ticking off their day has no business seeing what the job makes. */}
+      {canManage && tasks.length > 0 && (
+        <div className="mb-4">
+          <TaskTotalsTable projectId={projectId} />
+        </div>
       )}
 
       {isLoading ? (

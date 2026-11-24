@@ -21,6 +21,12 @@ public record TimesheetEntryDto(
     string EndTime,
     decimal Hours,
     string? Note,
+    /// <summary>
+    /// The task on this job it belongs to, and that task's title for the list. Both null for a
+    /// line posted against the job as a whole, which is most of them.
+    /// </summary>
+    Guid? ProjectTaskId,
+    string? ProjectTaskTitle,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
@@ -37,4 +43,6 @@ public record SaveTimesheetEntryRequest(
     DateOnly EndDate,
     TimeOnly StartTime,
     TimeOnly EndTime,
-    string? Note);
+    string? Note,
+    /// <summary>Optional: the task these hours went into.</summary>
+    Guid? ProjectTaskId = null);

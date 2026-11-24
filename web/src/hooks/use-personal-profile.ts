@@ -3,6 +3,8 @@ import { api } from "@/lib/api";
 import type {
   ApplicationEligibility,
   MyApplication,
+  MyInvoice,
+  MyJob,
   PersonalProfile,
   SavePersonalProfileValues,
 } from "@/lib/types";
@@ -75,5 +77,33 @@ export function useApplyToJob() {
       void queryClient.invalidateQueries({ queryKey: ["candidatures"] });
       void queryClient.invalidateQueries({ queryKey: [...KEY, "candidatures"] });
     },
+  });
+}
+
+/**
+ * The companies this person works for.
+ *
+ * Read from the employee records that carry their account, not from what they may open: a
+ * login to a company is not a job at it.
+ */
+export function useMyJobsQuery(enabled = true) {
+  return useQuery({
+    queryKey: ["mon-espace", "emplois"],
+    queryFn: () => api.get<MyJob[]>("mon-espace/emplois"),
+    enabled,
+  });
+}
+
+/**
+ * Every invoice this person has been sent, across every company that has one for them.
+ *
+ * Drafts are not among them: the API leaves them out, because an invoice that has not been
+ * given to anybody is a document its sender has not finished writing.
+ */
+export function useMyInvoicesQuery(enabled = true) {
+  return useQuery({
+    queryKey: ["mon-espace", "factures"],
+    queryFn: () => api.get<MyInvoice[]>("mon-espace/factures"),
+    enabled,
   });
 }

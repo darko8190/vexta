@@ -34,6 +34,8 @@ import { ApiError } from "@/lib/api";
 import type { ProjectExpense } from "@/lib/types";
 import { ex } from "@/lib/placeholders";
 
+import { TaskPickerField } from "@/components/projects/detail/task-picker-field";
+
 const formSchema = z.object({
   name: z.string().trim().min(1, "Le nom est requis.").max(200, "200 caractères maximum."),
   description: z.string().trim().max(2000, "2000 caractères maximum."),
@@ -41,6 +43,7 @@ const formSchema = z.object({
   cost: z.string(),
   sellingPrice: z.string(),
   spentOn: z.string(),
+  projectTaskId: z.string(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -109,6 +112,7 @@ export function ExpenseFormSheet({
       cost: "",
       sellingPrice: "",
       spentOn: "",
+      projectTaskId: "",
     },
   });
 
@@ -122,6 +126,7 @@ export function ExpenseFormSheet({
       cost: amountField(expense?.cost),
       sellingPrice: amountField(expense?.sellingPrice),
       spentOn: expense?.spentOn ?? "",
+      projectTaskId: expense?.projectTaskId ?? "",
     });
 
   }, [open, expense, form]);
@@ -249,6 +254,7 @@ export function ExpenseFormSheet({
           cost,
           sellingPrice,
           spentOn: values.spentOn || null,
+          projectTaskId: values.projectTaskId || null,
           mediaAssetIds: attachments.map((photo) => photo.mediaAssetId),
         },
       });
@@ -534,6 +540,19 @@ export function ExpenseFormSheet({
                 )}
               </FieldDescription>
             </Field>
+
+            <Controller
+              name="projectTaskId"
+              control={form.control}
+              render={({ field }) => (
+                <TaskPickerField
+                  id="expense-task"
+                  projectId={projectId}
+                  value={field.value || null}
+                  onChange={(taskId) => field.onChange(taskId ?? "")}
+                />
+              )}
+            />
           </FieldGroup>
         </form>
 

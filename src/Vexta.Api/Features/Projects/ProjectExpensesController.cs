@@ -119,6 +119,11 @@ public class ProjectExpensesController(
             return BadRequest(new { message = "Ce type de dépense n'existe pas." });
         }
 
+        if (await ProjectTaskLink.ProblemAsync(db, projectId, request.ProjectTaskId, ct) is { } wrongTask)
+        {
+            return BadRequest(new { message = wrongTask });
+        }
+
         var expense = new ProjectExpense
         {
             TenantId = tenantId,
@@ -128,7 +133,8 @@ public class ProjectExpensesController(
             ExpenseTypeId = request.ExpenseTypeId,
             Cost = request.Cost,
             SellingPrice = request.SellingPrice,
-            SpentOn = request.SpentOn
+            SpentOn = request.SpentOn,
+            ProjectTaskId = request.ProjectTaskId
         };
 
         db.ProjectExpenses.Add(expense);
@@ -163,12 +169,18 @@ public class ProjectExpensesController(
             return BadRequest(new { message = "Ce type de dépense n'existe pas." });
         }
 
+        if (await ProjectTaskLink.ProblemAsync(db, expense.ProjectId, request.ProjectTaskId, ct) is { } wrongTask)
+        {
+            return BadRequest(new { message = wrongTask });
+        }
+
         expense.Name = request.Name.Trim();
         expense.Description = Clean(request.Description);
         expense.ExpenseTypeId = request.ExpenseTypeId;
         expense.Cost = request.Cost;
         expense.SellingPrice = request.SellingPrice;
         expense.SpentOn = request.SpentOn;
+        expense.ProjectTaskId = request.ProjectTaskId;
         expense.UpdatedAt = DateTimeOffset.UtcNow;
 
         db.ProjectExpensePhotos.RemoveRange(expense.Photos);
@@ -305,6 +317,8 @@ public class ProjectExpensesController(
             x.SellingPrice,
             x.SpentOn,
             x.Photos.Count,
+            x.ProjectTaskId,
+            x.ProjectTask == null ? null : x.ProjectTask.Title,
             x.CreatedAt,
             x.UpdatedAt);
 }

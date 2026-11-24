@@ -833,6 +833,10 @@ export interface ProjectMaterial {
   /** quantity × unitPrice, computed by the API so both ends show the same figure. */
   total: number;
   sortOrder: number;
+  /** The task on this job it belongs to, and that task's title. Null when it belongs to the job
+   * as a whole, which is most lines. */
+  projectTaskId: string | null;
+  projectTaskTitle: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -904,6 +908,8 @@ export interface SaveProjectMaterialValues {
   purchasePrice: number | null;
   marginPercent: number | null;
   unitPrice: number;
+  /** Optional: the task on this job it belongs to. */
+  projectTaskId: string | null;
 }
 
 /** One stretch of time worked on a job. The hours are rounded to the quarter by the API. */
@@ -920,6 +926,10 @@ export interface TimesheetEntry {
   /** Rounded to the quarter hour: 7 h 52 → 16 h 03 is 8,25. */
   hours: number;
   note: string | null;
+  /** The task on this job it belongs to, and that task's title. Null when it belongs to the job
+   * as a whole, which is most lines. */
+  projectTaskId: string | null;
+  projectTaskTitle: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -931,6 +941,8 @@ export interface SaveTimesheetValues {
   startTime: string;
   endTime: string;
   note: string | null;
+  /** Optional: the task on this job it belongs to. */
+  projectTaskId: string | null;
 }
 
 /** A file filed against a job. The URL is signed and short-lived, so it is never stored. */
@@ -991,6 +1003,10 @@ export interface ProjectExpense {
   sellingPrice: number | null;
   spentOn: string | null;
   photoCount: number;
+  /** The task on this job it belongs to, and that task's title. Null when it belongs to the job
+   * as a whole, which is most lines. */
+  projectTaskId: string | null;
+  projectTaskTitle: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -2344,6 +2360,10 @@ export interface ProjectExtraCharge {
   cost: number | null;
   sellingPrice: number | null;
   chargedOn: string | null;
+  /** The task on this job it belongs to, and that task's title. Null when it belongs to the job
+   * as a whole, which is most lines. */
+  projectTaskId: string | null;
+  projectTaskTitle: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -2389,4 +2409,103 @@ export interface PublicInvoice {
   isCancelled: boolean;
   /** The company can take a card right now, for this invoice. */
   canPayOnline: boolean;
+}
+
+/**
+ * What one task of a job cost, what it sold for, and the difference.
+ *
+ * The arithmetic is the project cost table's, grouped by task, so the rows add up to the total
+ * printed above them. Hours carry revenue and no cost: what a company charges for an hour is
+ * settled, what that hour costs it is payroll, which Vexta does not know.
+ */
+export interface ProjectTaskTotals {
+  /** Null for the one row that is not a task: everything nobody attached to one. */
+  taskId: string | null;
+  title: string;
+  status: ProjectTaskStatus | null;
+  hours: number;
+  cost: number;
+  revenue: number;
+  profit: number;
+}
+
+// ---- The personal space: what a person has across every company ----
+
+/** A job this person holds, as their own space lists it. */
+export interface MyJob {
+  employeeId: string;
+  companyName: string;
+  /** Null when the company has no public page: the card names it without linking anywhere. */
+  companySlug: string | null;
+  jobTitle: string | null;
+  role: UserRole;
+  /** When the company added them to its list. Not a hire date — Vexta records none. */
+  addedOn: string;
+}
+
+/** One invoice a company has sent this person. */
+export interface MyInvoice {
+  id: string;
+  number: string;
+  companyName: string;
+  companySlug: string | null;
+  issueDate: string;
+  dueDate: string;
+  currency: string;
+  total: number;
+  paid: number;
+  /** What is still owed. Zero once it is settled. */
+  outstanding: number;
+  status: InvoiceStatus;
+  /** The payment link, when the company takes cards and something is still owed. */
+  payToken: string | null;
+}
+
+// ---- The directory: everything published across Vexta ----
+
+export interface DirectoryCompany {
+  name: string;
+  slug: string;
+  headline: string | null;
+  city: string | null;
+  province: string | null;
+  /** Only so the card can build the logo URL, which is anonymous by design. */
+  tenantId: string;
+  logoETag: string | null;
+  brandColor: string | null;
+  openJobs: number;
+  publicProducts: number;
+}
+
+export interface DirectoryJob {
+  id: string;
+  title: string;
+  description: string | null;
+  location: string | null;
+  employmentType: EmploymentType;
+  compensation: string | null;
+  postedOn: string | null;
+  companyName: string;
+  companySlug: string;
+  tenantId: string;
+}
+
+export interface DirectoryProduct {
+  id: string;
+  title: string;
+  description: string | null;
+  categoryName: string | null;
+  sellingPrice: number | null;
+  imageUrl: string | null;
+  companyName: string;
+  companySlug: string;
+}
+
+/** What the directory holds, so a menu can leave out what is empty. */
+export interface DirectorySummary {
+  companies: number;
+  jobs: number;
+  products: number;
+  /** Only the categories that actually have a public product in them. */
+  categories: string[];
 }

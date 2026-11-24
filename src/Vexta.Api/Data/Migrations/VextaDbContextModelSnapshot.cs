@@ -2782,6 +2782,9 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("ProjectTaskId")
+                        .HasColumnType("uuid");
+
                     b.Property<decimal?>("SellingPrice")
                         .HasPrecision(14, 2)
                         .HasColumnType("numeric(14,2)");
@@ -2798,6 +2801,8 @@ namespace Vexta.Api.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ExpenseTypeId");
+
+                    b.HasIndex("ProjectTaskId");
 
                     b.HasIndex("ProjectId", "CreatedAt");
 
@@ -2862,6 +2867,9 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("ProjectTaskId")
+                        .HasColumnType("uuid");
+
                     b.Property<decimal?>("SellingPrice")
                         .HasPrecision(14, 2)
                         .HasColumnType("numeric(14,2)");
@@ -2873,6 +2881,8 @@ namespace Vexta.Api.Data.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ProjectTaskId");
 
                     b.HasIndex("ProjectId", "CreatedAt");
 
@@ -2907,6 +2917,9 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("ProjectTaskId")
+                        .HasColumnType("uuid");
+
                     b.Property<decimal?>("PurchasePrice")
                         .HasPrecision(14, 2)
                         .HasColumnType("numeric(14,2)");
@@ -2935,6 +2948,8 @@ namespace Vexta.Api.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ProductId");
+
+                    b.HasIndex("ProjectTaskId");
 
                     b.HasIndex("ProjectId", "SortOrder");
 
@@ -3673,6 +3688,9 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("ProjectTaskId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateOnly>("StartDate")
                         .HasColumnType("date");
 
@@ -3688,6 +3706,8 @@ namespace Vexta.Api.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("EmployeeId");
+
+                    b.HasIndex("ProjectTaskId");
 
                     b.HasIndex("ProjectId", "StartDate");
 
@@ -4465,9 +4485,16 @@ namespace Vexta.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Vexta.Api.Domain.ProjectTask", "ProjectTask")
+                        .WithMany()
+                        .HasForeignKey("ProjectTaskId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("ExpenseType");
 
                     b.Navigation("Project");
+
+                    b.Navigation("ProjectTask");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.ProjectExpensePhoto", b =>
@@ -4497,7 +4524,14 @@ namespace Vexta.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Vexta.Api.Domain.ProjectTask", "ProjectTask")
+                        .WithMany()
+                        .HasForeignKey("ProjectTaskId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Project");
+
+                    b.Navigation("ProjectTask");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.ProjectMaterial", b =>
@@ -4513,9 +4547,16 @@ namespace Vexta.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Vexta.Api.Domain.ProjectTask", "ProjectTask")
+                        .WithMany()
+                        .HasForeignKey("ProjectTaskId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Product");
 
                     b.Navigation("Project");
+
+                    b.Navigation("ProjectTask");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.ProjectNote", b =>
@@ -4724,9 +4765,16 @@ namespace Vexta.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Vexta.Api.Domain.ProjectTask", "ProjectTask")
+                        .WithMany()
+                        .HasForeignKey("ProjectTaskId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Employee");
 
                     b.Navigation("Project");
+
+                    b.Navigation("ProjectTask");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.ApplicationUser", b =>

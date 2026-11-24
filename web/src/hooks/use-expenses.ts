@@ -11,6 +11,8 @@ export interface ExpenseFormValues {
   spentOn: string | null;
   /** The whole set, in order: what is sent replaces what the expense had. */
   mediaAssetIds: string[];
+  /** Optional: the task on this job it belongs to. */
+  projectTaskId: string | null;
 }
 
 /**

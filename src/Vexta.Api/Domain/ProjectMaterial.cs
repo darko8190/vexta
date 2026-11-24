@@ -17,6 +17,22 @@ public class ProjectMaterial
     public Project? Project { get; set; }
 
     /// <summary>
+    /// The task on this job that this line belongs to, or null for something posted against the
+    /// job as a whole.
+    ///
+    /// Optional on purpose. Not every hour and not every bag of concrete belongs to a named
+    /// task, and forcing a choice would get a made-up answer — which is worse than no answer,
+    /// because a task's total would then be wrong rather than merely incomplete. What it buys
+    /// when it is filled in is the figure nobody could produce before: what one task actually
+    /// cost, what it sold for, and the difference.
+    ///
+    /// SetNull on delete: removing a task from the plan must not take the hours or the money
+    /// spent while it existed.
+    /// </summary>
+    public Guid? ProjectTaskId { get; set; }
+    public ProjectTask? ProjectTask { get; set; }
+
+    /// <summary>
     /// The catalogue entry this came from, or null for something typed in by hand. SetNull
     /// when the product is deleted — the line stays, because the material was still used.
     /// </summary>

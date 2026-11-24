@@ -8,6 +8,8 @@ export interface ExtraChargeFormValues {
   cost: number | null;
   sellingPrice: number | null;
   chargedOn: string | null;
+  /** Optional: the task on this job it belongs to. */
+  projectTaskId: string | null;
 }
 
 /**

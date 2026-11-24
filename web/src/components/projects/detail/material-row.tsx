@@ -7,6 +7,7 @@ import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { RequiredMark } from "@/components/ui/required-mark";
 import { ProductPicker } from "@/components/invoices/product-picker";
+import { TaskPickerField } from "@/components/projects/detail/task-picker-field";
 import { marginPercentFrom, sellingPriceFrom } from "@/lib/pricing";
 import type { MarginMode, ProductSearchResult, SaveProjectMaterialValues } from "@/lib/types";
 
@@ -78,12 +79,26 @@ function ReadCell({
  * against the invoice, and greyed-out fields read worse than a table. The columns are the same
  * ones, so every number still sits under its own heading.
  */
-export function MaterialReadRow({ values }: { values: SaveProjectMaterialValues }) {
+export function MaterialReadRow({
+  values,
+  taskTitle,
+}: {
+  values: SaveProjectMaterialValues;
+  /** The task it was filed under, when it was filed under one. */
+  taskTitle?: string | null;
+}) {
   return (
     <div
       className={`grid gap-2 rounded-lg border border-border p-3 ${MATERIAL_GRID} lg:items-center lg:gap-2`}
     >
-      <ReadCell label="Code" value={values.code ?? "—"} />
+      <div className="min-w-0 space-y-1">
+        <ReadCell label="Code" value={values.code ?? "—"} />
+        {taskTitle && (
+          <p className="truncate text-xs text-muted-foreground" title={taskTitle}>
+            {taskTitle}
+          </p>
+        )}
+      </div>
       <ReadCell label="Description" value={values.description} />
       <ReadCell label="Unité" value={values.unit ?? "—"} />
       <ReadCell label="Qté" value={String(values.quantity)} numeric />
@@ -113,6 +128,7 @@ export function MaterialReadRow({ values }: { values: SaveProjectMaterialValues 
  */
 export function MaterialRow({
   values,
+  projectId,
   marginMode,
   onChange,
   onCommit,
@@ -121,6 +137,7 @@ export function MaterialRow({
   disabled,
 }: {
   values: SaveProjectMaterialValues;
+  projectId: string;
   marginMode: MarginMode;
   onChange: (next: SaveProjectMaterialValues) => void;
   /** Save this row now. Left to the caller to decide whether that is a POST or a PUT. */
@@ -208,6 +225,21 @@ export function MaterialRow({
             onBlur={commit}
           />
         </Field>
+
+        <TaskPickerField
+          id={`${fieldId}-task`}
+          projectId={projectId}
+          value={values.projectTaskId}
+          compact
+          // Committed on the spot rather than on blur like the text fields: a select has no
+          // blur anybody expects, and a choice left unsaved with nothing on screen saying so is
+          // the worst of both.
+          onChange={(taskId) => {
+            const next = { ...values, projectTaskId: taskId };
+            onChange(next);
+            onCommit(next);
+          }}
+        />
       </div>
 
       <Field>

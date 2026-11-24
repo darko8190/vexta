@@ -51,6 +51,10 @@ public class ProjectMaterialsController(VextaDbContext db, ICurrentUserService c
         if (await LockedAsync(projectId, ct) is { } locked) return BadRequest(new { message = locked });
         if (Problem(request) is { } problem) return BadRequest(new { message = problem });
         if (await UnknownProductAsync(request.ProductId, ct)) return BadRequest(new { message = ProductMissing });
+        if (await ProjectTaskLink.ProblemAsync(db, projectId, request.ProjectTaskId, ct) is { } wrongTask)
+        {
+            return BadRequest(new { message = wrongTask });
+        }
 
         // Max + 1, not a count: deleting the third of four rows would otherwise hand its rank
         // to the next line added, and two rows sharing a rank is a table that shuffles itself.
@@ -70,6 +74,7 @@ public class ProjectMaterialsController(VextaDbContext db, ICurrentUserService c
             PurchasePrice = request.PurchasePrice,
             MarginPercent = request.MarginPercent,
             UnitPrice = request.UnitPrice,
+            ProjectTaskId = request.ProjectTaskId,
             SortOrder = (lastSortOrder ?? -1) + 1
         };
 
@@ -91,6 +96,10 @@ public class ProjectMaterialsController(VextaDbContext db, ICurrentUserService c
         if (await LockedAsync(projectId, ct) is { } locked) return BadRequest(new { message = locked });
         if (Problem(request) is { } problem) return BadRequest(new { message = problem });
         if (await UnknownProductAsync(request.ProductId, ct)) return BadRequest(new { message = ProductMissing });
+        if (await ProjectTaskLink.ProblemAsync(db, projectId, request.ProjectTaskId, ct) is { } wrongTask)
+        {
+            return BadRequest(new { message = wrongTask });
+        }
 
         material.ProductId = request.ProductId;
         material.Code = Clean(request.Code);
@@ -100,6 +109,7 @@ public class ProjectMaterialsController(VextaDbContext db, ICurrentUserService c
         material.PurchasePrice = request.PurchasePrice;
         material.MarginPercent = request.MarginPercent;
         material.UnitPrice = request.UnitPrice;
+        material.ProjectTaskId = request.ProjectTaskId;
         material.UpdatedAt = DateTimeOffset.UtcNow;
 
         await db.SaveChangesAsync(ct);
@@ -180,6 +190,11 @@ public class ProjectMaterialsController(VextaDbContext db, ICurrentUserService c
         m.MarginPercent,
         m.UnitPrice,
         m.SortOrder,
+        m.ProjectTaskId,
+        // Null even when a task is attached: this overload maps an entity that was just
+        // written, with no navigation loaded. The list and the single-row GET both project
+        // through ToDto(), which does carry the title.
+        null,
         m.CreatedAt,
         m.UpdatedAt);
 
@@ -195,6 +210,8 @@ public class ProjectMaterialsController(VextaDbContext db, ICurrentUserService c
             m.MarginPercent,
             m.UnitPrice,
             m.SortOrder,
+            m.ProjectTaskId,
+            m.ProjectTask == null ? null : m.ProjectTask.Title,
             m.CreatedAt,
             m.UpdatedAt);
 }

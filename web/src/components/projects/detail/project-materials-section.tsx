@@ -36,6 +36,7 @@ function toValues(material: ProjectMaterial): SaveProjectMaterialValues {
     purchasePrice: material.purchasePrice,
     marginPercent: material.marginPercent,
     unitPrice: material.unitPrice,
+    projectTaskId: material.projectTaskId,
   };
 }
 
@@ -49,6 +50,7 @@ function blankValues(): SaveProjectMaterialValues {
     purchasePrice: null,
     marginPercent: null,
     unitPrice: 0,
+    projectTaskId: null,
   };
 }
 
@@ -241,11 +243,16 @@ export function ProjectMaterialsSection({
 
           {materials.map((material) =>
             locked ? (
-              <MaterialReadRow key={material.id} values={valuesOf(material)} />
+              <MaterialReadRow
+                key={material.id}
+                values={valuesOf(material)}
+                taskTitle={material.projectTaskTitle}
+              />
             ) : (
               <MaterialRow
                 key={material.id}
                 values={valuesOf(material)}
+                projectId={projectId}
                 marginMode={marginMode}
                 onChange={(next) => setEdits((previous) => ({ ...previous, [material.id]: next }))}
                 onCommit={(next) => void commitExisting(material, next)}
@@ -262,6 +269,7 @@ export function ProjectMaterialsSection({
               <MaterialRow
                 key={draft.uid}
                 values={draft.values}
+                projectId={projectId}
                 marginMode={marginMode}
                 onChange={(next) =>
                   setDrafts((previous) =>

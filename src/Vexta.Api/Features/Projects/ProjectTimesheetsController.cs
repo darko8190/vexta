@@ -48,6 +48,10 @@ public class ProjectTimesheetsController(VextaDbContext db, ICurrentUserService 
         if (!await db.Projects.AnyAsync(p => p.Id == projectId, ct)) return NotFound();
         if (await LockedAsync(projectId, ct) is { } locked) return BadRequest(new { message = locked });
         if (await ProblemAsync(request, ct) is { } problem) return BadRequest(new { message = problem });
+        if (await ProjectTaskLink.ProblemAsync(db, projectId, request.ProjectTaskId, ct) is { } wrongTask)
+        {
+            return BadRequest(new { message = wrongTask });
+        }
 
         var entry = new TimesheetEntry
         {
@@ -59,7 +63,8 @@ public class ProjectTimesheetsController(VextaDbContext db, ICurrentUserService 
             StartTime = request.StartTime,
             EndTime = request.EndTime,
             Hours = WorkHours.Between(request.StartDate, request.StartTime, request.EndDate, request.EndTime),
-            Note = Clean(request.Note)
+            Note = Clean(request.Note),
+            ProjectTaskId = request.ProjectTaskId
         };
 
         db.TimesheetEntries.Add(entry);
@@ -80,6 +85,10 @@ public class ProjectTimesheetsController(VextaDbContext db, ICurrentUserService 
         if (entry is null) return NotFound();
         if (await LockedAsync(projectId, ct) is { } locked) return BadRequest(new { message = locked });
         if (await ProblemAsync(request, ct) is { } problem) return BadRequest(new { message = problem });
+        if (await ProjectTaskLink.ProblemAsync(db, projectId, request.ProjectTaskId, ct) is { } wrongTask)
+        {
+            return BadRequest(new { message = wrongTask });
+        }
 
         entry.EmployeeId = request.EmployeeId;
         entry.StartDate = request.StartDate;
@@ -88,6 +97,7 @@ public class ProjectTimesheetsController(VextaDbContext db, ICurrentUserService 
         entry.EndTime = request.EndTime;
         entry.Hours = WorkHours.Between(request.StartDate, request.StartTime, request.EndDate, request.EndTime);
         entry.Note = Clean(request.Note);
+        entry.ProjectTaskId = request.ProjectTaskId;
         entry.UpdatedAt = DateTimeOffset.UtcNow;
 
         await db.SaveChangesAsync(ct);
@@ -178,6 +188,8 @@ public class ProjectTimesheetsController(VextaDbContext db, ICurrentUserService 
             x.EndTime,
             x.Hours,
             x.Note,
+            x.ProjectTaskId,
+            x.ProjectTask == null ? null : x.ProjectTask.Title,
             x.CreatedAt,
             x.UpdatedAt);
 
@@ -191,6 +203,8 @@ public class ProjectTimesheetsController(VextaDbContext db, ICurrentUserService 
             row.EndTime.ToString(@"HH\:mm"),
             row.Hours,
             row.Note,
+            row.ProjectTaskId,
+            row.ProjectTaskTitle,
             row.CreatedAt,
             row.UpdatedAt);
 
@@ -205,6 +219,8 @@ public class ProjectTimesheetsController(VextaDbContext db, ICurrentUserService 
         TimeOnly EndTime,
         decimal Hours,
         string? Note,
+        Guid? ProjectTaskId,
+        string? ProjectTaskTitle,
         DateTimeOffset CreatedAt,
         DateTimeOffset UpdatedAt);
 }

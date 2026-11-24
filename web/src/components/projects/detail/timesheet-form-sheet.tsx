@@ -78,6 +78,8 @@ function today(): string {
   return `${now.getFullYear()}-${month}-${day}`;
 }
 
+import { TaskPickerField } from "@/components/projects/detail/task-picker-field";
+
 const formSchema = z
   .object({
     employeeId: z.string().min(1, "Choisissez un employé."),
@@ -86,6 +88,7 @@ const formSchema = z
     startTime: z.string().min(1, "L'heure de début est requise."),
     endTime: z.string().min(1, "L'heure de fin est requise."),
     note: z.string().trim().max(500, "500 caractères maximum."),
+    projectTaskId: z.string(),
   })
   .refine(
     (values) =>
@@ -126,6 +129,7 @@ export function TimesheetFormSheet({
       startTime: "",
       endTime: "",
       note: "",
+      projectTaskId: "",
     },
   });
 
@@ -141,6 +145,7 @@ export function TimesheetFormSheet({
       startTime: entry?.startTime ?? "",
       endTime: entry?.endTime ?? "",
       note: entry?.note ?? "",
+      projectTaskId: entry?.projectTaskId ?? "",
     });
 
     // An entry whose two dates already differ was set by hand once, so moving the start date
@@ -169,6 +174,7 @@ export function TimesheetFormSheet({
           startTime: values.startTime,
           endTime: values.endTime,
           note: values.note || null,
+          projectTaskId: values.projectTaskId || null,
         },
       });
 
@@ -375,6 +381,19 @@ export function TimesheetFormSheet({
                   />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                 </Field>
+              )}
+            />
+
+            <Controller
+              name="projectTaskId"
+              control={form.control}
+              render={({ field }) => (
+                <TaskPickerField
+                  id="timesheet-task"
+                  projectId={projectId}
+                  value={field.value || null}
+                  onChange={(taskId) => field.onChange(taskId ?? "")}
+                />
               )}
             />
           </FieldGroup>

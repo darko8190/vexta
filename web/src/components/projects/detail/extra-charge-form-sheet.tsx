@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { TaskPickerField } from "@/components/projects/detail/task-picker-field";
 import { useSaveExtraCharge } from "@/hooks/use-extra-charges";
 import { ApiError } from "@/lib/api";
 import type { ProjectExtraCharge } from "@/lib/types";
@@ -31,6 +32,7 @@ const formSchema = z.object({
   cost: z.string(),
   sellingPrice: z.string(),
   chargedOn: z.string(),
+  projectTaskId: z.string(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -58,6 +60,7 @@ function toFormValues(charge?: ProjectExtraCharge): FormValues {
     cost: amountField(charge?.cost),
     sellingPrice: amountField(charge?.sellingPrice),
     chargedOn: charge?.chargedOn ?? "",
+    projectTaskId: charge?.projectTaskId ?? "",
   };
 }
 
@@ -110,6 +113,7 @@ export function ExtraChargeFormSheet({
           cost,
           sellingPrice,
           chargedOn: values.chargedOn || null,
+          projectTaskId: values.projectTaskId || null,
         },
       });
 
@@ -213,6 +217,19 @@ export function ExtraChargeFormSheet({
                   <FieldLabel htmlFor="charge-date">Date</FieldLabel>
                   <Input {...field} id="charge-date" type="date" />
                 </Field>
+              )}
+            />
+
+            <Controller
+              name="projectTaskId"
+              control={form.control}
+              render={({ field }) => (
+                <TaskPickerField
+                  id="charge-task"
+                  projectId={projectId}
+                  value={field.value || null}
+                  onChange={(taskId) => field.onChange(taskId ?? "")}
+                />
               )}
             />
           </FieldGroup>

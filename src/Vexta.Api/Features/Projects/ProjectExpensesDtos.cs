@@ -63,6 +63,12 @@ public record ProjectExpenseDto(
     decimal? SellingPrice,
     DateOnly? SpentOn,
     int PhotoCount,
+    /// <summary>
+    /// The task on this job it belongs to, and that task's title for the list. Both null for a
+    /// line posted against the job as a whole, which is most of them.
+    /// </summary>
+    Guid? ProjectTaskId,
+    string? ProjectTaskTitle,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
@@ -80,4 +86,6 @@ public record SaveProjectExpenseRequest(
     decimal? Cost,
     decimal? SellingPrice,
     DateOnly? SpentOn,
-    IReadOnlyList<Guid>? MediaAssetIds);
+    IReadOnlyList<Guid>? MediaAssetIds,
+    /// <summary>Optional: the task this expense was incurred for.</summary>
+    Guid? ProjectTaskId = null);

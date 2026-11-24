@@ -2,7 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
 export interface AiSettings {
-  provider: "Anthropic" | "OpenAi";
+  /** Mirrors AiProvider on the server. "Copilot" is GitHub Models, not the editor's Copilot. */
+  provider: "Anthropic" | "OpenAi" | "Gemini" | "Copilot";
   model: string;
   /** Whether a key is on file. The key itself never comes back from the server. */
   hasApiKey: boolean;

@@ -18,6 +18,12 @@ public record ProjectMaterialDto(
     decimal? MarginPercent,
     decimal UnitPrice,
     int SortOrder,
+    /// <summary>
+    /// The task on this job it belongs to, and that task's title for the list. Both null for a
+    /// line posted against the job as a whole, which is most of them.
+    /// </summary>
+    Guid? ProjectTaskId,
+    string? ProjectTaskTitle,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt)
 {
@@ -38,4 +44,6 @@ public record SaveProjectMaterialRequest(
     decimal Quantity,
     decimal? PurchasePrice,
     decimal? MarginPercent,
-    decimal UnitPrice);
+    decimal UnitPrice,
+    /// <summary>Optional: the task this material was used on.</summary>
+    Guid? ProjectTaskId = null);

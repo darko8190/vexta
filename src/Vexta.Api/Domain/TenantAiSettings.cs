@@ -6,7 +6,28 @@ public enum AiProvider
     Anthropic = 0,
 
     /// <summary>ChatGPT, through OpenAI's API.</summary>
-    OpenAi = 1
+    OpenAi = 1,
+
+    /// <summary>
+    /// Gemini, through Google's OpenAI-compatible endpoint rather than its own protocol.
+    ///
+    /// Google publishes an address that speaks Chat Completions, tool calls included, so this
+    /// is the same loop as <see cref="OpenAi"/> pointed somewhere else. Writing a second
+    /// adapter against Google's native shape would be a second thing to keep in step with the
+    /// first, for an assistant that would behave identically.
+    /// </summary>
+    Gemini = 2,
+
+    /// <summary>
+    /// GitHub Models — what a company can actually connect when it says "Copilot".
+    ///
+    /// There is no public API behind the Copilot that answers inside an editor, so a key for it
+    /// does not exist to be pasted anywhere. What GitHub does offer is an inference endpoint on
+    /// the same subscription, reached with a GitHub token, and it too speaks Chat Completions.
+    /// The screen says so in as many words rather than letting somebody go hunting for a key
+    /// that was never issued.
+    /// </summary>
+    Copilot = 3
 }
 
 /// <summary>

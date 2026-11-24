@@ -17,6 +17,12 @@ public record ProjectExtraChargeDto(
     decimal? Cost,
     decimal? SellingPrice,
     DateOnly? ChargedOn,
+    /// <summary>
+    /// The task on this job it belongs to, and that task's title for the list. Both null for a
+    /// line posted against the job as a whole, which is most of them.
+    /// </summary>
+    Guid? ProjectTaskId,
+    string? ProjectTaskTitle,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
@@ -25,7 +31,9 @@ public record SaveProjectExtraChargeRequest(
     string? Description,
     decimal? Cost,
     decimal? SellingPrice,
-    DateOnly? ChargedOn);
+    DateOnly? ChargedOn,
+    /// <summary>Optional: the task this charge belongs to.</summary>
+    Guid? ProjectTaskId = null);
 
 /// <summary>
 /// The extra charges added to one project.
@@ -83,6 +91,10 @@ public class ProjectExtraChargesController(
         // A billed job takes no new charges: it would be money nobody put on the invoice.
         if (ProjectLock.Problem(status.Value) is { } locked) return BadRequest(new { message = locked });
         if (Problem(request) is { } problem) return BadRequest(new { message = problem });
+        if (await ProjectTaskLink.ProblemAsync(db, projectId, request.ProjectTaskId, ct) is { } wrongTask)
+        {
+            return BadRequest(new { message = wrongTask });
+        }
 
         var charge = new ProjectExtraCharge
         {
@@ -92,7 +104,8 @@ public class ProjectExtraChargesController(
             Description = Clean(request.Description),
             Cost = request.Cost,
             SellingPrice = request.SellingPrice,
-            ChargedOn = request.ChargedOn
+            ChargedOn = request.ChargedOn,
+            ProjectTaskId = request.ProjectTaskId
         };
 
         db.ProjectExtraCharges.Add(charge);
@@ -116,12 +129,17 @@ public class ProjectExtraChargesController(
         }
 
         if (Problem(request) is { } problem) return BadRequest(new { message = problem });
+        if (await ProjectTaskLink.ProblemAsync(db, charge.ProjectId, request.ProjectTaskId, ct) is { } wrongTask)
+        {
+            return BadRequest(new { message = wrongTask });
+        }
 
         charge.Name = request.Name.Trim();
         charge.Description = Clean(request.Description);
         charge.Cost = request.Cost;
         charge.SellingPrice = request.SellingPrice;
         charge.ChargedOn = request.ChargedOn;
+        charge.ProjectTaskId = request.ProjectTaskId;
         charge.UpdatedAt = DateTimeOffset.UtcNow;
 
         await db.SaveChangesAsync(ct);
@@ -169,6 +187,8 @@ public class ProjectExtraChargesController(
             x.Cost,
             x.SellingPrice,
             x.ChargedOn,
+            x.ProjectTaskId,
+            x.ProjectTask == null ? null : x.ProjectTask.Title,
             x.CreatedAt,
             x.UpdatedAt);
 }

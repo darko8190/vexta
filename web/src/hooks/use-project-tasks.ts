@@ -3,6 +3,7 @@ import { api } from "@/lib/api";
 import type {
   ProjectTask,
   ProjectTaskStatus,
+  ProjectTaskTotals,
   SaveProjectTaskValues,
   TaskAssignables,
 } from "@/lib/types";
@@ -15,6 +16,7 @@ import type {
 function invalidate(queryClient: ReturnType<typeof useQueryClient>, projectId: string) {
   queryClient.invalidateQueries({ queryKey: ["projects", projectId, "taches"] });
   queryClient.invalidateQueries({ queryKey: ["projects", projectId, "summary"] });
+  queryClient.invalidateQueries({ queryKey: ["projects", projectId, "taches", "totaux"] });
 }
 
 export function useProjectTasksQuery(projectId: string | undefined, enabled = true) {
@@ -86,5 +88,20 @@ export function useDeleteProjectTask(projectId: string) {
   return useMutation({
     mutationFn: (id: string) => api.delete(`projects/${projectId}/taches/${id}`),
     onSuccess: () => invalidate(queryClient, projectId),
+  });
+}
+
+/**
+ * The money on the job, broken down by task.
+ *
+ * Managers only, and asked for only when the panel that shows it is open: the row carries what
+ * the company paid beside what it charges, and four grouped reads is more than the task list
+ * needs to draw itself.
+ */
+export function useProjectTaskTotalsQuery(projectId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: ["projects", projectId, "taches", "totaux"],
+    queryFn: () => api.get<ProjectTaskTotals[]>(`projects/${projectId}/taches/totaux`),
+    enabled: Boolean(projectId) && enabled,
   });
 }

@@ -43,6 +43,25 @@ const PROVIDERS = [
     keysUrl: "https://platform.openai.com/api-keys",
     hint: "Le modèle doit savoir utiliser des outils ; les modèles « mini » y arrivent moins bien.",
   },
+  {
+    value: "Gemini",
+    label: "Gemini",
+    vendor: "Google",
+    defaultModel: "gemini-3.8-flash",
+    keysUrl: "https://aistudio.google.com/apikey",
+    hint: "La clé vient de Google AI Studio. Les modèles « flash » coûtent moins cher et suffisent ici.",
+  },
+  {
+    // Not the Copilot that answers inside an editor — that one has no key to paste. This is
+    // GitHub's inference endpoint on the same subscription, and the hint says so rather than
+    // sending somebody hunting for a key that was never issued.
+    value: "Copilot",
+    label: "Copilot",
+    vendor: "GitHub Models",
+    defaultModel: "openai/gpt-5",
+    keysUrl: "https://github.com/settings/personal-access-tokens",
+    hint: "Un jeton GitHub avec la permission « Models ». Le nom du modèle porte son éditeur devant, comme openai/gpt-5.",
+  },
 ] as const;
 
 /** "15,75" and "15.75" both, because a price is typed with a comma here. */

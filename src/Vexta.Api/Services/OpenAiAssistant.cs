@@ -20,6 +20,19 @@ public static class OpenAiAssistant
 {
     public const string DefaultEndpoint = "https://api.openai.com/v1/chat/completions";
 
+    /// <summary>
+    /// Google's OpenAI-compatible address. The key is a Gemini key from AI Studio, carried in
+    /// the same Authorization header — Google accepts it there rather than requiring its own.
+    /// </summary>
+    public const string GeminiEndpoint =
+        "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+
+    /// <summary>
+    /// GitHub Models, which is what "Copilot" means when there is a token to paste. The token
+    /// is a GitHub one with the <c>models</c> scope, and it goes in the same header.
+    /// </summary>
+    public const string GitHubModelsEndpoint = "https://models.github.ai/inference/chat/completions";
+
     public static async Task<AssistantRun> RunAsync(
         string apiKey,
         string model,

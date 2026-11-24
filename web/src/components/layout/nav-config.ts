@@ -1,6 +1,7 @@
 ﻿import {
   Blocks,
   Boxes,
+  Briefcase,
   Building2,
   CalendarClock,
   ChartBar,
@@ -12,6 +13,7 @@
   LayoutDashboard,
   ListChecks,
   Palette,
+  Search,
   Settings,
   ShoppingCart,
   Sparkles,
@@ -84,14 +86,28 @@ const tenantAdminNav: NavItem[] = [
 ];
 
 /**
- * A personal space holds what belongs to the person rather than to a company: their CV, and the
- * applications it has sent. Clients, projects and invoices are still absent on purpose -- they
- * belong to a company, and offering them here would open screens whose only content is an
- * invitation to buy a business plan.
+ * A personal space holds what belongs to the person rather than to a company.
+ *
+ * Two halves, in this order. First what is theirs — their CV, the jobs they hold, what they
+ * have been invoiced — gathered from every company on the platform rather than from the one
+ * space they happen to be in: somebody who is a customer of three contractors had three places
+ * to look and three places to forget one.
+ *
+ * Then the directory: the companies, the positions and the products published across Vexta.
+ * That half is not about them at all, which is why it comes second — but it is the half that
+ * makes a personal space worth opening when there is nothing waiting in the first.
+ *
+ * Clients and projects are still absent on purpose. They belong to a company, and offering them
+ * here would open screens whose only content is an invitation to buy a business plan.
  */
 const personalNav: NavItem[] = [
   { href: "/tableau-de-bord", label: "Tableau de bord", icon: LayoutDashboard },
   { href: "/mon-cv", label: "Mon CV", icon: FileUser },
+  { href: "/mes-emplois", label: "Mes emplois", icon: Briefcase },
+  { href: "/mes-factures", label: "Mes factures", icon: FileText },
+  { href: "/entreprises", label: "Entreprises", icon: Building2 },
+  { href: "/emplois", label: "Rechercher un emploi", icon: Search },
+  { href: "/magasiner", label: "Magasiner", icon: ShoppingCart },
 ];
 
 /**

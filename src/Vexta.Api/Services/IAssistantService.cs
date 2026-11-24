@@ -90,13 +90,32 @@ public class AssistantService(
     private const int MaxTurns = 8;
 
     /// <summary>
-    /// Where a ChatGPT-shaped request goes. OpenAI's own address unless a deployment points it
-    /// somewhere else — an Azure endpoint, a compatible gateway.
+    /// Where a Chat Completions request goes for each provider that speaks that shape.
+    ///
+    /// Three providers, one loop. OpenAI, Google and GitHub all publish an address that takes
+    /// the same body and answers the same way, tool calls included, so the only thing that
+    /// differs between them is this string. Each one can be overridden by a deployment — an
+    /// Azure endpoint, a compatible gateway — which is also what makes the loop testable
+    /// without spending anybody's money.
     /// </summary>
-    private string OpenAiEndpoint =>
-        configuration["Assistant:OpenAiEndpoint"] is { Length: > 0 } custom
-            ? custom
-            : OpenAiAssistant.DefaultEndpoint;
+    private string EndpointFor(AiProvider provider)
+    {
+        var (setting, fallback) = provider switch
+        {
+            AiProvider.Gemini => ("Assistant:GeminiEndpoint", OpenAiAssistant.GeminiEndpoint),
+            AiProvider.Copilot => ("Assistant:CopilotEndpoint", OpenAiAssistant.GitHubModelsEndpoint),
+            _ => ("Assistant:OpenAiEndpoint", OpenAiAssistant.DefaultEndpoint)
+        };
+
+        return configuration[setting] is { Length: > 0 } custom ? custom : fallback;
+    }
+
+    /// <summary>
+    /// True for every provider served by <see cref="OpenAiAssistant"/>. Anthropic is the one
+    /// that is not: it has its own protocol and its own adapter.
+    /// </summary>
+    private static bool SpeaksChatCompletions(AiProvider provider) =>
+        provider is AiProvider.OpenAi or AiProvider.Gemini or AiProvider.Copilot;
 
     public async Task<AssistantAvailability> AvailabilityAsync(CancellationToken ct = default)
     {
@@ -237,7 +256,8 @@ public class AssistantService(
             // a fraction of a cent to find out.
             var answer = settings.Provider switch
             {
-                AiProvider.OpenAi => await OpenAiAssistant.PingAsync(apiKey, settings.Model, http, OpenAiEndpoint, ct),
+                var p when SpeaksChatCompletions(p) =>
+                    await OpenAiAssistant.PingAsync(apiKey, settings.Model, http, EndpointFor(p), ct),
                 _ => await AnthropicAssistant.PingAsync(apiKey, settings.Model, ct),
             };
 
@@ -287,8 +307,8 @@ public class AssistantService(
         {
             var run = settings.Provider switch
             {
-                AiProvider.OpenAi => await OpenAiAssistant.RunAsync(
-                    apiKey, settings.Model, prompt, history, tool, MaxTurns, http, OpenAiEndpoint, ct),
+                var p when SpeaksChatCompletions(p) => await OpenAiAssistant.RunAsync(
+                    apiKey, settings.Model, prompt, history, tool, MaxTurns, http, EndpointFor(p), ct),
                 _ => await AnthropicAssistant.RunAsync(
                     apiKey, settings.Model, prompt, history, tool, MaxTurns, ct),
             };

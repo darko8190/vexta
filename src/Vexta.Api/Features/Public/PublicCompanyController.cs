@@ -39,6 +39,7 @@ public class PublicCompanyController(VextaDbContext db, IR2StorageService storag
                 t.Phone,
                 t.BrandColor,
                 t.SubscriptionStatus,
+                CanCharge = t.StripeAccountId != null && t.StripeChargesEnabled,
                 LogoETag = t.Logo!.ETag
             })
             .FirstOrDefaultAsync(ct);
@@ -94,8 +95,13 @@ public class PublicCompanyController(VextaDbContext db, IR2StorageService storag
             tenant.BrandColor,
             page.Style,
             // Products and orders are two switches, and both have to be on: a basket on a page
-            // that is not showing its products would be a basket with nothing to put in it.
-            page.ShowProducts && page.AcceptsOrders,
+            // that is not showing its products would be a basket with nothing to put in it. A
+            // company that asks to be paid at its counter needs a third thing -- a Stripe
+            // account that can take the money -- and the same answer ShopGate gives, or the
+            // page would offer a basket that refuses at the till.
+            page.ShowProducts && page.AcceptsOrders
+                && (!page.RequiresOnlinePayment || tenant.CanCharge),
+            page.RequiresOnlinePayment,
             address,
             products,
             jobs,
@@ -354,6 +360,8 @@ public record PublicCompanyDto(
     PublicPageStyle Style,
     /// <summary>Whether a visitor may order the products rather than only look at them.</summary>
     bool AcceptsOrders,
+    /// <summary>Whether ordering here means paying for it on the spot.</summary>
+    bool RequiresPayment,
     CompanyAddressDto? Address,
     List<PublicProductDto> Products,
     List<PublicJobDto> Jobs,

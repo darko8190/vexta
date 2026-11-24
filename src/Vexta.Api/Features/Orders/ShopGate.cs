@@ -5,7 +5,7 @@ using Vexta.Api.Domain;
 namespace Vexta.Api.Features.Orders;
 
 /// <summary>A company whose shop window is open for orders.</summary>
-public record ShopContext(Guid TenantId, string Name, decimal GstRate, decimal QstRate);
+public record ShopContext(Guid TenantId, string Name, decimal GstRate, decimal QstRate, bool RequiresPayment);
 
 /// <summary>
 /// The one gate every ordering route passes through, written once because asking "may I order
@@ -16,7 +16,8 @@ public record ShopContext(Guid TenantId, string Name, decimal GstRate, decimal Q
 /// published, that page shows its products, and it accepts orders. Showing products and taking
 /// orders are deliberately two switches — a shop window is "this is what we carry", a basket is
 /// "ask us and we will get it to you", and the second is a promise nobody should make by
-/// accident.
+/// accident. A company that has gone further and asks to be paid at the counter needs a fifth
+/// thing to be true: a Stripe account that can actually take the money.
 ///
 /// Every failure returns null, so the caller answers one identical 404: nobody outside can tell
 /// a company that does not exist from one that closed its shop this morning.
@@ -30,17 +31,29 @@ public static class ShopGate
 
         var tenant = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
             .Where(t => t.Slug == slug)
-            .Select(t => new { t.Id, t.Name, t.SubscriptionStatus })
+            .Select(t => new
+            {
+                t.Id,
+                t.Name,
+                t.SubscriptionStatus,
+                CanCharge = t.StripeAccountId != null && t.StripeChargesEnabled
+            })
             .FirstOrDefaultAsync(ct);
 
         if (tenant is null || tenant.SubscriptionStatus != TenantSubscriptionStatus.Active) return null;
 
-        var open = await db.PublicPages.IgnoreQueryFilters().AsNoTracking()
+        var page = await db.PublicPages.IgnoreQueryFilters().AsNoTracking()
             .Where(p => p.TenantId == tenant.Id)
-            .Select(p => p.IsPublished && p.ShowProducts && p.AcceptsOrders)
+            .Select(p => new { p.IsPublished, p.ShowProducts, p.AcceptsOrders, p.RequiresOnlinePayment })
             .FirstOrDefaultAsync(ct);
 
-        if (!open) return null;
+        if (page is null || !page.IsPublished || !page.ShowProducts || !page.AcceptsOrders) return null;
+
+        // A company that asks to be paid at its own counter, and whose Stripe account cannot
+        // take a charge today, has no counter today. The shop closes rather than quietly
+        // falling back to orders nobody paid for -- which is the exact thing the switch was
+        // reached for in the first place.
+        if (page.RequiresOnlinePayment && !tenant.CanCharge) return null;
 
         // Read here rather than at the moment of saving, so the figure the checkout shows and
         // the figure stored on the order come from the same read of the same row.
@@ -49,6 +62,7 @@ public static class ShopGate
             .Select(b => new { b.GstRate, b.QstRate })
             .FirstOrDefaultAsync(ct);
 
-        return new ShopContext(tenant.Id, tenant.Name, rates?.GstRate ?? 0m, rates?.QstRate ?? 0m);
+        return new ShopContext(
+            tenant.Id, tenant.Name, rates?.GstRate ?? 0m, rates?.QstRate ?? 0m, page.RequiresOnlinePayment);
     }
 }

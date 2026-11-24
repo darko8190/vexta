@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { FileText, Search, ShoppingBag } from "lucide-react";
+import { CreditCard, FileText, Search, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -133,6 +133,12 @@ export function OrdersSection() {
                   <Badge variant={customerOrderStatusBadgeVariant[order.status]}>
                     {customerOrderStatusLabels[order.status]}
                   </Badge>
+                  {order.paidAt && (
+                    <Badge variant="secondary">
+                      <CreditCard className="size-3" aria-hidden="true" />
+                      Payée
+                    </Badge>
+                  )}
                   {order.invoiceNumber && (
                     <Badge variant="outline">
                       <FileText className="size-3" />

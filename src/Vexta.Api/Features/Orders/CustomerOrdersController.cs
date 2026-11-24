@@ -40,7 +40,11 @@ public class CustomerOrdersController(VextaDbContext db, ICurrentUserService cur
         [FromQuery] string? recherche,
         CancellationToken ct)
     {
-        var query = db.CustomerOrders.AsNoTracking();
+        // An order still at the till is not an order. It is a checkout somebody has open, or
+        // walked away from, and it has no business in the book the counter picks from.
+        var query = db.CustomerOrders.AsNoTracking()
+            .Where(o => o.Status != CustomerOrderStatus.EnAttenteDePaiement);
+
         if (etat is { } status) query = query.Where(o => o.Status == status);
 
         var rows = await query
@@ -70,7 +74,7 @@ public class CustomerOrdersController(VextaDbContext db, ICurrentUserService cur
     public async Task<ActionResult<OrderDetailDto>> Get(Guid id, CancellationToken ct)
     {
         var row = await db.CustomerOrders.AsNoTracking()
-            .Where(o => o.Id == id)
+            .Where(o => o.Id == id && o.Status != CustomerOrderStatus.EnAttenteDePaiement)
             .Select(Projection())
             .FirstOrDefaultAsync(ct);
 
@@ -110,7 +114,16 @@ public class CustomerOrdersController(VextaDbContext db, ICurrentUserService cur
     {
         if (!Enum.IsDefined(request.Status)) return BadRequest(new { message = "État inconnu." });
 
-        var order = await db.CustomerOrders.FirstOrDefaultAsync(o => o.Id == id, ct);
+        // Not a state the company may put an order into. It means "the customer has not paid",
+        // which is Stripe's answer and nobody else's -- and an order moved there by hand would
+        // disappear from the book it was moved in.
+        if (request.Status == CustomerOrderStatus.EnAttenteDePaiement)
+        {
+            return BadRequest(new { message = "Cet état appartient au paiement en ligne." });
+        }
+
+        var order = await db.CustomerOrders
+            .FirstOrDefaultAsync(o => o.Id == id && o.Status != CustomerOrderStatus.EnAttenteDePaiement, ct);
         if (order is null) return NotFound();
 
         // Refused rather than silently allowed. An invoice has gone out against this order;
@@ -150,7 +163,7 @@ public class CustomerOrdersController(VextaDbContext db, ICurrentUserService cur
 
         var order = await db.CustomerOrders
             .Include(o => o.Lines)
-            .FirstOrDefaultAsync(o => o.Id == id, ct);
+            .FirstOrDefaultAsync(o => o.Id == id && o.Status != CustomerOrderStatus.EnAttenteDePaiement, ct);
 
         if (order is null) return NotFound();
 
@@ -180,42 +193,7 @@ public class CustomerOrdersController(VextaDbContext db, ICurrentUserService cur
             });
         }
 
-        var today = BusinessDay.Today;
-
-        var invoice = new Domain.Invoice
-        {
-            TenantId = tenantId,
-            Number = InvoiceNumbering.Format(settings.InvoicePrefix, settings.NextInvoiceNumber),
-            ClientId = order.ClientId,
-            Status = InvoiceStatus.Brouillon,
-            IssueDate = today,
-            DueDate = today.AddDays(settings.PaymentTermsDays),
-            Currency = order.Currency,
-            // The exemption is read from the client now rather than copied from the order: an
-            // invoice is a tax document and has to say what is true the day it is issued.
-            IsTaxExempt = client.IsTaxExempt,
-            Notes = $"Commande {OrderNumber.Of(order.Number)} du {order.CreatedAt.ToLocalTime():d MMMM yyyy}."
-                + (string.IsNullOrWhiteSpace(order.Note) ? "" : $"\n\n{order.Note.Trim()}"),
-            Lines = order.Lines
-                .OrderBy(l => l.SortOrder)
-                .Select((l, index) => new InvoiceLine
-                {
-                    // Matériaux: everything on a shop order came out of the catalogue, which is
-                    // what that kind means here. Labour and extras are typed by hand afterwards.
-                    Kind = InvoiceLineKind.Materiaux,
-                    ProductId = l.ProductId,
-                    Description = l.Description,
-                    Quantity = l.Quantity,
-                    UnitPrice = l.UnitPrice,
-                    IsTaxable = !client.IsTaxExempt && l.IsTaxable,
-                    SortOrder = index
-                })
-                .ToList()
-        };
-
-        // Advanced here, not derived from a count: deleting an invoice must never hand its
-        // number to the next one.
-        settings.NextInvoiceNumber++;
+        var invoice = OrderInvoicing.Build(order, client, settings, InvoiceStatus.Brouillon);
 
         db.Invoices.Add(invoice);
 
@@ -253,6 +231,8 @@ public class CustomerOrdersController(VextaDbContext db, ICurrentUserService cur
         decimal QstRate,
         Guid? InvoiceId,
         string? InvoiceNumber,
+        DateTimeOffset? PaidAt,
+        decimal AmountPaid,
         DateTimeOffset CreatedAt,
         List<LineAmount> Lines);
 
@@ -275,6 +255,8 @@ public class CustomerOrdersController(VextaDbContext db, ICurrentUserService cur
             o.QstRate,
             o.InvoiceId,
             o.Invoice == null ? null : o.Invoice.Number,
+            o.PaidAt,
+            o.AmountPaid,
             o.CreatedAt,
             o.Lines.Select(l => new LineAmount(l.Quantity, l.UnitPrice, l.IsTaxable)).ToList());
 
@@ -308,6 +290,8 @@ public class CustomerOrdersController(VextaDbContext db, ICurrentUserService cur
             row.Lines.Count,
             row.InvoiceId,
             row.InvoiceNumber,
+            row.PaidAt,
+            row.AmountPaid,
             row.CreatedAt);
     }
 }

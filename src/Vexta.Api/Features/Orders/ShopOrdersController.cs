@@ -5,6 +5,8 @@ using Vexta.Api.Common;
 using Vexta.Api.Data;
 using Vexta.Api.Domain;
 using Vexta.Api.Features.Invoices;
+using Vexta.Api.Services;
+using Stripe;
 
 namespace Vexta.Api.Features.Orders;
 
@@ -29,7 +31,12 @@ namespace Vexta.Api.Features.Orders;
 [ApiController]
 [Route("api/boutique")]
 [Authorize]
-public class ShopOrdersController(VextaDbContext db, ICurrentUserService currentUser) : ControllerBase
+public class ShopOrdersController(
+    VextaDbContext db,
+    ICurrentUserService currentUser,
+    IStripeConnectService connect,
+    IConfiguration configuration,
+    ILogger<ShopOrdersController> logger) : ControllerBase
 {
     /// <summary>
     /// Whether this account may order here, and under what name.
@@ -60,7 +67,8 @@ public class ShopOrdersController(VextaDbContext db, ICurrentUserService current
             refusal,
             client?.Name ?? account.Name,
             client?.Email ?? account.Email,
-            client?.Phone));
+            client?.Phone,
+            shop.RequiresPayment));
     }
 
     [HttpPost("commandes")]
@@ -135,7 +143,10 @@ public class ShopOrdersController(VextaDbContext db, ICurrentUserService current
             ContactEmail = client.Email ?? account.Email,
             ContactPhone = Clean(request.ContactPhone) ?? client.Phone,
             Note = Cap(Clean(request.Note), 2000),
-            Status = CustomerOrderStatus.Recue,
+            // Not an order yet when the company asks to be paid at its counter: the row has to
+            // exist for the payment page to name something and for the prices to be fixed here
+            // rather than in a browser, but nobody at the company sees it until the card clears.
+            Status = shop.RequiresPayment ? CustomerOrderStatus.EnAttenteDePaiement : CustomerOrderStatus.Recue,
             IsTaxExempt = client.IsTaxExempt,
             GstRate = shop.GstRate,
             QstRate = shop.QstRate
@@ -170,11 +181,177 @@ public class ShopOrdersController(VextaDbContext db, ICurrentUserService current
         // one without buying anything.
         await db.SaveChangesAsync(ct);
 
+        if (!shop.RequiresPayment)
+        {
+            return Ok(new PlaceOrderResultDto(
+                order.Id,
+                OrderNumber.Of(order.Number),
+                $"Merci, votre commande {OrderNumber.Of(order.Number)} est envoyée à {shop.Name}.",
+                null));
+        }
+
+        var checkout = await OpenTillAsync(order, request.Slug!, ct);
+
+        if (checkout is null)
+        {
+            return BadRequest(new
+            {
+                message = "Le paiement n'a pas pu être démarré. Réessayez dans un instant, "
+                    + "votre commande vous attend dans Mes commandes."
+            });
+        }
+
         return Ok(new PlaceOrderResultDto(
             order.Id,
             OrderNumber.Of(order.Number),
-            $"Merci, votre commande {OrderNumber.Of(order.Number)} est envoyée à {shop.Name}."));
+            $"Votre commande {OrderNumber.Of(order.Number)} vous attend au paiement.",
+            checkout));
     }
+
+    /// <summary>
+    /// Opens the payment page again for an order whose checkout was abandoned or expired.
+    ///
+    /// A Stripe session does not live forever, so coming back to one is coming back to a dead
+    /// link. Each call opens a new one, which is why this is a POST.
+    /// </summary>
+    [HttpPost("commandes/{id:guid}/paiement")]
+    public async Task<ActionResult<object>> Pay(Guid id, CancellationToken ct)
+    {
+        if (currentUser.UserId is not { } userId) return Forbid();
+
+        var order = await db.CustomerOrders.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(o => o.Id == id && o.PlacedByUserId == userId, ct);
+
+        if (order is null) return NotFound();
+        if (order.PaidAt is not null) return BadRequest(new { message = "Cette commande est déjà payée." });
+
+        if (order.Status != CustomerOrderStatus.EnAttenteDePaiement)
+        {
+            return BadRequest(new { message = "Cette commande n'est pas en attente de paiement." });
+        }
+
+        var slug = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
+            .Where(t => t.Id == order.TenantId)
+            .Select(t => t.Slug)
+            .FirstOrDefaultAsync(ct);
+
+        // The gate again, not the switch as it stood when the order was written: a company that
+        // closed its shop or lost its ability to charge since must not be charged into.
+        if (await ShopGate.ResolveAsync(db, slug, ct) is not { RequiresPayment: true })
+        {
+            return BadRequest(new { message = "Cette entreprise n'accepte pas les paiements en ligne pour le moment." });
+        }
+
+        var checkout = await OpenTillAsync(order, slug!, ct);
+
+        return checkout is null
+            ? BadRequest(new { message = "Le paiement n'a pas pu être démarré. Réessayez dans un instant." })
+            : Ok(new { url = checkout });
+    }
+
+    /// <summary>
+    /// Settles the order on the way back from Stripe, so the screen says "payée" without waiting
+    /// for the webhook.
+    ///
+    /// The session id is not believed on its own: Stripe is asked whether it is finished, paid,
+    /// and on this company's account. One from somewhere else resolves to nothing.
+    /// </summary>
+    [HttpPost("commandes/{id:guid}/confirmation")]
+    public async Task<ActionResult<object>> Confirm(
+        Guid id, ConfirmOrderPaymentRequest request, CancellationToken ct)
+    {
+        if (currentUser.UserId is not { } userId) return Forbid();
+
+        var order = await db.CustomerOrders.IgnoreQueryFilters().AsNoTracking()
+            .FirstOrDefaultAsync(o => o.Id == id && o.PlacedByUserId == userId, ct);
+
+        if (order is null) return NotFound();
+
+        var sessionId = Clean(request.SessionId) ?? order.StripeCheckoutSessionId;
+        if (sessionId is null) return BadRequest(new { message = "Session de paiement manquante." });
+
+        var tenant = await db.Tenants.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(t => t.Id == order.TenantId, ct);
+        if (tenant is null) return NotFound();
+
+        try
+        {
+            await connect.ConfirmOrderPaymentAsync(sessionId, tenant, db, ct);
+        }
+        catch (StripeException ex)
+        {
+            logger.LogWarning(ex, "Confirmation refusée pour la commande {Order}.", order.Id);
+        }
+        catch (InvalidOperationException ex)
+        {
+            logger.LogWarning(ex, "Confirmation impossible pour la commande {Order}.", order.Id);
+        }
+
+        // Where the order stands either way, rather than a yes or a no: the webhook may well
+        // have settled it a second before this call, and the screen's job is to say where
+        // things are.
+        var paid = await db.CustomerOrders.IgnoreQueryFilters().AsNoTracking()
+            .Where(o => o.Id == id)
+            .Select(o => o.PaidAt != null)
+            .FirstOrDefaultAsync(ct);
+
+        return Ok(new { paid });
+    }
+
+    /// <summary>
+    /// The Stripe page for this order, or null when Stripe would not open one. Writes the
+    /// session onto the order first, so a customer who comes back can be told which till they
+    /// were standing at.
+    /// </summary>
+    private async Task<string?> OpenTillAsync(CustomerOrder order, string slug, CancellationToken ct)
+    {
+        var tenant = await db.Tenants.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(t => t.Id == order.TenantId, ct);
+        if (tenant is null) return null;
+
+        var lines = await db.CustomerOrderLines.IgnoreQueryFilters().AsNoTracking()
+            .Where(l => l.OrderId == order.Id)
+            .Select(l => new InvoiceTotals.Line(l.Quantity, l.UnitPrice, l.IsTaxable))
+            .ToListAsync(ct);
+
+        // The order's own frozen rates, which is the figure the basket showed and the customer
+        // accepted. Reading the company's current settings here would charge a total nobody
+        // was ever shown.
+        var total = InvoiceTotals.For(lines, order.GstRate, order.QstRate, order.IsTaxExempt).Total;
+
+        var back = $"{FrontendUrl}/e/{Uri.EscapeDataString(slug)}";
+
+        try
+        {
+            var checkout = await connect.CreateOrderCheckoutSessionAsync(
+                tenant,
+                order,
+                total,
+                successUrl: $"{FrontendUrl}/mes-commandes?commande={order.Id}&session_id={{CHECKOUT_SESSION_ID}}",
+                cancelUrl: $"{back}?paiement=annule",
+                ct);
+
+            order.StripeCheckoutSessionId = checkout.SessionId;
+            order.UpdatedAt = DateTimeOffset.UtcNow;
+            await db.SaveChangesAsync(ct);
+
+            return checkout.Url;
+        }
+        catch (StripeException ex)
+        {
+            // The order stays, unpaid and invisible to the company. Deleting it would take away
+            // the one thing the customer can come back to.
+            logger.LogWarning(ex, "Stripe a refusé la caisse pour la commande {Order}.", order.Id);
+            return null;
+        }
+        catch (InvalidOperationException ex)
+        {
+            logger.LogWarning(ex, "Caisse impossible pour la commande {Order}.", order.Id);
+            return null;
+        }
+    }
+
+    private string FrontendUrl => configuration["Frontend:BaseUrl"]?.TrimEnd('/') ?? "http://localhost:3000";
 
     /// <summary>
     /// The customer file this account already has at this company, if any.

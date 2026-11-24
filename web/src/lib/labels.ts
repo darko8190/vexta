@@ -162,6 +162,7 @@ export const customerOrderStatusLabels: Record<CustomerOrderStatus, string> = {
   Prete: "Prête",
   Livree: "Livrée",
   Annulee: "Annulée",
+  EnAttenteDePaiement: "Paiement à terminer",
 };
 
 export const customerOrderStatusBadgeVariant: Record<
@@ -173,6 +174,7 @@ export const customerOrderStatusBadgeVariant: Record<
   Prete: "secondary",
   Livree: "outline",
   Annulee: "destructive",
+  EnAttenteDePaiement: "outline",
 };
 
 /** What a band of the public page holds, in the words of somebody arranging one. */

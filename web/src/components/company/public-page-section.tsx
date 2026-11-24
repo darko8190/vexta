@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import * as z from "zod";
 import { BriefcaseBusiness, ExternalLink, Globe, Info } from "lucide-react";
 import { toast } from "sonner";
@@ -32,6 +32,7 @@ const formSchema = z.object({
   showJobs: z.boolean(),
   showForms: z.boolean(),
   acceptsOrders: z.boolean(),
+  requiresOnlinePayment: z.boolean(),
   style: z.enum(["Classique", "Chantier", "Epure", "Vitrine", "Journal", "Panneau", "Affiche"]),
 });
 
@@ -46,6 +47,7 @@ function toFormValues(settings?: PublicPageSettings): FormValues {
     showJobs: settings?.showJobs ?? true,
     showForms: settings?.showForms ?? false,
     acceptsOrders: settings?.acceptsOrders ?? false,
+    requiresOnlinePayment: settings?.requiresOnlinePayment ?? false,
     style: settings?.style ?? "Classique",
   };
 }
@@ -72,6 +74,7 @@ function PublishCard({ settings }: { settings: PublicPageSettings }) {
         showJobs: settings.showJobs,
         showForms: settings.showForms,
         acceptsOrders: settings.acceptsOrders,
+        requiresOnlinePayment: settings.requiresOnlinePayment,
         // Carried through unchanged: this switch publishes the page, and leaving the style out
         // would reset the company's choice every time it went online.
         style: settings.style,
@@ -166,6 +169,10 @@ function ContentCard({ settings }: { settings: PublicPageSettings }) {
     defaultValues: toFormValues(settings),
   });
 
+  // The payment switch only makes sense under the basket, so it only appears under it.
+  const acceptsOrders = useWatch({ control: form.control, name: "acceptsOrders" });
+  const canCharge = settings.canChargeOnline;
+
   useEffect(() => {
     form.reset(toFormValues(settings));
   }, [settings, form]);
@@ -183,6 +190,7 @@ function ContentCard({ settings }: { settings: PublicPageSettings }) {
         showJobs: values.showJobs,
         showForms: values.showForms,
         acceptsOrders: values.acceptsOrders,
+        requiresOnlinePayment: values.requiresOnlinePayment,
         style: values.style,
       });
       toast.success("Page publique mise à jour.");
@@ -334,13 +342,49 @@ function ContentCard({ settings }: { settings: PublicPageSettings }) {
                     <FieldDescription>
                       Un panier s&apos;ajoute à vos produits et vos visiteurs peuvent commander.
                       Séparé de « Afficher mes produits » parce que ce sont deux promesses : une
-                      vitrine dit ce que vous vendez, un panier dit que vous le livrez. Rien
-                      n&apos;est payé en ligne — les commandes arrivent dans Commandes en ligne,
-                      et c&apos;est vous qui facturez.
+                      vitrine dit ce que vous vendez, un panier dit que vous le livrez. Les
+                      commandes arrivent dans Commandes en ligne.
                     </FieldDescription>
                   </Field>
                 )}
               />
+
+              {acceptsOrders && (
+                <Controller
+                  name="requiresOnlinePayment"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Field className="pl-7">
+                      <div className="flex items-center gap-3">
+                        <Checkbox
+                          id="public-requires-payment"
+                          checked={field.value}
+                          disabled={!canCharge}
+                          onCheckedChange={(checked) => field.onChange(checked === true)}
+                        />
+                        <FieldLabel htmlFor="public-requires-payment">
+                          Faire payer la commande en ligne
+                        </FieldLabel>
+                      </div>
+                      <FieldDescription>
+                        {canCharge ? (
+                          <>
+                            Le client paie par carte avant que la commande compte. Elle vous
+                            arrive déjà payée, avec sa facture réglée dans votre livre. Une
+                            caisse abandonnée ne vous est jamais montrée.
+                          </>
+                        ) : (
+                          <>
+                            Branchez d&apos;abord les paiements en ligne dans Paramètres :
+                            tant que votre compte Stripe ne peut pas encaisser, personne ne
+                            pourrait payer.
+                          </>
+                        )}
+                      </FieldDescription>
+                    </Field>
+                  )}
+                />
+              )}
             </div>
 
             <Controller

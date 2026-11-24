@@ -108,3 +108,31 @@ export function usePlaceOrder() {
     },
   });
 }
+
+/**
+ * Opens the payment page again for an order whose checkout was abandoned or expired.
+ *
+ * Each call makes a new Stripe session, because the old one does not live forever — which is
+ * why coming back to pay is a POST and not a stored link.
+ */
+export function usePayOrder() {
+  return useMutation({
+    mutationFn: (id: string) => api.post<{ url: string }>(`boutique/commandes/${id}/paiement`, {}),
+  });
+}
+
+/**
+ * Settles the order on the way back from Stripe, so the screen says so without waiting for the
+ * webhook. The session id is not believed: the API asks Stripe about it.
+ */
+export function useConfirmOrderPayment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, sessionId }: { id: string; sessionId: string | null }) =>
+      api.post<{ paid: boolean }>(`boutique/commandes/${id}/confirmation`, { sessionId }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["mon-espace", "commandes"] });
+      invalidate(queryClient);
+    },
+  });
+}

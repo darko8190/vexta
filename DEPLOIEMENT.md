@@ -1994,6 +1994,56 @@ pièce jointe manquante ne doit pas coûter un emploi à quelqu'un.
 
 ---
 
+### Payer sa commande en ligne
+
+Une entreprise qui accepte les commandes peut maintenant demander à être payée au moment de la
+commande, par carte, sur son propre compte Stripe. L'argent ne passe jamais par Vexta : le
+client voit le nom de l'entreprise sur son relevé, et c'est elle qui paie les frais de Stripe.
+
+**Un troisième interrupteur**, sous « Accepter les commandes en ligne », parce que c'est une
+troisième promesse. « Voici ce qu'on vend », « demandez-nous et on vous le livre » et « payez
+maintenant et c'est à vous » sont trois conversations différentes.
+
+Il ne s'allume que si votre compte Stripe peut encaisser. Vexta refuse de l'activer avant, là où
+le message peut vous dire quoi faire, plutôt que de vous laisser découvrir le problème par un
+client. **Et si Stripe cesse de pouvoir encaisser, la boutique ferme** : le panier disparaît de
+la page. C'est voulu — se rabattre sur des commandes non payées vous donnerait exactement ce que
+l'interrupteur servait à éviter.
+
+**Quand il est allumé, le paiement est exigé, pas offert.** Un interrupteur qui ne ferait que
+l'offrir produirait deux sortes de commandes à partir d'un seul panier, et vous passeriez la
+semaine à courir après la moitié qui n'a pas payé.
+
+Ce que voit le client : le bouton du panier devient **Payer et commander**, et il arrive
+directement sur la page de paiement de Stripe. Au retour, **Mes commandes** lui dit où en est son
+paiement.
+
+**Une caisse abandonnée ne vous est jamais montrée.** La commande existe — il faut bien que la
+page de paiement nomme quelque chose, et que les prix soient fixés ici plutôt que dans un
+navigateur — mais tant que la carte n'a pas passé, elle n'entre pas dans votre livre de
+commandes. Le client, lui, la voit dans son espace avec un bouton **Payer** pour reprendre là où
+il en était : une session Stripe expire, alors chaque reprise en ouvre une neuve.
+
+**Une commande payée arrive avec sa facture, déjà réglée.** Le numéro de facture est pris au
+moment du paiement et non à l'ouverture de la caisse : un client qui s'en va sans payer ne brûle
+jamais un numéro. La facture porte la mention de la commande, le mot du client, et un paiement
+« Payé en ligne à la commande ». Vous n'avez rien à presser.
+
+Si vos paramètres de facturation ne sont pas remplis, l'argent rentre quand même et la commande
+reste à facturer avec le bouton habituel : refuser une vente à cause d'un préfixe manquant
+serait refuser une vente.
+
+**Les taxes sont celles que le client a acceptées.** Le montant prélevé est calculé avec les deux
+taux figés sur la commande, pas avec vos réglages du jour. Si vous changez un taux entre la
+commande et le paiement, la facture le dira — un paiement partiel ou un petit crédit — plutôt que
+de réécrire discrètement le total pour qu'il colle.
+
+Le retour du navigateur et le webhook de Stripe se font la course exprès : le premier arrivé
+enregistre le paiement, le second reconnaît que c'est déjà fait. Rien n'est encaissé ni facturé
+deux fois.
+
+---
+
 ## 7. Compression des fichiers R2
 
 Les fichiers sont compressés en gzip **dans le navigateur**, avant d'être envoyés — le fichier ne

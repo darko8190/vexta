@@ -268,6 +268,7 @@ public class PersonalDeskController(VextaDbContext db, ICurrentUserService curre
                 o.Number,
                 o.TenantId,
                 o.Status,
+                o.PaidAt,
                 o.Currency,
                 o.IsTaxExempt,
                 o.GstRate,
@@ -322,6 +323,7 @@ public class PersonalDeskController(VextaDbContext db, ICurrentUserService curre
                     InvoiceTotals.Round(total),
                     r.Lines.Count,
                     summary,
+                    r.PaidAt,
                     r.CreatedAt);
             })
             .ToList();

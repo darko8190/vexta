@@ -29,7 +29,13 @@ public record OrderEligibilityDto(
     string? Refusal,
     string ContactName,
     string? ContactEmail,
-    string? ContactPhone);
+    string? ContactPhone,
+    /// <summary>
+    /// Whether ordering here means paying for it now. The basket needs it before it offers the
+    /// button: "Commander" and "Payer et commander" are two different promises, and somebody
+    /// about to be sent to a card form should be told so beforehand.
+    /// </summary>
+    bool RequiresPayment);
 
 /// <param name="Quantity">
 /// How many. The price is never sent: it is read from the catalogue here, because a caller that
@@ -45,7 +51,14 @@ public record PlaceOrderRequest(
     string? ContactPhone = null);
 
 /// <summary>What to say back once an order is down: its number, so it can be quoted.</summary>
-public record PlaceOrderResultDto(Guid Id, string Number, string Message);
+/// <param name="PaymentUrl">
+/// Where to send the customer to pay, for a company that asks to be paid at its counter. Null
+/// when the order stands on its own and the company will invoice it.
+/// </param>
+public record PlaceOrderResultDto(Guid Id, string Number, string Message, string? PaymentUrl);
+
+/// <summary>The session the customer came back from, which Stripe is asked about rather than believed.</summary>
+public record ConfirmOrderPaymentRequest(string? SessionId);
 
 // ---- An order, read ----
 
@@ -81,6 +94,13 @@ public record OrderDto(
     /// <summary>The invoice drawn from it, when there is one. The order is then done with.</summary>
     Guid? InvoiceId,
     string? InvoiceNumber,
+    /// <summary>
+    /// When the customer paid by card at the company's own counter, or null for an order the
+    /// company will invoice the usual way. An order that arrives already paid is a different
+    /// thing to pick, and the person at the counter has to be able to see which it is.
+    /// </summary>
+    DateTimeOffset? PaidAt,
+    decimal AmountPaid,
     DateTimeOffset CreatedAt);
 
 public record OrderDetailDto(OrderDto Order, string? Note, IReadOnlyList<OrderLineDto> Lines);
@@ -107,4 +127,6 @@ public record MyOrderDto(
     int LineCount,
     /// <summary>What was ordered, in one line: "Bardeaux BP Mystique × 12, et 2 autres".</summary>
     string Summary,
+    /// <summary>When it was paid by card, or null — including for an order still at the till.</summary>
+    DateTimeOffset? PaidAt,
     DateTimeOffset CreatedAt);

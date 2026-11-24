@@ -922,6 +922,10 @@ namespace Vexta.Api.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<decimal>("AmountPaid")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)");
+
                     b.Property<Guid>("ClientId")
                         .HasColumnType("uuid");
 
@@ -963,6 +967,9 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<int>("Number")
                         .HasColumnType("integer");
 
+                    b.Property<DateTimeOffset?>("PaidAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid>("PlacedByUserId")
                         .HasColumnType("uuid");
 
@@ -972,6 +979,14 @@ namespace Vexta.Api.Data.Migrations
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
+
+                    b.Property<string>("StripeCheckoutSessionId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("StripePaymentReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -3294,6 +3309,9 @@ namespace Vexta.Api.Data.Migrations
                         .HasColumnType("character varying(200)");
 
                     b.Property<bool>("IsPublished")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("RequiresOnlinePayment")
                         .HasColumnType("boolean");
 
                     b.Property<bool>("ShowForms")

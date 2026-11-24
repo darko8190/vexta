@@ -11,6 +11,7 @@ export interface PublicPageValues {
   showJobs: boolean;
   showForms: boolean;
   acceptsOrders: boolean;
+  requiresOnlinePayment: boolean;
   style: PublicPageStyle;
 }
 

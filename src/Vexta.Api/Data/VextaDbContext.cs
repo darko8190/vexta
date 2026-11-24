@@ -767,6 +767,9 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.Property(o => o.Currency).HasMaxLength(3);
             e.Property(o => o.GstRate).HasPrecision(6, 3);
             e.Property(o => o.QstRate).HasPrecision(6, 3);
+            e.Property(o => o.AmountPaid).HasPrecision(14, 2);
+            e.Property(o => o.StripeCheckoutSessionId).HasMaxLength(200);
+            e.Property(o => o.StripePaymentReference).HasMaxLength(200);
 
             // One sequence per company, with nothing allowed to hand out the same number twice.
             e.HasIndex(o => new { o.TenantId, o.Number }).IsUnique();

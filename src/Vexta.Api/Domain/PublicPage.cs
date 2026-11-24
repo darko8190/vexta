@@ -86,6 +86,24 @@ public class PublicPage
     /// </summary>
     public bool AcceptsOrders { get; set; }
 
+    /// <summary>
+    /// Whether an order has to be paid by card before it counts as placed.
+    ///
+    /// A third switch rather than a setting on the second, because it is a third promise. "We
+    /// carry this", "ask us and we will get it to you" and "pay us now and it is yours" are
+    /// three different conversations, and a company that wants the first two does not thereby
+    /// want the third.
+    ///
+    /// When it is on, payment is required and not merely offered. A switch that only offered it
+    /// would make two kinds of order out of one basket, and the company would spend its week
+    /// chasing the half that did not pay -- which is worse than either answer taken whole.
+    ///
+    /// It can only be turned on while the company's own Stripe account can take charges, and
+    /// the shop closes if that stops being true. Falling back to unpaid orders would hand a
+    /// company exactly the thing it switched this on to avoid.
+    /// </summary>
+    public bool RequiresOnlinePayment { get; set; }
+
     public PublicPageStyle Style { get; set; } = PublicPageStyle.Classique;
 
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FileText } from "lucide-react";
+import { CreditCard, FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
@@ -25,7 +25,11 @@ import { formatAmount } from "@/lib/money";
 import { formatMoment } from "@/lib/dates";
 import type { CustomerOrderStatus } from "@/lib/types";
 
-const STATES = Object.keys(customerOrderStatusLabels) as CustomerOrderStatus[];
+// Every state but the one that belongs to the payment: "Paiement à terminer" is Stripe's
+// answer, not a shelf the counter can put an order on, and the API refuses it.
+const STATES = (Object.keys(customerOrderStatusLabels) as CustomerOrderStatus[]).filter(
+  (state) => state !== "EnAttenteDePaiement",
+);
 
 /**
  * One order: what was asked for, by whom, and what the company has done about it.
@@ -113,6 +117,17 @@ export function OrderSheet({
                     {[order.contactPhone, order.contactEmail].filter(Boolean).join(" · ") || "—"}
                   </dd>
                 </div>
+
+                {order.paidAt && (
+                  <div className="min-w-0 sm:col-span-2">
+                    <dt className="text-xs text-muted-foreground">Paiement</dt>
+                    <dd className="mt-0.5 flex items-center gap-1.5 text-sm text-foreground">
+                      <CreditCard className="size-4 shrink-0" aria-hidden="true" />
+                      Payée en ligne le {formatMoment(order.paidAt)} —{" "}
+                      {formatAmount(order.amountPaid, order.currency)}
+                    </dd>
+                  </div>
+                )}
 
                 {order.invoiceNumber && (
                   <div className="min-w-0 sm:col-span-2">

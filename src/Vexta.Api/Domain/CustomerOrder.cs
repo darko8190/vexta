@@ -27,7 +27,21 @@ public enum CustomerOrderStatus
     /// Cancelled, by either side. Kept rather than deleted: a customer who ordered and did not
     /// receive is a conversation, and a row that vanished is a conversation with no record.
     /// </summary>
-    Annulee = 4
+    Annulee = 4,
+
+    /// <summary>
+    /// Written down, but not yet an order: the company asks to be paid at the counter of its
+    /// own shop window and the card has not gone through.
+    ///
+    /// The row exists before the money because the payment page has to name something, and the
+    /// prices have to be fixed by the company rather than by the browser. It is kept out of the
+    /// company's order book entirely until it is paid -- a checkout somebody abandoned is not
+    /// something anybody should have to read, let alone pick.
+    ///
+    /// The customer does see it, in their own space, with the way to finish paying. That is the
+    /// one place where it is useful: they tried to buy something and it did not go through.
+    /// </summary>
+    EnAttenteDePaiement = 5
 }
 
 /// <summary>
@@ -108,6 +122,33 @@ public class CustomerOrder
     /// </summary>
     public Guid? InvoiceId { get; set; }
     public Invoice? Invoice { get; set; }
+
+    // ---- Paid at the counter, when the company asks to be ----
+
+    /// <summary>
+    /// When the money arrived, or null for an order that is to be invoiced the usual way.
+    ///
+    /// This is what says an order was paid, not the status: the status moves on as the company
+    /// picks and delivers, and the fact of having been paid must survive all of it.
+    /// </summary>
+    public DateTimeOffset? PaidAt { get; set; }
+
+    /// <summary>What was actually charged, which is the figure the invoice is settled with.</summary>
+    public decimal AmountPaid { get; set; }
+
+    /// <summary>
+    /// The checkout page currently open for this order, if any. Replaced each time a customer
+    /// comes back to finish paying, because a Stripe session expires and the old one cannot be
+    /// reopened.
+    /// </summary>
+    public string? StripeCheckoutSessionId { get; set; }
+
+    /// <summary>
+    /// The payment intent Stripe settled it with. Written once, and what makes the webhook and
+    /// the page the customer lands on safe to race: whichever gets here first writes it, and
+    /// the other recognises it.
+    /// </summary>
+    public string? StripePaymentReference { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;

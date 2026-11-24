@@ -5,6 +5,7 @@ using Vexta.Api.Common;
 using Vexta.Api.Data;
 using Vexta.Api.Domain;
 using Vexta.Api.Features.Invoices;
+using Vexta.Api.Features.Orders;
 
 // Stripe has an Invoice of its own, which this file never uses: Vexta raises the invoice and
 // Stripe is only asked to take a card against it. Spelled out so the ambiguity cannot be
@@ -27,6 +28,9 @@ public record ConnectAccountState(
     bool ChargesEnabled,
     bool PayoutsEnabled,
     bool DetailsSubmitted);
+
+/// <summary>Where a customer goes to pay for an order, and the session that is waiting there.</summary>
+public record OrderCheckout(string Url, string SessionId);
 
 /// <summary>
 /// The company's own Stripe account: opening one, finding out whether it can take money, and
@@ -90,6 +94,30 @@ public interface IStripeConnectService
         CancellationToken ct = default);
 
     /// <summary>
+    /// The hosted page where a customer pays for one order, charged on the company's own
+    /// account, and the id of the session it opened.
+    ///
+    /// The session id comes back because an order keeps it: a Stripe session expires, and a
+    /// customer who comes back a day later has to be given a new page rather than a dead link.
+    /// </summary>
+    Task<OrderCheckout> CreateOrderCheckoutSessionAsync(
+        Tenant tenant,
+        CustomerOrder order,
+        decimal amount,
+        string successUrl,
+        string cancelUrl,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Reads a finished order checkout back from Stripe and settles the order, so the page the
+    /// customer lands on says "payée" without waiting for a webhook. Safe to run after the
+    /// webhook has already run.
+    /// </summary>
+    /// <returns>True when the order is paid.</returns>
+    Task<bool> ConfirmOrderPaymentAsync(
+        string sessionId, Tenant tenant, VextaDbContext db, CancellationToken ct = default);
+
+    /// <summary>
     /// Verifies a delivery from the Connect endpoint, which signs with its own secret — see
     /// <see cref="PlatformSettingKeys.StripeConnectWebhookSecret"/>.
     /// </summary>
@@ -113,6 +141,12 @@ public class StripeConnectService(
 {
     /// <summary>Checkout metadata key carrying the invoice being paid, for the webhook.</summary>
     private const string InvoiceKey = "invoice_id";
+
+    /// <summary>
+    /// Checkout metadata key carrying the order being paid. Its presence is what tells the two
+    /// kinds of session apart: an invoice is paid under <see cref="InvoiceKey"/>, an order here.
+    /// </summary>
+    private const string OrderKey = "order_id";
 
     private async Task<string> RequireSecretKeyAsync(CancellationToken ct)
     {
@@ -363,6 +397,66 @@ public class StripeConnectService(
         return session.Url;
     }
 
+    public async Task<OrderCheckout> CreateOrderCheckoutSessionAsync(
+        Tenant tenant,
+        CustomerOrder order,
+        decimal amount,
+        string successUrl,
+        string cancelUrl,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(tenant.StripeAccountId) || !tenant.StripeChargesEnabled)
+        {
+            throw new InvalidOperationException("Cette entreprise n'accepte pas encore les paiements en ligne.");
+        }
+
+        if (amount <= 0)
+        {
+            throw new InvalidOperationException("Cette commande n'a rien à payer.");
+        }
+
+        var client = new StripeClient(await RequireSecretKeyAsync(ct));
+
+        var session = await new SessionService(client).CreateAsync(new SessionCreateOptions
+        {
+            Mode = "payment",
+            SuccessUrl = successUrl,
+            CancelUrl = cancelUrl,
+            // The customer's address, so the receipt Stripe sends goes somewhere.
+            CustomerEmail = string.IsNullOrWhiteSpace(order.ContactEmail) ? null : order.ContactEmail,
+            ClientReferenceId = order.Id.ToString(),
+            Metadata = new Dictionary<string, string>
+            {
+                [OrderKey] = order.Id.ToString(),
+                ["order_number"] = OrderNumber.Of(order.Number)
+            },
+            LineItems =
+            [
+                new SessionLineItemOptions
+                {
+                    Quantity = 1,
+                    PriceData = new SessionLineItemPriceDataOptions
+                    {
+                        Currency = (order.Currency ?? "CAD").ToLowerInvariant(),
+                        // One line for the whole order rather than one per article, exactly as
+                        // an invoice is charged as one figure. The customer saw the detail in
+                        // the basket and keeps it in Mes commandes; splitting it here would put
+                        // the taxes somewhere, and the total Stripe charges has to be the total
+                        // that was accepted, to the cent.
+                        UnitAmount = (long)decimal.Round(amount * 100m, 0, MidpointRounding.AwayFromZero),
+                        ProductData = new SessionLineItemPriceDataProductDataOptions
+                        {
+                            Name = $"Commande {OrderNumber.Of(order.Number)}",
+                            Description = tenant.Name
+                        }
+                    }
+                }
+            ]
+        }, new RequestOptions { StripeAccount = tenant.StripeAccountId }, ct);
+
+        return new OrderCheckout(session.Url, session.Id);
+    }
+
     public async Task<Event> ConstructEventAsync(
         string payload, string signatureHeader, CancellationToken ct = default)
     {
@@ -405,7 +499,18 @@ public class StripeConnectService(
                 // money to a company, and an event could credit somebody else's invoice.
                 if (string.IsNullOrWhiteSpace(stripeEvent.Account)) return;
 
-                await RecordInvoicePaymentAsync(session, stripeEvent.Account, db, ct);
+                // Which of the two things was paid, decided by the key the session carries
+                // rather than by trying one and falling through to the other: a session that
+                // matched nothing would otherwise be indistinguishable from one that failed.
+                if (IsOrderSession(session))
+                {
+                    await RecordOrderPaymentAsync(session, stripeEvent.Account, db, ct);
+                }
+                else
+                {
+                    await RecordInvoicePaymentAsync(session, stripeEvent.Account, db, ct);
+                }
+
                 break;
             }
             default:
@@ -513,5 +618,144 @@ public class StripeConnectService(
             "Paiement en ligne de {Amount} enregistré sur la facture {Invoice}.", amount, invoiceId);
 
         return true;
+    }
+
+    public async Task<bool> ConfirmOrderPaymentAsync(
+        string sessionId, Tenant tenant, VextaDbContext db, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(tenant.StripeAccountId)) return false;
+
+        var client = new StripeClient(await RequireSecretKeyAsync(ct));
+
+        // Read on the connected account, because that is where the session was created.
+        var session = await new SessionService(client).GetAsync(
+            sessionId,
+            requestOptions: new RequestOptions { StripeAccount = tenant.StripeAccountId },
+            cancellationToken: ct);
+
+        return await RecordOrderPaymentAsync(session, tenant.StripeAccountId, db, ct);
+    }
+
+    private static bool IsOrderSession(Session session) =>
+        session.Metadata is not null && session.Metadata.ContainsKey(OrderKey);
+
+    /// <summary>
+    /// Settles the order a finished session paid for, once.
+    ///
+    /// Shared by the webhook and the page the customer lands on, which race each other by
+    /// design. PaidAt is what makes that safe: whichever arrives first writes it, and the
+    /// second finds the order already settled and says so rather than charging the books twice.
+    /// </summary>
+    private async Task<bool> RecordOrderPaymentAsync(
+        Session session, string accountId, VextaDbContext db, CancellationToken ct)
+    {
+        // Stripe is the authority on whether the money arrived, not the browser that came back.
+        if (session.Status != "complete") return false;
+        if (session.PaymentStatus is not ("paid" or "no_payment_required")) return false;
+
+        var rawOrderId = session.Metadata is not null && session.Metadata.TryGetValue(OrderKey, out var fromMetadata)
+            ? fromMetadata
+            : session.ClientReferenceId;
+
+        if (!Guid.TryParse(rawOrderId, out var orderId)) return false;
+
+        var order = await db.CustomerOrders.IgnoreQueryFilters()
+            .Include(o => o.Lines)
+            .FirstOrDefaultAsync(o => o.Id == orderId, ct);
+        if (order is null) return false;
+
+        // The company that owns the order must be the company that was paid. Without this check
+        // an event from any connected account could settle any order in the platform, because
+        // the order id travels in metadata a caller controls.
+        var owns = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
+            .AnyAsync(t => t.Id == order.TenantId && t.StripeAccountId == accountId, ct);
+        if (!owns)
+        {
+            logger.LogWarning(
+                "Session Stripe {Session} du compte {Account} refusée : la commande {Order} appartient à une autre entreprise.",
+                session.Id, accountId, orderId);
+            return false;
+        }
+
+        if (order.PaidAt is not null) return true;
+
+        var amount = InvoiceTotals.Round((decimal)(session.AmountTotal ?? 0L) / 100m);
+        if (amount <= 0) return false;
+
+        var reference = session.PaymentIntentId ?? session.Id;
+
+        order.PaidAt = DateTimeOffset.UtcNow;
+        order.AmountPaid = amount;
+        order.StripePaymentReference = reference;
+        // Only now is it an order. Until the card went through it was a checkout somebody had
+        // open, and the company's order book never saw it.
+        order.Status = CustomerOrderStatus.Recue;
+        order.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await InvoicePaidOrderAsync(order, amount, reference, db, ct);
+
+        await db.SaveChangesAsync(ct);
+
+        logger.LogInformation(
+            "Commande {Order} payée en ligne : {Amount}.", OrderNumber.Of(order.Number), amount);
+
+        return true;
+    }
+
+    /// <summary>
+    /// Puts the paid order in the company's invoice book, already settled.
+    ///
+    /// Here rather than left for somebody to press a button: the money has arrived, and an
+    /// invoice nobody raised is a sale missing from the books and a customer with no receipt.
+    /// The number is taken now rather than when the checkout opened, so a customer who walks
+    /// away from the payment page never burns an invoice number.
+    ///
+    /// A company with no billing settings yet keeps its money and its order; the invoice simply
+    /// is not raised, and the Facturer button still works afterwards. Refusing the payment over
+    /// a missing prefix would be refusing a sale.
+    /// </summary>
+    private async Task InvoicePaidOrderAsync(
+        CustomerOrder order, decimal amount, string reference, VextaDbContext db, CancellationToken ct)
+    {
+        if (order.InvoiceId is not null) return;
+
+        var client = await db.Clients.IgnoreQueryFilters().AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Id == order.ClientId, ct);
+
+        var settings = await db.BillingSettings.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(b => b.TenantId == order.TenantId, ct);
+
+        if (client is null || settings is null)
+        {
+            logger.LogWarning(
+                "Commande {Order} payée mais non facturée : paramètres de facturation ou client manquants.",
+                order.Id);
+            return;
+        }
+
+        var invoice = OrderInvoicing.Build(order, client, settings, InvoiceStatus.Envoyee);
+
+        db.Invoices.Add(invoice);
+        order.InvoiceId = invoice.Id;
+
+        db.InvoicePayments.Add(new InvoicePayment
+        {
+            TenantId = order.TenantId,
+            InvoiceId = invoice.Id,
+            Date = DateOnly.FromDateTime(DateTime.Now),
+            Amount = amount,
+            Method = PaymentMethod.Carte,
+            Reference = reference,
+            Note = "Payé en ligne à la commande"
+            // No CreatedByUserId: nobody at the company entered this.
+        });
+
+        // The invoice's taxes are worked out from the company's settings as they stand today,
+        // while the amount charged used the rates the order froze. They are the same figure
+        // unless the company changed its rates between the two, in which case the invoice shows
+        // a partial payment or a small credit -- which is the truth, and visible, rather than a
+        // total quietly restated to match what was taken.
+        var total = InvoiceTotals.For(invoice.Lines, settings, invoice.IsTaxExempt).Total;
+        InvoiceStatusRules.ApplyPaid(invoice, amount, total);
     }
 }

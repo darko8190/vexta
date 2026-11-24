@@ -1489,6 +1489,10 @@ export interface PublicPageSettings {
   showForms: boolean;
   /** Whether visitors may order the products rather than only look at them. */
   acceptsOrders: boolean;
+  /** Whether an order has to be paid by card before it counts as placed. */
+  requiresOnlinePayment: boolean;
+  /** Whether the company's own Stripe account can take a charge today. */
+  canChargeOnline: boolean;
   style: PublicPageStyle;
   /** Where the page lives: /e/{slug}. */
   slug: string;
@@ -1511,6 +1515,8 @@ export interface PublicCompany {
   style: PublicPageStyle;
   /** Whether the basket is offered. Products shown and orders accepted are two switches. */
   acceptsOrders: boolean;
+  /** Whether ordering here means paying for it on the spot. */
+  requiresPayment: boolean;
   address: CompanyAddress | null;
   products: PublicProduct[];
   jobs: PublicJob[];
@@ -1629,7 +1635,14 @@ export interface PublicPageForm {
 // ---- Commandes : ce qu'un client commande sur la page publique d'une entreprise ----
 
 /** Where an order stands. Each one means something different to the person waiting. */
-export type CustomerOrderStatus = "Recue" | "EnPreparation" | "Prete" | "Livree" | "Annulee";
+export type CustomerOrderStatus =
+  | "Recue"
+  | "EnPreparation"
+  | "Prete"
+  | "Livree"
+  | "Annulee"
+  /** Written down but not yet an order: the card has not gone through. */
+  | "EnAttenteDePaiement";
 
 /** Whether this account may order from a company, and under what name. */
 export interface OrderEligibility {
@@ -1640,6 +1653,8 @@ export interface OrderEligibility {
   contactName: string;
   contactEmail: string | null;
   contactPhone: string | null;
+  /** Whether ordering here means paying for it now. */
+  requiresPayment: boolean;
 }
 
 /** One line of a basket on its way out. The price is never sent: the API reads it. */
@@ -1652,6 +1667,8 @@ export interface PlaceOrderResult {
   id: string;
   number: string;
   message: string;
+  /** Where to go and pay, for a company that asks to be paid at its counter. */
+  paymentUrl: string | null;
 }
 
 export interface OrderLine {
@@ -1684,6 +1701,9 @@ export interface CustomerOrder {
   /** The invoice drawn from it, when there is one. The order is then done with. */
   invoiceId: string | null;
   invoiceNumber: string | null;
+  /** When the customer paid by card, or null for an order to be invoiced the usual way. */
+  paidAt: string | null;
+  amountPaid: number;
   createdAt: string;
 }
 
@@ -1706,6 +1726,8 @@ export interface MyOrder {
   lineCount: number;
   /** What was ordered, in one line. */
   summary: string;
+  /** When it was paid by card, or null — including while it is still at the till. */
+  paidAt: string | null;
   createdAt: string;
 }
 

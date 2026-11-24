@@ -127,6 +127,15 @@ export function BasketPanel({ slug, companyName }: { slug: string; companyName: 
       // would cost somebody the twenty minutes they spent filling it.
       basket.clear();
       setNote("");
+
+      if (result.paymentUrl) {
+        // Straight to the till. Not a link to press: somebody who has just agreed to pay has
+        // made the decision, and a second button between them and the card form is a place to
+        // change their mind about something they already decided.
+        window.location.href = result.paymentUrl;
+        return;
+      }
+
       setDone(result.message);
     } catch (err) {
       setError(
@@ -140,6 +149,11 @@ export function BasketPanel({ slug, companyName }: { slug: string; companyName: 
   if (basket.items.length === 0 && !done) return null;
 
   const ready = Boolean(user) && eligibility.data?.canOrder === true;
+
+  // Said before the button rather than discovered after it: "Commander" and "Payer et
+  // commander" are two different promises, and somebody about to be sent to a card form has a
+  // right to know that before they press.
+  const requiresPayment = eligibility.data?.requiresPayment === true;
 
   return (
     <>
@@ -166,9 +180,11 @@ export function BasketPanel({ slug, companyName }: { slug: string; companyName: 
           <DialogHeader>
             <DialogTitle>Mon panier — {companyName}</DialogTitle>
             <DialogDescription>
-              {user
-                ? "L'entreprise vous confirmera le prix final et la livraison."
-                : "Il faut un compte Vexta pour commander."}
+              {!user
+                ? "Il faut un compte Vexta pour commander."
+                : requiresPayment
+                  ? "Vous payez par carte maintenant. La livraison se règle avec l'entreprise."
+                  : "L'entreprise vous confirmera le prix final et la livraison."}
             </DialogDescription>
           </DialogHeader>
 
@@ -249,7 +265,9 @@ export function BasketPanel({ slug, companyName }: { slug: string; companyName: 
                 <p className="text-right text-sm text-foreground">
                   Sous-total : <strong className="tabular-nums">{money.format(basket.subtotal)}</strong>
                   <span className="block text-xs text-muted-foreground">
-                    Les taxes et la livraison s&apos;ajoutent sur la facture.
+                    {requiresPayment
+                      ? "Les taxes s'ajoutent au paiement. La livraison se règle avec l'entreprise."
+                      : "Les taxes et la livraison s'ajoutent sur la facture."}
                   </span>
                 </p>
 
@@ -291,7 +309,7 @@ export function BasketPanel({ slug, companyName }: { slug: string; companyName: 
               <>
                 <Button type="button" onClick={() => void send()} disabled={place.isPending}>
                   {place.isPending && <Spinner />}
-                  Envoyer ma commande
+                  {requiresPayment ? "Payer et commander" : "Envoyer ma commande"}
                 </Button>
                 <DialogClose render={<Button type="button" variant="outline" />}>
                   Continuer mes achats

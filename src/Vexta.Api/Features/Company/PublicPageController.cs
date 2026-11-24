@@ -36,22 +36,24 @@ public class PublicPageController(VextaDbContext db, ICurrentUserService current
     {
         if (currentUser.TenantId is not { } tenantId) return Forbid();
 
-        var slug = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
+        var company = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
             .Where(t => t.Id == tenantId)
-            .Select(t => t.Slug)
+            .Select(t => new { t.Slug, CanCharge = t.StripeAccountId != null && t.StripeChargesEnabled })
             .FirstOrDefaultAsync(ct);
 
-        if (slug is null) return NotFound();
+        if (company?.Slug is not { } slug) return NotFound();
 
         var page = await db.PublicPages.AsNoTracking()
             .FirstOrDefaultAsync(p => p.TenantId == tenantId, ct);
 
         return Ok(page is null
             ? new PublicPageSettingsDto(
-                false, null, null, null, true, true, false, false, PublicPageStyle.Classique, slug, null)
+                false, null, null, null, true, true, false, false, false, company.CanCharge,
+                PublicPageStyle.Classique, slug, null)
             : new PublicPageSettingsDto(
                 page.IsPublished, page.Headline, page.About, page.ContactNote,
                 page.ShowProducts, page.ShowJobs, page.ShowForms, page.AcceptsOrders,
+                page.RequiresOnlinePayment, company.CanCharge,
                 page.Style, slug, page.UpdatedAt));
     }
 
@@ -68,6 +70,18 @@ public class PublicPageController(VextaDbContext db, ICurrentUserService current
         if (request.ContactNote is { Length: > 1000 })
             return BadRequest(new { message = "La note de contact ne peut pas dépasser 1000 caractères." });
 
+        // Refused here rather than left to fail at the till. A company that switches this on
+        // without a Stripe account that can charge would be publishing a shop whose only door
+        // is locked, and would find out from a customer.
+        if (request.RequiresOnlinePayment && !await CanChargeAsync(tenantId, ct))
+        {
+            return BadRequest(new
+            {
+                message = "Branchez d'abord les paiements en ligne dans Paramètres : "
+                    + "sans compte Stripe capable d'encaisser, personne ne pourrait payer."
+            });
+        }
+
         var page = await db.PublicPages.FirstOrDefaultAsync(p => p.TenantId == tenantId, ct);
         if (page is null)
         {
@@ -83,12 +97,18 @@ public class PublicPageController(VextaDbContext db, ICurrentUserService current
         page.ShowJobs = request.ShowJobs;
         page.ShowForms = request.ShowForms;
         page.AcceptsOrders = request.AcceptsOrders;
+        // Only ever on alongside the basket: paying for an order nobody may place is nothing.
+        page.RequiresOnlinePayment = request.AcceptsOrders && request.RequiresOnlinePayment;
         page.Style = Enum.IsDefined(request.Style) ? request.Style : PublicPageStyle.Classique;
         page.UpdatedAt = DateTimeOffset.UtcNow;
 
         await db.SaveChangesAsync(ct);
         return await GetPublicPage(ct);
     }
+
+    private Task<bool> CanChargeAsync(Guid tenantId, CancellationToken ct) =>
+        db.Tenants.IgnoreQueryFilters().AsNoTracking()
+            .AnyAsync(t => t.Id == tenantId && t.StripeAccountId != null && t.StripeChargesEnabled, ct);
 
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

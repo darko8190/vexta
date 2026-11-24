@@ -58,6 +58,13 @@ public record PublicPageSettingsDto(
     bool ShowJobs,
     bool ShowForms,
     bool AcceptsOrders,
+    bool RequiresOnlinePayment,
+    /// <summary>
+    /// Whether the company's own Stripe account can take a charge today. Sent with the page's
+    /// settings because the switch above depends on it, and a toggle that refuses without
+    /// saying why is a toggle somebody presses four times.
+    /// </summary>
+    bool CanChargeOnline,
     PublicPageStyle Style,
     string Slug,
     /// <summary>Null while nothing has ever been saved — the page is defaults, not a record.</summary>
@@ -72,6 +79,7 @@ public record SavePublicPageRequest(
     bool ShowJobs,
     bool ShowForms,
     bool AcceptsOrders,
+    bool RequiresOnlinePayment,
     PublicPageStyle Style);
 
 /// <summary>

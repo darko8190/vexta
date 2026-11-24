@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text;
 using Vexta.Api.Domain;
 
@@ -11,7 +10,9 @@ namespace Vexta.Api.Common;
 /// is to read it. A copy of the tables would mean the same CV stored once per application, with
 /// nothing able to query across them and every one of them a second place to keep in step.
 ///
-/// It is also the content a PDF renders, so the two cannot disagree about what was sent.
+/// It renders a <see cref="CvModel"/>, which is also what the PDF renders, so the text a company
+/// reads on screen and the document attached to the same application cannot disagree about what
+/// was sent.
 /// </summary>
 public static class CvText
 {
@@ -20,7 +21,10 @@ public static class CvText
         string lastName,
         string? email,
         PersonalProfile profile,
-        string? coverNote)
+        string? coverNote) =>
+        Build(CvModel.From(firstName, lastName, email, profile, coverNote));
+
+    public static string Build(CvModel cv)
     {
         var lines = new StringBuilder();
 
@@ -30,74 +34,49 @@ public static class CvText
             lines.AppendLine(title.ToUpperInvariant());
         }
 
-        lines.AppendLine($"{firstName} {lastName}".Trim());
-        if (!string.IsNullOrWhiteSpace(profile.Headline)) lines.AppendLine(profile.Headline);
+        lines.AppendLine(cv.Name);
+        if (cv.Headline is { } headline) lines.AppendLine(headline);
+        if (cv.Contact.Count > 0) lines.AppendLine(string.Join(" · ", cv.Contact));
+        if (cv.Availability is { } availability) lines.AppendLine(availability);
 
-        var contact = new[] { email, profile.Phone, Place(profile) }
-            .Where(part => !string.IsNullOrWhiteSpace(part));
-        if (contact.Any()) lines.AppendLine(string.Join(" · ", contact));
-
-        if (profile.AvailableFrom is { } from)
+        if (cv.CoverNote is { } note)
         {
-            lines.AppendLine($"Disponible à partir du {from.ToString("d MMMM yyyy", Culture)}");
+            Section(CvModel.MessageHeading);
+            lines.AppendLine(note);
         }
 
-        if (!string.IsNullOrWhiteSpace(coverNote))
+        if (cv.Summary is { } summary)
         {
-            Section("Message");
-            lines.AppendLine(coverNote.Trim());
+            Section(CvModel.SummaryHeading);
+            lines.AppendLine(summary);
         }
 
-        if (!string.IsNullOrWhiteSpace(profile.Summary))
+        if (cv.Roles.Count > 0)
         {
-            Section("Profil");
-            lines.AppendLine(profile.Summary.Trim());
-        }
-
-        if (profile.Experiences.Count > 0)
-        {
-            Section("Expérience");
-            foreach (var experience in profile.Experiences.OrderBy(x => x.SortOrder))
+            Section(CvModel.ExperienceHeading);
+            foreach (var role in cv.Roles)
             {
-                var heading = new[] { experience.Title, experience.Employer, experience.Location }
-                    .Where(part => !string.IsNullOrWhiteSpace(part));
-
-                lines.AppendLine($"- {string.Join(" — ", heading)}");
-
-                if (Period(experience.StartedOn, experience.EndedOn) is { } period)
-                {
-                    lines.AppendLine($"  {period}");
-                }
-
-                if (!string.IsNullOrWhiteSpace(experience.Description))
-                {
-                    lines.AppendLine($"  {experience.Description.Trim()}");
-                }
+                lines.AppendLine($"- {role.Heading}");
+                if (role.Period is { } period) lines.AppendLine($"  {period}");
+                if (role.Description is { } description) lines.AppendLine($"  {description}");
             }
         }
 
-        if (profile.Education.Count > 0)
+        if (cv.Studies.Count > 0)
         {
-            Section("Formation");
-            foreach (var education in profile.Education.OrderBy(x => x.SortOrder))
+            Section(CvModel.EducationHeading);
+            foreach (var study in cv.Studies)
             {
-                var heading = new[] { education.Program, education.School }
-                    .Where(part => !string.IsNullOrWhiteSpace(part));
-
-                var year = education.CompletedYear is { } completed ? $" ({completed})" : "";
-                lines.AppendLine($"- {string.Join(" — ", heading)}{year}");
-
-                if (!string.IsNullOrWhiteSpace(education.Notes))
-                {
-                    lines.AppendLine($"  {education.Notes.Trim()}");
-                }
+                var year = study.Year is { } completed ? $" ({completed})" : "";
+                lines.AppendLine($"- {study.Heading}{year}");
+                if (study.Notes is { } notes) lines.AppendLine($"  {notes}");
             }
         }
 
-        if (!string.IsNullOrWhiteSpace(profile.Skills))
+        if (cv.Skills.Count > 0)
         {
-            Section("Cartes et compétences");
-            foreach (var skill in profile.Skills.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            Section(CvModel.SkillsHeading);
+            foreach (var skill in cv.Skills)
             {
                 lines.AppendLine($"- {skill}");
             }
@@ -108,29 +87,5 @@ public static class CvText
         // The column is 8000; a CV past that has been pasted rather than written, and the cut is
         // marked so nobody reads a truncated job history as a complete one.
         return text.Length <= 8000 ? text : text[..7980].TrimEnd() + "\n[…]";
-    }
-
-    private static readonly CultureInfo Culture = CultureInfo.GetCultureInfo("fr-CA");
-
-    private static string? Place(PersonalProfile profile)
-    {
-        var parts = new[] { profile.City, profile.Province }
-            .Where(part => !string.IsNullOrWhiteSpace(part));
-
-        return parts.Any() ? string.Join(", ", parts) : null;
-    }
-
-    /// <summary>
-    /// "mars 2019 – aujourd'hui" or "2019 – 2024". A missing end date means still there, which
-    /// is what a blank end date means on every CV ever written.
-    /// </summary>
-    private static string? Period(DateOnly? from, DateOnly? to)
-    {
-        if (from is null && to is null) return null;
-
-        var start = from?.ToString("MMMM yyyy", Culture) ?? "?";
-        var end = to?.ToString("MMMM yyyy", Culture) ?? "aujourd'hui";
-
-        return $"{start} – {end}";
     }
 }

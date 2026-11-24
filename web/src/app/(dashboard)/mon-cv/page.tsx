@@ -1,6 +1,7 @@
 "use client";
 
 import { PageHeader } from "@/components/layout/page-header";
+import { CvDocumentSection } from "@/components/personal/cv-document-section";
 import { CvSection } from "@/components/personal/cv-section";
 import { MyApplicationsSection } from "@/components/personal/my-applications-section";
 
@@ -20,6 +21,7 @@ export default function MyCvPage() {
       />
 
       <CvSection />
+      <CvDocumentSection />
       <MyApplicationsSection />
     </div>
   );

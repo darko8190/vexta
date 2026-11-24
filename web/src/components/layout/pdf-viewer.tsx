@@ -7,14 +7,15 @@ import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 
 /**
- * The invoice document itself, in a viewer, with the two things anyone does with an invoice:
- * print it and keep a copy.
+ * A PDF the API produced, in a viewer, with the two things anyone does with a document: print
+ * it and keep a copy.
  *
- * It shows the PDF the API produced rather than a drawing of it in HTML. A preview that is a
- * second implementation of the layout is a preview that can be wrong about the document it
- * claims to show — and the only moment this is useful is the moment before it is sent.
+ * It shows the document itself rather than a drawing of it in HTML. A preview that is a second
+ * implementation of the layout is a preview that can be wrong about the document it claims to
+ * show — and the moments this is useful are the moment before an invoice is sent and the
+ * moment before a CV is.
  */
-export function InvoicePdfViewer({
+export function PdfViewer({
   url,
   loading,
   error,

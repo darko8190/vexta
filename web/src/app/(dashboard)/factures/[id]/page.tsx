@@ -21,7 +21,7 @@ import {
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
 import { InvoicePaymentsSection } from "@/components/invoices/invoice-payments-section";
-import { InvoicePdfViewer } from "@/components/invoices/invoice-pdf-viewer";
+import { PdfViewer } from "@/components/layout/pdf-viewer";
 import { InvoiceSendDialog } from "@/components/invoices/invoice-send-dialog";
 import { useIsClientUser } from "@/hooks/use-can-create";
 import { useDeleteInvoice, useInvoiceQuery } from "@/hooks/use-invoices";
@@ -296,7 +296,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         {/* Beside the lines on a wide screen, under them otherwise. Sticky so the document
             stays in view while a long list of lines is being read. */}
         <aside className="2xl:sticky 2xl:top-6 2xl:self-start">
-          <InvoicePdfViewer
+          <PdfViewer
             url={pdf.url}
             loading={pdf.loading}
             error={pdf.error}

@@ -1955,6 +1955,45 @@ ne doit jamais emporter la page d'une entreprise avec lui.
 
 ---
 
+### Le CV en document
+
+Le CV qu'une personne écrit dans **Mon CV** se lit maintenant aussi comme un document : mis en
+page, imprimable, téléchargeable. L'aperçu apparaît sous le formulaire, dans **Votre CV en PDF**.
+
+**C'est le même CV, pas une deuxième version de celui-ci.** Le texte qu'une entreprise reçoit avec
+une candidature et le document qui s'imprime sont deux rendus d'un seul modèle. Il n'y a donc
+aucune façon pour le papier de dire autre chose que ce qui a été envoyé — et les deux sont lus
+par les deux mêmes personnes, au sujet du même emploi.
+
+**L'aperçu se redessine quand vous enregistrez**, sans bouton à chercher : c'est le CV enregistré
+qui décide du document, pas le formulaire en cours de saisie.
+
+Le document est **refusé tant qu'il n'y a qu'un nom** — pas de titre, pas de résumé, pas une
+expérience, pas une formation, pas une carte. Une page avec un nom et du blanc en dessous est
+pire que rien : quelqu'un l'enverrait.
+
+Il est mis comme un CV, pas comme une facture : pas de bandeau de couleur, pas de logo, pas de
+marque. Ce document appartient à la personne, pas à une entreprise, et il est lu par quelqu'un
+qui décide s'il va téléphoner. Lettre, Montserrat, des titres en petites capitales espacées
+au-dessus d'un filet — et il photocopie. Le nom et le numéro de page sont au pied de chaque page,
+ce qui permet de rattacher une deuxième page restée seule dans une pile.
+
+**Ce que l'entreprise reçoit change aussi.** Quand quelqu'un postule avec un CV tapé ici plutôt
+qu'un document à lui, l'entreprise recevait du texte à l'écran et aucune pièce jointe : rien à
+imprimer pour la rencontre, rien à faire suivre au contremaître qui décide. Le CV mis en page est
+maintenant déposé dans l'espace de l'entreprise et attaché à la fiche du candidat, comme l'est
+déjà un CV téléversé.
+
+**Le document de la personne gagne toujours.** Quelqu'un qui a apporté son propre CV l'a écrit
+comme il veut être lu ; un CV que nous composerions à partir des champs remplis après coup serait
+le moins bon des deux documents, et ce serait celui que l'entreprise ouvrirait.
+
+Si R2 est injoignable, le dépôt échoue, la candidature passe quand même et le journal dit
+pourquoi. L'entreprise garde le nom, le téléphone et le CV complet en texte sur la fiche — une
+pièce jointe manquante ne doit pas coûter un emploi à quelqu'un.
+
+---
+
 ## 7. Compression des fichiers R2
 
 Les fichiers sont compressés en gzip **dans le navigateur**, avant d'être envoyés — le fichier ne

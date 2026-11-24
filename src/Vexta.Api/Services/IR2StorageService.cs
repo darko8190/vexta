@@ -33,6 +33,16 @@ public interface IR2StorageService
     /// </summary>
     Task<byte[]> ReadAsync(string objectKey, CancellationToken ct = default);
 
+    /// <summary>
+    /// Puts bytes this application produced into the bucket.
+    ///
+    /// Every other file in the system arrives through a presigned URL, straight from the
+    /// browser, which is deliberate: the bytes never pass through the API. This exists for the
+    /// one file nobody uploads -- the CV document generated when somebody applies with a CV
+    /// they typed here rather than one they had on disk.
+    /// </summary>
+    Task WriteAsync(string objectKey, byte[] content, string contentType, CancellationToken ct = default);
+
     Task DeleteAsync(string objectKey, CancellationToken ct = default);
 
     /// <summary>
@@ -202,6 +212,24 @@ public class R2StorageService(IPlatformSettingsService settings) : IR2StorageSer
         }
 
         return bytes;
+    }
+
+    public async Task WriteAsync(
+        string objectKey, byte[] content, string contentType, CancellationToken ct = default)
+    {
+        var config = await RequireConfigurationAsync(ct);
+        using var client = CreateClient(config);
+        using var stream = new MemoryStream(content, writable: false);
+
+        await client.PutObjectAsync(
+            new PutObjectRequest
+            {
+                BucketName = config.Bucket,
+                Key = objectKey,
+                InputStream = stream,
+                ContentType = contentType
+            },
+            ct);
     }
 
     public async Task DeleteAsync(string objectKey, CancellationToken ct = default)

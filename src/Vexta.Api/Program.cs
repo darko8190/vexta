@@ -222,7 +222,7 @@ builder.Services.AddCors(options =>
 });
 
 // Fonts and licence, once per process rather than per document.
-InvoiceDocument.Configure();
+PdfSetup.Configure();
 
 var app = builder.Build();
 

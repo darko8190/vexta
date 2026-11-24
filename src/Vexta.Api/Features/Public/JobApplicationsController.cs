@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using QuestPDF.Fluent;
 using Vexta.Api.Common;
 using Vexta.Api.Data;
 using Vexta.Api.Domain;
@@ -122,10 +123,21 @@ public class JobApplicationsController(
             }
         }
 
+        // The CV as it reads today. One model, rendered twice: as the text the company reads on
+        // the candidate's card, and as the document attached to it. They cannot disagree about
+        // what was sent because there is only one of them.
+        var cv = CvModel.From(account.FirstName, account.LastName, account.Email, profile, request.CoverNote);
+
         // Everything the company will be able to open has to be copied into its own space
         // first: its media routes are scoped to its tenant, and a row pointing at the
         // applicant's prefix would be a broken link at best and a cross-tenant read at worst.
-        var resumeCopy = await CopyToCompanyAsync(profile.ResumeMediaAssetId, context.TenantId, ct);
+        //
+        // Their own document when they uploaded one, and ours only when they did not. Somebody
+        // who brought a CV wrote it the way they want to be read; a copy we typeset from the
+        // fields they filled in afterwards would be the lesser of the two documents, and it
+        // would be the one the company opens.
+        var resumeCopy = await CopyToCompanyAsync(profile.ResumeMediaAssetId, context.TenantId, ct)
+            ?? await TypesetCvAsync(cv, context.TenantId, ct);
 
         var candidate = new Candidate
         {
@@ -143,7 +155,7 @@ public class JobApplicationsController(
             ResumeMediaAssetId = resumeCopy,
             // The CV as it read today, frozen. Written here rather than left for the company to
             // fetch, because there is nothing for it to fetch: this record is the application.
-            ApplicationSummary = CvText.Build(account.FirstName, account.LastName, account.Email, profile, request.CoverNote)
+            ApplicationSummary = CvText.Build(cv)
         };
 
         db.Candidates.Add(candidate);
@@ -287,6 +299,52 @@ public class JobApplicationsController(
 
         db.MediaAssets.Add(copy);
         return copy.Id;
+    }
+
+    /// <summary>
+    /// The CV the person typed, set as a document in the company's own space, and the new
+    /// asset's id -- or null when there is nothing to set or storage would not take it.
+    ///
+    /// Worth doing because of what the alternative is. A company receiving an application from
+    /// somebody who typed their CV here used to get text on a screen and no attachment: nothing
+    /// to print for the meeting, nothing to forward to the foreman who will actually decide.
+    ///
+    /// A failure here does not fail the application, exactly as a failed copy does not. The
+    /// company still has the name, the telephone number and the whole CV as text on the card.
+    /// </summary>
+    private async Task<Guid?> TypesetCvAsync(CvModel cv, Guid companyTenantId, CancellationToken ct)
+    {
+        // A CV with nothing on it but a name happens: the rule for applying accepts an uploaded
+        // document instead of filled-in fields. If the upload is what failed above, there is
+        // nothing here to make a document out of either.
+        if (!cv.HasContent) return null;
+
+        var asset = new MediaAsset
+        {
+            TenantId = companyTenantId,
+            ObjectKey = $"{companyTenantId}/{Guid.NewGuid()}.pdf",
+            FileName = $"CV - {cv.Name}.pdf",
+            ContentType = "application/pdf",
+            // Nobody in that company uploaded this, so no account of theirs is named.
+            UploadedById = null
+        };
+
+        try
+        {
+            var bytes = new CvDocument(cv).GeneratePdf();
+            asset.SizeBytes = bytes.Length;
+            asset.OriginalSizeBytes = bytes.Length;
+
+            await storage.WriteAsync(asset.ObjectKey, bytes, asset.ContentType, ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "CV typographié non déposé pour le locataire {TenantId}.", companyTenantId);
+            return null;
+        }
+
+        db.MediaAssets.Add(asset);
+        return asset.Id;
     }
 
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

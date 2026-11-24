@@ -21,7 +21,7 @@ import Link from "next/link";
 import { ClientPicker } from "@/components/clients/client-picker";
 import { ProjectPicker } from "@/components/invoices/project-picker";
 import { InvoiceLineRows, type LinesForm } from "@/components/invoices/invoice-line-rows";
-import { InvoicePdfViewer } from "@/components/invoices/invoice-pdf-viewer";
+import { PdfViewer } from "@/components/layout/pdf-viewer";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { buttonVariants } from "@/components/ui/button";
 import { useBillingSettingsQuery } from "@/hooks/use-billing-settings";
@@ -626,7 +626,7 @@ export function InvoiceForm({
       {/* Beside the form on a wide screen, under it otherwise — stacking beats a preview too
           narrow to read. Sticky so it stays in view while the lines are being filled in. */}
       <aside className="2xl:sticky 2xl:top-6 2xl:self-start">
-        <InvoicePdfViewer
+        <PdfViewer
           url={preview.url}
           loading={preview.loading}
           error={clientId ? preview.error : "Choisissez un client pour voir la facture."}

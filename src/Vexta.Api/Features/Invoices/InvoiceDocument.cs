@@ -1,6 +1,4 @@
 using System.Globalization;
-using System.Reflection;
-using QuestPDF.Drawing;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
@@ -288,23 +286,4 @@ public class InvoiceDocument(InvoicePdfModel model) : IDocument
 
     private static string Number(decimal value) =>
         value.ToString("0.##", Culture).Replace(' ', ' ').Replace(' ', ' ');
-
-    /// <summary>
-    /// Registers the embedded fonts and the licence once per process. QuestPDF reads no fonts
-    /// from the host: the runtime image has none, and a document that falls back to a different
-    /// typeface per machine is a document the company cannot vouch for.
-    /// </summary>
-    public static void Configure()
-    {
-        // Community: free for individuals and for companies under one million USD of yearly
-        // revenue. See https://www.questpdf.com/license/.
-        QuestPDF.Settings.License = LicenseType.Community;
-
-        var assembly = Assembly.GetExecutingAssembly();
-        foreach (var name in assembly.GetManifestResourceNames().Where(n => n.EndsWith(".ttf")))
-        {
-            using var stream = assembly.GetManifestResourceStream(name)!;
-            FontManager.RegisterFontFromStream(stream);
-        }
-    }
 }

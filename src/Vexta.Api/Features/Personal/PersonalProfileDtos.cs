@@ -28,6 +28,13 @@ public record PersonalProfileDto(
     bool IsComplete,
     /// <summary>What still has to be filled in before an application can be sent, in French.</summary>
     List<string> Missing,
+    /// <summary>
+    /// Whether there is anything on this CV beyond a name, which is what decides whether there
+    /// is a document to render. Answered here rather than worked out again in the browser: the
+    /// rule belongs to the thing that draws the document, and two copies of it would disagree
+    /// the first time one of them changed.
+    /// </summary>
+    bool HasContent,
     DateTimeOffset? UpdatedAt);
 
 public record PersonalExperienceDto(

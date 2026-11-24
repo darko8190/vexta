@@ -1373,6 +1373,8 @@ export interface PersonalProfile {
   isComplete: boolean;
   /** What is still missing, in French, ready to show. */
   missing: string[];
+  /** Whether there is anything beyond a name, and so a document worth rendering. */
+  hasContent: boolean;
   updatedAt: string | null;
 }
 

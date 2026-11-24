@@ -1,6 +1,9 @@
+using System.Globalization;
+using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using QuestPDF.Fluent;
 using Vexta.Api.Common;
 using Vexta.Api.Data;
 using Vexta.Api.Domain;
@@ -165,6 +168,47 @@ public class PersonalProfileController(VextaDbContext db, ICurrentUserService cu
         return Ok(items);
     }
 
+    /// <summary>
+    /// The CV as a document: what somebody prints, brings to an interview, or attaches to an
+    /// email sent to a company that is not on Vexta at all.
+    ///
+    /// The same CV the companies here receive as text, set on paper -- one model renders both,
+    /// so there is no version of this that says something the application did not.
+    ///
+    /// Refused while there is nothing on it but a name. A page with a name and a blank space
+    /// under it is worse than no document: somebody would send it.
+    /// </summary>
+    [HttpGet("pdf")]
+    public async Task<IActionResult> Pdf(CancellationToken ct)
+    {
+        if (currentUser.UserId is not { } userId) return Forbid();
+
+        var account = await db.Users.AsNoTracking()
+            .Where(u => u.Id == userId)
+            .Select(u => new { u.FirstName, u.LastName, u.Email })
+            .FirstOrDefaultAsync(ct);
+
+        if (account is null) return NotFound();
+
+        var profile = await LoadAsync(userId, ct);
+        if (profile is null)
+        {
+            return BadRequest(new { message = "Remplissez votre CV avant de le télécharger." });
+        }
+
+        // No covering note: that is written for one position and belongs to that application,
+        // not to the CV somebody keeps.
+        var cv = CvModel.From(account.FirstName, account.LastName, account.Email, profile, null);
+
+        if (!cv.HasContent)
+        {
+            return BadRequest(new { message = "Remplissez votre CV avant de le télécharger." });
+        }
+
+        Response.Headers.ContentDisposition = $"inline; filename=\"{FileName(cv.Name)}\"";
+        return File(new CvDocument(cv).GeneratePdf(), "application/pdf");
+    }
+
     // ---- Helpers ----
 
     private Task<PersonalProfile?> LoadAsync(Guid userId, CancellationToken ct) =>
@@ -227,6 +271,7 @@ public class PersonalProfileController(VextaDbContext db, ICurrentUserService cu
             education,
             missing.Count == 0,
             missing,
+            profile is not null && CvModel.From(firstName, lastName, email, profile, null).HasContent,
             profile?.UpdatedAt);
     }
 
@@ -264,4 +309,25 @@ public class PersonalProfileController(VextaDbContext db, ICurrentUserService cu
     }
 
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    /// <summary>
+    /// "CV-Marc-Belanger.pdf". Accents folded and anything else dropped: the name comes from a
+    /// text box, and a Content-Disposition filename carrying an accent or a quotation mark
+    /// arrives mangled, renamed or not at all, depending on the browser.
+    /// </summary>
+    private static string FileName(string name)
+    {
+        var folded = name.Normalize(NormalizationForm.FormD)
+            .Where(c => CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark);
+
+        var safe = new StringBuilder();
+        foreach (var c in folded)
+        {
+            if (char.IsAsciiLetterOrDigit(c)) safe.Append(c);
+            else if (safe.Length > 0 && safe[^1] != '-') safe.Append('-');
+        }
+
+        var trimmed = safe.ToString().Trim('-');
+        return trimmed.Length == 0 ? "CV.pdf" : $"CV-{trimmed}.pdf";
+    }
 }

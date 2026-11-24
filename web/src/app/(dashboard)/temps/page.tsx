@@ -4,6 +4,7 @@ import { useState } from "react";
 import { CalendarClock, Fingerprint } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { SectionNav, type NavSection } from "@/components/layout/section-nav";
+import { useSectionCountsQuery } from "@/hooks/use-section-counts";
 import { SectionPlaceholder } from "@/components/projects/detail/section-placeholder";
 import { WorkTimesheetsSection } from "@/components/work/timesheets-section";
 
@@ -21,10 +22,11 @@ import { WorkTimesheetsSection } from "@/components/work/timesheets-section";
  */
 export default function TimePage() {
   const [section, setSection] = useState("feuilles-de-temps");
+  const { data: counts } = useSectionCountsQuery();
 
   const sections: NavSection[] = [
-    { key: "feuilles-de-temps", label: "Feuilles de temps", icon: CalendarClock },
-    { key: "poincons", label: "Poinçons", icon: Fingerprint },
+    { key: "feuilles-de-temps", label: "Feuilles de temps", count: counts?.timesheets ?? 0, icon: CalendarClock },
+    { key: "poincons", label: "Poinçons", count: 0, icon: Fingerprint },
   ];
 
   return (

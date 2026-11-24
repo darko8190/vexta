@@ -62,7 +62,7 @@ function amountField(value: number | null | undefined): string {
  * the bill and the cost table use. Storing it as well would let the three disagree the first
  * time somebody edited the price by hand.
  */
-function toFormValues(mode: MarginMode, charge?: ProjectExtraCharge): FormValues {
+function toFormValues(mode: MarginMode, charge?: ProjectExtraCharge, defaultTaskId?: string): FormValues {
   const margin = marginPercentFrom(charge?.cost, charge?.sellingPrice, mode);
 
   return {
@@ -72,7 +72,7 @@ function toFormValues(mode: MarginMode, charge?: ProjectExtraCharge): FormValues
     marginPercent: margin == null ? "" : decimalField(margin),
     sellingPrice: amountField(charge?.sellingPrice),
     chargedOn: charge?.chargedOn ?? "",
-    projectTaskId: charge?.projectTaskId ?? "",
+    projectTaskId: charge ? (charge.projectTaskId ?? "") : (defaultTaskId ?? ""),
   };
 }
 
@@ -89,11 +89,14 @@ export function ExtraChargeFormSheet({
   onOpenChange,
   projectId,
   charge,
+  defaultTaskId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projectId: string;
   charge?: ProjectExtraCharge;
+  /** Opened from a task's page: a new row is filed against that task until somebody says otherwise. */
+  defaultTaskId?: string;
 }) {
   const isEditing = Boolean(charge);
   const save = useSaveExtraCharge(projectId);
@@ -101,12 +104,12 @@ export function ExtraChargeFormSheet({
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: toFormValues(marginMode, charge),
+    defaultValues: toFormValues(marginMode, charge, defaultTaskId),
   });
 
   useEffect(() => {
-    if (open) form.reset(toFormValues(marginMode, charge));
-  }, [open, charge, form, marginMode]);
+    if (open) form.reset(toFormValues(marginMode, charge, defaultTaskId));
+  }, [open, charge, form, marginMode, defaultTaskId]);
 
   /** Vendant from the cost and the margin, whenever both are readable. Same rule as a product. */
   function repriceSelling(costRaw: string, marginRaw: string) {

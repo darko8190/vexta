@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Building2, ClipboardList, PackageCheck } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { SectionNav, type NavSection } from "@/components/layout/section-nav";
+import { useSectionCountsQuery } from "@/hooks/use-section-counts";
 import { GoodsReceiptsSection } from "@/components/purchasing/goods-receipts-section";
 import { PurchaseOrdersSection } from "@/components/purchasing/purchase-orders-section";
 import { SuppliersSection } from "@/components/purchasing/suppliers-section";
@@ -20,11 +21,12 @@ export default function SupplyPage() {
   // Always the suppliers, and not remembered between visits: nothing can be ordered before
   // somebody has been recorded to order from, so it is where the work starts.
   const [section, setSection] = useState("fournisseurs");
+  const { data: counts } = useSectionCountsQuery();
 
   const sections: NavSection[] = [
-    { key: "fournisseurs", label: "Fournisseurs", icon: Building2 },
-    { key: "commandes", label: "Commandes", icon: ClipboardList },
-    { key: "receptions", label: "Réceptions", icon: PackageCheck },
+    { key: "fournisseurs", label: "Fournisseurs", count: counts?.suppliers ?? 0, icon: Building2 },
+    { key: "commandes", label: "Commandes", count: counts?.purchaseOrders ?? 0, icon: ClipboardList },
+    { key: "receptions", label: "Réceptions", count: counts?.goodsReceipts ?? 0, icon: PackageCheck },
   ];
 
   return (

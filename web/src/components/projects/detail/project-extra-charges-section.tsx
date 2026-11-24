@@ -36,9 +36,15 @@ import type { ProjectExtraCharge } from "@/lib/types";
 export function ProjectExtraChargesSection({
   projectId,
   locked,
+  taskId,
 }: {
   projectId: string;
   locked?: boolean;
+  /**
+   * Shows only what is attached to this task, and files new rows against it — the same section
+   * as on the project, opened from the task's own page.
+   */
+  taskId?: string;
 }) {
   // A failed read is not a project without charges: `data` is undefined either way, so asking
   // only `length === 0` would say there are none when the request merely did not come back.
@@ -51,7 +57,7 @@ export function ProjectExtraChargesSection({
   const [editing, setEditing] = useState<ProjectExtraCharge | undefined>(undefined);
   const [deleteTarget, setDeleteTarget] = useState<ProjectExtraCharge | undefined>(undefined);
 
-  const charges = data ?? [];
+  const charges = (data ?? []).filter((charge) => !taskId || charge.projectTaskId === taskId);
 
   function openCreate() {
     if (locked) return;
@@ -208,6 +214,7 @@ export function ProjectExtraChargesSection({
           onOpenChange={setFormOpen}
           projectId={projectId}
           charge={editing}
+          defaultTaskId={taskId}
         />
       )}
 

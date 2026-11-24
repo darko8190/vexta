@@ -4,6 +4,7 @@ import { useState } from "react";
 import { FileText, ReceiptText, Undo2, Wallet } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { SectionNav, type NavSection } from "@/components/layout/section-nav";
+import { useSectionCountsQuery } from "@/hooks/use-section-counts";
 import { CreditsSection } from "@/components/invoices/credits-section";
 import { InvoicesSection } from "@/components/invoices/invoices-section";
 import { PaymentsSection } from "@/components/invoices/payments-section";
@@ -23,12 +24,14 @@ import { useIsClientUser } from "@/hooks/use-can-create";
 export default function BillingPage() {
   const isClient = useIsClientUser();
   const [section, setSection] = useState("factures");
+  // Staff only: a customer gets no rail, and the endpoint would refuse them.
+  const { data: counts } = useSectionCountsQuery(!isClient);
 
   const sections: NavSection[] = [
-    { key: "factures", label: "Factures", icon: FileText },
-    { key: "paiements", label: "Paiements", icon: Wallet },
-    { key: "credits", label: "Crédits", icon: ReceiptText },
-    { key: "remboursements", label: "Remboursements", icon: Undo2 },
+    { key: "factures", label: "Factures", count: counts?.invoices ?? 0, icon: FileText },
+    { key: "paiements", label: "Paiements", count: counts?.payments ?? 0, icon: Wallet },
+    { key: "credits", label: "Crédits", count: counts?.credits ?? 0, icon: ReceiptText },
+    { key: "remboursements", label: "Remboursements", count: counts?.refunds ?? 0, icon: Undo2 },
   ];
 
   if (isClient) {

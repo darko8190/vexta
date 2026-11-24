@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   CircleCheck,
   ListChecks,
@@ -66,6 +67,8 @@ function assignedTo(task: ProjectTask): string {
  * the punch list is finished.
  */
 export function ProjectTasksSection({ projectId }: { projectId: string }) {
+  // A press on a task opens its own page — its details and everything filed against it.
+  const router = useRouter();
   const canManage = useCanManage();
   const {
     data,
@@ -189,10 +192,13 @@ export function ProjectTasksSection({ projectId }: { projectId: string }) {
               return (
                 <div
                   key={task.id}
-                  {...(canManage ? rowOpenProps(() => openEdit(task), `Ouvrir la tâche ${task.title}`) : {})}
+                  {...rowOpenProps(
+                    () => router.push(`/projets/${projectId}/taches/${task.id}`),
+                    `Ouvrir la tâche ${task.title}`,
+                  )}
                   className={cn(
                     "flex items-start gap-3 rounded-lg border border-border bg-card p-3",
-                    canManage && rowOpenClassName,
+                    rowOpenClassName,
                     // Finished work stays on the list — it is the record of what was done —
                     // but it stops competing for attention with what is still open.
                     done && "opacity-60",

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { FileText, Receipt } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { SectionNav, type NavSection } from "@/components/layout/section-nav";
+import { useSectionCountsQuery } from "@/hooks/use-section-counts";
 import { ExpensesSection } from "@/components/purchasing/expenses-section";
 import { SectionPlaceholder } from "@/components/projects/detail/section-placeholder";
 
@@ -16,10 +17,11 @@ import { SectionPlaceholder } from "@/components/projects/detail/section-placeho
  */
 export default function PurchasingPage() {
   const [section, setSection] = useState("depenses");
+  const { data: counts } = useSectionCountsQuery();
 
   const sections: NavSection[] = [
-    { key: "depenses", label: "Dépenses", icon: Receipt },
-    { key: "factures-fournisseurs", label: "Factures fournisseurs", icon: FileText },
+    { key: "depenses", label: "Dépenses", count: counts?.expenses ?? 0, icon: Receipt },
+    { key: "factures-fournisseurs", label: "Factures fournisseurs", count: 0, icon: FileText },
   ];
 
   return (

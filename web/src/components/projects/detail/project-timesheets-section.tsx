@@ -61,9 +61,15 @@ function dates(entry: TimesheetEntry): string {
 export function ProjectTimesheetsSection({
   projectId,
   locked,
+  taskId,
 }: {
   projectId: string;
   locked?: boolean;
+  /**
+   * Shows only what is attached to this task, and files new rows against it — the same section
+   * as on the project, opened from the task's own page.
+   */
+  taskId?: string;
 }) {
   // A failed read is not a shift nobody worked: `data` is undefined either way, so asking only
   // `length === 0` would say "aucune heure inscrite" about hours that are on file and simply
@@ -79,7 +85,7 @@ export function ProjectTimesheetsSection({
   const [editing, setEditing] = useState<TimesheetEntry | undefined>(undefined);
   const [deleteTarget, setDeleteTarget] = useState<TimesheetEntry | undefined>(undefined);
 
-  const entries = data ?? [];
+  const entries = (data ?? []).filter((entry) => !taskId || entry.projectTaskId === taskId);
   const totalHours = entries.reduce((sum, entry) => sum + entry.hours, 0);
 
   // Both still check the lock although neither has a button when it is on: the guard is what
@@ -244,6 +250,7 @@ export function ProjectTimesheetsSection({
         onOpenChange={setFormOpen}
         projectId={projectId}
         entry={editing}
+        defaultTaskId={taskId}
       />
 
       <ConfirmDeleteDialog

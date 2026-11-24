@@ -103,11 +103,14 @@ export function TimesheetFormSheet({
   onOpenChange,
   projectId,
   entry,
+  defaultTaskId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projectId: string;
   entry?: TimesheetEntry;
+  /** Opened from a task's page: a new row is filed against that task until somebody says otherwise. */
+  defaultTaskId?: string;
 }) {
   const isEditing = Boolean(entry);
   const save = useSaveTimesheet(projectId);
@@ -145,13 +148,13 @@ export function TimesheetFormSheet({
       startTime: entry?.startTime ?? "",
       endTime: entry?.endTime ?? "",
       note: entry?.note ?? "",
-      projectTaskId: entry?.projectTaskId ?? "",
+      projectTaskId: entry ? (entry.projectTaskId ?? "") : (defaultTaskId ?? ""),
     });
 
     // An entry whose two dates already differ was set by hand once, so moving the start date
     // must not quietly pull the end date back onto it.
     endDateEdited.current = entry !== undefined && entry.startDate !== entry.endDate;
-  }, [open, entry, form]);
+  }, [open, entry, form, defaultTaskId]);
 
   const [startDate, startTime, endDate, endTime] = useWatch({
     control: form.control,

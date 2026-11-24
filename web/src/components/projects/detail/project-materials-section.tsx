@@ -40,7 +40,7 @@ function toValues(material: ProjectMaterial): SaveProjectMaterialValues {
   };
 }
 
-function blankValues(): SaveProjectMaterialValues {
+function blankValues(taskId?: string): SaveProjectMaterialValues {
   return {
     productId: null,
     code: null,
@@ -50,7 +50,7 @@ function blankValues(): SaveProjectMaterialValues {
     purchasePrice: null,
     marginPercent: null,
     unitPrice: 0,
-    projectTaskId: null,
+    projectTaskId: taskId ?? null,
   };
 }
 
@@ -80,9 +80,15 @@ interface Draft {
 export function ProjectMaterialsSection({
   projectId,
   locked,
+  taskId,
 }: {
   projectId: string;
   locked?: boolean;
+  /**
+   * Shows only what is attached to this task, and files new rows against it — the same section
+   * as on the project, opened from the task's own page.
+   */
+  taskId?: string;
 }) {
   const { data, isLoading } = useProjectMaterialsQuery(projectId);
   const { data: settings } = useBillingSettingsQuery();
@@ -106,7 +112,7 @@ export function ProjectMaterialsSection({
   const posting = useRef(new Set<string>());
   const nextUid = useRef(0);
 
-  const materials = data ?? [];
+  const materials = (data ?? []).filter((material) => !taskId || material.projectTaskId === taskId);
   const marginMode = settings?.marginMode ?? "Multiplication";
 
   function valuesOf(material: ProjectMaterial): SaveProjectMaterialValues {
@@ -162,7 +168,7 @@ export function ProjectMaterialsSection({
 
   function addDraft() {
     nextUid.current += 1;
-    setDrafts((previous) => [...previous, { uid: `draft-${nextUid.current}`, values: blankValues() }]);
+    setDrafts((previous) => [...previous, { uid: `draft-${nextUid.current}`, values: blankValues(taskId) }]);
   }
 
   async function confirmDelete() {

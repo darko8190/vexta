@@ -77,11 +77,14 @@ export function ExpenseFormSheet({
   onOpenChange,
   projectId,
   expense,
+  defaultTaskId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projectId: string;
   expense?: ProjectExpense;
+  /** Opened from a task's page: a new row is filed against that task until somebody says otherwise. */
+  defaultTaskId?: string;
 }) {
   const isEditing = Boolean(expense);
   const save = useSaveExpense(projectId);
@@ -126,10 +129,10 @@ export function ExpenseFormSheet({
       cost: amountField(expense?.cost),
       sellingPrice: amountField(expense?.sellingPrice),
       spentOn: expense?.spentOn ?? "",
-      projectTaskId: expense?.projectTaskId ?? "",
+      projectTaskId: expense ? (expense.projectTaskId ?? "") : (defaultTaskId ?? ""),
     });
 
-  }, [open, expense, form]);
+  }, [open, expense, form, defaultTaskId]);
 
   const saved: Attachment[] = useMemo(
     () =>

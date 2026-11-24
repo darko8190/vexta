@@ -44,9 +44,15 @@ function money(amount: number | null): string {
 export function ProjectExpensesSection({
   projectId,
   locked,
+  taskId,
 }: {
   projectId: string;
   locked?: boolean;
+  /**
+   * Shows only what is attached to this task, and files new rows against it — the same section
+   * as on the project, opened from the task's own page.
+   */
+  taskId?: string;
 }) {
   // A failed read is not a project without expenses: `data` is undefined either way, so asking
   // only `length === 0` would tell someone the receipts they filed are gone when the request
@@ -62,7 +68,7 @@ export function ProjectExpensesSection({
   const [editing, setEditing] = useState<ProjectExpense | undefined>(undefined);
   const [deleteTarget, setDeleteTarget] = useState<ProjectExpense | undefined>(undefined);
 
-  const expenses = data ?? [];
+  const expenses = (data ?? []).filter((expense) => !taskId || expense.projectTaskId === taskId);
 
   // Both still check the lock although neither has a button when it is on: the guard is what
   // makes the panel unreachable, rather than it merely having nothing left to press.
@@ -226,6 +232,7 @@ export function ProjectExpensesSection({
         onOpenChange={setFormOpen}
         projectId={projectId}
         expense={editing}
+        defaultTaskId={taskId}
       />
 
       <ConfirmDeleteDialog

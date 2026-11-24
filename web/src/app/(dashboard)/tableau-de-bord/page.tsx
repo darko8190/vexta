@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FileText, FolderKanban, UserRound } from "lucide-react";
+import { ClipboardPen, FileText, FolderKanban, UserRound } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AdminDashboardStats } from "@/components/dashboard/admin-dashboard-stats";
 import { DashboardStats } from "@/components/dashboard/dashboard-stats";
@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { UpgradeCta } from "@/components/layout/upgrade-cta";
 import { useProjectsQuery } from "@/hooks/use-projects";
 import { useInvoicesQuery } from "@/hooks/use-invoices";
+import { useQuotesQuery } from "@/hooks/use-quotes";
 import { useAuth } from "@/lib/auth-context";
 import { tenantStatusLabels } from "@/lib/labels";
 
@@ -69,16 +70,19 @@ function PersonalDashboard() {
 }
 
 /**
- * A customer's own two numbers. The client directory is closed to them, so asking for its count
- * would be a refused request behind a tile that could only ever show a dash.
+ * A customer's own numbers. The client directory is closed to them, so asking for its count
+ * would be a refused request behind a tile that could only ever show a dash. The quotes tile
+ * counts the ones still waiting for their answer, which is the only figure there they act on.
  */
 function ClientDashboard() {
   const { data: projects } = useProjectsQuery(1, "");
+  const { data: quotes } = useQuotesQuery(1, "", "Envoyee");
   const { data: invoices } = useInvoicesQuery(1, "");
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid gap-4 sm:grid-cols-3">
       <StatCard href="/projets" label="Mes projets" value={projects?.totalCount ?? "—"} icon={FolderKanban} />
+      <StatCard href="/soumissions" label="Soumissions à répondre" value={quotes?.totalCount ?? "—"} icon={ClipboardPen} />
       <StatCard href="/factures" label="Mes factures" value={invoices?.totalCount ?? "—"} icon={FileText} />
     </div>
   );

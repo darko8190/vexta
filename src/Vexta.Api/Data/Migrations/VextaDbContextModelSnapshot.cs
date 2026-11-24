@@ -3710,6 +3710,17 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<Guid>("ClientId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset?>("ClientRespondedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ClientRespondedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ClientResponseNote")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 

@@ -91,6 +91,22 @@ export function useConvertQuote() {
   });
 }
 
+/**
+ * The customer's answer from their portal. Accepting makes the project on the server, so the
+ * project lists are refreshed along with the quote.
+ */
+export function useRespondToQuote() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, answer, note }: { id: string; answer: "accepter" | "refuser"; note: string | null }) =>
+      api.post<QuoteRecord>(`soumissions/${id}/${answer}`, { note }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+    },
+  });
+}
+
 export function useSaveQuoteLine(quoteId: string) {
   const invalidate = useInvalidate();
   return useMutation({

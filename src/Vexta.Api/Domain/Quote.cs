@@ -56,6 +56,15 @@ public class Quote
     /// <summary>When it was last emailed to the client. Null until it has left.</summary>
     public DateTimeOffset? SentAt { get; set; }
 
+    /// <summary>
+    /// The client's own answer, given from their portal: when, who pressed the button, and what
+    /// they wrote with it. Kept apart from the status because the status can still be moved by
+    /// staff afterwards, and the record of what the client said should not move with it.
+    /// </summary>
+    public DateTimeOffset? ClientRespondedAt { get; set; }
+    public string? ClientRespondedBy { get; set; }
+    public string? ClientResponseNote { get; set; }
+
     /// <summary>The work's own planned dates, carried to the project on acceptance.</summary>
     public DateOnly? StartDate { get; set; }
     public DateOnly? EndDate { get; set; }

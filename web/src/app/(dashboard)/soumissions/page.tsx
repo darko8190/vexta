@@ -21,7 +21,7 @@ import { PaginationBar } from "@/components/layout/pagination-bar";
 import { SearchInput } from "@/components/layout/search-input";
 import { UpgradeCta } from "@/components/layout/upgrade-cta";
 import { QuoteFormSheet } from "@/components/quotes/quote-form-sheet";
-import { useCanCreate } from "@/hooks/use-can-create";
+import { useCanCreate, useIsClientUser } from "@/hooks/use-can-create";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { storedQuoteValues, useDeleteQuote, useQuotesQuery, useUpdateQuote } from "@/hooks/use-quotes";
 import { formatDateOnly } from "@/lib/dates";
@@ -39,10 +39,14 @@ const editableStatuses = (Object.keys(quoteStatusLabels) as QuoteStatus[]).map((
 /**
  * Soumissions: the prices given to clients, before any work is done, and what became of them.
  * An accepted one is converted into a project from its own page.
+ *
+ * A customer lands here too, on the quotes they were sent: read-only, and answered from each
+ * quote's own page.
  */
 export default function QuotesPage() {
   const router = useRouter();
-  const canCreate = useCanCreate();
+  const isClient = useIsClientUser();
+  const canCreate = useCanCreate() && !isClient;
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search);
@@ -141,7 +145,7 @@ export default function QuotesPage() {
     await update.mutateAsync({ id: quote.id, values });
   }
 
-  const addButton = canCreate ? (
+  const addButton = isClient ? null : canCreate ? (
     <Button onClick={() => setFormOpen(true)}>
       <Plus />
       Nouvelle soumission
@@ -164,8 +168,12 @@ export default function QuotesPage() {
   return (
     <div>
       <PageHeader
-        title="Soumissions"
-        description="Les prix donnés aux clients, et ce qu'ils sont devenus."
+        title={isClient ? "Mes soumissions" : "Soumissions"}
+        description={
+          isClient
+            ? "Les prix que votre fournisseur vous a envoyés. Ouvrez-en une pour l'accepter ou la refuser."
+            : "Les prix donnés aux clients, et ce qu'ils sont devenus."
+        }
         action={addButton}
       />
 
@@ -184,9 +192,11 @@ export default function QuotesPage() {
             description={
               debouncedSearch
                 ? "Essayez une autre recherche."
-                : "Préparez un prix : tâches, matériaux et frais. Acceptée, elle devient un projet."
+                : isClient
+                  ? "Aucune soumission ne vous a été envoyée pour l'instant."
+                  : "Préparez un prix : tâches, matériaux et frais. Acceptée, elle devient un projet."
             }
-            action={!debouncedSearch ? addButton : undefined}
+            action={!debouncedSearch && addButton ? addButton : undefined}
           />
         </>
       ) : (
@@ -199,7 +209,7 @@ export default function QuotesPage() {
           onOpen={(quote) => router.push(`/soumissions/${quote.id}`)}
           onSaveRow={canCreate ? saveRow : undefined}
           toolbarStart={searchBox}
-          actions={(quote) => (
+          actions={isClient ? undefined : (quote) => (
             <DropdownMenu>
               <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label="Actions" />}>
                 <MoreHorizontal />
@@ -217,11 +227,14 @@ export default function QuotesPage() {
 
       <PaginationBar result={data} onPageChange={setPage} />
 
-      <QuoteFormSheet
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        onCreated={(created) => router.push(`/soumissions/${created.id}`)}
-      />
+      {/* Not mounted for a customer: closed, it still asks for the company's wage scales. */}
+      {!isClient && (
+        <QuoteFormSheet
+          open={formOpen}
+          onOpenChange={setFormOpen}
+          onCreated={(created) => router.push(`/soumissions/${created.id}`)}
+        />
+      )}
 
       <ConfirmDeleteDialog
         open={Boolean(deleteTarget)}

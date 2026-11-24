@@ -126,6 +126,8 @@ const personalNav: NavItem[] = [
 const clientNav: NavItem[] = [
   { href: "/tableau-de-bord", label: "Tableau de bord", icon: LayoutDashboard },
   { href: "/projets", label: "Mes projets", icon: FolderKanban },
+  // Between the two, in the order the money happens: the price, the work, the bill.
+  { href: "/soumissions", label: "Mes soumissions", icon: ClipboardPen },
   { href: "/factures", label: "Mes factures", icon: FileText },
 ];
 

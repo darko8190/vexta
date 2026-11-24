@@ -14,10 +14,10 @@ import { cn } from "@/lib/utils";
  * /profil is on the list because it is theirs, not the company's: it holds their name and the
  * button that resets their own password.
  */
-const CLIENT_ROUTES = ["/tableau-de-bord", "/projets", "/factures", "/profil"];
+const CLIENT_ROUTES = ["/tableau-de-bord", "/projets", "/soumissions", "/factures", "/profil"];
 
 /**
- * The sidebar already offers a customer only their own two modules, but a URL typed or kept in
+ * The sidebar already offers a customer only their own modules, but a URL typed or kept in
  * a bookmark goes wherever it likes. The API refuses those modules with a 403; without this the
  * page would render its chrome and then sit there with nothing in it, which reads as a bug
  * rather than as a closed door.
@@ -42,7 +42,7 @@ export function ClientRouteGuard({ children }: { children: React.ReactNode }) {
       </CardHeader>
 
       <CardContent className="text-sm text-muted-foreground">
-        Vous avez accès à vos projets et à vos factures.
+        Vous avez accès à vos projets, à vos soumissions et à vos factures.
       </CardContent>
 
       <CardFooter>

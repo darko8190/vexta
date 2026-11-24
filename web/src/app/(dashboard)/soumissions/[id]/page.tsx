@@ -38,8 +38,10 @@ import { SectionNav, type NavSection } from "@/components/layout/section-nav";
 import { InvoiceSendDialog } from "@/components/invoices/invoice-send-dialog";
 import { PdfViewer } from "@/components/layout/pdf-viewer";
 import { ProjectCostTable } from "@/components/projects/detail/project-cost-table";
+import { useIsClientUser } from "@/hooks/use-can-create";
 import { usePdfDocument } from "@/hooks/use-pdf-document";
 import { ProjectDocumentsSection } from "@/components/projects/detail/project-documents-section";
+import { ClientQuoteView } from "@/components/quotes/client-quote-view";
 import { QuoteFormSheet } from "@/components/quotes/quote-form-sheet";
 import { QuoteLinesSection } from "@/components/quotes/quote-lines-section";
 import {
@@ -59,9 +61,17 @@ import { cn } from "@/lib/utils";
  * One quote, laid out like a project because it is the project before it is sold: its details
  * editable in place, then its tasks, materials and extra charges, and the money they add up to.
  * Convertir en projet carries all of it over and freezes the quote.
+ *
+ * A customer opening the same address gets their own view instead: the document and their two
+ * answers. Split at the top so neither one asks for what the other may not read.
  */
 export default function QuoteDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const isClient = useIsClientUser();
+  return isClient ? <ClientQuoteView id={id} /> : <StaffQuoteDetail id={id} />;
+}
+
+function StaffQuoteDetail({ id }: { id: string }) {
   const router = useRouter();
   const { data: quote, isLoading, isError } = useQuoteQuery(id);
   const { data: summary, isLoading: summaryLoading } = useQuoteSummaryQuery(id);
@@ -204,6 +214,17 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
             </Button>
           </div>
         </div>
+
+        {quote.clientRespondedAt && (
+          <p className="mt-4 border-t border-border pt-3 text-sm text-muted-foreground">
+            {quote.status === "Refusee" ? "Refusée" : "Acceptée"} par le client depuis son portail le{" "}
+            {formatMoment(quote.clientRespondedAt)}
+            {quote.clientRespondedBy ? ` (${quote.clientRespondedBy})` : ""}.
+            {quote.clientResponseNote && (
+              <span className="mt-1 block whitespace-pre-line text-foreground">« {quote.clientResponseNote} »</span>
+            )}
+          </p>
+        )}
 
         {locked && (
           <p className="mt-4 border-t border-border pt-3 text-xs text-muted-foreground">

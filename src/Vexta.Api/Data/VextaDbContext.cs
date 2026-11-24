@@ -1237,6 +1237,8 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.HasIndex(q => new { q.TenantId, q.Number }).IsUnique();
             e.Property(q => q.PoNumber).HasMaxLength(100);
             e.Property(q => q.Description).HasMaxLength(4000);
+            e.Property(q => q.ClientRespondedBy).HasMaxLength(200);
+            e.Property(q => q.ClientResponseNote).HasMaxLength(2000);
 
             // Restrict on the client, like a project: a client with quotes on file is not
             // deleted out from under them.

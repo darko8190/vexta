@@ -5,30 +5,50 @@ using Vexta.Api.Auth;
 using Vexta.Api.Common;
 using Vexta.Api.Data;
 using Vexta.Api.Domain;
+using Vexta.Api.Features.Invoices;
 using Vexta.Api.Features.Projects;
+using Vexta.Api.Services;
 
 namespace Vexta.Api.Features.Quotes;
 
 /// <summary>
 /// Soumissions: the prices given before any work is done, and what became of them.
 ///
-/// Staff only, read and write. A customer will read their own quotes from their portal one day;
-/// until that screen exists, opening the API to them would only be a door with nothing behind it.
+/// Staff read and write. A customer reads their own from their portal — the query filter keeps
+/// them to their client's rows, and drafts are withheld here, because a price still being worked
+/// out is not a price given. The customer's only writes are Accepter and Refuser; every other
+/// write carries [StaffOnly], and so do the lines and the cost table, which show what the work
+/// costs the company and not only what it sells for.
 /// </summary>
 [ApiController]
 [Route("api/soumissions")]
-[Authorize(Roles = Roles.Staff)]
+[Authorize(Roles = Roles.StaffAndClients)]
 [RequireActiveSubscription]
-public class QuotesController(VextaDbContext db, ICurrentUserService currentUser) : ControllerBase
+public class QuotesController(
+    VextaDbContext db,
+    ICurrentUserService currentUser,
+    IInvoicePdfService pdf,
+    IMailgunService mailgun,
+    IConfiguration configuration,
+    ILogger<QuotesController> logger) : ControllerBase
 {
     private const string Locked = "Cette soumission est devenue un projet : ses prix ne changent plus.";
+    private const int MaxResponseNoteLength = 2000;
+
+    private string FrontendUrl => configuration["Frontend:BaseUrl"]?.TrimEnd('/') ?? "http://localhost:3000";
+
+    /// <summary>Every quote this person may read: a customer never sees a draft.</summary>
+    private IQueryable<Quote> Visible() =>
+        currentUser.IsClient
+            ? db.Quotes.Where(q => q.Status != QuoteStatus.Brouillon)
+            : db.Quotes;
 
     [HttpGet]
     public async Task<ActionResult<PagedResult<QuoteDto>>> List(
         [FromQuery] PagingQuery query, [FromQuery] Guid? clientId, [FromQuery] QuoteStatus? status,
         [FromQuery] Guid? clientAssetId)
     {
-        var quotes = db.Quotes.AsNoTracking().AsQueryable();
+        var quotes = Visible().AsNoTracking();
         if (clientId is not null) quotes = quotes.Where(q => q.ClientId == clientId);
         if (status is not null) quotes = quotes.Where(q => q.Status == status);
         if (clientAssetId is not null) quotes = quotes.Where(q => q.ClientAssetId == clientAssetId);
@@ -71,6 +91,7 @@ public class QuotesController(VextaDbContext db, ICurrentUserService currentUser
     /// labour, materials and extra charges, what each costs, what each sells for, and the taxes.
     /// </summary>
     [HttpGet("{id:guid}/sommaire")]
+    [StaffOnly]
     public async Task<ActionResult<QuoteSummaryDto>> Summary(Guid id)
     {
         var quote = await db.Quotes.AsNoTracking().Include(q => q.Lines).FirstOrDefaultAsync(q => q.Id == id);
@@ -194,6 +215,7 @@ public class QuotesController(VextaDbContext db, ICurrentUserService currentUser
     // ---- Lines ----
 
     [HttpGet("{id:guid}/lignes")]
+    [StaffOnly]
     public async Task<ActionResult<List<QuoteLineDto>>> Lines(Guid id, [FromQuery] QuoteLineKind? kind)
     {
         if (!await db.Quotes.AnyAsync(q => q.Id == id)) return NotFound();
@@ -274,24 +296,171 @@ public class QuotesController(VextaDbContext db, ICurrentUserService currentUser
     /// every material and extra charge at the price quoted. Done once; the quote then points at
     /// its project and stops changing.
     /// </summary>
+    /// <summary>
+    /// The quote as a document: what is attached to the email, and what the customer reads in
+    /// their portal. Inline, because it is shown in a viewer rather than downloaded.
+    /// </summary>
+    [HttpGet("{id:guid}/pdf")]
+    public async Task<IActionResult> Pdf(Guid id, CancellationToken ct)
+    {
+        // Through the visible set first: the renderer reads past the draft rule.
+        if (!await Visible().AnyAsync(q => q.Id == id, ct)) return NotFound();
+
+        var rendered = await pdf.RenderQuoteAsync(id, ct);
+        if (rendered is not { } document) return NotFound();
+
+        Response.Headers.ContentDisposition = $"inline; filename=\"Soumission-S-{document.Number:0000}.pdf\"";
+        return File(document.Bytes, "application/pdf");
+    }
+
     [HttpPost("{id:guid}/convertir")]
     [Authorize(Roles = Roles.Managers)]
     [StaffOnly]
     [RequireBusinessTenant]
     public async Task<ActionResult<QuoteDto>> Convert(Guid id)
     {
-        var quote = await db.Quotes
-            .Include(q => q.Lines)
-            .Include(q => q.Documents)
-            .Include(q => q.Notes)
-            .Include(q => q.Client)
-            .FirstOrDefaultAsync(q => q.Id == id);
+        var quote = await LoadForProjectAsync(id);
         if (quote is null) return NotFound();
         if (quote.ProjectId is not null) return BadRequest(new { message = "Cette soumission est déjà devenue un projet." });
         if (quote.Status is QuoteStatus.Refusee or QuoteStatus.Expiree)
             return BadRequest(new { message = "Une soumission refusée ou expirée ne devient pas un projet. Remettez-la en brouillon d'abord." });
         if (quote.Client!.WorkRefusal() is { } refusal) return BadRequest(new { message = refusal });
 
+        await CreateProjectAsync(quote);
+        await db.SaveChangesAsync();
+        return Ok(await GetDtoAsync(id));
+    }
+
+    /// <summary>
+    /// The customer says yes from their portal. That is the same step as Convertir en projet —
+    /// an accepted quote is a job — so the project is made now, rather than the yes sitting on
+    /// the quote until somebody at the office notices it. The company is told by email.
+    /// </summary>
+    [HttpPost("{id:guid}/accepter")]
+    public async Task<ActionResult<QuoteDto>> Accept(Guid id, QuoteResponseRequest request, CancellationToken ct)
+    {
+        if (!currentUser.IsClient)
+            return BadRequest(new { message = "Cette réponse appartient au client. Utilisez « Convertir en projet »." });
+
+        var quote = await LoadForProjectAsync(id);
+        if (quote is null) return NotFound();
+        if (CanRespond(quote) is { } problem) return BadRequest(new { message = problem });
+        if (Clean(request.Note) is { Length: > MaxResponseNoteLength })
+            return BadRequest(new { message = $"Le message est limité à {MaxResponseNoteLength} caractères." });
+        if (quote.Client!.WorkRefusal() is not null)
+            return BadRequest(new { message = "Cette soumission ne peut pas être acceptée en ligne. Communiquez avec l'entreprise." });
+
+        await RecordResponseAsync(quote, request, ct);
+        var project = await CreateProjectAsync(quote);
+        await db.SaveChangesAsync(ct);
+
+        await NotifyCompanyAsync(quote, accepted: true,
+            $"Le projet P-{project.Number:0000} a été créé à partir de la soumission.", ct);
+        return Ok(await GetDtoAsync(id));
+    }
+
+    /// <summary>The customer says no from their portal, with a reason if they give one.</summary>
+    [HttpPost("{id:guid}/refuser")]
+    public async Task<ActionResult<QuoteDto>> Refuse(Guid id, QuoteResponseRequest request, CancellationToken ct)
+    {
+        if (!currentUser.IsClient)
+            return BadRequest(new { message = "Cette réponse appartient au client. Changez plutôt le statut de la soumission." });
+
+        var quote = await Visible().Include(q => q.Client).FirstOrDefaultAsync(q => q.Id == id, ct);
+        if (quote is null) return NotFound();
+        if (CanRespond(quote) is { } problem) return BadRequest(new { message = problem });
+        if (Clean(request.Note) is { Length: > MaxResponseNoteLength })
+            return BadRequest(new { message = $"Le message est limité à {MaxResponseNoteLength} caractères." });
+
+        await RecordResponseAsync(quote, request, ct);
+        quote.Status = QuoteStatus.Refusee;
+        await db.SaveChangesAsync(ct);
+
+        await NotifyCompanyAsync(quote, accepted: false, null, ct);
+        return Ok(await GetDtoAsync(id));
+    }
+
+    /// <summary>
+    /// Why a customer cannot answer this quote, or null. Only a quote that is out with them and
+    /// still holds: an expired price is the company's to renew, not the customer's to take.
+    /// </summary>
+    private static string? CanRespond(Quote quote)
+    {
+        if (quote.ProjectId is not null || quote.Status == QuoteStatus.Acceptee)
+            return "Cette soumission a déjà été acceptée.";
+        if (quote.Status == QuoteStatus.Refusee) return "Cette soumission a déjà été refusée.";
+        if (quote.Status == QuoteStatus.Expiree
+            || (quote.ValidUntil is { } until && until < BusinessDay.Today))
+            return "Cette soumission est expirée. Communiquez avec l'entreprise pour un nouveau prix.";
+        if (quote.Status != QuoteStatus.Envoyee) return "Cette soumission n'attend pas de réponse.";
+        return null;
+    }
+
+    private async Task RecordResponseAsync(Quote quote, QuoteResponseRequest request, CancellationToken ct)
+    {
+        var name = await db.Users.AsNoTracking()
+            .Where(u => u.Id == currentUser.UserId)
+            .Select(u => u.FirstName + " " + u.LastName)
+            .FirstOrDefaultAsync(ct);
+
+        quote.ClientRespondedAt = DateTimeOffset.UtcNow;
+        quote.ClientRespondedBy = Clean(name) is { } who ? Truncate(who, 200) : null;
+        quote.ClientResponseNote = Clean(request.Note);
+        quote.UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    /// <summary>
+    /// Tells the company the customer answered. Best effort: the answer is already saved, and a
+    /// mail server that is down must not turn the customer's yes into an error on their screen.
+    /// </summary>
+    private async Task NotifyCompanyAsync(Quote quote, bool accepted, string? extra, CancellationToken ct)
+    {
+        try
+        {
+            var tenant = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
+                .Where(t => t.Id == quote.TenantId)
+                .Select(t => new { t.Name, t.ContactEmail })
+                .FirstOrDefaultAsync(ct);
+            if (tenant?.ContactEmail is not { Length: > 0 } to) return;
+
+            var number = $"S-{quote.Number:0000}";
+            var client = quote.Client?.Name ?? "Le client";
+            var verb = accepted ? "accepté" : "refusé";
+            var who = quote.ClientRespondedBy is { } name && name != client ? $" ({Html(name)})" : "";
+            var note = quote.ClientResponseNote is { } text
+                ? $"<p>Son message :</p><blockquote>{Html(text).Replace("\n", "<br>")}</blockquote>"
+                : "";
+            var body =
+                $"<p>{Html(client)}{who} a {verb} la soumission {number} depuis son portail.</p>" +
+                (extra is null ? "" : $"<p>{Html(extra)}</p>") +
+                note +
+                $"<p><a href=\"{FrontendUrl}/soumissions/{quote.Id}\">Ouvrir la soumission</a></p>";
+
+            await mailgun.SendAsync(to, tenant.Name, $"Soumission {number} {verb}e par {client}", body, ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not tell tenant {TenantId} about the answer to quote {QuoteId}", quote.TenantId, quote.Id);
+        }
+    }
+
+    private static string Html(string value) => value
+        .Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;");
+
+    private Task<Quote?> LoadForProjectAsync(Guid id) =>
+        Visible()
+            .Include(q => q.Lines)
+            .Include(q => q.Documents)
+            .Include(q => q.Notes)
+            .Include(q => q.Client)
+            .FirstOrDefaultAsync(q => q.Id == id);
+
+    /// <summary>
+    /// Builds the project an accepted quote becomes, links the two and marks the quote accepted.
+    /// Does not save, so the caller's own changes go in the same transaction.
+    /// </summary>
+    private async Task<Project> CreateProjectAsync(Quote quote)
+    {
         var tenantId = quote.TenantId;
         var highest = await db.Projects.IgnoreQueryFilters()
             .Where(p => p.TenantId == tenantId)
@@ -390,9 +559,7 @@ public class QuotesController(VextaDbContext db, ICurrentUserService currentUser
         quote.ProjectId = project.Id;
         quote.Status = QuoteStatus.Acceptee;
         quote.UpdatedAt = DateTimeOffset.UtcNow;
-
-        await db.SaveChangesAsync();
-        return Ok(await GetDtoAsync(id));
+        return project;
     }
 
     // ---- Helpers ----
@@ -494,7 +661,7 @@ public class QuotesController(VextaDbContext db, ICurrentUserService currentUser
             LineTotal(l), l.SortOrder);
 
     private Task<QuoteDto?> GetDtoAsync(Guid id) =>
-        db.Quotes.AsNoTracking().Where(q => q.Id == id).Select(ToDto()).FirstOrDefaultAsync();
+        Visible().AsNoTracking().Where(q => q.Id == id).Select(ToDto()).FirstOrDefaultAsync();
 
     private static System.Linq.Expressions.Expression<Func<Quote, QuoteDto>> ToDto() => q => new QuoteDto(
         q.Id,
@@ -531,5 +698,8 @@ public class QuotesController(VextaDbContext db, ICurrentUserService currentUser
         q.Lines.Sum(l => Math.Round(l.Quantity * l.UnitPrice, 2)),
         q.CreatedAt,
         q.UpdatedAt,
-        q.SentAt);
+        q.SentAt,
+        q.ClientRespondedAt,
+        q.ClientRespondedBy,
+        q.ClientResponseNote);
 }

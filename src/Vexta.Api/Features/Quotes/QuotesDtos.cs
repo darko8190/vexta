@@ -36,7 +36,14 @@ public record QuoteDto(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     /// <summary>When it was last emailed to the client.</summary>
-    DateTimeOffset? SentAt);
+    DateTimeOffset? SentAt,
+    /// <summary>The client's answer from the portal, if they gave one there.</summary>
+    DateTimeOffset? ClientRespondedAt,
+    string? ClientRespondedBy,
+    string? ClientResponseNote);
+
+/// <summary>What the client may write with their answer. Optional either way.</summary>
+public record QuoteResponseRequest(string? Note);
 
 public record UpsertQuoteRequest(
     Guid ClientId,

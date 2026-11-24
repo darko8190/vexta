@@ -14,7 +14,8 @@ namespace Vexta.Api.Features.Quotes;
 public record QuoteSentDto(string Email, DateTimeOffset SentAt, QuoteStatus Status);
 
 /// <summary>
-/// The quote as paper, and as an email.
+/// The quote as an email. The PDF itself is served by <see cref="QuotesController"/>, where the
+/// customer can reach it too.
 ///
 /// The send endpoints answer in the invoice's own shapes — the same recipients, the same copy to
 /// employees, the same attachments — so the one send form serves both documents. The quote's
@@ -31,22 +32,15 @@ public class QuoteSendController(
     IInvoicePdfService pdf,
     IMailgunService mailgun,
     IR2StorageService storage,
-    IHttpClientFactory httpClientFactory) : ControllerBase
+    IHttpClientFactory httpClientFactory,
+    IConfiguration configuration) : ControllerBase
 {
+    private string FrontendUrl => configuration["Frontend:BaseUrl"]?.TrimEnd('/') ?? "http://localhost:3000";
+
     /// <summary>Under Mailgun's own limit, so the answer can name the problem. Same as invoices.</summary>
     private const long MaxAttachmentBytes = 20L * 1024 * 1024;
     private const int MaxBodyLength = 100_000;
     private const int MaxSubjectLength = 300;
-
-    [HttpGet("pdf")]
-    public async Task<IActionResult> Pdf(Guid id, CancellationToken ct)
-    {
-        var rendered = await pdf.RenderQuoteAsync(id, ct);
-        if (rendered is not { } document) return NotFound();
-
-        Response.Headers.ContentDisposition = $"inline; filename=\"Soumission-S-{document.Number:0000}.pdf\"";
-        return File(document.Bytes, "application/pdf");
-    }
 
     /// <summary>
     /// What the send form opens with: who it can go to (the billing contact first), who can be
@@ -86,14 +80,24 @@ public class QuoteSendController(
             ? $", valide jusqu'au {until.ToString("d MMMM yyyy", Formats.Quebec)}"
             : "";
 
+        // A customer who can sign in answers with one button, so the message offers it. One
+        // without access is not sent to a page that would only ask them for a password.
+        var hasPortal = quote.Client?.UserId is not null
+            || await db.ClientContacts.AnyAsync(c => c.ClientId == quote.ClientId && c.UserId != null, ct);
+        var howToAccept = hasPortal
+            ? $"<p>Vous pouvez la consulter et l'accepter en ligne depuis votre portail : " +
+              $"<a href=\"{FrontendUrl}/soumissions/{quote.Id}\">voir la soumission</a>. " +
+              "Vous pouvez aussi nous la retourner signée ou répondre à ce courriel.</p>"
+            : "<p>Pour l'accepter, il suffit de nous la retourner signée ou de répondre à ce courriel. " +
+              "N'hésitez pas à nous écrire pour toute question.</p>";
+
         // Plain wording rather than a template the company edits: quotes do not have one yet,
         // and the person reads and can change every word before it leaves.
         var body =
             $"<p>Bonjour {Html(greeting)},</p>" +
             $"<p>Vous trouverez ci-joint notre soumission {Html(number)} au montant de " +
             $"{Html(total.ToString("C2", Formats.Quebec))} taxes incluses{Html(validity)}.</p>" +
-            "<p>Pour l'accepter, il suffit de nous la retourner signée ou de répondre à ce courriel. " +
-            "N'hésitez pas à nous écrire pour toute question.</p>" +
+            howToAccept +
             $"<p>{Html(company)}</p>";
 
         return Ok(new InvoiceSendDefaultsDto(

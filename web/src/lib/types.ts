@@ -3034,6 +3034,10 @@ export interface QuoteRecord {
   updatedAt: string;
   /** When it was last emailed to the client. */
   sentAt: string | null;
+  /** The client's own answer from their portal, if they gave it there. */
+  clientRespondedAt: string | null;
+  clientRespondedBy: string | null;
+  clientResponseNote: string | null;
 }
 
 export interface QuoteFormValues {

@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Building2, BriefcaseBusiness, ClipboardPen, FileText, Mail, MapPin, Phone } from "lucide-react";
 import { BrandTheme } from "@/components/layout/brand-theme";
+import { AddToBasketButton, BasketPanel } from "@/components/public/basket-panel";
 import { JobApplicationDialog } from "@/components/public/job-application-dialog";
 import { PublicAccountBar } from "@/components/public/public-account-bar";
 import { PublicFormDialog } from "@/components/public/public-form-dialog";
@@ -228,7 +229,32 @@ async function CompanyPageContent({ params }: Pick<PageProps<"/e/[slug]">, "para
                         {product.sellingPrice !== null && (
                           <p className="mt-3 text-base font-semibold tabular-nums text-foreground">
                             {money.format(product.sellingPrice)}
+                            {/* The unit beside the figure, because "12,50 $" for a square foot
+                                and for a pallet are very different offers. */}
+                            {product.unit && (
+                              <span className="text-sm font-normal text-muted-foreground">
+                                {" / "}
+                                {product.unit}
+                              </span>
+                            )}
                           </p>
+                        )}
+
+                        {/* mt-auto on the wrapper, not the button: a grid of cards whose
+                            descriptions are different lengths should still line its buttons up
+                            along the bottom. */}
+                        {company.acceptsOrders && (
+                          <div className="mt-auto">
+                            <AddToBasketButton
+                              slug={company.slug}
+                              product={{
+                                id: product.id,
+                                title: product.title,
+                                unit: product.unit,
+                                sellingPrice: product.sellingPrice,
+                              }}
+                            />
+                          </div>
                         )}
                       </div>
                     </li>
@@ -409,6 +435,11 @@ async function CompanyPageContent({ params }: Pick<PageProps<"/e/[slug]">, "para
           </div>
         </main>
 
+        {/* Outside the main column and after it: a basket is the visitor's, not the company's,
+            and it must not take on whichever arrangement the page is drawn with. */}
+        {company.acceptsOrders && (
+          <BasketPanel slug={company.slug} companyName={company.name} />
+        )}
       </div>
     </>
   );

@@ -63,6 +63,9 @@ public static class ModuleIcons
         // give Achats a basket or Outils a mortarboard, and would have to settle for a cog.
         "ShoppingCart", "GraduationCap", "ClipboardPen", "ListChecks", "CalendarClock",
         "FolderOpen", "Wallet", "HandCoins", "UserPlus", "BookUser", "PackageCheck",
+        // A bag, not a trolley: the trolley is already Achats, and the two tabs point opposite
+        // ways -- one is the company buying, the other its customers buying from it.
+        "ShoppingBag",
         // Features draw from the same set as modules, and the assistant needs a face.
         "Sparkles", "Bot"
     };

@@ -57,6 +57,7 @@ public record PublicPageSettingsDto(
     bool ShowProducts,
     bool ShowJobs,
     bool ShowForms,
+    bool AcceptsOrders,
     PublicPageStyle Style,
     string Slug,
     /// <summary>Null while nothing has ever been saved — the page is defaults, not a record.</summary>
@@ -70,6 +71,7 @@ public record SavePublicPageRequest(
     bool ShowProducts,
     bool ShowJobs,
     bool ShowForms,
+    bool AcceptsOrders,
     PublicPageStyle Style);
 
 /// <summary>

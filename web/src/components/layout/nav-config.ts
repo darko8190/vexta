@@ -1,4 +1,4 @@
-﻿import {
+﻿﻿import {
   Blocks,
   Boxes,
   Briefcase,
@@ -15,6 +15,7 @@
   Palette,
   Search,
   Settings,
+  ShoppingBag,
   ShoppingCart,
   Sparkles,
   Tag,
@@ -63,6 +64,10 @@ const tenantNav: NavItem[] = [
   // is money promised. They are read by different people on different days.
   { href: "/approvisionnement", label: "Fournisseurs & Commandes", icon: Truck },
   { href: "/inventaire", label: "Inventaire", icon: Boxes },
+  // Right after Inventaire, because that is where what it sells comes from. "En ligne" is
+  // doing real work in the label: Fournisseurs & Commandes above is the company buying, and
+  // somebody who opened the wrong one would only find out from the names on the rows.
+  { href: "/commandes", label: "Commandes en ligne", icon: ShoppingBag },
   // Outils, not "Outils & Formation": the formations went to Ressources humaines, where the
   // people they belong to are. A heading that still named them would send somebody here first.
   { href: "/outils", label: "Outils", icon: ClipboardPen },
@@ -104,6 +109,7 @@ const personalNav: NavItem[] = [
   { href: "/tableau-de-bord", label: "Tableau de bord", icon: LayoutDashboard },
   { href: "/mon-cv", label: "Mon CV", icon: FileUser },
   { href: "/mes-emplois", label: "Mes emplois", icon: Briefcase },
+  { href: "/mes-commandes", label: "Mes commandes", icon: ShoppingBag },
   { href: "/mes-factures", label: "Mes factures", icon: FileText },
   { href: "/entreprises", label: "Entreprises", icon: Building2 },
   { href: "/emplois", label: "Rechercher un emploi", icon: Search },

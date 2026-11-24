@@ -1,0 +1,308 @@
+"use client";
+
+import { useState } from "react";
+import { CheckCircle2, Minus, Plus, ShoppingBag, Trash2 } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
+import { SignInToOrder } from "@/components/public/public-account-bar";
+import { useBasket } from "@/hooks/use-basket";
+import { useOrderEligibilityQuery, usePlaceOrder } from "@/hooks/use-orders";
+import { useAuth } from "@/lib/auth-context";
+import { ApiError } from "@/lib/api";
+import { ex } from "@/lib/placeholders";
+
+const money = new Intl.NumberFormat("fr-CA", { style: "currency", currency: "CAD" });
+
+/**
+ * The button that puts a product in the basket.
+ *
+ * Its own small component so the product card stays a card: everything about what a basket is
+ * lives in the hook, and the card only has to know which product it is showing.
+ */
+export function AddToBasketButton({
+  slug,
+  product,
+}: {
+  slug: string;
+  product: { id: string; title: string; unit: string | null; sellingPrice: number | null };
+}) {
+  const basket = useBasket(slug);
+
+  // A product with no price is "prix sur demande" on the page, and the API refuses it on an
+  // order: the customer would be agreeing to a figure nobody has named. No button, rather than
+  // a button that is refused after they have filled in a delivery note.
+  if (product.sellingPrice === null) return null;
+
+  const inBasket = basket.items.find((line) => line.productId === product.id);
+
+  return (
+    <Button
+      type="button"
+      variant={inBasket ? "secondary" : "outline"}
+      size="sm"
+      className="mt-3 w-full"
+      onClick={() =>
+        basket.add({
+          productId: product.id,
+          title: product.title,
+          unit: product.unit,
+          unitPrice: product.sellingPrice ?? 0,
+        })
+      }
+    >
+      <Plus className="size-4" />
+      {inBasket ? `Au panier (${inBasket.quantity})` : "Ajouter au panier"}
+    </Button>
+  );
+}
+
+/**
+ * The basket, and the order that comes out of it.
+ *
+ * A bar fixed to the bottom of the window rather than a section of the page: somebody adding a
+ * fourth item is halfway down a catalogue, and a basket they have to scroll back up to find is
+ * a basket they forget they have.
+ *
+ * Nothing is shown at all while it is empty. An empty basket on a page is an invitation to
+ * explain what a basket is, and the page has better things to say.
+ *
+ * Ordering needs an account — the dialog says so plainly to a visitor who has none, and offers
+ * the same sign-in as applying for a job rather than a second one of its own.
+ */
+export function BasketPanel({ slug, companyName }: { slug: string; companyName: string }) {
+  const { user } = useAuth();
+  const basket = useBasket(slug);
+  const place = usePlaceOrder();
+
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState("");
+  const [phone, setPhone] = useState("");
+  const [phoneTouched, setPhoneTouched] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
+
+  // Asked only once the dialog is open and there is somebody to ask about. A visitor reading
+  // the page has not yet asked a question that needs answering.
+  const eligibility = useOrderEligibilityQuery(slug, open && Boolean(user));
+
+  // What the company has on file, unless this person has typed something else for this order.
+  const phoneValue = phoneTouched ? phone : phone || (eligibility.data?.contactPhone ?? "");
+
+  function onOpenChange(next: boolean) {
+    setOpen(next);
+    if (!next) return;
+
+    setError(null);
+    setDone(null);
+  }
+
+  async function send() {
+    setError(null);
+
+    try {
+      const result = await place.mutateAsync({
+        slug,
+        lines: basket.items.map((line) => ({
+          productId: line.productId,
+          quantity: line.quantity,
+        })),
+        note: note.trim() || null,
+        contactPhone: phoneValue.trim() || null,
+      });
+
+      // Emptied only once the API has the order. A network failure that cleared the basket
+      // would cost somebody the twenty minutes they spent filling it.
+      basket.clear();
+      setNote("");
+      setDone(result.message);
+    } catch (err) {
+      setError(
+        err instanceof ApiError || err instanceof Error
+          ? err.message
+          : "Votre commande n'a pas pu être envoyée.",
+      );
+    }
+  }
+
+  if (basket.items.length === 0 && !done) return null;
+
+  const ready = Boolean(user) && eligibility.data?.canOrder === true;
+
+  return (
+    <>
+      {basket.items.length > 0 && (
+        <div className="sticky bottom-0 z-40 border-t border-border bg-card/95 backdrop-blur">
+          <div className="mx-auto flex w-full max-w-4xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
+            <p className="text-sm text-foreground">
+              <ShoppingBag className="mr-2 inline size-4 align-text-bottom" aria-hidden="true" />
+              {basket.count} article{basket.count > 1 ? "s" : ""}
+              <span className="text-muted-foreground"> · </span>
+              <strong className="tabular-nums">{money.format(basket.subtotal)}</strong>
+              <span className="ml-1 text-xs text-muted-foreground">avant taxes</span>
+            </p>
+
+            <Button type="button" onClick={() => onOpenChange(true)}>
+              Voir mon panier
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Mon panier — {companyName}</DialogTitle>
+            <DialogDescription>
+              {user
+                ? "L'entreprise vous confirmera le prix final et la livraison."
+                : "Il faut un compte Vexta pour commander."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="max-h-[60vh] overflow-y-auto px-4">
+            {done ? (
+              <Alert>
+                <CheckCircle2 />
+                <AlertDescription>{done}</AlertDescription>
+              </Alert>
+            ) : !user ? (
+              <SignInToOrder slug={slug} />
+            ) : eligibility.isLoading ? (
+              <p className="py-4 text-sm text-muted-foreground">Un instant…</p>
+            ) : eligibility.data?.canOrder === false ? (
+              <Alert variant="destructive">
+                <AlertDescription>
+                  {eligibility.data.refusal ??
+                    "Cette entreprise ne prend pas de commandes en ligne pour le moment."}
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <FieldGroup>
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+
+                <ul className="divide-y divide-border">
+                  {basket.items.map((line) => (
+                    <li key={line.productId} className="flex items-center gap-3 py-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-foreground">{line.title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {money.format(line.unitPrice)}
+                          {line.unit ? ` / ${line.unit}` : ""}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Retirer un ${line.title}`}
+                          onClick={() => basket.setQuantity(line.productId, line.quantity - 1)}
+                        >
+                          <Minus className="size-4" />
+                        </Button>
+                        <span className="w-8 text-center text-sm tabular-nums">{line.quantity}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Ajouter un ${line.title}`}
+                          onClick={() => basket.setQuantity(line.productId, line.quantity + 1)}
+                        >
+                          <Plus className="size-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Retirer ${line.title} du panier`}
+                          onClick={() => basket.remove(line.productId)}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
+
+                      <p className="w-20 text-right text-sm font-medium tabular-nums text-foreground">
+                        {money.format(line.quantity * line.unitPrice)}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+
+                <p className="text-right text-sm text-foreground">
+                  Sous-total : <strong className="tabular-nums">{money.format(basket.subtotal)}</strong>
+                  <span className="block text-xs text-muted-foreground">
+                    Les taxes et la livraison s&apos;ajoutent sur la facture.
+                  </span>
+                </p>
+
+                <Field>
+                  <FieldLabel htmlFor="order-phone">Téléphone</FieldLabel>
+                  <Input
+                    id="order-phone"
+                    value={phoneValue}
+                    onChange={(event) => {
+                      setPhoneTouched(true);
+                      setPhone(event.target.value);
+                    }}
+                    placeholder={ex("418 555-0199")}
+                  />
+                  <FieldDescription>
+                    Le numéro où vous joindre pour cette commande.
+                  </FieldDescription>
+                </Field>
+
+                <Field>
+                  <FieldLabel htmlFor="order-note">Un mot à l&apos;entreprise</FieldLabel>
+                  <Textarea
+                    id="order-note"
+                    rows={3}
+                    value={note}
+                    onChange={(event) => setNote(event.target.value)}
+                    placeholder={ex("Livraison au chantier, rue Saint-Jean. Avant vendredi si possible.")}
+                  />
+                  <FieldDescription>
+                    Optionnel. Une adresse de livraison, une date, une question.
+                  </FieldDescription>
+                </Field>
+              </FieldGroup>
+            )}
+          </div>
+
+          <DialogFooter>
+            {ready && !done ? (
+              <>
+                <Button type="button" onClick={() => void send()} disabled={place.isPending}>
+                  {place.isPending && <Spinner />}
+                  Envoyer ma commande
+                </Button>
+                <DialogClose render={<Button type="button" variant="outline" />}>
+                  Continuer mes achats
+                </DialogClose>
+              </>
+            ) : (
+              <DialogClose render={<Button type="button" variant="outline" />}>Fermer</DialogClose>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}

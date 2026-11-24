@@ -5,6 +5,7 @@ using Vexta.Api.Common;
 using Vexta.Api.Data;
 using Vexta.Api.Domain;
 using Vexta.Api.Features.Invoices;
+using Vexta.Api.Features.Orders;
 
 // Vexta's invoice, never Stripe's. This file does not talk to Stripe at all.
 using Invoice = Vexta.Api.Domain.Invoice;
@@ -240,6 +241,89 @@ public class PersonalDeskController(VextaDbContext db, ICurrentUserService curre
             // "what do I still have to pay", not browsing their filing.
             .OrderBy(x => x.Outstanding <= 0)
             .ThenByDescending(x => x.IssueDate)
+            .ToList();
+
+        return Ok(items);
+    }
+
+    /// <summary>
+    /// Every order this person placed, across every company they have bought from.
+    ///
+    /// Keyed on the account that placed it rather than on a customer file, unlike the invoices
+    /// above. The two differ on purpose: a company may invoice a client file somebody was given
+    /// access to afterwards, but an order was placed by a person who was signed in at the time,
+    /// and that person is the one who should see it.
+    /// </summary>
+    [HttpGet("commandes")]
+    public async Task<ActionResult<List<MyOrderDto>>> Orders(CancellationToken ct)
+    {
+        if (currentUser.UserId is not { } userId) return Forbid();
+
+        var rows = await db.CustomerOrders.IgnoreQueryFilters().AsNoTracking()
+            .Where(o => o.PlacedByUserId == userId)
+            .OrderByDescending(o => o.CreatedAt)
+            .Select(o => new
+            {
+                o.Id,
+                o.Number,
+                o.TenantId,
+                o.Status,
+                o.Currency,
+                o.IsTaxExempt,
+                o.GstRate,
+                o.QstRate,
+                o.CreatedAt,
+                Lines = o.Lines
+                    .OrderBy(l => l.SortOrder)
+                    .Select(l => new { l.Description, l.Quantity, l.UnitPrice, l.IsTaxable })
+                    .ToList()
+            })
+            .ToListAsync(ct);
+
+        if (rows.Count == 0) return Ok(new List<MyOrderDto>());
+
+        var tenantIds = rows.Select(r => r.TenantId).Distinct().ToList();
+
+        var companies = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
+            .Where(t => tenantIds.Contains(t.Id))
+            .Select(t => new { t.Id, t.Name, t.Slug })
+            .ToDictionaryAsync(t => t.Id, t => t, ct);
+
+        var published = await PublishedSlugsAsync(tenantIds, ct);
+
+        var items = rows
+            .Select(r =>
+            {
+                var company = companies.GetValueOrDefault(r.TenantId);
+
+                // The rates stored on the order, not the company's current ones: the figure
+                // shown here has to be the figure that was agreed to.
+                var total = InvoiceTotals.For(
+                    r.Lines.Select(l => new InvoiceTotals.Line(l.Quantity, l.UnitPrice, l.IsTaxable)),
+                    r.GstRate,
+                    r.QstRate,
+                    r.IsTaxExempt).Total;
+
+                var first = r.Lines.FirstOrDefault();
+
+                var summary = first is null
+                    ? "—"
+                    : r.Lines.Count == 1
+                        ? first.Description
+                        : $"{first.Description}, et {r.Lines.Count - 1} autre{(r.Lines.Count > 2 ? "s" : "")}";
+
+                return new MyOrderDto(
+                    r.Id,
+                    OrderNumber.Of(r.Number),
+                    company?.Name ?? "",
+                    company is not null && published.Contains(company.Id) ? company.Slug : null,
+                    r.Status,
+                    r.Currency,
+                    InvoiceTotals.Round(total),
+                    r.Lines.Count,
+                    summary,
+                    r.CreatedAt);
+            })
             .ToList();
 
         return Ok(items);

@@ -76,6 +76,16 @@ public class PublicPage
     /// </summary>
     public bool ShowForms { get; set; }
 
+    /// <summary>
+    /// Whether visitors may order the products on the page rather than only look at them.
+    ///
+    /// Off by default and separate from <see cref="ShowProducts"/>, because they are different
+    /// promises. A shop window says "this is what we carry"; a basket says "ask us for it and we
+    /// will get it to you", and a company that has not decided it can keep stock, answer the
+    /// telephone and deliver should not be making that promise by accident.
+    /// </summary>
+    public bool AcceptsOrders { get; set; }
+
     public PublicPageStyle Style { get; set; } = PublicPageStyle.Classique;
 
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;

@@ -6,6 +6,7 @@ import type {
   CredentialKind,
   CvEntryKind,
   EmploymentType,
+  CustomerOrderStatus,
   FormActionKind,
   FormFieldTarget,
   FormKind,
@@ -145,6 +146,32 @@ export const formFieldTargetLabels: Record<FormFieldTarget, string> = {
   ActifReference: "Actif — plaque ou référence",
   ActifUsage: "Actif — usage (km, heures)",
   ActifNotes: "Actif — notes",
+};
+
+/**
+ * Where an order stands, in the words a counter would use.
+ *
+ * The same five words on both sides: the company moves the order along, and the customer reads
+ * exactly what the company said. A screen that translated them would be two vocabularies for
+ * one fact, and the telephone call that follows would be about the translation.
+ */
+export const customerOrderStatusLabels: Record<CustomerOrderStatus, string> = {
+  Recue: "Reçue",
+  EnPreparation: "En préparation",
+  Prete: "Prête",
+  Livree: "Livrée",
+  Annulee: "Annulée",
+};
+
+export const customerOrderStatusBadgeVariant: Record<
+  CustomerOrderStatus,
+  "default" | "secondary" | "outline" | "destructive"
+> = {
+  Recue: "default",
+  EnPreparation: "secondary",
+  Prete: "secondary",
+  Livree: "outline",
+  Annulee: "destructive",
 };
 
 export const formActionKindLabels: Record<FormActionKind, string> = {

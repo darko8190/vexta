@@ -1485,6 +1485,8 @@ export interface PublicPageSettings {
   showJobs: boolean;
   /** Off by default: forms built for the crew are not thereby offered to the internet. */
   showForms: boolean;
+  /** Whether visitors may order the products rather than only look at them. */
+  acceptsOrders: boolean;
   style: PublicPageStyle;
   /** Where the page lives: /e/{slug}. */
   slug: string;
@@ -1505,6 +1507,8 @@ export interface PublicCompany {
   brandColor: string | null;
   /** Which of the four arrangements the page is drawn with. */
   style: PublicPageStyle;
+  /** Whether the basket is offered. Products shown and orders accepted are two switches. */
+  acceptsOrders: boolean;
   address: CompanyAddress | null;
   products: PublicProduct[];
   jobs: PublicJob[];
@@ -1518,6 +1522,89 @@ export interface PublicPageForm {
   title: string;
   description: string | null;
   kind: FormKind;
+}
+
+// ---- Commandes : ce qu'un client commande sur la page publique d'une entreprise ----
+
+/** Where an order stands. Each one means something different to the person waiting. */
+export type CustomerOrderStatus = "Recue" | "EnPreparation" | "Prete" | "Livree" | "Annulee";
+
+/** Whether this account may order from a company, and under what name. */
+export interface OrderEligibility {
+  companyName: string;
+  canOrder: boolean;
+  /** Why not. Null when the answer is yes. */
+  refusal: string | null;
+  contactName: string;
+  contactEmail: string | null;
+  contactPhone: string | null;
+}
+
+/** One line of a basket on its way out. The price is never sent: the API reads it. */
+export interface PlaceOrderLine {
+  productId: string;
+  quantity: number;
+}
+
+export interface PlaceOrderResult {
+  id: string;
+  number: string;
+  message: string;
+}
+
+export interface OrderLine {
+  id: string;
+  productId: string | null;
+  description: string;
+  unit: string | null;
+  quantity: number;
+  unitPrice: number;
+  isTaxable: boolean;
+  lineTotal: number;
+  sortOrder: number;
+}
+
+/** An order as the company's list shows it. */
+export interface CustomerOrder {
+  id: string;
+  number: string;
+  clientId: string;
+  clientName: string;
+  contactName: string;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  status: CustomerOrderStatus;
+  currency: string;
+  subtotal: number;
+  taxTotal: number;
+  total: number;
+  lineCount: number;
+  /** The invoice drawn from it, when there is one. The order is then done with. */
+  invoiceId: string | null;
+  invoiceNumber: string | null;
+  createdAt: string;
+}
+
+export interface CustomerOrderDetail {
+  order: CustomerOrder;
+  note: string | null;
+  lines: OrderLine[];
+}
+
+/** One order this person placed, read from their own space. */
+export interface MyOrder {
+  id: string;
+  number: string;
+  companyName: string;
+  /** Null when the company's page is not published: the row then offers no link. */
+  companySlug: string | null;
+  status: CustomerOrderStatus;
+  currency: string;
+  total: number;
+  lineCount: number;
+  /** What was ordered, in one line. */
+  summary: string;
+  createdAt: string;
 }
 
 /** One of the company's forms, with its questions, as a visitor fills it. */
@@ -1534,6 +1621,8 @@ export interface PublicProduct {
   number: number;
   title: string;
   description: string | null;
+  /** How it is sold: un, pi², sac. What the price is per. */
+  unit: string | null;
   categoryName: string | null;
   sellingPrice: number | null;
   imageUrl: string | null;

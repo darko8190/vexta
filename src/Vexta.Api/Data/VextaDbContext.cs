@@ -1,4 +1,4 @@
-﻿﻿using Microsoft.AspNetCore.Http;
+﻿﻿﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -84,6 +84,8 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
     public DbSet<ClientAccountEntry> ClientAccountEntries => Set<ClientAccountEntry>();
     public DbSet<InvoicePayment> InvoicePayments => Set<InvoicePayment>();
     public DbSet<ClientAssetType> ClientAssetTypes => Set<ClientAssetType>();
+    public DbSet<CustomerOrder> CustomerOrders => Set<CustomerOrder>();
+    public DbSet<CustomerOrderLine> CustomerOrderLines => Set<CustomerOrderLine>();
     public DbSet<FormTemplate> FormTemplates => Set<FormTemplate>();
     public DbSet<FormField> FormFields => Set<FormField>();
     public DbSet<FormAction> FormActions => Set<FormAction>();
@@ -687,6 +689,61 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             // for the same reason: two names for one kind is two people filing in two places.
             e.HasIndex(t => new { t.TenantId, t.Name }).IsUnique();
             e.HasQueryFilter(t => t.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<CustomerOrder>(e =>
+        {
+            // Cascade: an order belongs to the customer it was placed by, and deleting a client
+            // file takes their orders with it the way it takes their invoices.
+            e.HasOne(o => o.Client).WithMany()
+                .HasForeignKey(o => o.ClientId).OnDelete(DeleteBehavior.Cascade);
+
+            // Restrict: the account that placed it is how the person finds it again from their
+            // own space, and an order with no author is an order nobody can claim.
+            e.HasOne(o => o.PlacedByUser).WithMany()
+                .HasForeignKey(o => o.PlacedByUserId).OnDelete(DeleteBehavior.Restrict);
+
+            // SetNull: deleting the invoice drawn from an order must not delete the order, which
+            // is the record of what was actually asked for.
+            e.HasOne(o => o.Invoice).WithMany()
+                .HasForeignKey(o => o.InvoiceId).OnDelete(DeleteBehavior.SetNull);
+
+            e.Property(o => o.ContactName).HasMaxLength(200);
+            e.Property(o => o.ContactEmail).HasMaxLength(256);
+            e.Property(o => o.ContactPhone).HasMaxLength(40);
+            e.Property(o => o.Note).HasMaxLength(2000);
+            e.Property(o => o.Currency).HasMaxLength(3);
+            e.Property(o => o.GstRate).HasPrecision(6, 3);
+            e.Property(o => o.QstRate).HasPrecision(6, 3);
+
+            // One sequence per company, with nothing allowed to hand out the same number twice.
+            e.HasIndex(o => new { o.TenantId, o.Number }).IsUnique();
+
+            // What a person's own space asks for: their orders, newest first, across every
+            // company at once -- so the tenant cannot be part of this one.
+            e.HasIndex(o => new { o.PlacedByUserId, o.CreatedAt });
+
+            e.HasQueryFilter(o => o.TenantId == CurrentTenantId
+                && (CurrentClientId == null || o.ClientId == CurrentClientId));
+        });
+
+        builder.Entity<CustomerOrderLine>(e =>
+        {
+            e.HasOne(l => l.Order).WithMany(o => o.Lines)
+                .HasForeignKey(l => l.OrderId).OnDelete(DeleteBehavior.Cascade);
+
+            // SetNull: tidying the catalogue must not rewrite what somebody ordered. The line
+            // carries its own description and price, so it stays readable without the product.
+            e.HasOne(l => l.Product).WithMany()
+                .HasForeignKey(l => l.ProductId).OnDelete(DeleteBehavior.SetNull);
+
+            e.Property(l => l.Description).HasMaxLength(500);
+            e.Property(l => l.Unit).HasMaxLength(20);
+            e.Property(l => l.Quantity).HasPrecision(14, 3);
+            e.Property(l => l.UnitPrice).HasPrecision(14, 2);
+
+            e.HasIndex(l => new { l.OrderId, l.SortOrder });
+            e.HasQueryFilter(l => l.TenantId == CurrentTenantId);
         });
 
         builder.Entity<FormTemplate>(e =>

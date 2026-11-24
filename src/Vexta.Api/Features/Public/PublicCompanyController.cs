@@ -88,6 +88,9 @@ public class PublicCompanyController(VextaDbContext db, IR2StorageService storag
             tenant.Id,
             tenant.BrandColor,
             page.Style,
+            // Products and orders are two switches, and both have to be on: a basket on a page
+            // that is not showing its products would be a basket with nothing to put in it.
+            page.ShowProducts && page.AcceptsOrders,
             address,
             products,
             jobs,
@@ -186,6 +189,7 @@ public class PublicCompanyController(VextaDbContext db, IR2StorageService storag
                 p.Number,
                 p.Title,
                 p.Description,
+                p.Unit,
                 CategoryName = p.Category == null ? null : p.Category.Name,
                 p.SellingPrice,
                 Image = p.Images
@@ -215,7 +219,8 @@ public class PublicCompanyController(VextaDbContext db, IR2StorageService storag
             }
 
             products.Add(new PublicProductDto(
-                row.Id, row.Number, row.Title, row.Description, row.CategoryName, row.SellingPrice, imageUrl));
+                row.Id, row.Number, row.Title, row.Description, row.Unit, row.CategoryName,
+                row.SellingPrice, imageUrl));
         }
 
         return products;
@@ -241,6 +246,8 @@ public record PublicCompanyDto(
     string? BrandColor,
     /// <summary>Which of the four arrangements the page is drawn with.</summary>
     PublicPageStyle Style,
+    /// <summary>Whether a visitor may order the products rather than only look at them.</summary>
+    bool AcceptsOrders,
     CompanyAddressDto? Address,
     List<PublicProductDto> Products,
     List<PublicJobDto> Jobs,
@@ -253,6 +260,8 @@ public record PublicProductDto(
     int Number,
     string Title,
     string? Description,
+    /// <summary>How it is sold: un, pi², sac. What the price is per.</summary>
+    string? Unit,
     string? CategoryName,
     decimal? SellingPrice,
     string? ImageUrl);

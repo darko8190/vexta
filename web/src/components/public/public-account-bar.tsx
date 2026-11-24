@@ -64,14 +64,40 @@ export function PublicAccountBar({ slug }: { slug: string }) {
  * Postuler, so the message is about what is in the way rather than about what the page offers.
  */
 export function SignInToApply({ slug }: { slug: string }) {
+  return (
+    <SignInPrompt slug={slug}>
+      Postuler demande un compte Vexta — gratuit, et c&apos;est lui qui garde votre CV pour les
+      prochaines offres plutôt que de vous le faire réécrire chaque fois.
+    </SignInPrompt>
+  );
+}
+
+/**
+ * Ordering also needs an account, and for its own reason: an order is a commitment both ways,
+ * and it is what makes "Mes commandes" possible for somebody who buys from four suppliers.
+ */
+export function SignInToOrder({ slug }: { slug: string }) {
+  return (
+    <SignInPrompt slug={slug}>
+      Commander demande un compte Vexta — gratuit, et c&apos;est lui qui vous montre où en sont
+      vos commandes chez toutes les entreprises, plutôt que de vous faire fouiller vos courriels.
+    </SignInPrompt>
+  );
+}
+
+/**
+ * The two buttons, with whatever reason the caller has for showing them.
+ *
+ * One component rather than two nearly identical ones: the return address and the wording of
+ * the links are the same everywhere, and the only thing that differs is the sentence above
+ * them — which is exactly the part each caller should own.
+ */
+function SignInPrompt({ slug, children }: { slug: string; children: React.ReactNode }) {
   const back = `/e/${encodeURIComponent(slug)}`;
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">
-        Postuler demande un compte Vexta — gratuit, et c&apos;est lui qui garde votre CV pour les
-        prochaines offres plutôt que de vous le faire réécrire chaque fois.
-      </p>
+      <p className="text-sm text-muted-foreground">{children}</p>
       <div className="flex flex-wrap gap-2">
         <Link
           href={`/inscription?type=personnel&retour=${encodeURIComponent(back)}`}

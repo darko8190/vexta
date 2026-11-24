@@ -5,6 +5,7 @@ import type {
   MyApplication,
   MyInvoice,
   MyJob,
+  MyOrder,
   PersonalProfile,
   SavePersonalProfileValues,
 } from "@/lib/types";
@@ -90,6 +91,21 @@ export function useMyJobsQuery(enabled = true) {
   return useQuery({
     queryKey: ["mon-espace", "emplois"],
     queryFn: () => api.get<MyJob[]>("mon-espace/emplois"),
+    enabled,
+  });
+}
+
+/**
+ * Every order this person placed, across every company they have bought from.
+ *
+ * Keyed on the account that placed it rather than on a customer file, unlike the invoices
+ * below: an order was placed by somebody who was signed in at the time, and that person is the
+ * one who should see it.
+ */
+export function useMyOrdersQuery(enabled = true) {
+  return useQuery({
+    queryKey: ["mon-espace", "commandes"],
+    queryFn: () => api.get<MyOrder[]>("mon-espace/commandes"),
     enabled,
   });
 }

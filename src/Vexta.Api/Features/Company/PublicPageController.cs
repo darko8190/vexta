@@ -1,4 +1,4 @@
-﻿﻿using Microsoft.AspNetCore.Authorization;
+﻿﻿﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Vexta.Api.Common;
@@ -48,10 +48,11 @@ public class PublicPageController(VextaDbContext db, ICurrentUserService current
 
         return Ok(page is null
             ? new PublicPageSettingsDto(
-                false, null, null, null, true, true, false, PublicPageStyle.Classique, slug, null)
+                false, null, null, null, true, true, false, false, PublicPageStyle.Classique, slug, null)
             : new PublicPageSettingsDto(
                 page.IsPublished, page.Headline, page.About, page.ContactNote,
-                page.ShowProducts, page.ShowJobs, page.ShowForms, page.Style, slug, page.UpdatedAt));
+                page.ShowProducts, page.ShowJobs, page.ShowForms, page.AcceptsOrders,
+                page.Style, slug, page.UpdatedAt));
     }
 
     [HttpPut("public-page")]
@@ -81,6 +82,7 @@ public class PublicPageController(VextaDbContext db, ICurrentUserService current
         page.ShowProducts = request.ShowProducts;
         page.ShowJobs = request.ShowJobs;
         page.ShowForms = request.ShowForms;
+        page.AcceptsOrders = request.AcceptsOrders;
         page.Style = Enum.IsDefined(request.Style) ? request.Style : PublicPageStyle.Classique;
         page.UpdatedAt = DateTimeOffset.UtcNow;
 

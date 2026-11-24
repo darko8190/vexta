@@ -31,6 +31,7 @@ const formSchema = z.object({
   showProducts: z.boolean(),
   showJobs: z.boolean(),
   showForms: z.boolean(),
+  acceptsOrders: z.boolean(),
   style: z.enum(["Classique", "Chantier", "Epure", "Vitrine", "Journal", "Panneau", "Affiche"]),
 });
 
@@ -44,6 +45,7 @@ function toFormValues(settings?: PublicPageSettings): FormValues {
     showProducts: settings?.showProducts ?? true,
     showJobs: settings?.showJobs ?? true,
     showForms: settings?.showForms ?? false,
+    acceptsOrders: settings?.acceptsOrders ?? false,
     style: settings?.style ?? "Classique",
   };
 }
@@ -69,6 +71,7 @@ function PublishCard({ settings }: { settings: PublicPageSettings }) {
         showProducts: settings.showProducts,
         showJobs: settings.showJobs,
         showForms: settings.showForms,
+        acceptsOrders: settings.acceptsOrders,
         // Carried through unchanged: this switch publishes the page, and leaving the style out
         // would reset the company's choice every time it went online.
         style: settings.style,
@@ -179,6 +182,7 @@ function ContentCard({ settings }: { settings: PublicPageSettings }) {
         showProducts: values.showProducts,
         showJobs: values.showJobs,
         showForms: values.showForms,
+        acceptsOrders: values.acceptsOrders,
         style: values.style,
       });
       toast.success("Page publique mise à jour.");
@@ -311,6 +315,32 @@ function ContentCard({ settings }: { settings: PublicPageSettings }) {
                 vous avez cochés « sur la page publique » apparaissent — ce qui veut dire que
                 décocher ici les retire tous d&apos;un coup.
               </FieldDescription>
+
+              <Controller
+                name="acceptsOrders"
+                control={form.control}
+                render={({ field }) => (
+                  <Field>
+                    <div className="flex items-center gap-3">
+                      <Checkbox
+                        id="public-accepts-orders"
+                        checked={field.value}
+                        onCheckedChange={(checked) => field.onChange(checked === true)}
+                      />
+                      <FieldLabel htmlFor="public-accepts-orders">
+                        Accepter les commandes en ligne
+                      </FieldLabel>
+                    </div>
+                    <FieldDescription>
+                      Un panier s&apos;ajoute à vos produits et vos visiteurs peuvent commander.
+                      Séparé de « Afficher mes produits » parce que ce sont deux promesses : une
+                      vitrine dit ce que vous vendez, un panier dit que vous le livrez. Rien
+                      n&apos;est payé en ligne — les commandes arrivent dans Commandes en ligne,
+                      et c&apos;est vous qui facturez.
+                    </FieldDescription>
+                  </Field>
+                )}
+              />
             </div>
 
             <Controller

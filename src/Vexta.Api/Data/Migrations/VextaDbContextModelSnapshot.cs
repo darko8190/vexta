@@ -916,6 +916,130 @@ namespace Vexta.Api.Data.Migrations
                     b.ToTable("CompanyLocations");
                 });
 
+            modelBuilder.Entity("Vexta.Api.Domain.CustomerOrder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ClientId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ContactEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("ContactName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ContactPhone")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<decimal>("GstRate")
+                        .HasPrecision(6, 3)
+                        .HasColumnType("numeric(6,3)");
+
+                    b.Property<Guid?>("InvoiceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsTaxExempt")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("PlacedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("QstRate")
+                        .HasPrecision(6, 3)
+                        .HasColumnType("numeric(6,3)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClientId");
+
+                    b.HasIndex("InvoiceId");
+
+                    b.HasIndex("PlacedByUserId", "CreatedAt");
+
+                    b.HasIndex("TenantId", "Number")
+                        .IsUnique();
+
+                    b.ToTable("CustomerOrders");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.CustomerOrderLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<bool>("IsTaxable")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(14, 3)
+                        .HasColumnType("numeric(14,3)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Unit")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("OrderId", "SortOrder");
+
+                    b.ToTable("CustomerOrderLines");
+                });
+
             modelBuilder.Entity("Vexta.Api.Domain.EmergencyContact", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3087,6 +3211,9 @@ namespace Vexta.Api.Data.Migrations
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
 
+                    b.Property<bool>("AcceptsOrders")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("ContactNote")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
@@ -3995,6 +4122,50 @@ namespace Vexta.Api.Data.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Vexta.Api.Domain.CustomerOrder", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.Client", "Client")
+                        .WithMany()
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Vexta.Api.Domain.Invoice", "Invoice")
+                        .WithMany()
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Vexta.Api.Domain.ApplicationUser", "PlacedByUser")
+                        .WithMany()
+                        .HasForeignKey("PlacedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Client");
+
+                    b.Navigation("Invoice");
+
+                    b.Navigation("PlacedByUser");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.CustomerOrderLine", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.CustomerOrder", "Order")
+                        .WithMany("Lines")
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Vexta.Api.Domain.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Order");
+
+                    b.Navigation("Product");
+                });
+
             modelBuilder.Entity("Vexta.Api.Domain.EmergencyContact", b =>
                 {
                     b.HasOne("Vexta.Api.Domain.Employee", "Employee")
@@ -4842,6 +5013,11 @@ namespace Vexta.Api.Data.Migrations
             modelBuilder.Entity("Vexta.Api.Domain.ClientAssetType", b =>
                 {
                     b.Navigation("Assets");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.CustomerOrder", b =>
+                {
+                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.ExpenseType", b =>

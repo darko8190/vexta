@@ -1,4 +1,4 @@
-﻿﻿# Déploiement de Vexta sur Dokploy
+﻿﻿﻿# Déploiement de Vexta sur Dokploy
 
 Deux environnements, deux branches, deux fichiers compose :
 
@@ -1839,6 +1839,67 @@ formulaire public de personne du tout — et dans ces deux cas il ne trouvait au
 formulaire ne faisait rien, sans le dire. **Si vous aviez attaché un courriel ou une création de
 client à un formulaire de candidature, il ne partait pas.** Il part maintenant : l'entreprise est
 lue sur la soumission elle-même, qui est l'autorité qui compte.
+
+### Panier et commandes en ligne
+
+Un visiteur peut maintenant commander les produits d'une page publique, et retrouver ses
+commandes dans **Mes commandes**.
+
+**Deux interrupteurs, pas un.** « Afficher mes produits » dit ce que vous vendez ; « Accepter les
+commandes en ligne » dit que vous le livrez. Ce sont deux promesses, et une entreprise qui n'a
+pas décidé qu'elle tient du stock, répond au téléphone et livre ne devrait pas faire la seconde
+par accident. Les deux se cochent dans **Entreprise → Page publique**.
+
+**Commander demande un compte**, contrairement aux formulaires publics. Pas une barrière pour
+le plaisir : une commande est un engagement des deux côtés — vous la préparez, le client vient
+la chercher et la paie — et chacun a besoin de savoir à qui il a affaire. C'est aussi la seule
+façon que « Mes commandes » existe : quelqu'un qui achète chez quatre fournisseurs retrouve ses
+quatre commandes au même endroit au lieu de fouiller ses courriels.
+
+**Le panier vit dans le navigateur du visiteur**, un par entreprise. Rien n'est envoyé tant que
+la commande n'est pas passée — un panier, c'est quelqu'un qui réfléchit, et une entreprise n'a
+pas besoin de le regarder réfléchir. Un panier par entreprise parce que deux entrepreneurs
+livrent séparément, facturent séparément et sont deux conversations.
+
+**Les prix ne viennent jamais du navigateur.** Le panier envoie des identifiants de produits et
+des quantités ; ce que ça coûte est lu dans votre catalogue par l'API. Un appelant qui pourrait
+nommer un prix nommerait le sien. Un produit sans prix affiché — « prix sur demande » — n'a pas
+de bouton et est refusé sur une commande : le client accepterait un chiffre que personne n'a
+nommé.
+
+**Ce que la commande garde** est une photo du moment : la description, l'unité, le prix unitaire
+et vos deux taux de taxes tels qu'ils étaient. Le catalogue bouge, et ce qui a été convenu ne
+doit pas bouger avec lui. C'est la seule chose qui diffère d'une facture — une facture est
+réimprimable par l'entreprise, une commande est un chiffre qu'un client a vu et accepté.
+
+**Le dossier client s'ouvre tout seul** à la première commande d'un compte que vous ne
+connaissez pas encore, avec le compte rattaché. Une commande qui n'appartient à personne ne peut
+pas devenir une facture, ce qui est toute la raison d'en avoir une. Une deuxième commande du même
+compte retombe sur le même dossier plutôt que d'en ouvrir un second. Un client bloqué est refusé,
+et on lui dit pourquoi.
+
+**Rien ne sort du stock.** Une commande est une demande, pas une vente : le stock bouge quand
+vous préparez. Laisser un inconnu décrémenter une tablette serait une façon de la vider sans rien
+acheter.
+
+**Côté entreprise**, un nouvel onglet : **Commandes en ligne**. « En ligne » fait un vrai travail
+dans ce titre — le menu a déjà *Fournisseurs & Commandes*, qui est vous qui achetez ; celles-ci
+vont dans l'autre sens. Cinq états — Reçue, En préparation, Prête, Livrée, Annulée — et le client
+lit exactement le même mot dans son espace, ce qui est toute la raison de les tenir à jour.
+
+**Facturer une commande** crée une facture **en brouillon** avec les mêmes lignes, au même prix,
+dans le même ordre, et la note du client reportée dessus. Un brouillon toujours : c'est vous qui
+décidez quoi facturer — une livraison, un rabais, une correction — et une facture qui partait au
+moment où on presse un bouton serait un document que personne n'a relu. Une fois par commande, et
+une commande facturée ne peut plus être annulée sans annuler la facture d'abord.
+
+**Les lignes d'une commande ne se modifient jamais.** Une commande est ce que le client a
+demandé ; une entreprise qui pourrait la réécrire changerait ce que quelqu'un a accepté après
+coup. Ce que vous facturez va sur la facture, qui est à vous.
+
+Rien n'est payé en ligne à cette étape. Les paiements par carte restent sur les factures — voir
+*Paiements en ligne* plus haut — et les deux fonctionnent ensemble : la commande devient une
+facture, la facture porte un lien de paiement.
 
 ---
 

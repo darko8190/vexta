@@ -10,6 +10,7 @@ export interface PublicPageValues {
   showProducts: boolean;
   showJobs: boolean;
   showForms: boolean;
+  acceptsOrders: boolean;
   style: PublicPageStyle;
 }
 

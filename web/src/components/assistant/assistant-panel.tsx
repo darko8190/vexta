@@ -116,7 +116,7 @@ export function AssistantPanel({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="flex w-full flex-col sm:max-w-xl">
+      <SheetContent layout="panel" className="flex w-full flex-col sm:max-w-xl">
         <SheetHeader>
           <div className="flex items-center justify-between gap-2 pr-8">
             <SheetTitle className="flex items-center gap-2">

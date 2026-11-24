@@ -28,6 +28,11 @@ public record InvoicePaymentsDto(
     /// never arrived, and the person reconciling the month has to be able to tell them apart.
     /// </summary>
     decimal Refunded,
+    /// <summary>
+    /// What credit notes took off the invoice. Not money: what the client stopped owing. It
+    /// comes off the outstanding figure and never off what was paid.
+    /// </summary>
+    decimal Credited,
     decimal Outstanding,
     /// <summary>
     /// Why "porté au compte" cannot be used, or null when it can. Sent with the list so the

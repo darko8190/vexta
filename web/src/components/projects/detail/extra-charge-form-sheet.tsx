@@ -22,14 +22,18 @@ import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { TaskPickerField } from "@/components/projects/detail/task-picker-field";
 import { useSaveExtraCharge } from "@/hooks/use-extra-charges";
+import { decimalField, parseDecimal } from "@/components/products/product-format";
+import { useMarginMode } from "@/hooks/use-products";
 import { ApiError } from "@/lib/api";
-import type { ProjectExtraCharge } from "@/lib/types";
+import { marginPercentFrom, sellingPriceFrom } from "@/lib/pricing";
+import type { MarginMode, ProjectExtraCharge } from "@/lib/types";
 import { ex } from "@/lib/placeholders";
 
 const formSchema = z.object({
   name: z.string().trim().min(1, "Le nom est requis.").max(200, "200 caractères maximum."),
   description: z.string().trim().max(2000, "2000 caractères maximum."),
   cost: z.string(),
+  marginPercent: z.string(),
   sellingPrice: z.string(),
   chargedOn: z.string(),
   projectTaskId: z.string(),
@@ -53,11 +57,19 @@ function amountField(value: number | null | undefined): string {
   return value % 1 === 0 ? String(value) : value.toFixed(2).replace(".", ",");
 }
 
-function toFormValues(charge?: ProjectExtraCharge): FormValues {
+/**
+ * The margin is not stored: it is read back from the cost and the selling price, which are what
+ * the bill and the cost table use. Storing it as well would let the three disagree the first
+ * time somebody edited the price by hand.
+ */
+function toFormValues(mode: MarginMode, charge?: ProjectExtraCharge): FormValues {
+  const margin = marginPercentFrom(charge?.cost, charge?.sellingPrice, mode);
+
   return {
     name: charge?.name ?? "",
     description: charge?.description ?? "",
     cost: amountField(charge?.cost),
+    marginPercent: margin == null ? "" : decimalField(margin),
     sellingPrice: amountField(charge?.sellingPrice),
     chargedOn: charge?.chargedOn ?? "",
     projectTaskId: charge?.projectTaskId ?? "",
@@ -85,15 +97,36 @@ export function ExtraChargeFormSheet({
 }) {
   const isEditing = Boolean(charge);
   const save = useSaveExtraCharge(projectId);
+  const marginMode = useMarginMode();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: toFormValues(charge),
+    defaultValues: toFormValues(marginMode, charge),
   });
 
   useEffect(() => {
-    if (open) form.reset(toFormValues(charge));
-  }, [open, charge, form]);
+    if (open) form.reset(toFormValues(marginMode, charge));
+  }, [open, charge, form, marginMode]);
+
+  /** Vendant from the cost and the margin, whenever both are readable. Same rule as a product. */
+  function repriceSelling(costRaw: string, marginRaw: string) {
+    const cost = parseDecimal(costRaw);
+    const margin = parseDecimal(marginRaw, { places: 3 });
+    if (cost === "invalid" || margin === "invalid" || cost == null || margin == null) return;
+
+    const selling = sellingPriceFrom(cost, margin, marginMode);
+    if (selling != null) form.setValue("sellingPrice", amountField(selling));
+  }
+
+  /** And the other way: a price typed by hand says what the margin really is. */
+  function repriceMargin(sellingRaw: string) {
+    const cost = parseDecimal(form.getValues("cost"));
+    const selling = parseDecimal(sellingRaw);
+    if (cost === "invalid" || selling === "invalid" || cost == null || selling == null) return;
+
+    const margin = marginPercentFrom(cost, selling, marginMode);
+    form.setValue("marginPercent", margin == null ? "" : decimalField(margin));
+  }
 
   async function onSubmit(values: FormValues) {
     const cost = parseAmount(values.cost);
@@ -184,15 +217,42 @@ export function ExtraChargeFormSheet({
               )}
             />
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-3">
               <Controller
                 name="cost"
                 control={form.control}
                 render={({ field }) => (
                   <Field>
                     <FieldLabel htmlFor="charge-cost">Coût</FieldLabel>
-                    <Input {...field} id="charge-cost" inputMode="decimal" placeholder={ex("0,00")} />
-                    <FieldDescription>Ce que ça vous a coûté.</FieldDescription>
+                    <Input
+                      {...field}
+                      id="charge-cost"
+                      inputMode="decimal"
+                      placeholder={ex("0,00")}
+                      onChange={(event) => {
+                        field.onChange(event);
+                        repriceSelling(event.target.value, form.getValues("marginPercent"));
+                      }}
+                    />
+                  </Field>
+                )}
+              />
+              <Controller
+                name="marginPercent"
+                control={form.control}
+                render={({ field }) => (
+                  <Field>
+                    <FieldLabel htmlFor="charge-margin">Marge (%)</FieldLabel>
+                    <Input
+                      {...field}
+                      id="charge-margin"
+                      inputMode="decimal"
+                      placeholder={ex("0")}
+                      onChange={(event) => {
+                        field.onChange(event);
+                        repriceSelling(form.getValues("cost"), event.target.value);
+                      }}
+                    />
                   </Field>
                 )}
               />
@@ -202,12 +262,27 @@ export function ExtraChargeFormSheet({
                 render={({ field }) => (
                   <Field>
                     <FieldLabel htmlFor="charge-selling">Vendant</FieldLabel>
-                    <Input {...field} id="charge-selling" inputMode="decimal" placeholder={ex("0,00")} />
-                    <FieldDescription>Ce que le client paie.</FieldDescription>
+                    <Input
+                      {...field}
+                      id="charge-selling"
+                      inputMode="decimal"
+                      placeholder={ex("0,00")}
+                      onChange={(event) => {
+                        field.onChange(event);
+                        repriceMargin(event.target.value);
+                      }}
+                    />
                   </Field>
                 )}
               />
             </div>
+
+            <FieldDescription>
+              Le coût est ce que ça vous a coûté, le vendant ce que le client paie.{" "}
+              {marginMode === "Division"
+                ? "Marge sur le prix de vente : 100 $ à 35 % donne 153,85 $."
+                : "Marge sur le coût : 100 $ à 35 % donne 135 $."}
+            </FieldDescription>
 
             <Controller
               name="chargedOn"

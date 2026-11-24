@@ -209,7 +209,12 @@ public class PublicInvoicePaymentController(
         var paid = InvoiceSettlement.Net(
             taken, await InvoiceSettlement.RefundedAsync(db.InvoiceRefunds.IgnoreQueryFilters(), invoice.Id, ct));
 
-        var outstanding = InvoiceTotals.Round(Math.Max(0m, total - paid));
+        // And what credit notes took off. The amount on the Pay button is what the checkout
+        // charges, so an uncounted credit note here is a card charged for money not owed.
+        var credited = await InvoiceSettlement.CreditedAsync(
+            db.InvoiceCredits.IgnoreQueryFilters(), invoice.Id, ct);
+
+        var outstanding = InvoiceSettlement.Outstanding(total, credited, paid);
         var cancelled = invoice.Status == InvoiceStatus.Annulee;
 
         // Checked here and not taken from the company's cached flag alone: a plan that dropped

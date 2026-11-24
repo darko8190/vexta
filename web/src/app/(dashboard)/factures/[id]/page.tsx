@@ -21,6 +21,7 @@ import {
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
 import { InvoicePaymentsSection } from "@/components/invoices/invoice-payments-section";
+import { InvoiceCreditsSection } from "@/components/invoices/invoice-credits-section";
 import { InvoiceRefundsSection } from "@/components/invoices/invoice-refunds-section";
 import { PdfViewer } from "@/components/layout/pdf-viewer";
 import { InvoiceSendDialog } from "@/components/invoices/invoice-send-dialog";
@@ -297,6 +298,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             {/* Under the payments and not beside them: giving money back is something that
                 happens to a payment, and reading it the other way round makes no sense. */}
             <InvoiceRefundsSection invoiceId={invoice.id} />
+            {/* Last, because it is what squares the paperwork once the money has moved. */}
+            <InvoiceCreditsSection invoiceId={invoice.id} cancelled={invoice.status === "Annulee"} />
           </>
         )}
         </div>

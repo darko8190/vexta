@@ -75,6 +75,11 @@ public class DashboardController(VextaDbContext db, ICurrentUserService currentU
         var refunded = await InvoiceSettlement.RefundedByInvoiceAsync(
             db.InvoiceRefunds.AsNoTracking(), invoices.Select(i => i.Id).ToList(), ct);
 
+        // And what credit notes took off. An invoice squared by a credit note is not money the
+        // company is waiting for, and counting it would inflate the one figure read every morning.
+        var credited = await InvoiceSettlement.CreditedByInvoiceAsync(
+            db.InvoiceCredits.AsNoTracking(), invoices.Select(i => i.Id).ToList(), ct);
+
         var rows = invoices.Select(i =>
         {
             var totals = InvoiceTotals.For(
@@ -94,7 +99,8 @@ public class DashboardController(VextaDbContext db, ICurrentUserService currentU
                 i.Status,
                 Total = totals.Total,
                 Paid = settled,
-                Balance = totals.Total - settled
+                Balance = InvoiceSettlement.Outstanding(
+                    totals.Total, credited.GetValueOrDefault(i.Id, 0m), settled)
             };
         }).ToList();
 

@@ -157,7 +157,8 @@ public class InvoiceRefundsController(
 
         // The invoice stops being settled by what went back out. It does not become a draft
         // again and it does not change what it bills — it simply has less against it.
-        InvoiceStatusRules.ApplyPaid(invoice, state.Refundable - refund.Amount, await TotalOf(invoice, ct));
+        InvoiceStatusRules.ApplyPaid(
+            invoice, state.Refundable - refund.Amount, await TotalOf(invoice, ct), await CreditedOf(invoice, ct));
 
         await db.SaveChangesAsync(ct);
 
@@ -199,7 +200,8 @@ public class InvoiceRefundsController(
 
         db.InvoiceRefunds.Remove(refund);
 
-        InvoiceStatusRules.ApplyPaid(invoice, state.Refundable + refund.Amount, await TotalOf(invoice, ct));
+        InvoiceStatusRules.ApplyPaid(
+            invoice, state.Refundable + refund.Amount, await TotalOf(invoice, ct), await CreditedOf(invoice, ct));
 
         await db.SaveChangesAsync(ct);
 
@@ -207,6 +209,9 @@ public class InvoiceRefundsController(
     }
 
     // ---- Helpers ----
+
+    private Task<decimal> CreditedOf(Invoice invoice, CancellationToken ct) =>
+        InvoiceSettlement.CreditedAsync(db.InvoiceCredits, invoice.Id, ct);
 
     private async Task<decimal> TotalOf(Invoice invoice, CancellationToken ct)
     {

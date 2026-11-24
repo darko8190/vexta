@@ -24,11 +24,16 @@ public static class InvoiceStatusRules
     /// money arriving afterwards does not undo the decision — it is a refund waiting to happen,
     /// and silently reviving the invoice would hide that from the person who has to deal with it.
     /// </summary>
-    public static void ApplyPaid(Invoice invoice, decimal paid, decimal total)
+    /// <param name="credited">
+    /// What credit notes took off the invoice. Required rather than defaulted: every caller has
+    /// to have asked, or an invoice squared by a credit note would stay Envoyée forever on
+    /// whichever screen forgot.
+    /// </param>
+    public static void ApplyPaid(Invoice invoice, decimal paid, decimal total, decimal credited)
     {
         if (invoice.Status is InvoiceStatus.Annulee or InvoiceStatus.Brouillon) return;
 
-        invoice.Status = paid >= total && total > 0
+        invoice.Status = paid + credited >= total && total > 0
             ? InvoiceStatus.Payee
             // Back to what it was before it was paid: sent, or late if its due date has passed.
             // An invoice whose payment is undone must not stay green.

@@ -47,6 +47,16 @@ public class BillingSettings
     public int NextInvoiceNumber { get; set; } = 1;
 
     /// <summary>
+    /// NC-0001. A credit note is numbered from its own counter: sharing the invoices' would
+    /// leave holes in the invoice sequence, and a gap there is the first thing an auditor asks
+    /// about.
+    /// </summary>
+    public string CreditPrefix { get; set; } = "NC";
+
+    /// <summary>Same rule as the invoices': never reused, even after a deletion.</summary>
+    public int NextCreditNumber { get; set; } = 1;
+
+    /// <summary>
     /// What an hour of labour is charged at by default. The starting point for a Main-d'œuvre
     /// line, not a ceiling — a line can always be priced differently.
     /// </summary>

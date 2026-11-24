@@ -206,6 +206,11 @@ public class PersonalDeskController(VextaDbContext db, ICurrentUserService curre
         var refunds = await InvoiceSettlement.RefundedByInvoiceAsync(
             db.InvoiceRefunds.IgnoreQueryFilters().AsNoTracking(), invoiceIds, ct);
 
+        // And credit notes, or a customer the company credited would still be shown the full
+        // amount with a button to pay it.
+        var credits = await InvoiceSettlement.CreditedByInvoiceAsync(
+            db.InvoiceCredits.IgnoreQueryFilters().AsNoTracking(), invoiceIds, ct);
+
         var items = rows
             .Select(r =>
             {
@@ -219,7 +224,7 @@ public class PersonalDeskController(VextaDbContext db, ICurrentUserService curre
 
                 var paid = InvoiceSettlement.Net(
                     payments.GetValueOrDefault(r.Id), refunds.GetValueOrDefault(r.Id));
-                var outstanding = InvoiceTotals.Round(Math.Max(0m, total - paid));
+                var outstanding = InvoiceSettlement.Outstanding(total, credits.GetValueOrDefault(r.Id), paid);
 
                 // The link is offered only when pressing it would work: the company has an
                 // account that can take cards, and there is something left to pay.

@@ -243,6 +243,8 @@ export interface InvoicePayments {
   paid: number;
   /** What was given back, kept beside the paid figure rather than folded into it. */
   refunded: number;
+  /** What credit notes took off. Not money: what the client stopped owing. */
+  credited: number;
   outstanding: number;
   /** Why "porté au compte" cannot be used, or null when it can. */
   accountRefusal: string | null;
@@ -2648,6 +2650,54 @@ export interface RefundTotals {
 export interface RefundList {
   page: PagedResult<RefundListItem>;
   totals: RefundTotals;
+}
+
+/** A credit note: what an invoice no longer bills. Subtotal + gst + qst is exactly amount. */
+export interface InvoiceCredit {
+  id: string;
+  /** NC-0001, from its own counter. */
+  number: string;
+  date: string;
+  subtotal: number;
+  gst: number;
+  qst: number;
+  amount: number;
+  reason: string;
+  createdAt: string;
+}
+
+export interface InvoiceCredits {
+  total: number;
+  credited: number;
+  /** The most a further credit note can take off. */
+  creditable: number;
+  credits: InvoiceCredit[];
+}
+
+export interface SaveInvoiceCreditValues {
+  /** Taxes included; the API splits it the way the invoice did. */
+  amount: number;
+  reason: string;
+  date: string | null;
+}
+
+export interface CreditListItem extends InvoiceCredit {
+  invoiceId: string;
+  invoiceNumber: string;
+  clientId: string | null;
+  clientName: string;
+}
+
+export interface CreditTotals {
+  count: number;
+  amount: number;
+  gst: number;
+  qst: number;
+}
+
+export interface CreditList {
+  page: PagedResult<CreditListItem>;
+  totals: CreditTotals;
 }
 
 

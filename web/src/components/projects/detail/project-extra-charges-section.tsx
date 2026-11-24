@@ -19,9 +19,11 @@ import { LoadErrorState } from "@/components/layout/load-error-state";
 import { BilledNotice } from "@/components/projects/detail/billed-notice";
 import { ExtraChargeFormSheet } from "@/components/projects/detail/extra-charge-form-sheet";
 import { useDeleteExtraCharge, useExtraChargesQuery } from "@/hooks/use-extra-charges";
+import { useMarginMode } from "@/hooks/use-products";
 import { ApiError } from "@/lib/api";
 import { formatDateOnly } from "@/lib/dates";
 import { formatAmount } from "@/lib/money";
+import { marginPercentFrom } from "@/lib/pricing";
 import type { ProjectExtraCharge } from "@/lib/types";
 
 /**
@@ -43,6 +45,7 @@ export function ProjectExtraChargesSection({
   const { data, isLoading, isError, isPlaceholderData, error: loadError, refetch } =
     useExtraChargesQuery(projectId);
   const remove = useDeleteExtraCharge(projectId);
+  const marginMode = useMarginMode();
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<ProjectExtraCharge | undefined>(undefined);
@@ -124,12 +127,14 @@ export function ProjectExtraChargesSection({
                 <TableHead>Frais</TableHead>
                 <TableHead className="w-28">Date</TableHead>
                 <TableHead className="w-28 text-right">Coût</TableHead>
+                <TableHead className="w-20 text-right">Marge</TableHead>
                 <TableHead className="w-28 text-right">Vendant</TableHead>
                 {!locked && <TableHead className="w-10" />}
               </TableRow>
             </TableHeader>
             <TableBody>
               {charges.map((charge) => {
+                const margin = marginPercentFrom(charge.cost, charge.sellingPrice, marginMode);
                 const cells = (
                   <>
                     <TableCell className="font-medium">
@@ -145,6 +150,11 @@ export function ProjectExtraChargesSection({
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-muted-foreground">
                       {charge.cost == null ? "—" : formatAmount(charge.cost)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                      {margin == null
+                        ? "—"
+                        : `${margin.toLocaleString("fr-CA", { maximumFractionDigits: 1 })} %`}
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-muted-foreground">
                       {charge.sellingPrice == null ? "—" : formatAmount(charge.sellingPrice)}

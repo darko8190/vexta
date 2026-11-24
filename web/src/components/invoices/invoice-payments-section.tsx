@@ -85,6 +85,8 @@ export function InvoicePaymentsSection({ invoiceId }: { invoiceId: string }) {
   const payments = data?.payments ?? [];
   const outstanding = data?.outstanding ?? 0;
   const refunded = data?.refunded ?? 0;
+  const credited = data?.credited ?? 0;
+  const tiles = 3 + (refunded > 0 ? 1 : 0) + (credited > 0 ? 1 : 0);
   const settled = Boolean(data) && outstanding <= 0;
 
   async function confirmDelete() {
@@ -135,7 +137,9 @@ export function InvoicePaymentsSection({ invoiceId }: { invoiceId: string }) {
           <dl
             className={cn(
               "mb-4 grid gap-4 rounded-lg border border-border bg-card p-4 text-sm",
-              refunded > 0 ? "sm:grid-cols-4" : "sm:grid-cols-3",
+              tiles === 3 && "sm:grid-cols-3",
+              tiles === 4 && "sm:grid-cols-2 lg:grid-cols-4",
+              tiles === 5 && "sm:grid-cols-3 lg:grid-cols-5",
             )}
           >
             <div>
@@ -152,6 +156,14 @@ export function InvoicePaymentsSection({ invoiceId }: { invoiceId: string }) {
               <div>
                 <dt className="text-muted-foreground">Remboursé</dt>
                 <dd className="text-foreground tabular-nums">{formatAmount(refunded)}</dd>
+              </div>
+            )}
+            {/* Not money: what the client stopped owing. Shown so "reste à payer" can be
+                worked out from the figures on screen. */}
+            {credited > 0 && (
+              <div>
+                <dt className="text-muted-foreground">Crédité</dt>
+                <dd className="text-foreground tabular-nums">{formatAmount(credited)}</dd>
               </div>
             )}
             <div>

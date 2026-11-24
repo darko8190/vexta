@@ -119,7 +119,7 @@ public class InvoicePaymentsController(VextaDbContext db, ICurrentUserService cu
             });
         }
 
-        ApplyStatus(invoice, state.Paid + payment.Amount, state.Total);
+        ApplyStatus(invoice, state.Paid + payment.Amount, state.Total, state.Credited);
         await db.SaveChangesAsync(ct);
 
         return Ok(await BuildAsync(invoice, ct));
@@ -165,7 +165,7 @@ public class InvoicePaymentsController(VextaDbContext db, ICurrentUserService cu
         db.ClientAccountEntries.RemoveRange(charges);
         db.InvoicePayments.Remove(payment);
 
-        ApplyStatus(invoice, state.Paid - payment.Amount, state.Total);
+        ApplyStatus(invoice, state.Paid - payment.Amount, state.Total, state.Credited);
 
         await db.SaveChangesAsync(ct);
 
@@ -182,8 +182,8 @@ public class InvoicePaymentsController(VextaDbContext db, ICurrentUserService cu
     /// The rule itself lives in <see cref="InvoiceStatusRules"/>, shared with the online payment
     /// that arrives without anybody pressing anything.
     /// </summary>
-    private static void ApplyStatus(Invoice invoice, decimal paid, decimal total) =>
-        InvoiceStatusRules.ApplyPaid(invoice, paid, total);
+    private static void ApplyStatus(Invoice invoice, decimal paid, decimal total, decimal credited) =>
+        InvoiceStatusRules.ApplyPaid(invoice, paid, total, credited);
 
     private Task<Invoice?> LoadInvoiceAsync(Guid invoiceId, CancellationToken ct) => db.Invoices
         .Include(i => i.Client)
@@ -206,14 +206,16 @@ public class InvoicePaymentsController(VextaDbContext db, ICurrentUserService cu
 
         var refunded = await InvoiceSettlement.RefundedAsync(db.InvoiceRefunds, invoice.Id, ct);
         var paid = InvoiceSettlement.Net(payments.Sum(p => p.Amount), refunded);
+        var credited = await InvoiceSettlement.CreditedAsync(db.InvoiceCredits, invoice.Id, ct);
 
         return new InvoicePaymentsDto(
             total,
             paid,
             refunded,
+            credited,
             // Never negative: a rounding cent on an over-collected invoice should read as
             // settled, not as a debt owed back through this screen.
-            Math.Max(0m, InvoiceTotals.Round(total - paid)),
+            InvoiceSettlement.Outstanding(total, credited, paid),
             invoice.Client?.AccountRefusal(),
             payments);
     }

@@ -12,6 +12,7 @@ import {
   ComboboxTrigger,
 } from "@/components/ui/combobox";
 import { AddressFormSheet } from "@/components/addresses/address-form-sheet";
+import { NestedSheet } from "@/components/ui/sheet";
 import { useAddressesQuery } from "@/hooks/use-addresses";
 import type { AddressRecord } from "@/lib/types";
 
@@ -116,15 +117,18 @@ export function AddressPicker({
         </ComboboxContent>
       </Combobox>
 
-      <AddressFormSheet
-        open={createOpen}
-        onOpenChange={setCreateOpen}
-        defaultClientId={clientId}
-        onCreated={(created) => {
-          onChange(created.id);
-          setTyped(oneLine(created));
-        }}
-      />
+      {/* Created on behalf of the form this picker sits in: a dialog over it, never a page. */}
+      <NestedSheet>
+        <AddressFormSheet
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          defaultClientId={clientId}
+          onCreated={(created) => {
+            onChange(created.id);
+            setTyped(oneLine(created));
+          }}
+        />
+      </NestedSheet>
     </>
   );
 }

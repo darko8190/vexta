@@ -195,7 +195,7 @@ export function InvoiceRefundsSection({ invoiceId }: { invoiceId: string }) {
           <p className="mt-3 flex items-start gap-2 text-xs text-muted-foreground">
             <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
             Un remboursement ne réduit pas ce qui a été facturé : le montant dû remonte d&apos;autant.
-            Pour que la facture elle-même baisse, il faudra une note de crédit.
+            Pour que la facture elle-même baisse, émettez une note de crédit plus bas.
           </p>
         </>
       )}

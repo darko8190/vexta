@@ -84,6 +84,7 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
     public DbSet<ClientAccountEntry> ClientAccountEntries => Set<ClientAccountEntry>();
     public DbSet<InvoicePayment> InvoicePayments => Set<InvoicePayment>();
     public DbSet<InvoiceRefund> InvoiceRefunds => Set<InvoiceRefund>();
+    public DbSet<InvoiceCredit> InvoiceCredits => Set<InvoiceCredit>();
     public DbSet<ClientAssetType> ClientAssetTypes => Set<ClientAssetType>();
     public DbSet<Gallery> Galleries => Set<Gallery>();
     public DbSet<GalleryImage> GalleryImages => Set<GalleryImage>();
@@ -331,6 +332,30 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             // sees what was given back on it, and nothing from anybody else's.
             e.HasQueryFilter(r => r.TenantId == CurrentTenantId
                 && (CurrentClientId == null || r.Invoice!.ClientId == CurrentClientId));
+        });
+
+        builder.Entity<InvoiceCredit>(e =>
+        {
+            e.HasOne(c => c.Invoice).WithMany()
+                .HasForeignKey(c => c.InvoiceId).OnDelete(DeleteBehavior.Cascade);
+
+            e.Property(c => c.Number).HasMaxLength(20);
+            e.Property(c => c.Subtotal).HasPrecision(14, 2);
+            e.Property(c => c.Gst).HasPrecision(14, 2);
+            e.Property(c => c.Qst).HasPrecision(14, 2);
+            e.Property(c => c.Amount).HasPrecision(14, 2);
+            e.Property(c => c.Reason).HasMaxLength(300);
+
+            e.HasIndex(c => new { c.InvoiceId, c.Date });
+
+            // Unique per company, the way an invoice number is: two credit notes quoting the
+            // same number is a filing problem nobody notices until an audit.
+            e.HasIndex(c => new { c.TenantId, c.Number }).IsUnique();
+
+            // A customer reads the credit notes on their own invoices, like the payments and
+            // refunds beside them, and nothing from anybody else's.
+            e.HasQueryFilter(c => c.TenantId == CurrentTenantId
+                && (CurrentClientId == null || c.Invoice!.ClientId == CurrentClientId));
         });
 
         builder.Entity<ClientContact>(e =>
@@ -1408,6 +1433,7 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.Property(b => b.GstNumber).HasMaxLength(40);
             e.Property(b => b.QstNumber).HasMaxLength(40);
             e.Property(b => b.InvoicePrefix).HasMaxLength(10);
+            e.Property(b => b.CreditPrefix).HasMaxLength(10);
             e.Property(b => b.Currency).HasMaxLength(3);
             e.Property(b => b.InvoiceEmailSubject).HasMaxLength(300);
             e.Property(b => b.InvoiceEmailBody).HasMaxLength(8000);

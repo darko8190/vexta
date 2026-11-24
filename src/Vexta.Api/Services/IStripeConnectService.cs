@@ -659,7 +659,10 @@ public class StripeConnectService(
             takenBefore,
             await InvoiceSettlement.RefundedAsync(db.InvoiceRefunds.IgnoreQueryFilters(), invoiceId, ct));
 
-        InvoiceStatusRules.ApplyPaid(invoice, paidBefore + amount, total);
+        var credited = await InvoiceSettlement.CreditedAsync(
+            db.InvoiceCredits.IgnoreQueryFilters(), invoiceId, ct);
+
+        InvoiceStatusRules.ApplyPaid(invoice, paidBefore + amount, total, credited);
 
         await db.SaveChangesAsync(ct);
 
@@ -805,6 +808,7 @@ public class StripeConnectService(
         // a partial payment or a small credit -- which is the truth, and visible, rather than a
         // total quietly restated to match what was taken.
         var total = InvoiceTotals.For(invoice.Lines, settings, invoice.IsTaxExempt).Total;
-        InvoiceStatusRules.ApplyPaid(invoice, amount, total);
+        // Built a moment ago from the order, so nothing can have credited it yet.
+        InvoiceStatusRules.ApplyPaid(invoice, amount, total, credited: 0m);
     }
 }

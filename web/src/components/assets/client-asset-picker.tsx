@@ -12,6 +12,7 @@ import {
   ComboboxTrigger,
 } from "@/components/ui/combobox";
 import { AssetFormSheet } from "@/components/clients/detail/asset-form-sheet";
+import { NestedSheet } from "@/components/ui/sheet";
 import { useClientAssetsQuery } from "@/hooks/use-client-assets";
 import type { ClientAsset } from "@/lib/types";
 
@@ -122,17 +123,20 @@ export function ClientAssetPicker({
       </Combobox>
 
       {/* Mounted only once a client is chosen: the sheet writes to that client's file, and
-          there is no file to write to before then. */}
+          there is no file to write to before then. Created on behalf of the form this picker
+          sits in, so a dialog over it, never a page. */}
       {clientId && (
-        <AssetFormSheet
-          open={createOpen}
-          onOpenChange={setCreateOpen}
-          clientId={clientId}
-          onCreated={(created) => {
-            onChange(created.id);
-            setTyped(created.label);
-          }}
-        />
+        <NestedSheet>
+          <AssetFormSheet
+            open={createOpen}
+            onOpenChange={setCreateOpen}
+            clientId={clientId}
+            onCreated={(created) => {
+              onChange(created.id);
+              setTyped(created.label);
+            }}
+          />
+        </NestedSheet>
       )}
     </>
   );

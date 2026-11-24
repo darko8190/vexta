@@ -357,6 +357,11 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<DateTimeOffset?>("ConfiguredAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("CreditPrefix")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
                     b.Property<string>("Currency")
                         .IsRequired()
                         .HasMaxLength(3)
@@ -395,6 +400,9 @@ namespace Vexta.Api.Data.Migrations
                         .HasColumnType("character varying(10)");
 
                     b.Property<int>("MarginMode")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("NextCreditNumber")
                         .HasColumnType("integer");
 
                     b.Property<int>("NextInvoiceNumber")
@@ -1978,6 +1986,63 @@ namespace Vexta.Api.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("Invoices");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.InvoiceCredit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("Gst")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)");
+
+                    b.Property<Guid>("InvoiceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<decimal>("Qst")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<decimal>("Subtotal")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InvoiceId", "Date");
+
+                    b.HasIndex("TenantId", "Number")
+                        .IsUnique();
+
+                    b.ToTable("InvoiceCredits");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.InvoiceLine", b =>
@@ -4619,6 +4684,17 @@ namespace Vexta.Api.Data.Migrations
                     b.Navigation("PricePolicy");
 
                     b.Navigation("Project");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.InvoiceCredit", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.Invoice", "Invoice")
+                        .WithMany()
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Invoice");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.InvoiceLine", b =>

@@ -12,6 +12,7 @@ import {
   ComboboxTrigger,
 } from "@/components/ui/combobox";
 import { ClientFormSheet } from "@/components/clients/client-form-sheet";
+import { NestedSheet } from "@/components/ui/sheet";
 import { useClientSummaryQuery } from "@/hooks/use-clients";
 import { formatClientNumber, type ClientSummary } from "@/lib/types";
 
@@ -112,14 +113,17 @@ export function ClientPicker({
         </ComboboxContent>
       </Combobox>
 
-      <ClientFormSheet
-        open={createOpen}
-        onOpenChange={setCreateOpen}
-        onCreated={(created) => {
-          onChange(created.id);
-          setTyped(created.name);
-        }}
-      />
+      {/* Created on behalf of the form this picker sits in: a dialog over it, never a page. */}
+      <NestedSheet>
+        <ClientFormSheet
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          onCreated={(created) => {
+            onChange(created.id);
+            setTyped(created.name);
+          }}
+        />
+      </NestedSheet>
     </>
   );
 }

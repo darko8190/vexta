@@ -3044,6 +3044,21 @@ export interface QuoteRecord {
   clientResponseNote: string | null;
   /** The name the customer typed to sign the acceptance in their portal. */
   clientSignature: string | null;
+  /** Percent asked up front, and the invoice drafted for it on acceptance. */
+  depositPercent: number | null;
+  depositInvoiceId: string | null;
+  depositInvoiceNumber: string | null;
+  /** What the options not (yet) taken would add, before taxes. Not in the subtotal. */
+  optionsTotal: number;
+  /** The optional lines with their price, which the customer chooses among when accepting. */
+  options: QuoteOption[];
+}
+
+export interface QuoteOption {
+  id: string;
+  description: string;
+  total: number;
+  isSelected: boolean;
 }
 
 export interface QuoteFormValues {
@@ -3063,6 +3078,22 @@ export interface QuoteFormValues {
   categoryId: string | null;
   subCategoryId: string | null;
   wageClassificationId: string | null;
+  /** Percent asked up front; null for none. */
+  depositPercent?: number | null;
+  /** On creation only: start from this template's lines. */
+  templateId?: string | null;
+}
+
+/** A quote kept to start others from. */
+export interface QuoteTemplate {
+  id: string;
+  name: string;
+  description: string | null;
+  lineCount: number;
+  /** The lines that are not options, before taxes. */
+  subtotal: number;
+  depositPercent: number | null;
+  updatedAt: string;
 }
 
 export interface QuoteLine {
@@ -3077,6 +3108,9 @@ export interface QuoteLine {
   unitPrice: number;
   total: number;
   sortOrder: number;
+  /** An extra the client may take; counted in the total only once selected. */
+  isOptional: boolean;
+  isSelected: boolean;
 }
 
 export interface SaveQuoteLineValues {
@@ -3088,6 +3122,8 @@ export interface SaveQuoteLineValues {
   productId?: string | null;
   code?: string | null;
   unit?: string | null;
+  isOptional?: boolean;
+  isSelected?: boolean;
 }
 
 export interface QuoteSummary {

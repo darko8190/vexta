@@ -67,7 +67,9 @@ public record BillingSettingsDto(
     string? QuoteEmailBody,
     string DefaultQuoteEmailSubject,
     string DefaultQuoteEmailBody,
-    IReadOnlyList<InvoiceEmailFieldDto> QuoteEmailFields);
+    IReadOnlyList<InvoiceEmailFieldDto> QuoteEmailFields,
+    /// <summary>The conditions printed on quotes above the signature. Null for none.</summary>
+    string? QuoteTerms);
 
 /// <summary>One field a template may drop in, and what it stands for.</summary>
 public record InvoiceEmailFieldDto(string Field, string Description);
@@ -223,6 +225,37 @@ public class BillingSettingsController(VextaDbContext db, ICurrentUserService cu
             settings.InvoiceEmailSubject = subject;
             settings.InvoiceEmailBody = body;
         }, ct);
+
+    /// <summary>
+    /// The conditions printed on every quote. Its own endpoint, like the email wording: writing
+    /// them is not the company declaring its taxes, so it must not unlock invoicing.
+    /// </summary>
+    [HttpPut("soumission-conditions")]
+    [Authorize(Roles = Roles.Owner)]
+    public async Task<ActionResult<BillingSettingsDto>> SaveQuoteTerms(SaveQuoteTermsRequest request, CancellationToken ct)
+    {
+        if (currentUser.TenantId is not { } tenantId) return Forbid();
+
+        var terms = Clean(request.Terms);
+        if (terms is { Length: > 4000 })
+            return BadRequest(new { message = "Les conditions ne peuvent pas dépasser 4 000 caractères." });
+
+        var settings = await db.BillingSettings.FirstOrDefaultAsync(b => b.TenantId == tenantId, ct);
+        if (settings is null)
+        {
+            settings = new Domain.BillingSettings
+            {
+                TenantId = tenantId,
+                DefaultPricePolicyId = await DefaultPolicyIdAsync(null, ct)
+            };
+            db.BillingSettings.Add(settings);
+        }
+
+        settings.QuoteTerms = terms;
+        settings.UpdatedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(ct);
+        return Ok(ToDto(settings, settings.DefaultPricePolicyId));
+    }
 
     /// <summary>The quote's wording, saved the same way and under the same limits.</summary>
     [HttpPut("email/soumission")]
@@ -505,7 +538,8 @@ public class BillingSettingsController(VextaDbContext db, ICurrentUserService cu
             model.QuoteEmailBody,
             QuoteEmailTemplate.DefaultSubject,
             QuoteEmailTemplate.DefaultBody,
-            [.. QuoteEmailTemplate.Fields.Select(f => new InvoiceEmailFieldDto(f.Field, f.Description))]);
+            [.. QuoteEmailTemplate.Fields.Select(f => new InvoiceEmailFieldDto(f.Field, f.Description))],
+            model.QuoteTerms);
     }
 }
 
@@ -514,6 +548,9 @@ public class BillingSettingsController(VextaDbContext db, ICurrentUserService cu
 /// a copy of it, so a company that has not written its own keeps following the default.
 /// </summary>
 public record SaveInvoiceEmailRequest(string? Subject, string? Body);
+
+/// <summary>Blank clears them.</summary>
+public record SaveQuoteTermsRequest(string? Terms);
 
 /// <summary>
 /// The template to render a preview of. Taken from the request so the card can show what is

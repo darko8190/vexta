@@ -29,7 +29,7 @@ import { ClientAssetPicker } from "@/components/assets/client-asset-picker";
 import { ClientPicker } from "@/components/clients/client-picker";
 import { ProjectCategoryFields } from "@/components/projects/project-category-fields";
 import { useClientQuery } from "@/hooks/use-clients";
-import { useCreateQuote, useUpdateQuote } from "@/hooks/use-quotes";
+import { useCreateQuote, useQuoteTemplatesQuery, useUpdateQuote } from "@/hooks/use-quotes";
 import { useWageClassificationsQuery } from "@/hooks/use-wage-classifications";
 import { quoteStatusLabels } from "@/lib/labels";
 import { ex } from "@/lib/placeholders";
@@ -67,6 +67,10 @@ const formSchema = z
     categoryId: z.string(),
     subCategoryId: z.string(),
     wageClassificationId: z.string(),
+    depositPercent: z
+      .string()
+      .refine((v) => v.trim() === "" || (Number(v) >= 0 && Number(v) <= 100), "Un pourcentage entre 0 et 100."),
+    templateId: z.string(),
   })
   .refine((v) => !v.issuedOn || !v.validUntil || v.validUntil >= v.issuedOn, {
     path: ["validUntil"],
@@ -95,6 +99,8 @@ function toFormValues(quote?: QuoteRecord, defaultClientId?: string): FormValues
     categoryId: quote?.categoryId ?? "",
     subCategoryId: quote?.subCategoryId ?? "",
     wageClassificationId: quote?.wageClassificationId ?? "",
+    depositPercent: quote?.depositPercent != null ? String(quote.depositPercent) : "",
+    templateId: "",
   };
 }
 
@@ -118,6 +124,8 @@ export function QuoteFormSheet({
 }) {
   const isEditing = Boolean(quote);
   const create = useCreateQuote();
+  // Only when creating: an existing quote already has its lines.
+  const { data: templates } = useQuoteTemplatesQuery(open && !isEditing);
   const update = useUpdateQuote();
   const pending = create.isPending || update.isPending;
   // Once it is a project, the price belongs to the project: client, tax and status stay put.
@@ -163,6 +171,8 @@ export function QuoteFormSheet({
       categoryId: values.categoryId || null,
       subCategoryId: values.categoryId ? values.subCategoryId || null : null,
       wageClassificationId: values.wageClassificationId || null,
+      depositPercent: values.depositPercent.trim() ? Number(values.depositPercent) : null,
+      templateId: isEditing ? null : values.templateId || null,
     };
 
     try {
@@ -238,6 +248,42 @@ export function QuoteFormSheet({
                 )}
               />
             </fieldset>
+
+            {!isEditing && templates && templates.length > 0 && (
+              <Controller
+                name="templateId"
+                control={form.control}
+                render={({ field }) => (
+                  <Field>
+                    <FieldLabel htmlFor="quote-template">Partir d&apos;un modèle</FieldLabel>
+                    <Select
+                      value={field.value || "aucun"}
+                      onValueChange={(value) => field.onChange(value === "aucun" ? "" : (value ?? ""))}
+                    >
+                      <SelectTrigger id="quote-template" className="w-full">
+                        <SelectValue>
+                          {(value: string) =>
+                            value === "aucun" ? "Aucun, une soumission vide" : (templates.find((t) => t.id === value)?.name ?? "")
+                          }
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="aucun">Aucun, une soumission vide</SelectItem>
+                        {templates.map((template) => (
+                          <SelectItem key={template.id} value={template.id}>
+                            {template.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FieldDescription>
+                      Ses lignes sont copiées dans la nouvelle soumission, avec sa description et son
+                      acompte si vous les laissez vides.
+                    </FieldDescription>
+                  </Field>
+                )}
+              />
+            )}
 
             <Controller
               name="description"
@@ -390,6 +436,33 @@ export function QuoteFormSheet({
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor="quote-po">Numéro de PO</FieldLabel>
                   <Input {...field} id="quote-po" placeholder={ex("PO-4471")} aria-invalid={fieldState.invalid} />
+                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              )}
+            />
+
+            <Controller
+              name="depositPercent"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor="quote-deposit">Acompte (%)</FieldLabel>
+                  <Input
+                    {...field}
+                    id="quote-deposit"
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    max={100}
+                    step="any"
+                    disabled={converted}
+                    placeholder={ex("30")}
+                    aria-invalid={fieldState.invalid}
+                  />
+                  <FieldDescription>
+                    Facultatif. À l&apos;acceptation, une facture d&apos;acompte est préparée en
+                    brouillon pour que vous la vérifiiez et l&apos;envoyiez.
+                  </FieldDescription>
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                 </Field>
               )}

@@ -133,7 +133,7 @@ public class QuotesController(
                 // A quote made a project counts as accepted whatever its status says.
                 Accepted = q.ProjectId != null || q.Status == QuoteStatus.Acceptee,
                 q.Status,
-                Amount = q.Lines.Sum(l => (decimal?)(l.Quantity * l.UnitPrice)) ?? 0m
+                Amount = q.Lines.Where(l => !l.IsOptional || l.IsSelected).Sum(l => (decimal?)(l.Quantity * l.UnitPrice)) ?? 0m
             })
             .ToListAsync(ct);
 
@@ -181,7 +181,8 @@ public class QuotesController(
 
         ProjectCostLineDto Line(QuoteLineKind kind, string key, string label)
         {
-            var lines = quote.Lines.Where(l => l.Kind == kind).ToList();
+            // Options not taken are not part of the price, so not of the cost table either.
+            var lines = quote.Lines.Where(l => l.Kind == kind && l.Counts).ToList();
             return new ProjectCostLineDto(key, label,
                 Round(lines.Sum(l => l.Quantity * (l.UnitCost ?? 0m))),
                 Round(lines.Sum(l => LineTotal(l))));
@@ -237,6 +238,32 @@ public class QuotesController(
             IsTaxExempt = request.IsTaxExempt ?? client.IsTaxExempt,
         };
         Apply(quote, request);
+
+        // From a template: its lines, and its description and deposit where the form left them empty.
+        if (request.TemplateId is { } templateId)
+        {
+            var template = await db.QuoteTemplates.AsNoTracking()
+                .Include(t => t.Lines)
+                .FirstOrDefaultAsync(t => t.Id == templateId);
+            if (template is null) return BadRequest(new { message = "Ce modèle n'existe plus." });
+
+            if (string.IsNullOrWhiteSpace(quote.Description)) quote.Description = template.Description;
+            quote.DepositPercent ??= template.DepositPercent;
+            quote.Lines = [.. template.Lines.OrderBy(l => l.Kind).ThenBy(l => l.SortOrder).Select(l => new QuoteLine
+            {
+                TenantId = tenantId,
+                Kind = l.Kind,
+                ProductId = l.ProductId,
+                Code = l.Code,
+                Description = l.Description,
+                Unit = l.Unit,
+                Quantity = l.Quantity,
+                UnitCost = l.UnitCost,
+                UnitPrice = l.UnitPrice,
+                IsOptional = l.IsOptional,
+                SortOrder = l.SortOrder
+            })];
+        }
 
         db.Quotes.Add(quote);
         await db.SaveChangesAsync();
@@ -390,6 +417,7 @@ public class QuotesController(
             CategoryId = source.CategoryId,
             SubCategoryId = source.SubCategoryId,
             WageClassificationId = source.WageClassificationId,
+            DepositPercent = source.DepositPercent,
             // Dates of the work are not copied: they belong to the job that was planned.
             Lines = [.. source.Lines.OrderBy(l => l.SortOrder).Select(l => new QuoteLine
             {
@@ -402,6 +430,8 @@ public class QuotesController(
                 Quantity = l.Quantity,
                 UnitCost = l.UnitCost,
                 UnitPrice = l.UnitPrice,
+                // An option stays an option; whether it was taken belongs to the original.
+                IsOptional = l.IsOptional,
                 SortOrder = l.SortOrder
             })]
         };
@@ -538,7 +568,8 @@ public class QuotesController(
             return BadRequest(new { message = "Une soumission refusée ou expirée ne devient pas un projet. Remettez-la en brouillon d'abord." });
         if (quote.Client!.WorkRefusal() is { } refusal) return BadRequest(new { message = refusal });
 
-        await CreateProjectAsync(quote);
+        var converted = await CreateProjectAsync(quote);
+        await CreateDepositInvoiceAsync(quote, converted);
         await db.SaveChangesAsync();
         return Ok(await GetDtoAsync(id));
     }
@@ -570,13 +601,26 @@ public class QuotesController(
         if (signature.Length > 200)
             return BadRequest(new { message = "Le nom est limité à 200 caractères." });
 
+        // The options taken, checked against this quote's own optional lines: an id from
+        // anywhere else is refused rather than ignored, so the client never accepts a total
+        // other than the one they were shown.
+        var chosen = request.OptionIds?.Distinct().ToList() ?? [];
+        var options = quote.Lines.Where(l => l.IsOptional).ToList();
+        if (chosen.Any(optionId => options.All(l => l.Id != optionId)))
+            return BadRequest(new { message = "Une des options choisies ne fait pas partie de cette soumission." });
+        foreach (var option in options) option.IsSelected = chosen.Contains(option.Id);
+
         await RecordResponseAsync(quote, request, ct);
         quote.ClientSignature = signature;
         var project = await CreateProjectAsync(quote);
+        var deposit = await CreateDepositInvoiceAsync(quote, project);
         await db.SaveChangesAsync(ct);
 
-        await NotifyCompanyAsync(quote, accepted: true,
-            $"Le projet P-{project.Number:0000} a été créé à partir de la soumission.", ct);
+        var taken = options.Where(l => l.IsSelected).Select(l => l.Description).ToList();
+        var extra = $"Le projet P-{project.Number:0000} a été créé à partir de la soumission.";
+        if (taken.Count > 0) extra += $" Options retenues : {string.Join(", ", taken)}.";
+        if (deposit is not null) extra += $" La facture d'acompte {deposit.Number} est prête en brouillon : vérifiez-la et envoyez-la au client.";
+        await NotifyCompanyAsync(quote, accepted: true, extra, ct);
         return Ok(await GetDtoAsync(id));
     }
 
@@ -681,6 +725,116 @@ public class QuotesController(
             .FirstOrDefaultAsync(q => q.Id == id);
 
     /// <summary>
+    /// The deposit invoice for a quote that asks for one, drafted against the new project and
+    /// left in Brouillon: an invoice is a legal document, so the company checks it and sends it
+    /// itself (with its « Payer en ligne » button when it takes cards). Skipped when billing is
+    /// not set up yet — numbering and taxes are the company's to decide, never guessed here.
+    /// Does not save.
+    /// </summary>
+    private async Task<Invoice?> CreateDepositInvoiceAsync(Quote quote, Project project)
+    {
+        if (quote.DepositPercent is not { } percent || percent <= 0 || quote.DepositInvoiceId is not null) return null;
+
+        var settings = await db.BillingSettings.FirstOrDefaultAsync(b => b.TenantId == quote.TenantId);
+        if (settings?.ConfiguredAt is null) return null;
+
+        var subtotal = Round(quote.Lines.Where(l => l.Counts).Sum(LineTotal));
+        var amount = Round(subtotal * percent / 100m);
+        if (amount <= 0) return null;
+
+        var today = BusinessDay.Today;
+        var invoice = new Invoice
+        {
+            TenantId = quote.TenantId,
+            Number = Vexta.Api.Features.BillingSettings.InvoiceNumbering.Format(settings.InvoicePrefix, settings.NextInvoiceNumber),
+            ClientId = quote.ClientId,
+            ProjectId = project.Id,
+            Status = InvoiceStatus.Brouillon,
+            IssueDate = today,
+            DueDate = today.AddDays(settings.PaymentTermsDays),
+            Currency = string.IsNullOrWhiteSpace(settings.Currency) ? "CAD" : settings.Currency.Trim().ToUpperInvariant(),
+            Notes = $"Acompte demandé à l'acceptation de la soumission S-{quote.Number:0000}.",
+            IsTaxExempt = quote.IsTaxExempt,
+            Lines =
+            [
+                new InvoiceLine
+                {
+                    Kind = InvoiceLineKind.Autre,
+                    Description = $"Acompte de {percent.ToString("0.##", Formats.Quebec)} % — soumission S-{quote.Number:0000}",
+                    Quantity = 1,
+                    UnitPrice = amount,
+                    IsTaxable = !quote.IsTaxExempt,
+                    SortOrder = 0
+                }
+            ]
+        };
+
+        // Advanced, never derived: the same rule as every other invoice.
+        settings.NextInvoiceNumber++;
+        db.Invoices.Add(invoice);
+        quote.DepositInvoiceId = invoice.Id;
+        return invoice;
+    }
+
+    /// <summary>
+    /// Keeps this quote's lines (and its description and deposit) as a template to start other
+    /// quotes from. A template with the same name is replaced, so saving again updates it.
+    /// </summary>
+    [HttpPost("{id:guid}/modele")]
+    [Authorize(Roles = Roles.Managers)]
+    [StaffOnly]
+    public async Task<ActionResult<QuoteTemplateDto>> SaveAsTemplate(Guid id, SaveQuoteTemplateRequest request, CancellationToken ct)
+    {
+        var name = Clean(request.Name);
+        if (name is null) return BadRequest(new { message = "Donnez un nom au modèle." });
+        if (name.Length > 200) return BadRequest(new { message = "Le nom est limité à 200 caractères." });
+
+        var quote = await db.Quotes.AsNoTracking().Include(q => q.Lines).FirstOrDefaultAsync(q => q.Id == id, ct);
+        if (quote is null) return NotFound();
+        if (quote.Lines.Count == 0) return BadRequest(new { message = "Ajoutez des lignes avant d'en faire un modèle." });
+
+        var tenantId = currentUser.TenantId!.Value;
+        var existing = await db.QuoteTemplates.Include(t => t.Lines)
+            .FirstOrDefaultAsync(t => t.Name.ToLower() == name.ToLower(), ct);
+        if (existing is not null)
+        {
+            db.QuoteTemplateLines.RemoveRange(existing.Lines);
+            existing.Lines = [];
+        }
+
+        var template = existing ?? new QuoteTemplate { TenantId = tenantId, Name = name };
+        template.Name = name;
+        template.Description = quote.Description;
+        template.DepositPercent = quote.DepositPercent;
+        template.UpdatedAt = DateTimeOffset.UtcNow;
+        foreach (var l in quote.Lines.OrderBy(l => l.Kind).ThenBy(l => l.SortOrder))
+        {
+            var line = new QuoteTemplateLine
+            {
+                TenantId = tenantId,
+                TemplateId = template.Id,
+                Kind = l.Kind,
+                ProductId = l.ProductId,
+                Code = l.Code,
+                Description = l.Description,
+                Unit = l.Unit,
+                Quantity = l.Quantity,
+                UnitCost = l.UnitCost,
+                UnitPrice = l.UnitPrice,
+                IsOptional = l.IsOptional,
+                SortOrder = l.SortOrder
+            };
+            if (existing is null) template.Lines.Add(line);
+            else db.QuoteTemplateLines.Add(line);
+        }
+        if (existing is null) db.QuoteTemplates.Add(template);
+
+        await db.SaveChangesAsync(ct);
+        return Ok(await db.QuoteTemplates.AsNoTracking().Where(t => t.Id == template.Id)
+            .Select(QuoteTemplatesController.ToDto()).FirstAsync(ct));
+    }
+
+    /// <summary>
     /// Builds the project an accepted quote becomes, links the two and marks the quote accepted.
     /// Does not save, so the caller's own changes go in the same transaction.
     /// </summary>
@@ -691,7 +845,8 @@ public class QuotesController(
             .Where(p => p.TenantId == tenantId)
             .MaxAsync(p => (int?)p.Number) ?? 0;
 
-        var ordered = quote.Lines.OrderBy(l => l.SortOrder).ThenBy(l => l.CreatedAt).ToList();
+        // Options not taken stay on the quote; the job is what was agreed to.
+        var ordered = quote.Lines.Where(l => l.Counts).OrderBy(l => l.SortOrder).ThenBy(l => l.CreatedAt).ToList();
         var project = new Project
         {
             TenantId = tenantId,
@@ -812,6 +967,7 @@ public class QuotesController(
         quote.CategoryId = request.CategoryId;
         quote.SubCategoryId = request.CategoryId is null ? null : request.SubCategoryId;
         quote.WageClassificationId = request.WageClassificationId;
+        quote.DepositPercent = request.DepositPercent is > 0 ? Math.Round(request.DepositPercent.Value, 2) : null;
     }
 
     private static void ApplyLine(QuoteLine line, SaveQuoteLineRequest request)
@@ -824,6 +980,8 @@ public class QuotesController(
         line.ProductId = request.ProductId;
         line.Code = Clean(request.Code);
         line.Unit = Clean(request.Unit);
+        line.IsOptional = request.IsOptional;
+        line.IsSelected = request.IsOptional && request.IsSelected;
     }
 
     /// <summary>
@@ -834,6 +992,8 @@ public class QuotesController(
     {
         if (request.ValidUntil is { } until && request.IssuedOn is { } issued && until < issued)
             return "La date d'échéance précède la date de la soumission.";
+        if (request.DepositPercent is < 0 or > 100)
+            return "L'acompte est un pourcentage entre 0 et 100.";
 
         foreach (var addressId in new[] { request.ClientAddressId, request.SameAddressAsClient ? null : request.SiteAddressId })
         {
@@ -883,7 +1043,7 @@ public class QuotesController(
 
     private static QuoteLineDto MapLine(QuoteLine l) =>
         new(l.Id, l.Kind, l.ProductId, l.Code, l.Description, l.Unit, l.Quantity, l.UnitCost, l.UnitPrice,
-            LineTotal(l), l.SortOrder);
+            LineTotal(l), l.SortOrder, l.IsOptional, l.IsSelected);
 
     private Task<QuoteDto?> GetDtoAsync(Guid id) =>
         Visible().AsNoTracking().Where(q => q.Id == id).Select(ToDto()).FirstOrDefaultAsync();
@@ -920,12 +1080,20 @@ public class QuotesController(
         q.WageClassification == null ? null : q.WageClassification.Name,
         q.ProjectId,
         q.Project == null ? null : q.Project.Number,
-        q.Lines.Sum(l => Math.Round(l.Quantity * l.UnitPrice, 2)),
+        q.Lines.Where(l => !l.IsOptional || l.IsSelected).Sum(l => Math.Round(l.Quantity * l.UnitPrice, 2)),
         q.CreatedAt,
         q.UpdatedAt,
         q.SentAt,
         q.ClientRespondedAt,
         q.ClientRespondedBy,
         q.ClientResponseNote,
-        q.ClientSignature);
+        q.ClientSignature,
+        q.DepositPercent,
+        q.DepositInvoiceId,
+        q.DepositInvoice == null ? null : q.DepositInvoice.Number,
+        q.Lines.Where(l => l.IsOptional && !l.IsSelected).Sum(l => Math.Round(l.Quantity * l.UnitPrice, 2)),
+        q.Lines.Where(l => l.IsOptional)
+            .OrderBy(l => l.Kind).ThenBy(l => l.SortOrder)
+            .Select(l => new QuoteOptionDto(l.Id, l.Description, Math.Round(l.Quantity * l.UnitPrice, 2), l.IsSelected))
+            .ToList());
 }

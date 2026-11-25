@@ -42,7 +42,20 @@ public record QuoteDto(
     string? ClientRespondedBy,
     string? ClientResponseNote,
     /// <summary>The name typed to sign the acceptance, when accepted from the portal.</summary>
-    string? ClientSignature);
+    string? ClientSignature,
+    /// <summary>The share asked up front, in percent, and the invoice drafted for it.</summary>
+    decimal? DepositPercent,
+    Guid? DepositInvoiceId,
+    string? DepositInvoiceNumber,
+    /// <summary>What the options not (yet) chosen would add, before taxes. Not in the subtotal.</summary>
+    decimal OptionsTotal,
+    /// <summary>
+    /// The optional lines, with their price: the customer chooses among them when accepting and
+    /// cannot read the lines themselves, which carry the company's costs.
+    /// </summary>
+    IReadOnlyList<QuoteOptionDto> Options);
+
+public record QuoteOptionDto(Guid Id, string Description, decimal Total, bool IsSelected);
 
 /// <summary>How many quotes this person can see in one status: the list's filter shows it.</summary>
 public record QuoteStatusCountDto(QuoteStatus Status, int Count);
@@ -67,7 +80,21 @@ public record QuoteStatsDto(
 /// <param name="Signature">
 /// The customer's full name, typed to sign. Required to accept, ignored on a refusal.
 /// </param>
-public record QuoteResponseRequest(string? Note, string? Signature = null);
+/// <param name="OptionIds">The optional lines the customer takes along with the acceptance.</param>
+public record QuoteResponseRequest(string? Note, string? Signature = null, IReadOnlyList<Guid>? OptionIds = null);
+
+/// <summary>A template as the list shows it: enough to choose one by.</summary>
+public record QuoteTemplateDto(
+    Guid Id,
+    string Name,
+    string? Description,
+    int LineCount,
+    /// <summary>The lines that are not options, before taxes.</summary>
+    decimal Subtotal,
+    decimal? DepositPercent,
+    DateTimeOffset UpdatedAt);
+
+public record SaveQuoteTemplateRequest(string Name);
 
 public record UpsertQuoteRequest(
     Guid ClientId,
@@ -86,7 +113,11 @@ public record UpsertQuoteRequest(
     Guid? ClientAssetId = null,
     Guid? CategoryId = null,
     Guid? SubCategoryId = null,
-    Guid? WageClassificationId = null);
+    Guid? WageClassificationId = null,
+    /// <summary>Percent asked up front, from 0 to 100. Null or 0 for none.</summary>
+    decimal? DepositPercent = null,
+    /// <summary>On creation only: the template whose lines the new quote starts with.</summary>
+    Guid? TemplateId = null);
 
 public record QuoteLineDto(
     Guid Id,
@@ -100,7 +131,10 @@ public record QuoteLineDto(
     decimal UnitPrice,
     /// <summary>Quantity × price, rounded here so the screen and the total agree to the cent.</summary>
     decimal Total,
-    int SortOrder);
+    int SortOrder,
+    /// <summary>An extra the client may take; in the total only once <c>IsSelected</c>.</summary>
+    bool IsOptional,
+    bool IsSelected);
 
 public record SaveQuoteLineRequest(
     QuoteLineKind Kind,
@@ -110,7 +144,10 @@ public record SaveQuoteLineRequest(
     decimal UnitPrice,
     Guid? ProductId = null,
     string? Code = null,
-    string? Unit = null);
+    string? Unit = null,
+    bool IsOptional = false,
+    /// <summary>The office marking an option as taken (the client said so by phone).</summary>
+    bool IsSelected = false);
 
 /// <summary>The rows behind each section, and the money, in the project's cost-table shape.</summary>
 public record QuoteSummaryDto(int Tasks, int Materials, int ExtraCharges, int DocumentsAndNotes, ProjectCostTableDto Costs);

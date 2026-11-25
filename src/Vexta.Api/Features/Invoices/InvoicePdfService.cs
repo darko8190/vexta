@@ -137,17 +137,21 @@ public class InvoicePdfService(VextaDbContext db, ICurrentUserService currentUse
 
         // Labour first, then materials, then the extra charges: the order the price is built in,
         // and the order a client reads a quote to see where the money goes.
-        var ordered = quote.Lines
+        // Options taken print with the rest, marked; the others go in their own list, outside the total.
+        var all = quote.Lines
             .OrderBy(l => l.Kind).ThenBy(l => l.SortOrder).ThenBy(l => l.CreatedAt)
             .ToList();
+        var ordered = all.Where(l => l.Counts).ToList();
 
-        var items = ordered
-            .Select(l => new InvoicePdfLine(
-                l.Kind == QuoteLineKind.Tache ? $"{l.Description.Trim()} (main-d'œuvre)" : l.Description.Trim(),
-                l.Quantity,
-                l.UnitPrice,
-                Round(l.Quantity * l.UnitPrice)))
-            .ToList();
+        static InvoicePdfLine Print(QuoteLine l)
+        {
+            var description = l.Kind == QuoteLineKind.Tache ? $"{l.Description.Trim()} (main-d'œuvre)" : l.Description.Trim();
+            if (l.IsOptional && l.IsSelected) description += " (option retenue)";
+            return new InvoicePdfLine(description, l.Quantity, l.UnitPrice, Round(l.Quantity * l.UnitPrice));
+        }
+
+        var items = ordered.Select(Print).ToList();
+        var options = all.Where(l => !l.Counts).Select(Print).ToList();
 
         var totals = InvoiceTotals.For(
             ordered.Select(l => new InvoiceTotals.Line(l.Quantity, l.UnitPrice, true)),
@@ -178,6 +182,9 @@ public class InvoicePdfService(VextaDbContext db, ICurrentUserService currentUse
             // No payment terms: "Payable à réception" is the invoice's promise, and on a quote it
             // would ask for money nobody owes yet.
             FooterNote = Clean(settings?.FooterNote),
+            // The quote's own conditions (warranty, delays, exclusions), printed above the signature.
+            Terms = Clean(settings?.QuoteTerms),
+            Options = options,
             Wording = InvoicePdfWording.Quote,
             Signature = quote.ClientSignature is { } typed && quote.ClientRespondedAt is { } at
                 ? Signed(typed, at)

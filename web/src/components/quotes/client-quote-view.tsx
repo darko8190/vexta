@@ -15,6 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -102,6 +103,12 @@ export function ClientQuoteView({ id }: { id: string }) {
               <span className="font-medium text-foreground tabular-nums">{formatAmount(quote.subtotal)}</span>
               {" · "}le détail et les taxes sont dans le document ci-dessous.
             </p>
+            {awaiting && quote.options.length > 0 && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                {quote.options.length === 1 ? "Une option vous est proposée" : `${quote.options.length} options vous sont proposées`}
+                {" "}en plus : vous les choisirez en acceptant.
+              </p>
+            )}
           </div>
 
           {awaiting && (
@@ -193,7 +200,12 @@ function AnswerDialog({ quote, answer, onClose }: { quote: QuoteRecord; answer: 
   const respond = useRespondToQuote();
   const [note, setNote] = useState("");
   const [signature, setSignature] = useState("");
+  const [chosen, setChosen] = useState<string[]>([]);
   const accepting = answer === "accepter";
+  // The total the customer is agreeing to: the base, plus the options ticked here.
+  const total =
+    quote.subtotal + quote.options.filter((option) => chosen.includes(option.id)).reduce((sum, option) => sum + option.total, 0);
+  const deposit = quote.depositPercent ? Math.round(total * quote.depositPercent) / 100 : null;
   // Typing one's name is the signature, so the button waits for one.
   const signed = signature.trim().length >= 2;
   const number = formatQuoteNumber(quote.number);
@@ -205,6 +217,7 @@ function AnswerDialog({ quote, answer, onClose }: { quote: QuoteRecord; answer: 
         answer,
         note: note.trim() || null,
         signature: accepting ? signature.trim() : null,
+        optionIds: accepting ? chosen : [],
       });
       toast.success(
         accepting
@@ -224,12 +237,37 @@ function AnswerDialog({ quote, answer, onClose }: { quote: QuoteRecord; answer: 
           <DialogTitle>{accepting ? `Accepter la soumission ${number} ?` : `Refuser la soumission ${number} ?`}</DialogTitle>
           <DialogDescription>
             {accepting
-              ? `Vous autorisez les travaux qu'elle décrit, au montant de ${formatAmount(quote.subtotal)} avant taxes. Votre fournisseur en est avisé et planifie la suite avec vous.`
+              ? `Vous autorisez les travaux qu'elle décrit, au montant de ${formatAmount(total)} avant taxes. Votre fournisseur en est avisé et planifie la suite avec vous.${
+                  deposit != null ? ` Un acompte de ${quote.depositPercent} % (${formatAmount(deposit)} avant taxes) vous sera facturé.` : ""
+                }`
               : "Votre fournisseur en est avisé. Dites-lui pourquoi si vous le souhaitez : il pourra vous proposer autre chose."}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 px-4">
+          {accepting && quote.options.length > 0 && (
+            <fieldset className="space-y-2">
+              <legend className="mb-1 text-sm font-medium text-foreground">Options proposées</legend>
+              {quote.options.map((option) => (
+                <div key={option.id} className="flex items-center gap-3">
+                  <Checkbox
+                    id={`quote-option-${option.id}`}
+                    checked={chosen.includes(option.id)}
+                    onCheckedChange={(checked) =>
+                      setChosen((current) =>
+                        checked === true ? [...current, option.id] : current.filter((id) => id !== option.id),
+                      )
+                    }
+                  />
+                  <label htmlFor={`quote-option-${option.id}`} className="flex min-w-0 flex-1 justify-between gap-3 text-sm">
+                    <span className="min-w-0">{option.description}</span>
+                    <span className="shrink-0 tabular-nums text-muted-foreground">+ {formatAmount(option.total)}</span>
+                  </label>
+                </div>
+              ))}
+              <p className="text-xs text-muted-foreground">Cochez celles que vous voulez ; le montant ci-dessus suit votre choix.</p>
+            </fieldset>
+          )}
           {accepting && (
             <Field>
               <FieldLabel htmlFor="quote-answer-signature">Votre nom complet</FieldLabel>

@@ -427,6 +427,10 @@ namespace Vexta.Api.Data.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
 
+                    b.Property<string>("QuoteTerms")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
                     b.Property<string>("RbqNumber")
                         .HasColumnType("text");
 
@@ -3741,6 +3745,13 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("DepositInvoiceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("DepositPercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
                     b.Property<string>("Description")
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
@@ -3803,6 +3814,8 @@ namespace Vexta.Api.Data.Migrations
                     b.HasIndex("ClientAssetId");
 
                     b.HasIndex("ClientId");
+
+                    b.HasIndex("DepositInvoiceId");
 
                     b.HasIndex("ProjectId");
 
@@ -3874,6 +3887,12 @@ namespace Vexta.Api.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
+
+                    b.Property<bool>("IsOptional")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsSelected")
+                        .HasColumnType("boolean");
 
                     b.Property<int>("Kind")
                         .HasColumnType("integer");
@@ -3949,6 +3968,99 @@ namespace Vexta.Api.Data.Migrations
                     b.HasIndex("QuoteId", "CreatedAt");
 
                     b.ToTable("QuoteNotes");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.QuoteTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("DepositPercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Name");
+
+                    b.ToTable("QuoteTemplates");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.QuoteTemplateLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<bool>("IsOptional")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(14, 3)
+                        .HasColumnType("numeric(14,3)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TemplateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Unit")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<decimal?>("UnitCost")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("TemplateId", "Kind", "SortOrder");
+
+                    b.ToTable("QuoteTemplateLines");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.ReceiptScan", b =>
@@ -5659,6 +5771,11 @@ namespace Vexta.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Vexta.Api.Domain.Invoice", "DepositInvoice")
+                        .WithMany()
+                        .HasForeignKey("DepositInvoiceId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Vexta.Api.Domain.Project", "Project")
                         .WithMany()
                         .HasForeignKey("ProjectId")
@@ -5686,6 +5803,8 @@ namespace Vexta.Api.Data.Migrations
                     b.Navigation("ClientAddress");
 
                     b.Navigation("ClientAsset");
+
+                    b.Navigation("DepositInvoice");
 
                     b.Navigation("Project");
 
@@ -5742,6 +5861,24 @@ namespace Vexta.Api.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Quote");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.QuoteTemplateLine", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Vexta.Api.Domain.QuoteTemplate", "Template")
+                        .WithMany("Lines")
+                        .HasForeignKey("TemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+
+                    b.Navigation("Template");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.ReceiptScan", b =>
@@ -6068,6 +6205,11 @@ namespace Vexta.Api.Data.Migrations
                     b.Navigation("Lines");
 
                     b.Navigation("Notes");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.QuoteTemplate", b =>
+                {
+                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.Supplier", b =>

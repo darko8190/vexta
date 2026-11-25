@@ -44,6 +44,8 @@ export interface BillingSettings {
   defaultQuoteEmailSubject: string;
   defaultQuoteEmailBody: string;
   quoteEmailFields: InvoiceEmailField[];
+  /** The conditions printed on quotes above the signature. */
+  quoteTerms: string | null;
 }
 
 /** Which document's email a template card edits. */
@@ -73,6 +75,7 @@ export type SaveBillingSettingsValues = Omit<
   | "defaultQuoteEmailSubject"
   | "defaultQuoteEmailBody"
   | "quoteEmailFields"
+  | "quoteTerms"
 >;
 
 /**
@@ -189,5 +192,14 @@ export function useSaveBillingSettings() {
       queryClient.invalidateQueries({ queryKey: ["billing-settings"] });
       queryClient.invalidateQueries({ queryKey: ["price-policies"] });
     },
+  });
+}
+
+/** The conditions printed on every quote. Blank clears them. Its own endpoint, like the email. */
+export function useSaveQuoteTerms() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (terms: string) => api.put<BillingSettings>("billing-settings/soumission-conditions", { terms }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["billing-settings"] }),
   });
 }

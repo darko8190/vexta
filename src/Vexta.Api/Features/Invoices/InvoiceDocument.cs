@@ -160,12 +160,20 @@ public class InvoiceDocument(InvoicePdfModel model) : IDocument
         }
 
         column.Item().PaddingTop(14).Text("Détail des travaux compris").Bold().FontColor(Blue);
-        column.Item().PaddingTop(6).Element(LinesTable);
+        column.Item().PaddingTop(6).Element(container => LinesTable(container, model.Lines));
         column.Item().PaddingTop(18).Element(Totals);
+
+        // A quote's options sit apart from the price, so the total says exactly what is agreed
+        // to and the extras can still be read with their own prices.
+        if (model.Options.Count > 0)
+        {
+            column.Item().PaddingTop(18).Text("Options proposées — non incluses dans le total").Bold().FontColor(Blue);
+            column.Item().PaddingTop(6).Element(container => LinesTable(container, model.Options));
+        }
         column.Item().PaddingTop(24).Element(Reception);
     });
 
-    private void LinesTable(IContainer container) => container.Table(table =>
+    private void LinesTable(IContainer container, IReadOnlyList<InvoicePdfLine> lines) => container.Table(table =>
     {
         table.ColumnsDefinition(columns =>
         {
@@ -185,7 +193,7 @@ public class InvoiceDocument(InvoicePdfModel model) : IDocument
             header.Cell().Element(HeaderCell).AlignRight().Text("Montant");
         });
 
-        foreach (var line in model.Lines)
+        foreach (var line in lines)
         {
             table.Cell().Element(BodyCell).Text(line.Description);
             table.Cell().Element(BodyCell).AlignRight().Text(Number(line.Quantity));

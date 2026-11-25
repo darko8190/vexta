@@ -10,6 +10,7 @@ import type {
   QuoteStatus,
   QuoteStatusCount,
   QuoteSummary,
+  QuoteTemplate,
   SaveQuoteLineValues,
 } from "@/lib/types";
 
@@ -146,13 +147,16 @@ export function useRespondToQuote() {
       answer,
       note,
       signature = null,
+      optionIds = [],
     }: {
       id: string;
       answer: "accepter" | "refuser";
       note: string | null;
       /** The typed full name that signs an acceptance. */
       signature?: string | null;
-    }) => api.post<QuoteRecord>(`soumissions/${id}/${answer}`, { note, signature }),
+      /** The optional lines taken along with the acceptance. */
+      optionIds?: string[];
+    }) => api.post<QuoteRecord>(`soumissions/${id}/${answer}`, { note, signature, optionIds }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["quotes"] });
       queryClient.invalidateQueries({ queryKey: ["projects"] });
@@ -198,5 +202,35 @@ export function storedQuoteValues(quote: QuoteRecord): QuoteFormValues {
     categoryId: quote.categoryId,
     subCategoryId: quote.subCategoryId,
     wageClassificationId: quote.wageClassificationId,
+    // Carried along so an edit made elsewhere (a cell in the table) does not clear it.
+    depositPercent: quote.depositPercent,
   };
+}
+
+// ---- Templates ----
+
+export function useQuoteTemplatesQuery(enabled = true) {
+  return useQuery({
+    queryKey: ["quote-templates"],
+    queryFn: () => api.get<QuoteTemplate[]>("modeles-soumission"),
+    enabled,
+  });
+}
+
+/** Keeps the quote's lines as a template. Saving under an existing name replaces that template. */
+export function useSaveQuoteAsTemplate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, name }: { id: string; name: string }) =>
+      api.post<QuoteTemplate>(`soumissions/${id}/modele`, { name }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["quote-templates"] }),
+  });
+}
+
+export function useDeleteQuoteTemplate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`modeles-soumission/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["quote-templates"] }),
+  });
 }

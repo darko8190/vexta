@@ -95,6 +95,12 @@ public class BillingSettings
     /// <summary>Payment conditions, as printed.</summary>
     public string? Terms { get; set; }
 
+    /// <summary>
+    /// The conditions printed on a quote above the signature: warranty, delays, exclusions.
+    /// Separate from <see cref="Terms"/>, which are payment conditions and belong to invoices.
+    /// </summary>
+    public string? QuoteTerms { get; set; }
+
     /// <summary>The line at the bottom: late fees, how to pay, a thank you.</summary>
     public string? FooterNote { get; set; }
 

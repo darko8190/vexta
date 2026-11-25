@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Building2, Clock, CreditCard, Mail, Percent, Receipt, Sparkles, Wallet } from "lucide-react";
+import { Building2, ClipboardPen, Clock, CreditCard, Mail, Percent, Receipt, Sparkles, Wallet } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +21,7 @@ import { EmailTemplateCard } from "@/components/settings/email-template-card";
 import { MarginModeCard } from "@/components/settings/margin-mode-card";
 import { OnlinePaymentsCard } from "@/components/settings/online-payments-card";
 import { PricePoliciesCard } from "@/components/settings/price-policies-card";
+import { QuoteTemplatesCard, QuoteTermsCard } from "@/components/settings/quote-settings-cards";
 import { WageClassificationsCard } from "@/components/settings/wage-classifications-card";
 import { useBillingStateQuery, type BillingState } from "@/hooks/use-billing";
 import { usePublicPlansQuery } from "@/hooks/use-catalog";
@@ -339,6 +340,7 @@ export default function SettingsPage() {
     ...(canManage
       ? [
           { key: "facturation", label: "Facturation", icon: Receipt },
+          { key: "soumissions", label: "Soumissions", icon: ClipboardPen },
           { key: "courriel", label: "Courriel", icon: Mail },
           // Beside Facturation rather than beside Abonnement, which is the money going the
           // other way: this one is the company being paid, not the company paying Vexta.
@@ -389,6 +391,12 @@ export default function SettingsPage() {
                 <BusinessSubscription state={data} />
               ))}
             {active === "facturation" && <BillingSettingsCard />}
+            {active === "soumissions" && (
+              <div className="space-y-6">
+                <QuoteTermsCard />
+                <QuoteTemplatesCard />
+              </div>
+            )}
             {active === "courriel" && (
               <div className="space-y-6">
                 <EmailTemplateCard kind="facture" />

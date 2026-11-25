@@ -71,6 +71,15 @@ public class Quote
     /// </summary>
     public string? ClientSignature { get; set; }
 
+    /// <summary>
+    /// The share of the price asked up front, in percent. Null for none. When the quote becomes
+    /// a project, a deposit invoice for it is drafted — left for the company to check and send,
+    /// because an invoice is a legal document nobody should find already sent in their name.
+    /// </summary>
+    public decimal? DepositPercent { get; set; }
+    public Guid? DepositInvoiceId { get; set; }
+    public Invoice? DepositInvoice { get; set; }
+
     /// <summary>The work's own planned dates, carried to the project on acceptance.</summary>
     public DateOnly? StartDate { get; set; }
     public DateOnly? EndDate { get; set; }
@@ -136,6 +145,16 @@ public class QuoteLine
     public decimal? UnitCost { get; set; }
     public decimal UnitPrice { get; set; }
 
+    /// <summary>
+    /// An extra the client may take or leave (gutters, a second coat). Not in the total until
+    /// chosen: <see cref="IsSelected"/> is set by the client when accepting, or by the office.
+    /// </summary>
+    public bool IsOptional { get; set; }
+    public bool IsSelected { get; set; }
+
+    /// <summary>In the price: every ordinary line, and the options that were chosen.</summary>
+    public bool Counts => !IsOptional || IsSelected;
+
     public int SortOrder { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
@@ -184,4 +203,46 @@ public class QuoteNote
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
+/// <summary>
+/// A quote kept to start others from: the lines of a kind of job the company prices often.
+/// Its own table rather than a flagged quote, so a template never takes a quote number, never
+/// shows in the list, and never counts in the acceptance rate.
+/// </summary>
+public class QuoteTemplate
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid TenantId { get; set; }
+
+    public required string Name { get; set; }
+    /// <summary>The description a quote made from it starts with.</summary>
+    public string? Description { get; set; }
+    public decimal? DepositPercent { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+
+    public List<QuoteTemplateLine> Lines { get; set; } = [];
+}
+
+public class QuoteTemplateLine
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid TenantId { get; set; }
+
+    public Guid TemplateId { get; set; }
+    public QuoteTemplate? Template { get; set; }
+
+    public QuoteLineKind Kind { get; set; }
+    public Guid? ProductId { get; set; }
+    public Product? Product { get; set; }
+    public string? Code { get; set; }
+    public required string Description { get; set; }
+    public string? Unit { get; set; }
+    public decimal Quantity { get; set; } = 1;
+    public decimal? UnitCost { get; set; }
+    public decimal UnitPrice { get; set; }
+    public bool IsOptional { get; set; }
+    public int SortOrder { get; set; }
 }

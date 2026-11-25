@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   ArrowRightLeft,
   BellRing,
+  BookmarkPlus,
   ClipboardPen,
   Copy,
   FolderKanban,
@@ -32,6 +33,17 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Field, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import { InlineSheet } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
@@ -52,7 +64,9 @@ import {
   useDuplicateQuote,
   useQuoteQuery,
   useQuoteSummaryQuery,
+  useSaveQuoteAsTemplate,
 } from "@/hooks/use-quotes";
+import { ex } from "@/lib/placeholders";
 import { Spinner } from "@/components/ui/spinner";
 import { ApiError } from "@/lib/api";
 import { formatDateOnly, formatMoment } from "@/lib/dates";
@@ -88,6 +102,7 @@ function StaffQuoteDetail({ id }: { id: string }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [sending, setSending] = useState(false);
   const [reminding, setReminding] = useState(false);
+  const [savingTemplate, setSavingTemplate] = useState(false);
 
   if (isLoading) {
     return (
@@ -212,7 +227,19 @@ function StaffQuoteDetail({ id }: { id: string }) {
             <p className="mt-1 text-sm text-muted-foreground">
               Total avant taxes :{" "}
               <span className="font-medium text-foreground tabular-nums">{formatAmount(quote.subtotal)}</span>
+              {quote.optionsTotal > 0 && (
+                <span> · options proposées en plus : {formatAmount(quote.optionsTotal)}</span>
+              )}
+              {quote.depositPercent != null && <span> · acompte de {quote.depositPercent} %</span>}
             </p>
+            {quote.depositInvoiceId && quote.depositInvoiceNumber && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                Facture d&apos;acompte :{" "}
+                <Link href={`/factures/${quote.depositInvoiceId}`} className="text-foreground underline-offset-4 hover:underline">
+                  {quote.depositInvoiceNumber}
+                </Link>
+              </p>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -231,6 +258,12 @@ function StaffQuoteDetail({ id }: { id: string }) {
               <Button variant="outline" size="sm" disabled={duplicate.isPending} onClick={onDuplicate}>
                 {duplicate.isPending ? <Spinner /> : <Copy />}
                 Dupliquer
+              </Button>
+            )}
+            {canManage && (
+              <Button variant="outline" size="sm" onClick={() => setSavingTemplate(true)}>
+                <BookmarkPlus />
+                Enregistrer comme modèle
               </Button>
             )}
             {quote.projectId && quote.projectNumber != null ? (
@@ -350,6 +383,8 @@ function StaffQuoteDetail({ id }: { id: string }) {
         reminder={reminding}
       />
 
+      {savingTemplate && <SaveTemplateDialog quote={quote} onClose={() => setSavingTemplate(false)} />}
+
       <ConvertDialog open={confirmConvert} onOpenChange={setConfirmConvert} onConfirm={onConvert} pending={convert.isPending} />
     </div>
   );
@@ -412,5 +447,59 @@ function ConvertDialog({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+  );
+}
+
+/**
+ * Names the template the quote's lines are kept as. Saving under a name already used replaces
+ * that template, which is how a template is updated.
+ */
+function SaveTemplateDialog({ quote, onClose }: { quote: QuoteRecord; onClose: () => void }) {
+  const save = useSaveQuoteAsTemplate();
+  const [name, setName] = useState(quote.description?.split(/\r?\n/)[0]?.slice(0, 80) ?? "");
+
+  async function submit() {
+    try {
+      const template = await save.mutateAsync({ id: quote.id, name: name.trim() });
+      toast.success(`Modèle « ${template.name} » enregistré.`, {
+        description: "Choisissez-le dans « Partir d'un modèle » en créant une soumission.",
+      });
+      onClose();
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Impossible d'enregistrer le modèle.");
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(next) => !next && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Enregistrer comme modèle</DialogTitle>
+          <DialogDescription>
+            Les lignes de cette soumission, sa description et son acompte sont gardés pour en
+            créer d&apos;autres. Un nom déjà utilisé remplace ce modèle.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="px-4">
+          <Field>
+            <FieldLabel htmlFor="quote-template-name">Nom du modèle</FieldLabel>
+            <Input
+              id="quote-template-name"
+              value={name}
+              maxLength={200}
+              onChange={(event) => setName(event.target.value)}
+              placeholder={ex("Réfection de toiture")}
+            />
+          </Field>
+        </div>
+        <DialogFooter>
+          <Button type="button" disabled={save.isPending || name.trim().length === 0} onClick={submit}>
+            {save.isPending && <Spinner />}
+            Enregistrer le modèle
+          </Button>
+          <DialogClose render={<Button type="button" variant="outline" />}>Annuler</DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

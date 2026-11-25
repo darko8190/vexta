@@ -70,6 +70,8 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
     public DbSet<WageClassificationStep> WageClassificationSteps => Set<WageClassificationStep>();
     public DbSet<Quote> Quotes => Set<Quote>();
     public DbSet<QuoteLine> QuoteLines => Set<QuoteLine>();
+    public DbSet<QuoteTemplate> QuoteTemplates => Set<QuoteTemplate>();
+    public DbSet<QuoteTemplateLine> QuoteTemplateLines => Set<QuoteTemplateLine>();
     public DbSet<QuoteDocument> QuoteDocuments => Set<QuoteDocument>();
     public DbSet<QuoteNote> QuoteNotes => Set<QuoteNote>();
     public DbSet<ProductImage> ProductImages => Set<ProductImage>();
@@ -1244,6 +1246,9 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.Property(q => q.ClientRespondedBy).HasMaxLength(200);
             e.Property(q => q.ClientResponseNote).HasMaxLength(2000);
             e.Property(q => q.ClientSignature).HasMaxLength(200);
+            e.Property(q => q.DepositPercent).HasPrecision(5, 2);
+            // SetNull: deleting the deposit invoice leaves the quote, which simply no longer has one.
+            e.HasOne(q => q.DepositInvoice).WithMany().HasForeignKey(q => q.DepositInvoiceId).OnDelete(DeleteBehavior.SetNull);
 
             // Restrict on the client, like a project: a client with quotes on file is not
             // deleted out from under them.
@@ -1285,6 +1290,29 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
                 && (CurrentClientId == null || n.Quote!.ClientId == CurrentClientId));
         });
 
+        builder.Entity<QuoteTemplate>(e =>
+        {
+            e.Property(t => t.Name).HasMaxLength(200);
+            e.Property(t => t.Description).HasMaxLength(4000);
+            e.Property(t => t.DepositPercent).HasPrecision(5, 2);
+            e.HasIndex(t => new { t.TenantId, t.Name });
+            e.HasQueryFilter(t => t.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<QuoteTemplateLine>(e =>
+        {
+            e.Property(l => l.Code).HasMaxLength(100);
+            e.Property(l => l.Description).HasMaxLength(2000);
+            e.Property(l => l.Unit).HasMaxLength(50);
+            e.Property(l => l.Quantity).HasPrecision(14, 3);
+            e.Property(l => l.UnitCost).HasPrecision(14, 2);
+            e.Property(l => l.UnitPrice).HasPrecision(14, 2);
+            e.HasOne(l => l.Template).WithMany(t => t.Lines).HasForeignKey(l => l.TemplateId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(l => l.Product).WithMany().HasForeignKey(l => l.ProductId).OnDelete(DeleteBehavior.SetNull);
+            e.HasIndex(l => new { l.TemplateId, l.Kind, l.SortOrder });
+            e.HasQueryFilter(l => l.TenantId == CurrentTenantId);
+        });
+
         builder.Entity<QuoteLine>(e =>
         {
             e.Property(l => l.Code).HasMaxLength(100);
@@ -1293,6 +1321,7 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.Property(l => l.Quantity).HasPrecision(14, 3);
             e.Property(l => l.UnitCost).HasPrecision(14, 2);
             e.Property(l => l.UnitPrice).HasPrecision(14, 2);
+            e.Ignore(l => l.Counts);
 
             e.HasOne(l => l.Quote).WithMany(q => q.Lines).HasForeignKey(l => l.QuoteId).OnDelete(DeleteBehavior.Cascade);
             // SetNull: retiring a product from the catalogue must not change a price already given.
@@ -1576,6 +1605,7 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.Property(b => b.InvoiceEmailBody).HasMaxLength(8000);
             e.Property(b => b.QuoteEmailSubject).HasMaxLength(300);
             e.Property(b => b.QuoteEmailBody).HasMaxLength(8000);
+            e.Property(b => b.QuoteTerms).HasMaxLength(4000);
             e.Property(b => b.GstRate).HasPrecision(6, 3);
             e.Property(b => b.QstRate).HasPrecision(6, 3);
             e.Property(b => b.DefaultHourlyRate).HasPrecision(14, 2);

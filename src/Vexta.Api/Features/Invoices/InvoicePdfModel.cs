@@ -57,6 +57,12 @@ public record InvoicePdfModel
     public InvoicePdfSignature? Signature { get; init; }
 
     /// <summary>
+    /// A quote's extras not taken (yet): listed apart, with their price, and outside the total.
+    /// Empty on an invoice.
+    /// </summary>
+    public IReadOnlyList<InvoicePdfLine> Options { get; init; } = [];
+
+    /// <summary>
     /// What the paper calls itself, and the few words that change with it. An invoice by
     /// default; a quote prints through the same layout with its own words, so the two documents
     /// a client gets from one company look like they came from one company.

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { RequiredMark } from "@/components/ui/required-mark";
@@ -64,6 +65,8 @@ interface Draft {
   margin: string;
   unitPrice: string;
   productId: string | null;
+  isOptional: boolean;
+  isSelected: boolean;
 }
 
 function toDraft(line: QuoteLine | undefined, kind: QuoteLineKind, defaultRate: number | null): Draft {
@@ -77,6 +80,8 @@ function toDraft(line: QuoteLine | undefined, kind: QuoteLineKind, defaultRate: 
     // A new labour line starts at the company's hourly rate: it is what most hours sell for.
     unitPrice: line ? String(line.unitPrice) : kind === "Tache" && defaultRate != null ? String(defaultRate) : "",
     productId: line?.productId ?? null,
+    isOptional: line?.isOptional ?? false,
+    isSelected: line?.isSelected ?? false,
   };
 }
 
@@ -197,6 +202,8 @@ function LineForm({
           productId: draft.productId,
           code: draft.code.trim() || null,
           unit: draft.unit.trim() || null,
+          isOptional: draft.isOptional,
+          isSelected: draft.isOptional && draft.isSelected,
         },
       });
       toast.success(line ? "Ligne mise à jour." : "Ligne ajoutée.");
@@ -354,6 +361,37 @@ function LineForm({
                 />
               </Field>
             </div>
+
+            <Field>
+              <div className="flex items-center gap-3">
+                <Checkbox
+                  id="quote-line-optional"
+                  checked={draft.isOptional}
+                  onCheckedChange={(checked) => set({ isOptional: checked === true, isSelected: false })}
+                />
+                <FieldLabel htmlFor="quote-line-optional" className="font-normal">
+                  Option, au choix du client
+                </FieldLabel>
+              </div>
+              <FieldDescription>
+                Pas dans le total : le client la coche s&apos;il la veut en acceptant. Elle apparaît à part sur le PDF.
+              </FieldDescription>
+            </Field>
+            {draft.isOptional && (
+              <Field>
+                <div className="flex items-center gap-3">
+                  <Checkbox
+                    id="quote-line-selected"
+                    checked={draft.isSelected}
+                    onCheckedChange={(checked) => set({ isSelected: checked === true })}
+                  />
+                  <FieldLabel htmlFor="quote-line-selected" className="font-normal">
+                    Retenue par le client
+                  </FieldLabel>
+                </div>
+                <FieldDescription>Si le client l&apos;a choisie autrement qu&apos;en ligne, par exemple au téléphone.</FieldDescription>
+              </Field>
+            )}
 
             <p className="text-sm text-muted-foreground">
               Total de la ligne : <span className="font-medium text-foreground tabular-nums">{formatAmount(total)}</span>

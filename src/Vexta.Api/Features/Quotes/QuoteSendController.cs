@@ -242,7 +242,7 @@ public class QuoteSendController(
     private static (decimal Subtotal, decimal Taxes) Totals(Quote quote, Domain.BillingSettings? settings)
     {
         var totals = InvoiceTotals.For(
-            quote.Lines.Select(l => new InvoiceTotals.Line(l.Quantity, l.UnitPrice, true)),
+            quote.Lines.Where(l => l.Counts).Select(l => new InvoiceTotals.Line(l.Quantity, l.UnitPrice, true)),
             settings?.GstRate ?? 0m,
             settings?.QstRate ?? 0m,
             quote.IsTaxExempt);

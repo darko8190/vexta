@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -65,8 +66,10 @@ export function QuoteLinesSection({
   const copy = quoteLineCopy[kind];
   const heading = headings[kind];
   const lines = data ?? [];
-  const total = lines.reduce((sum, line) => sum + line.total, 0);
-  const cost = lines.reduce((sum, line) => sum + line.quantity * (line.unitCost ?? 0), 0);
+  // Options not taken are outside the price, so outside these totals too.
+  const counted = lines.filter((line) => !line.isOptional || line.isSelected);
+  const total = counted.reduce((sum, line) => sum + line.total, 0);
+  const cost = counted.reduce((sum, line) => sum + line.quantity * (line.unitCost ?? 0), 0);
 
   function openCreate() {
     setEditing(undefined);
@@ -131,6 +134,11 @@ export function QuoteLinesSection({
                   <>
                     <TableCell className="max-w-80">
                       <span className="line-clamp-2 whitespace-normal">{line.description}</span>
+                      {line.isOptional && (
+                        <Badge variant={line.isSelected ? "secondary" : "outline"} className="mt-0.5 mr-1">
+                          {line.isSelected ? "Option retenue" : "Option, hors total"}
+                        </Badge>
+                      )}
                       {line.code && <span className="text-xs text-muted-foreground">{line.code}</span>}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">

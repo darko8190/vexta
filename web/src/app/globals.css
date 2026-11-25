@@ -222,9 +222,8 @@
  * the opening lines rise in once, sections rise in as they scroll into view, and cards lift
  * under the pointer. The halo drifts slowly behind it all.
  *
- * All of it sits behind prefers-reduced-motion, and the scroll reveal behind @supports too: a
- * browser that cannot tie an animation to scrolling shows the page as it always was, rather
- * than hiding content until a script decides to show it.
+ * All of it sits behind prefers-reduced-motion. The scroll reveal is driven by ScrollReveal
+ * (an IntersectionObserver), which works in every browser and hides nothing until it runs.
  *
  * The reveal moves `translate` and the lift moves `transform`, two separate properties, so a
  * card can do both without the finished reveal pinning the hover in place.
@@ -285,12 +284,9 @@
   }
 }
 
-@supports (animation-timeline: view()) {
-  @media (prefers-reduced-motion: no-preference) {
-    .vx-reveal {
-      animation: vx-rise linear both;
-      animation-timeline: view();
-      animation-range: entry 0% entry 35%;
-    }
+/* Hidden only once ScrollReveal has run and put vx-reveal-on on the page; it plays the way in. */
+@media (prefers-reduced-motion: no-preference) {
+  .vx-reveal-on .vx-reveal {
+    opacity: 0;
   }
 }

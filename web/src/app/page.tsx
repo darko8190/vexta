@@ -5,6 +5,7 @@ import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import { SiteFooter } from "@/components/marketing/site-footer";
+import { ScrollReveal } from "@/components/marketing/scroll-reveal";
 import { SiteHeader } from "@/components/marketing/site-header";
 import { getPublishedModules, getPublishedPlans } from "@/lib/catalog-cache";
 import { moduleIcon } from "@/lib/module-icons";
@@ -195,6 +196,7 @@ export default function HomePage() {
   return (
     <div className="flex min-h-screen flex-col">
       <SiteHeader />
+      <ScrollReveal />
 
       <main className="flex-1">
         <section className="vx-glow">

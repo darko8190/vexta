@@ -53,7 +53,15 @@ public record QuoteDto(
     /// The optional lines, with their price: the customer chooses among them when accepting and
     /// cannot read the lines themselves, which carry the company's costs.
     /// </summary>
-    IReadOnlyList<QuoteOptionDto> Options);
+    IReadOnlyList<QuoteOptionDto> Options,
+    /// <summary>1 for the first version; « S-0012 rév. 2 » from the second on.</summary>
+    int Revision,
+    /// <summary>The version this one revises, and the revision that replaced this one.</summary>
+    Guid? ReplacesId,
+    Guid? ReplacedById,
+    /// <summary>The invoice this quote was billed by directly, without a project.</summary>
+    Guid? InvoiceId,
+    string? InvoiceNumber);
 
 public record QuoteOptionDto(Guid Id, string Description, decimal Total, bool IsSelected);
 

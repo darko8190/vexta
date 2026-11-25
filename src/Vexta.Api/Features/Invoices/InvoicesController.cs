@@ -239,6 +239,29 @@ public class InvoicesController(
             e.SellingPrice!.Value,
             taxable)));
 
+        // Deposits already invoiced for this job are taken off what is left to bill: one line
+        // each, at the deposit's own amount before taxes, so the taxes come off with it and the
+        // client never pays the same share twice. A cancelled deposit is not deducted.
+        var deposits = await db.Quotes.AsNoTracking()
+            .Where(q => q.ProjectId == projectId && q.DepositInvoice != null
+                && q.DepositInvoice.Status != InvoiceStatus.Annulee)
+            .Select(q => new
+            {
+                q.DepositInvoice!.Number,
+                Amount = q.DepositInvoice.Lines.Sum(l => Math.Round(l.Quantity * l.UnitPrice, 2))
+            })
+            .ToListAsync(ct);
+
+        lines.AddRange(deposits.Where(d => d.Amount > 0).Select(d => new InvoiceDraftLineDto(
+            InvoiceLineKind.Autre,
+            null,
+            $"Moins : acompte facturé ({d.Number})",
+            1m,
+            null,
+            null,
+            -d.Amount,
+            taxable)));
+
         return Ok(new InvoiceDraftDto(
             project.ClientId,
             await DefaultPolicyAsync(projectId),

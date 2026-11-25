@@ -46,7 +46,7 @@ export function FormSubmissionsSection({ formId }: { formId: string }) {
   async function onMakeQuote(submission: FormSubmission) {
     try {
       const quote = await makeQuote.mutateAsync(submission.id);
-      toast.success(`Soumission ${formatQuoteNumber(quote.number)} créée, en brouillon.`);
+      toast.success(`Soumission ${formatQuoteNumber(quote.number, quote.revision)} créée, en brouillon.`);
       router.push(`/soumissions/${quote.id}`);
     } catch (error) {
       toast.error(error instanceof ApiError ? error.message : "Impossible de créer la soumission.");

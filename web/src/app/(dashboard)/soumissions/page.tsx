@@ -38,7 +38,8 @@ import { formatProjectNumber, formatQuoteNumber, type QuoteRecord, type QuoteSta
 
 // Acceptée is listed so a converted quote reads right in edit mode; choosing it on one that is
 // not converted is refused by the API with the reason.
-const editableStatuses = (Object.keys(quoteStatusLabels) as QuoteStatus[]).map((status) => ({
+// Replaced is the result of « Réviser », never a choice in a cell.
+const editableStatuses = (Object.keys(quoteStatusLabels) as QuoteStatus[]).filter((status) => status !== "Remplacee").map((status) => ({
   value: status,
   label: quoteStatusLabels[status],
 }));
@@ -100,7 +101,7 @@ export default function QuotesPage() {
       locked: true,
       headClassName: "w-24",
       cellClassName: "font-mono text-xs font-medium tabular-nums",
-      cell: (quote) => formatQuoteNumber(quote.number),
+      cell: (quote) => formatQuoteNumber(quote.number, quote.revision),
     },
     { key: "client", label: "Client", cellClassName: "font-medium", cell: (quote) => quote.clientName },
     {
@@ -256,7 +257,7 @@ export default function QuotesPage() {
           columns={columns}
           rows={data.items}
           getRowId={(quote) => quote.id}
-          rowLabel={(quote) => `Ouvrir la soumission ${formatQuoteNumber(quote.number)}`}
+          rowLabel={(quote) => `Ouvrir la soumission ${formatQuoteNumber(quote.number, quote.revision)}`}
           onOpen={(quote) => router.push(`/soumissions/${quote.id}`)}
           onSaveRow={canCreate ? saveRow : undefined}
           toolbarStart={searchBox}
@@ -291,7 +292,7 @@ export default function QuotesPage() {
         open={Boolean(deleteTarget)}
         onOpenChange={(open) => !open && setDeleteTarget(undefined)}
         title="Supprimer cette soumission ?"
-        description={`La soumission ${deleteTarget ? formatQuoteNumber(deleteTarget.number) : ""} et ses lignes seront supprimées. Un projet qui en serait issu reste en place.`}
+        description={`La soumission ${deleteTarget ? formatQuoteNumber(deleteTarget.number, deleteTarget.revision) : ""} et ses lignes seront supprimées. Un projet qui en serait issu reste en place.`}
         onConfirm={confirmDelete}
         pending={remove.isPending}
       />

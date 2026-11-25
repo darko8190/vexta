@@ -10,6 +10,7 @@ import {
   BookmarkPlus,
   ClipboardPen,
   Copy,
+  FilePen,
   FolderKanban,
   FileText,
   FolderOpen,
@@ -17,6 +18,7 @@ import {
   Info,
   ListChecks,
   Plus,
+  Receipt,
   Send,
   Trash2,
 } from "lucide-react";
@@ -62,6 +64,8 @@ import {
   useConvertQuote,
   useDeleteQuote,
   useDuplicateQuote,
+  useInvoiceQuote,
+  useReviseQuote,
   useQuoteQuery,
   useQuoteSummaryQuery,
   useSaveQuoteAsTemplate,
@@ -96,6 +100,9 @@ function StaffQuoteDetail({ id }: { id: string }) {
   const convert = useConvertQuote();
   const remove = useDeleteQuote();
   const duplicate = useDuplicateQuote();
+  const revise = useReviseQuote();
+  const invoiceQuote = useInvoiceQuote();
+  const [confirmInvoice, setConfirmInvoice] = useState(false);
   const canManage = useCanManage();
   const [section, setSection] = useState("details");
   const [confirmConvert, setConfirmConvert] = useState(false);
@@ -129,8 +136,12 @@ function StaffQuoteDetail({ id }: { id: string }) {
     );
   }
 
-  const locked = Boolean(quote.projectId);
-  const canConvert = !locked && quote.status !== "Refusee" && quote.status !== "Expiree";
+  // Made a project or billed directly: either way the prices are settled.
+  const locked = Boolean(quote.projectId || quote.invoiceId);
+  // Only a price already given can be revised; a draft is simply edited.
+  const canRevise = !locked && (quote.status === "Envoyee" || quote.status === "Refusee" || quote.status === "Expiree");
+  const canInvoice = !locked && (quote.status === "Brouillon" || quote.status === "Envoyee");
+  const canConvert = !locked && quote.status !== "Refusee" && quote.status !== "Expiree" && quote.status !== "Remplacee";
   // Out with the client and not answered yet: the next message is a reminder, not a copy.
   const awaiting = quote.status === "Envoyee" && !locked && Boolean(quote.sentAt);
 
@@ -139,10 +150,35 @@ function StaffQuoteDetail({ id }: { id: string }) {
     setSending(true);
   }
 
+  async function onRevise() {
+    try {
+      const next = await revise.mutateAsync(id);
+      toast.success(`${formatQuoteNumber(next.number, next.revision)} créée, en brouillon.`, {
+        description: "La version précédente est gardée comme « Remplacée ».",
+      });
+      router.push(`/soumissions/${next.id}`);
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Impossible de réviser la soumission.");
+    }
+  }
+
+  async function onInvoice() {
+    try {
+      const billed = await invoiceQuote.mutateAsync(id);
+      toast.success(`Facture ${billed.invoiceNumber ?? ""} créée en brouillon.`, {
+        description: "Vérifiez-la, puis envoyez-la au client.",
+      });
+      setConfirmInvoice(false);
+      if (billed.invoiceId) router.push(`/factures/${billed.invoiceId}`);
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Impossible de facturer la soumission.");
+    }
+  }
+
   async function onDuplicate() {
     try {
       const copy = await duplicate.mutateAsync(id);
-      toast.success(`Soumission ${formatQuoteNumber(copy.number)} créée, en brouillon.`);
+      toast.success(`Soumission ${formatQuoteNumber(copy.number, copy.revision)} créée, en brouillon.`);
       router.push(`/soumissions/${copy.id}`);
     } catch (error) {
       toast.error(error instanceof ApiError ? error.message : "Impossible de dupliquer la soumission.");
@@ -204,7 +240,7 @@ function StaffQuoteDetail({ id }: { id: string }) {
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-mono text-xs text-muted-foreground tabular-nums">
-                {formatQuoteNumber(quote.number)}
+                {formatQuoteNumber(quote.number, quote.revision)}
               </span>
               <Badge variant={quoteStatusBadgeVariant[quote.status]}>{quoteStatusLabels[quote.status]}</Badge>
               {quote.isTaxExempt && <Badge variant="outline">Non taxable</Badge>}
@@ -260,6 +296,24 @@ function StaffQuoteDetail({ id }: { id: string }) {
                 Dupliquer
               </Button>
             )}
+            {canManage && canRevise && (
+              <Button variant="outline" size="sm" disabled={revise.isPending} onClick={onRevise}>
+                {revise.isPending ? <Spinner /> : <FilePen />}
+                Réviser
+              </Button>
+            )}
+            {canManage && canInvoice && (
+              <Button variant="outline" size="sm" onClick={() => setConfirmInvoice(true)}>
+                <Receipt />
+                Facturer sans projet
+              </Button>
+            )}
+            {quote.invoiceId && quote.invoiceNumber && (
+              <Link href={`/factures/${quote.invoiceId}`} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+                <Receipt />
+                Facture {quote.invoiceNumber}
+              </Link>
+            )}
             {canManage && (
               <Button variant="outline" size="sm" onClick={() => setSavingTemplate(true)}>
                 <BookmarkPlus />
@@ -304,8 +358,31 @@ function StaffQuoteDetail({ id }: { id: string }) {
 
         {locked && (
           <p className="mt-4 border-t border-border pt-3 text-xs text-muted-foreground">
-            Acceptée et devenue un projet : ses lignes et ses prix ne changent plus. La description,
-            les dates et les adresses restent corrigeables.
+            Acceptée et devenue {quote.projectId ? "un projet" : "une facture"} : ses lignes et ses
+            prix ne changent plus. La description, les dates et les adresses restent corrigeables.
+          </p>
+        )}
+
+        {(quote.replacedById || quote.replacesId) && (
+          <p className="mt-4 border-t border-border pt-3 text-sm text-muted-foreground">
+            {quote.replacedById && (
+              <>
+                Remplacée par une version révisée :{" "}
+                <Link href={`/soumissions/${quote.replacedById}`} className="text-foreground underline-offset-4 hover:underline">
+                  ouvrir la plus récente
+                </Link>
+                .{" "}
+              </>
+            )}
+            {quote.replacesId && (
+              <>
+                Révision d&apos;une version précédente :{" "}
+                <Link href={`/soumissions/${quote.replacesId}`} className="text-foreground underline-offset-4 hover:underline">
+                  ouvrir la version précédente
+                </Link>
+                .
+              </>
+            )}
           </p>
         )}
       </div>
@@ -366,7 +443,7 @@ function StaffQuoteDetail({ id }: { id: string }) {
         open={confirmDelete}
         onOpenChange={setConfirmDelete}
         title="Supprimer cette soumission ?"
-        description={`La soumission ${formatQuoteNumber(quote.number)} et ses lignes seront supprimées.${quote.projectId ? " Le projet qui en est issu reste en place." : ""}`}
+        description={`La soumission ${formatQuoteNumber(quote.number, quote.revision)} et ses lignes seront supprimées.${quote.projectId ? " Le projet qui en est issu reste en place." : ""}`}
         onConfirm={onDelete}
         pending={remove.isPending}
       />
@@ -383,6 +460,32 @@ function StaffQuoteDetail({ id }: { id: string }) {
         reminder={reminding}
       />
 
+      <AlertDialog open={confirmInvoice} onOpenChange={setConfirmInvoice}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Facturer sans projet ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Pour un petit travail : une facture est créée en brouillon avec les lignes de la
+              soumission (et les options retenues). La soumission passe à « Acceptée » et ses prix
+              ne changent plus. Vous vérifiez la facture avant de l&apos;envoyer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={invoiceQuote.isPending}
+              onClick={(event) => {
+                event.preventDefault();
+                void onInvoice();
+              }}
+            >
+              {invoiceQuote.isPending && <Spinner />}
+              Créer la facture
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {savingTemplate && <SaveTemplateDialog quote={quote} onClose={() => setSavingTemplate(false)} />}
 
       <ConvertDialog open={confirmConvert} onOpenChange={setConfirmConvert} onConfirm={onConvert} pending={convert.isPending} />
@@ -393,7 +496,7 @@ function StaffQuoteDetail({ id }: { id: string }) {
 /** Keyed on the quote's last change by the page, so an edited quote is drawn again. */
 function QuotePdfPreview({ quote }: { quote: QuoteRecord }) {
   const pdf = usePdfDocument(`soumissions/${quote.id}/pdf`);
-  const number = formatQuoteNumber(quote.number);
+  const number = formatQuoteNumber(quote.number, quote.revision);
   return (
     <div className="space-y-4">
       <div>

@@ -98,6 +98,27 @@ export function useDeleteQuote() {
   });
 }
 
+/** The next version of a quote out with the client; the current one becomes « Remplacée ». */
+export function useReviseQuote() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: (id: string) => api.post<QuoteRecord>(`soumissions/${id}/reviser`),
+    onSuccess: () => invalidate(),
+  });
+}
+
+/** Bills the quote directly, without a project: a draft invoice with its lines. */
+export function useInvoiceQuote() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.post<QuoteRecord>(`soumissions/${id}/facturer`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    },
+  });
+}
+
 /** Turns the quote into a project. The projects list moves too, so both keys are refreshed. */
 export function useConvertQuote() {
   const queryClient = useQueryClient();

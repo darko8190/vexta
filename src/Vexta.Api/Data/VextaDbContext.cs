@@ -1240,7 +1240,11 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
 
         builder.Entity<Quote>(e =>
         {
-            e.HasIndex(q => new { q.TenantId, q.Number }).IsUnique();
+            // Unique per revision: every version of S-0012 shares the number.
+            e.HasIndex(q => new { q.TenantId, q.Number, q.Revision }).IsUnique();
+            e.Ignore(q => q.Label);
+            e.HasOne(q => q.Replaces).WithMany(q => q.Revisions).HasForeignKey(q => q.ReplacesId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(q => q.Invoice).WithMany().HasForeignKey(q => q.InvoiceId).OnDelete(DeleteBehavior.SetNull);
             e.Property(q => q.PoNumber).HasMaxLength(100);
             e.Property(q => q.Description).HasMaxLength(4000);
             e.Property(q => q.ClientRespondedBy).HasMaxLength(200);

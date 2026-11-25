@@ -71,7 +71,7 @@ export function ClientQuoteView({ id }: { id: string }) {
   // The same rule as the API's, so the buttons are not offered for an answer it would refuse.
   const expired = quote.status === "Expiree" || (quote.validUntil != null && quote.validUntil < todayIso());
   const awaiting = quote.status === "Envoyee" && !quote.projectId && !expired;
-  const number = formatQuoteNumber(quote.number);
+  const number = formatQuoteNumber(quote.number, quote.revision);
 
   return (
     <div>
@@ -158,6 +158,9 @@ function ResponseLine({ quote, expired }: { quote: QuoteRecord; expired: boolean
         )}
       </>
     );
+  } else if (quote.status === "Remplacee") {
+    // The revision may still be a draft the customer cannot open, so the list is where to look.
+    text = "Cette version a été remplacée par une soumission révisée. La nouvelle version se trouve dans vos soumissions dès que votre fournisseur vous l'envoie.";
   } else if (quote.status === "Acceptee") {
     text = "Acceptée. Les travaux sont planifiés avec vous.";
   } else if (quote.status === "Refusee") {
@@ -184,7 +187,7 @@ function ResponseLine({ quote, expired }: { quote: QuoteRecord; expired: boolean
 /** Keyed on the quote's last change, so an answer that changes the paper draws it again. */
 function QuoteDocument({ quote }: { quote: QuoteRecord }) {
   const pdf = usePdfDocument(`soumissions/${quote.id}/pdf`);
-  const number = formatQuoteNumber(quote.number);
+  const number = formatQuoteNumber(quote.number, quote.revision);
   return (
     <PdfViewer
       url={pdf.url}
@@ -208,7 +211,7 @@ function AnswerDialog({ quote, answer, onClose }: { quote: QuoteRecord; answer: 
   const deposit = quote.depositPercent ? Math.round(total * quote.depositPercent) / 100 : null;
   // Typing one's name is the signature, so the button waits for one.
   const signed = signature.trim().length >= 2;
-  const number = formatQuoteNumber(quote.number);
+  const number = formatQuoteNumber(quote.number, quote.revision);
 
   async function submit() {
     try {

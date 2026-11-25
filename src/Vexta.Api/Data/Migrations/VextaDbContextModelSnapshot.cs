@@ -3759,6 +3759,9 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<DateOnly?>("EndDate")
                         .HasColumnType("date");
 
+                    b.Property<Guid?>("InvoiceId")
+                        .HasColumnType("uuid");
+
                     b.Property<bool>("IsTaxExempt")
                         .HasColumnType("boolean");
 
@@ -3774,6 +3777,12 @@ namespace Vexta.Api.Data.Migrations
 
                     b.Property<Guid?>("ProjectId")
                         .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ReplacesId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Revision")
+                        .HasColumnType("integer");
 
                     b.Property<bool>("SameAddressAsClient")
                         .HasColumnType("boolean");
@@ -3817,7 +3826,11 @@ namespace Vexta.Api.Data.Migrations
 
                     b.HasIndex("DepositInvoiceId");
 
+                    b.HasIndex("InvoiceId");
+
                     b.HasIndex("ProjectId");
+
+                    b.HasIndex("ReplacesId");
 
                     b.HasIndex("SiteAddressId");
 
@@ -3825,7 +3838,7 @@ namespace Vexta.Api.Data.Migrations
 
                     b.HasIndex("WageClassificationId");
 
-                    b.HasIndex("TenantId", "Number")
+                    b.HasIndex("TenantId", "Number", "Revision")
                         .IsUnique();
 
                     b.ToTable("Quotes");
@@ -5776,9 +5789,19 @@ namespace Vexta.Api.Data.Migrations
                         .HasForeignKey("DepositInvoiceId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("Vexta.Api.Domain.Invoice", "Invoice")
+                        .WithMany()
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Vexta.Api.Domain.Project", "Project")
                         .WithMany()
                         .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Vexta.Api.Domain.Quote", "Replaces")
+                        .WithMany("Revisions")
+                        .HasForeignKey("ReplacesId")
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("Vexta.Api.Domain.Address", "SiteAddress")
@@ -5806,7 +5829,11 @@ namespace Vexta.Api.Data.Migrations
 
                     b.Navigation("DepositInvoice");
 
+                    b.Navigation("Invoice");
+
                     b.Navigation("Project");
+
+                    b.Navigation("Replaces");
 
                     b.Navigation("SiteAddress");
 
@@ -6205,6 +6232,8 @@ namespace Vexta.Api.Data.Migrations
                     b.Navigation("Lines");
 
                     b.Navigation("Notes");
+
+                    b.Navigation("Revisions");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.QuoteTemplate", b =>

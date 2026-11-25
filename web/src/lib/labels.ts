@@ -456,6 +456,7 @@ export const quoteStatusLabels: Record<QuoteStatus, string> = {
   Acceptee: "Acceptée",
   Refusee: "Refusée",
   Expiree: "Expirée",
+  Remplacee: "Remplacée",
 };
 
 export const quoteStatusBadgeVariant: Record<QuoteStatus, "default" | "secondary" | "destructive" | "outline"> = {
@@ -465,4 +466,5 @@ export const quoteStatusBadgeVariant: Record<QuoteStatus, "default" | "secondary
   Acceptee: "secondary",
   Refusee: "destructive",
   Expiree: "outline",
+  Remplacee: "outline",
 };

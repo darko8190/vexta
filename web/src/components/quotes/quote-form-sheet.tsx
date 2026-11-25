@@ -42,7 +42,8 @@ import {
 
 const allStatuses = Object.keys(quoteStatusLabels) as QuoteStatus[];
 /** Accepted is reached by converting to a project, never from the dropdown. */
-const pickableStatuses = allStatuses.filter((status) => status !== "Acceptee");
+// Accepted comes from converting or billing, and Replaced from revising: neither is picked by hand.
+const pickableStatuses = allStatuses.filter((status) => status !== "Acceptee" && status !== "Remplacee");
 
 const NO_CLASSIFICATION = "aucun";
 
@@ -181,7 +182,7 @@ export function QuoteFormSheet({
         toast.success("Soumission mise à jour.");
       } else {
         const created = await create.mutateAsync(payload);
-        toast.success(`Soumission ${formatQuoteNumber(created.number)} créée.`);
+        toast.success(`Soumission ${formatQuoteNumber(created.number, created.revision)} créée.`);
         onCreated?.(created);
       }
       onOpenChange(false);
@@ -205,7 +206,7 @@ export function QuoteFormSheet({
           <SheetTitle>{isEditing ? "Modifier la soumission" : "Nouvelle soumission"}</SheetTitle>
           <SheetDescription>
             {isEditing && quote
-              ? `Numéro ${formatQuoteNumber(quote.number)} — attribué automatiquement et jamais réutilisé.`
+              ? `Numéro ${formatQuoteNumber(quote.number, quote.revision)} — attribué automatiquement et jamais réutilisé.`
               : "Le numéro est attribué automatiquement à la création."}
           </SheetDescription>
         </SheetHeader>

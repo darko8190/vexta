@@ -2997,13 +2997,15 @@ export interface DirectorySummary {
 
 // ---- Soumissions ----
 
-export type QuoteStatus = "Brouillon" | "Envoyee" | "Acceptee" | "Refusee" | "Expiree";
+export type QuoteStatus = "Brouillon" | "Envoyee" | "Acceptee" | "Refusee" | "Expiree" | "Remplacee";
 
 /** Which project section the line becomes on acceptance: a task, a material, an extra charge. */
 export type QuoteLineKind = "Tache" | "Materiel" | "Frais";
 
-export function formatQuoteNumber(n: number): string {
-  return `S-${String(n).padStart(4, "0")}`;
+/** « S-0012 », or « S-0012 rév. 2 » from a quote's second version on. */
+export function formatQuoteNumber(n: number, revision = 1): string {
+  const number = `S-${String(n).padStart(4, "0")}`;
+  return revision > 1 ? `${number} rév. ${revision}` : number;
 }
 
 export interface QuoteRecord {
@@ -3052,6 +3054,14 @@ export interface QuoteRecord {
   optionsTotal: number;
   /** The optional lines with their price, which the customer chooses among when accepting. */
   options: QuoteOption[];
+  /** 1 for the first version. */
+  revision: number;
+  /** The version this one revises, and the revision that replaced this one. */
+  replacesId: string | null;
+  replacedById: string | null;
+  /** The invoice this quote was billed by directly, without a project. */
+  invoiceId: string | null;
+  invoiceNumber: string | null;
 }
 
 export interface QuoteOption {

@@ -58,8 +58,13 @@ const lineSchema = z.object({
   quantity: z.number().min(0.001, "Quantité invalide."),
   purchasePrice: z.number().min(0, "Prix invalide.").nullable(),
   marginPercent: z.number().nullable(),
-  unitPrice: z.number().min(0, "Prix invalide."),
+  unitPrice: z.number(),
   isTaxable: z.boolean(),
+}).refine((line) => line.unitPrice >= 0 || line.kind === "Autre", {
+  // A negative amount is a deduction — a deposit already billed, a credit — and only an
+  // « Autre » line can be one: a material or an hour sold below zero is a typing mistake.
+  path: ["unitPrice"],
+  message: "Seule une ligne « Autre » peut être négative (une déduction).",
 });
 
 const formSchema = z.object({

@@ -10,7 +10,9 @@ public enum QuoteStatus
     Envoyee = 1,
     Acceptee = 2,
     Refusee = 3,
-    Expiree = 4
+    Expiree = 4,
+    /// <summary>Superseded by a revision: kept to read what was proposed, never answered again.</summary>
+    Remplacee = 5
 }
 
 /// <summary>Which of the project's sections a quote line will become once the quote is accepted.</summary>
@@ -44,6 +46,28 @@ public class Quote
 
     /// <summary>Sequential within the tenant, never reused. Displayed as S-0001.</summary>
     public int Number { get; set; }
+
+    /// <summary>
+    /// 1 for the quote as first given; each « Réviser » makes the next one under the same
+    /// number, so the client and the office talk about « S-0012 » throughout and the revision
+    /// says which version.
+    /// </summary>
+    public int Revision { get; set; } = 1;
+
+    /// <summary>The version this one revises. SetNull if that one is deleted.</summary>
+    public Guid? ReplacesId { get; set; }
+    public Quote? Replaces { get; set; }
+    public List<Quote> Revisions { get; set; } = [];
+
+    /// <summary>« S-0012 », or « S-0012 rév. 2 » from the second version on.</summary>
+    public string Label => Revision > 1 ? $"S-{Number:0000} rév. {Revision}" : $"S-{Number:0000}";
+
+    /// <summary>
+    /// The invoice this quote was billed by directly, for a small job with no project. Like a
+    /// project, it freezes the quote's prices. SetNull if the invoice is deleted.
+    /// </summary>
+    public Guid? InvoiceId { get; set; }
+    public Invoice? Invoice { get; set; }
 
     public string? PoNumber { get; set; }
     public string? Description { get; set; }

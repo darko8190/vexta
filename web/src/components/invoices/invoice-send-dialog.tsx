@@ -82,7 +82,7 @@ export function InvoiceSendDialog({
     ? {
         base: "soumissions",
         id: quote.id,
-        number: formatQuoteNumber(quote.number),
+        number: formatQuoteNumber(quote.number, quote.revision),
         clientId: quote.clientId,
         clientName: quote.clientName,
         documentsFrom: "de la soumission",

@@ -85,7 +85,7 @@ public class QuoteSendController(
         var validUntil = quote.ValidUntil?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         var values = new Dictionary<string, string>
         {
-            ["numero"] = $"S-{quote.Number:0000}",
+            ["numero"] = quote.Label,
             ["entreprise"] = company,
             ["client"] = quote.Client?.Name ?? "",
             ["contact"] = recipients.FirstOrDefault()?.Name ?? quote.Client?.Name ?? "",
@@ -128,6 +128,8 @@ public class QuoteSendController(
     {
         var quote = await db.Quotes.Include(q => q.Client).FirstOrDefaultAsync(q => q.Id == id, ct);
         if (quote is null) return NotFound();
+        if (quote.Status == QuoteStatus.Remplacee)
+            return BadRequest(new { message = "Cette version a été remplacée par une révision. Envoyez la révision." });
 
         var to = request.To?.Trim();
         if (string.IsNullOrWhiteSpace(to)) return BadRequest(new { message = "Indiquez l'adresse courriel du destinataire." });
@@ -157,7 +159,7 @@ public class QuoteSendController(
 
         var attachments = new List<EmailAttachment>
         {
-            new($"Soumission-S-{quote.Number:0000}.pdf", "application/pdf", document.Bytes)
+            new($"Soumission-{quote.Label.Replace(" rév. ", "-rev")}.pdf", "application/pdf", document.Bytes)
         };
 
         var extras = await AttachmentSourcesAsync(id, request, ct);
@@ -214,7 +216,7 @@ public class QuoteSendController(
         quote.SentAt = DateTimeOffset.UtcNow;
         if (quote.Status == QuoteStatus.Brouillon) quote.Status = QuoteStatus.Envoyee;
         // An expired quote sent again with a new date is out with the client again.
-        if (quote.Status == QuoteStatus.Expiree && quote.ProjectId is null
+        if (quote.Status == QuoteStatus.Expiree && quote.ProjectId is null && quote.InvoiceId is null
             && quote.ValidUntil is { } until && until >= BusinessDay.Today)
             quote.Status = QuoteStatus.Envoyee;
         quote.UpdatedAt = DateTimeOffset.UtcNow;

@@ -344,7 +344,7 @@ export function ClientQuotesSection({ clientId }: { clientId: string }) {
               key={quote.id}
               {...rowOpenProps(
                 () => router.push(`/soumissions/${quote.id}`),
-                `Ouvrir la soumission ${formatQuoteNumber(quote.number)}`,
+                `Ouvrir la soumission ${formatQuoteNumber(quote.number, quote.revision)}`,
               )}
               className={cn(
                 "flex items-start justify-between gap-3 rounded-lg border border-border bg-card p-3",
@@ -353,7 +353,7 @@ export function ClientQuotesSection({ clientId }: { clientId: string }) {
             >
               <div className="min-w-0">
                 <span className="font-mono text-sm font-medium text-foreground">
-                  {formatQuoteNumber(quote.number)}
+                  {formatQuoteNumber(quote.number, quote.revision)}
                 </span>
                 <span className="ml-2 text-sm tabular-nums text-muted-foreground">
                   {formatAmount(quote.subtotal)}

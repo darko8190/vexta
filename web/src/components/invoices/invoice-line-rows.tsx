@@ -372,7 +372,6 @@ export function InvoiceLineRows({
                   <Input
                     type="number"
                     step="0.01"
-                    min="0"
                     inputMode="decimal"
                     className="text-right"
                     aria-label={unitPriceLabel}

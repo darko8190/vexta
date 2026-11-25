@@ -28,7 +28,7 @@ public interface IInvoicePdfService
     /// company header, the same lines and taxes, an acceptance block in place of the receipt.
     /// Null when there is no such quote here.
     /// </summary>
-    Task<(byte[] Bytes, int Number)?> RenderQuoteAsync(Guid quoteId, CancellationToken ct = default);
+    Task<(byte[] Bytes, string Label)?> RenderQuoteAsync(Guid quoteId, CancellationToken ct = default);
 }
 
 public class InvoicePdfService(VextaDbContext db, ICurrentUserService currentUser) : IInvoicePdfService
@@ -106,7 +106,7 @@ public class InvoicePdfService(VextaDbContext db, ICurrentUserService currentUse
             $"Signée électroniquement dans le portail client par {name}, le {local:yyyy-MM-dd} à {local:HH} h {local:mm}.");
     }
 
-    public async Task<(byte[] Bytes, int Number)?> RenderQuoteAsync(Guid quoteId, CancellationToken ct = default)
+    public async Task<(byte[] Bytes, string Label)?> RenderQuoteAsync(Guid quoteId, CancellationToken ct = default)
     {
         var quote = await db.Quotes.AsNoTracking()
             .Include(q => q.Lines)
@@ -160,7 +160,7 @@ public class InvoicePdfService(VextaDbContext db, ICurrentUserService currentUse
             quote.IsTaxExempt);
         var taxes = quote.IsTaxExempt ? ExemptLine : TaxLines(totals, settings);
 
-        var number = $"S-{quote.Number:0000}";
+        var number = quote.Label;
         var model = new InvoicePdfModel
         {
             Number = number,
@@ -191,7 +191,7 @@ public class InvoicePdfService(VextaDbContext db, ICurrentUserService currentUse
                 : null,
         };
 
-        return (new InvoiceDocument(model).GeneratePdf(), quote.Number);
+        return (new InvoiceDocument(model).GeneratePdf(), quote.Label);
     }
 
     /// <summary>

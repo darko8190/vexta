@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowUp, Eye, Pencil, Sparkles, Trash2 } from "lucide-react";
+import { ArrowUp, Eye, Mic, Pencil, Sparkles, Square, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -15,6 +16,7 @@ import {
   type AssistantAction,
   type AssistantTurn,
 } from "@/hooks/use-assistant";
+import { useSpeechDictation } from "@/hooks/use-speech-dictation";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
@@ -73,6 +75,11 @@ export function AssistantPanel({
   const [entries, setEntries] = useState<Entry[]>([]);
   const [draft, setDraft] = useState("");
   const bottom = useRef<HTMLDivElement>(null);
+  const dictation = useSpeechDictation({
+    value: draft,
+    onChange: setDraft,
+    onError: (message) => toast.error(message),
+  });
 
   // The only effect here, and it is about the viewport rather than about state: a new answer
   // that lands below the fold reads as nothing having happened.
@@ -83,6 +90,8 @@ export function AssistantPanel({
   async function send() {
     const text = draft.trim();
     if (!text || ask.isPending) return;
+    // A late result would otherwise write the question back into the emptied field.
+    dictation.stop();
 
     const history: AssistantTurn[] = [
       ...entries.map(({ role, text: body }) => ({ role, text: body })),
@@ -115,7 +124,14 @@ export function AssistantPanel({
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet
+      open={open}
+      onOpenChange={(next) => {
+        // The panel stays mounted when closed; the microphone must not.
+        if (!next) dictation.stop();
+        onOpenChange(next);
+      }}
+    >
       <SheetContent layout="panel" className="flex w-full flex-col sm:max-w-xl">
         <SheetHeader>
           <div className="flex items-center justify-between gap-2 pr-8">
@@ -206,10 +222,26 @@ export function AssistantPanel({
                   }
                 }}
                 rows={2}
-                placeholder="Posez votre question…"
+                placeholder={dictation.listening ? "Parlez, je vous écoute…" : "Posez votre question…"}
                 aria-label="Message à l'assistant"
                 className="min-h-0 resize-none"
               />
+              {/* Only where the browser can listen: Firefox has no dictation, and a button that
+                  can only fail is worse than none. */}
+              {dictation.supported && (
+                <Button
+                  size="icon"
+                  variant={dictation.listening ? "destructive" : "outline"}
+                  aria-label={dictation.listening ? "Arrêter la dictée" : "Dicter avec le micro"}
+                  aria-pressed={dictation.listening}
+                  title={dictation.listening ? "Arrêter la dictée" : "Dicter avec le micro"}
+                  onClick={dictation.toggle}
+                  disabled={ask.isPending}
+                  className={cn(dictation.listening && "animate-pulse motion-reduce:animate-none")}
+                >
+                  {dictation.listening ? <Square /> : <Mic />}
+                </Button>
+              )}
               <Button
                 size="icon"
                 aria-label="Envoyer"

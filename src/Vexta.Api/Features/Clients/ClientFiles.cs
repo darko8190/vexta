@@ -67,7 +67,7 @@ public static class ClientFiles
             Name = name.Length > 0 ? name : user.Email ?? "Client",
             Email = user.Email,
             Status = ClientStatus.Prospect,
-            Notes = $"Créé par {origin} de la page publique le {BusinessDay.Today:d MMMM yyyy}.",
+            Notes = $"Créé par {origin}, rempli en ligne le {BusinessDay.Today:d MMMM yyyy}.",
             // Attached straight away, so the next form they fill finds this file instead of
             // opening a second one.
             UserId = userId

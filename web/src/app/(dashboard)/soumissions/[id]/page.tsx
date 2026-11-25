@@ -10,6 +10,7 @@ import {
   BookmarkPlus,
   ClipboardPen,
   Copy,
+  FileDiff,
   FilePen,
   FolderKanban,
   FileText,
@@ -17,6 +18,7 @@ import {
   HardHat,
   Info,
   ListChecks,
+  PiggyBank,
   Plus,
   Receipt,
   Send,
@@ -59,12 +61,14 @@ import { usePdfDocument } from "@/hooks/use-pdf-document";
 import { ProjectDocumentsSection } from "@/components/projects/detail/project-documents-section";
 import { ClientQuoteView } from "@/components/quotes/client-quote-view";
 import { QuoteFormSheet } from "@/components/quotes/quote-form-sheet";
+import { QuoteComparisonSection } from "@/components/quotes/quote-comparison-section";
 import { QuoteLinesSection } from "@/components/quotes/quote-lines-section";
 import {
   useConvertQuote,
   useDeleteQuote,
   useDuplicateQuote,
   useInvoiceQuote,
+  useInvoiceQuoteDeposit,
   useReviseQuote,
   useQuoteQuery,
   useQuoteSummaryQuery,
@@ -102,7 +106,9 @@ function StaffQuoteDetail({ id }: { id: string }) {
   const duplicate = useDuplicateQuote();
   const revise = useReviseQuote();
   const invoiceQuote = useInvoiceQuote();
+  const invoiceDeposit = useInvoiceQuoteDeposit();
   const [confirmInvoice, setConfirmInvoice] = useState(false);
+  const [confirmDeposit, setConfirmDeposit] = useState(false);
   const canManage = useCanManage();
   const [section, setSection] = useState("details");
   const [confirmConvert, setConfirmConvert] = useState(false);
@@ -136,12 +142,24 @@ function StaffQuoteDetail({ id }: { id: string }) {
     );
   }
 
-  // Made a project or billed directly: either way the prices are settled.
-  const locked = Boolean(quote.projectId || quote.invoiceId);
+  // Made a project or billed directly: the quote's work is done.
+  const settled = Boolean(quote.projectId || quote.invoiceId);
+  // Its prices freeze earlier, as soon as a deposit was worked out from them.
+  const locked = settled || Boolean(quote.depositInvoiceId);
   // Only a price already given can be revised; a draft is simply edited.
   const canRevise = !locked && (quote.status === "Envoyee" || quote.status === "Refusee" || quote.status === "Expiree");
-  const canInvoice = !locked && (quote.status === "Brouillon" || quote.status === "Envoyee");
-  const canConvert = !locked && quote.status !== "Refusee" && quote.status !== "Expiree" && quote.status !== "Remplacee";
+  // Acceptée without a project only happens once its deposit is billed: the rest is still to bill.
+  const canInvoice =
+    !settled && (quote.status === "Brouillon" || quote.status === "Envoyee" || quote.status === "Acceptee");
+  const canInvoiceDeposit =
+    !settled &&
+    !quote.depositInvoiceId &&
+    (quote.depositPercent ?? 0) > 0 &&
+    (quote.status === "Brouillon" || quote.status === "Envoyee");
+  const canConvert = !settled && quote.status !== "Refusee" && quote.status !== "Expiree" && quote.status !== "Remplacee";
+  // The automatic reminder of the latest sending, not one left from an earlier one.
+  const remindedAt =
+    quote.reminderSentAt && quote.sentAt && quote.reminderSentAt > quote.sentAt ? quote.reminderSentAt : null;
   // Out with the client and not answered yet: the next message is a reminder, not a copy.
   const awaiting = quote.status === "Envoyee" && !locked && Boolean(quote.sentAt);
 
@@ -175,6 +193,19 @@ function StaffQuoteDetail({ id }: { id: string }) {
     }
   }
 
+  async function onInvoiceDeposit() {
+    try {
+      const billed = await invoiceDeposit.mutateAsync(id);
+      toast.success(`Facture d'acompte ${billed.depositInvoiceNumber ?? ""} créée en brouillon.`, {
+        description: "Vérifiez-la, puis envoyez-la au client.",
+      });
+      setConfirmDeposit(false);
+      if (billed.depositInvoiceId) router.push(`/factures/${billed.depositInvoiceId}`);
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Impossible de facturer l'acompte.");
+    }
+  }
+
   async function onDuplicate() {
     try {
       const copy = await duplicate.mutateAsync(id);
@@ -187,6 +218,8 @@ function StaffQuoteDetail({ id }: { id: string }) {
 
   const sections: NavSection[] = [
     { key: "details", label: "Détails", icon: Info },
+    // Only a revision has a version before it to compare with.
+    ...(quote.replacesId ? [{ key: "changements", label: "Changements", icon: FileDiff }] : []),
     { key: "taches", label: "Tâches", count: summary?.tasks ?? 0, icon: ListChecks },
     { key: "materiaux", label: "Matériaux", count: summary?.materials ?? 0, icon: HardHat },
     { key: "frais", label: "Frais supplémentaires", count: summary?.extraCharges ?? 0, icon: Plus },
@@ -247,6 +280,7 @@ function StaffQuoteDetail({ id }: { id: string }) {
               {quote.sentAt && (
                 <span className="text-xs text-muted-foreground">
                   Envoyée le {formatMoment(quote.sentAt)}
+                  {remindedAt && ` · relancée automatiquement le ${formatMoment(remindedAt)}`}
                 </span>
               )}
               {quote.validUntil && (
@@ -300,6 +334,12 @@ function StaffQuoteDetail({ id }: { id: string }) {
               <Button variant="outline" size="sm" disabled={revise.isPending} onClick={onRevise}>
                 {revise.isPending ? <Spinner /> : <FilePen />}
                 Réviser
+              </Button>
+            )}
+            {canManage && canInvoiceDeposit && (
+              <Button variant="outline" size="sm" onClick={() => setConfirmDeposit(true)}>
+                <PiggyBank />
+                Facturer l&apos;acompte
               </Button>
             )}
             {canManage && canInvoice && (
@@ -358,8 +398,11 @@ function StaffQuoteDetail({ id }: { id: string }) {
 
         {locked && (
           <p className="mt-4 border-t border-border pt-3 text-xs text-muted-foreground">
-            Acceptée et devenue {quote.projectId ? "un projet" : "une facture"} : ses lignes et ses
-            prix ne changent plus. La description, les dates et les adresses restent corrigeables.
+            {settled
+              ? `Acceptée et devenue ${quote.projectId ? "un projet" : "une facture"}`
+              : "Acceptée et son acompte facturé"}{" "}
+            : ses lignes et ses prix ne changent plus. La description, les dates et les adresses
+            restent corrigeables.
           </p>
         )}
 
@@ -401,8 +444,16 @@ function StaffQuoteDetail({ id }: { id: string }) {
                 <QuoteFormSheet open onOpenChange={() => {}} quote={quote} />
               </InlineSheet>
               <ProjectCostTable costs={summary?.costs} isLoading={summaryLoading} />
+              {summary && summary.linesWithoutCost > 0 && (
+                <p className="text-sm text-muted-foreground">
+                  {summary.linesWithoutCost === 1
+                    ? "1 ligne n'a pas de coûtant : elle compte comme gratuite, et la marge paraît plus haute qu'elle ne l'est."
+                    : `${summary.linesWithoutCost} lignes n'ont pas de coûtant : elles comptent comme gratuites, et la marge paraît plus haute qu'elle ne l'est.`}
+                </p>
+              )}
             </div>
           )}
+          {section === "changements" && quote.replacesId && <QuoteComparisonSection quoteId={quote.id} />}
           {section === "taches" && (
             <QuoteLinesSection
               quoteId={quote.id}
@@ -468,6 +519,8 @@ function StaffQuoteDetail({ id }: { id: string }) {
               Pour un petit travail : une facture est créée en brouillon avec les lignes de la
               soumission (et les options retenues). La soumission passe à « Acceptée » et ses prix
               ne changent plus. Vous vérifiez la facture avant de l&apos;envoyer.
+              {quote.depositInvoiceNumber &&
+                ` L'acompte déjà facturé (${quote.depositInvoiceNumber}) y est déduit.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -481,6 +534,35 @@ function StaffQuoteDetail({ id }: { id: string }) {
             >
               {invoiceQuote.isPending && <Spinner />}
               Créer la facture
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmDeposit} onOpenChange={setConfirmDeposit}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Facturer l&apos;acompte ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Une facture de {quote.depositPercent} % du total ({formatAmount(
+                Math.round(quote.subtotal * (quote.depositPercent ?? 0)) / 100,
+              )}{" "}
+              avant taxes) est créée en brouillon. La soumission passe à « Acceptée » et ses prix
+              ne changent plus. L&apos;acompte sera déduit de la facture finale, qu&apos;elle
+              passe par un projet ou par « Facturer sans projet ».
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={invoiceDeposit.isPending}
+              onClick={(event) => {
+                event.preventDefault();
+                void onInvoiceDeposit();
+              }}
+            >
+              {invoiceDeposit.isPending && <Spinner />}
+              Créer la facture d&apos;acompte
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

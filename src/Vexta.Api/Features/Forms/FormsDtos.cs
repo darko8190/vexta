@@ -52,6 +52,15 @@ public record FormActionDto(
 /// </summary>
 public record FormPublicLinkDto(string? Path, string? Missing);
 
+/// <summary>Who gets the form's link, and an optional note from the sender.</summary>
+public record SendFormLinkRequest(string? Email, string? Name, string? Message);
+
+/// <summary>
+/// The client whose record the answers will go to without a sign-in, when the address is one
+/// the company has on file and the form files on a client's record. Null otherwise.
+/// </summary>
+public record SendFormLinkResultDto(string? ClientName, bool FilesOnClient);
+
 /// <summary>The whole form: the record, its questions and what a filled copy sets off.</summary>
 public record FormTemplateDetailDto(
     FormTemplateDto Form,

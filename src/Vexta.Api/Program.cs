@@ -75,6 +75,7 @@ builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<ISecretProtector, SecretProtector>();
 builder.Services.AddScoped<IPlatformSettingsService, PlatformSettingsService>();
 builder.Services.AddScoped<IMailgunService, MailgunService>();
+builder.Services.AddSingleton<Vexta.Api.Features.Forms.FormInvitation>();
 builder.Services.AddScoped<IStripeService, StripeService>();
 builder.Services.AddScoped<IStripeConnectService, StripeConnectService>();
 builder.Services.AddScoped<ITenantSignupService, TenantSignupService>();
@@ -96,6 +97,8 @@ builder.Services.AddScoped<IReceiptScanner, ReceiptScanner>();
 builder.Services.AddScoped<IFeatureService, FeatureService>();
 builder.Services.AddScoped<IWorkbookService, WorkbookService>();
 builder.Services.AddScoped<IAssistantService, AssistantService>();
+// Chases unanswered quotes for the companies that turned it on.
+builder.Services.AddHostedService<Vexta.Api.Features.Quotes.QuoteReminderService>();
 
 builder.Services
     .AddIdentityCore<ApplicationUser>(options =>

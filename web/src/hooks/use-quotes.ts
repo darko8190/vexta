@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, buildQuery } from "@/lib/api";
 import type {
   PagedResult,
+  QuoteComparison,
   QuoteFormValues,
   QuoteLine,
   QuoteLineKind,
@@ -116,6 +117,27 @@ export function useInvoiceQuote() {
       queryClient.invalidateQueries({ queryKey: ["quotes"] });
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
     },
+  });
+}
+
+/** Bills only the deposit, for a quote that will be billed directly later. */
+export function useInvoiceQuoteDeposit() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.post<QuoteRecord>(`soumissions/${id}/acompte`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    },
+  });
+}
+
+/** What changed from the version a revision replaces. Only asked for when it is one. */
+export function useQuoteComparisonQuery(id: string | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: ["quotes", id, "comparison"],
+    queryFn: () => api.get<QuoteComparison>(`soumissions/${id}/comparaison`),
+    enabled: Boolean(id) && enabled,
   });
 }
 

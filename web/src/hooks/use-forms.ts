@@ -41,7 +41,7 @@ export function useFormQuery(id: string | undefined) {
 
 /** Where strangers fill the form, or why there is no such place yet. */
 export interface FormPublicLink {
-  /** A path on this site: the company's page, opening the form. */
+  /** A path on this site: the form's own page (/f/{id}). */
   path: string | null;
   /** The step that would make a link, worded for the person. */
   missing: string | null;
@@ -53,6 +53,21 @@ export function useFormPublicLinkQuery(id: string | undefined) {
     queryKey: ["formulaires", "lien", id],
     queryFn: () => api.get<FormPublicLink>(`formulaires/${id}/lien`),
     enabled: Boolean(id),
+  });
+}
+
+export interface SendFormLinkResult {
+  /** The client the answers go to without a sign-in, when the address is one of theirs. */
+  clientName: string | null;
+  /** The form files on a client's record (and so would otherwise ask for a sign-in). */
+  filesOnClient: boolean;
+}
+
+/** E-mails the form's link to one person, from the company's name. */
+export function useSendFormLink() {
+  return useMutation({
+    mutationFn: ({ id, email, message }: { id: string; email: string; message: string | null }) =>
+      api.post<SendFormLinkResult>(`formulaires/${id}/envoyer`, { email, message }),
   });
 }
 

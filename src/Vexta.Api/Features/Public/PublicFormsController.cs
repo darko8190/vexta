@@ -35,7 +35,8 @@ public class PublicFormsController(
     VextaDbContext db,
     IFormActionRunner actions,
     IPublicSubmissionLimiter limiter,
-    ICurrentUserService currentUser) : ControllerBase
+    ICurrentUserService currentUser,
+    FormInvitation invitation) : ControllerBase
 {
     /// <summary>
     /// The questions to fill.
@@ -50,15 +51,31 @@ public class PublicFormsController(
         var context = await PublicFormGate.ResolveAsync(db, slug, formId, ct);
         if (context is null) return NotFound();
 
-        var fields = await FieldsAsync(context.FormId, ct);
+        var form = await ReadAsync(context, ct);
+        return form is null ? NotFound() : Ok(form);
+    }
 
-        // A form that lost its questions is a form that asks nothing: the same answer as a form
-        // that was never there, because there is nothing to put on the screen either way.
-        if (fields.Count == 0) return NotFound();
+    /// <summary>
+    /// The same questions reached by the form's own link (/f/{id}) rather than from the
+    /// company's page, with the little of the company that page draws: its name, logo and colour.
+    /// </summary>
+    [HttpGet("~/api/public/formulaires/{formId:guid}")]
+    public async Task<ActionResult<SharedFormDto>> GetShared(
+        Guid formId, [FromQuery(Name = "jeton")] string? token, CancellationToken ct)
+    {
+        var shared = await PublicFormGate.ResolveSharedAsync(db, formId, ct);
+        if (shared is null) return NotFound();
 
-        return Ok(new PublicFormDto(
-            context.FormId, context.Title, context.Description, context.Kind, fields,
-            context.RequiresIdentification));
+        var form = await ReadAsync(shared.Form, ct);
+        if (form is null) return NotFound();
+
+        // E-mailed to an address one of the company's clients owns: no sign-in asked, and the
+        // page says whose record it goes to, so the person can tell it is the right one.
+        var invited = await InvitedClientAsync(shared.Form, token, ct);
+        if (invited is not null) form = form with { RequiresIdentification = false };
+
+        return Ok(new SharedFormDto(
+            form, shared.Form.TenantId, shared.CompanyName, shared.BrandColor, shared.LogoETag, invited?.Name));
     }
 
     [HttpPost("{formId:guid}")]
@@ -68,6 +85,36 @@ public class PublicFormsController(
         var context = await PublicFormGate.ResolveAsync(db, slug, formId, ct);
         if (context is null) return NotFound();
 
+        return await FileAsync(context, request, ct);
+    }
+
+    [HttpPost("~/api/public/formulaires/{formId:guid}")]
+    public async Task<ActionResult<PublicFormResultDto>> SubmitShared(
+        Guid formId, SubmitPublicFormRequest request, CancellationToken ct)
+    {
+        var shared = await PublicFormGate.ResolveSharedAsync(db, formId, ct);
+        if (shared is null) return NotFound();
+
+        return await FileAsync(shared.Form, request, ct, await InvitedClientAsync(shared.Form, request.Invitation, ct));
+    }
+
+    private async Task<PublicFormDto?> ReadAsync(PublicFormContext context, CancellationToken ct)
+    {
+        var fields = await FieldsAsync(context.FormId, ct);
+
+        // A form that lost its questions is a form that asks nothing: the same answer as a form
+        // that was never there, because there is nothing to put on the screen either way.
+        if (fields.Count == 0) return null;
+
+        return new PublicFormDto(
+            context.FormId, context.Title, context.Description, context.Kind, fields,
+            context.RequiresIdentification);
+    }
+
+    /// <summary>Files a reply once a gate has said which form it is for. Shared by both ways in.</summary>
+    private async Task<ActionResult<PublicFormResultDto>> FileAsync(
+        PublicFormContext context, SubmitPublicFormRequest request, CancellationToken ct, Client? invited = null)
+    {
         var address = HttpContext.Connection.RemoteIpAddress?.ToString();
 
         // Before the answers are read, so a flood costs one gate query rather than a validation
@@ -110,7 +157,13 @@ public class PublicFormsController(
         Client? client = null;
         var userId = currentUser.UserId;
 
-        if (context.RequiresIdentification)
+        if (context.RequiresIdentification && invited is not null)
+        {
+            // The link the company e-mailed stands in for the sign-in: see FormInvitation.
+            client = invited;
+            if (client.WorkRefusal() is { } barred) return BadRequest(new { message = barred });
+        }
+        else if (context.RequiresIdentification)
         {
             if (userId is not { } signedIn)
             {
@@ -134,7 +187,7 @@ public class PublicFormsController(
             FormTemplateId = context.FormId,
             // The account when the form asked for one; otherwise nobody, and the name is taken
             // from the answers themselves below, which is the only name there is.
-            SubmittedByUserId = client is not null ? userId : null,
+            SubmittedByUserId = client is not null && invited is null ? userId : null,
             SubmittedByName = client?.Name ?? NameFrom(fields, given),
             // The file it belongs to, which is what the asset action attaches to.
             CreatedClientId = client?.Id,
@@ -182,6 +235,19 @@ public class PublicFormsController(
         return Ok(new PublicFormResultDto(string.IsNullOrWhiteSpace(context.SuccessMessage)
             ? "Merci, votre demande est envoyée."
             : context.SuccessMessage));
+    }
+
+    /// <summary>
+    /// The client an e-mailed link vouches for, on a form that files on a client's record. Null
+    /// for any other form, and for a token that is forged, expired, for another form, or for an
+    /// address no single client of this company owns — the form then asks for a sign-in as usual.
+    /// </summary>
+    private async Task<Client?> InvitedClientAsync(PublicFormContext form, string? token, CancellationToken ct)
+    {
+        if (!form.RequiresIdentification) return null;
+        if (invitation.Open(token, form.FormId) is not { } email) return null;
+
+        return await FormInvitation.ClientForAsync(db, form.TenantId, email, ct);
     }
 
     private Task<List<PublicFormFieldDto>> FieldsAsync(Guid formId, CancellationToken ct) =>
@@ -235,9 +301,16 @@ public record PublicFormDto(
 /// </summary>
 public record PublicPageFormDto(Guid Id, string Title, string? Description, FormKind Kind);
 
+/// <summary>A form opened from its own link, with what is needed to draw it in the company's colours.</summary>
+public record SharedFormDto(
+    PublicFormDto Form, Guid TenantId, string CompanyName, string? BrandColor, string? LogoETag,
+    /// <summary>The client an e-mailed link fills this form for, without a sign-in.</summary>
+    string? InvitedAs = null);
+
 public record PublicFormAnswer(Guid FieldId, string? Value);
 
-public record SubmitPublicFormRequest(List<PublicFormAnswer>? Answers);
+/// <param name="Invitation">The token from an e-mailed link (/f/{id}?jeton=…), when there is one.</param>
+public record SubmitPublicFormRequest(List<PublicFormAnswer>? Answers, string? Invitation = null);
 
 /// <summary>What to say back. One sentence, the company's own if it wrote one.</summary>
 public record PublicFormResultDto(string Message);

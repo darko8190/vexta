@@ -81,6 +81,18 @@ public class Quote
     public DateTimeOffset? SentAt { get; set; }
 
     /// <summary>
+    /// The address it was last emailed to: the automatic reminder goes back to the person who
+    /// received the quote, never to a guess among the client's contacts.
+    /// </summary>
+    public string? SentTo { get; set; }
+
+    /// <summary>
+    /// When the automatic reminder went out. One per sending: a reminder older than
+    /// <see cref="SentAt"/> belongs to an earlier sending, so the next one may go.
+    /// </summary>
+    public DateTimeOffset? ReminderSentAt { get; set; }
+
+    /// <summary>
     /// The client's own answer, given from their portal: when, who pressed the button, and what
     /// they wrote with it. Kept apart from the status because the status can still be moved by
     /// staff afterwards, and the record of what the client said should not move with it.

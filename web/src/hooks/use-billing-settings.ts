@@ -46,6 +46,8 @@ export interface BillingSettings {
   quoteEmailFields: InvoiceEmailField[];
   /** The conditions printed on quotes above the signature. */
   quoteTerms: string | null;
+  /** Days before an unanswered quote is reminded automatically. Null for never. */
+  quoteReminderDays: number | null;
 }
 
 /** Which document's email a template card edits. */
@@ -76,6 +78,7 @@ export type SaveBillingSettingsValues = Omit<
   | "defaultQuoteEmailBody"
   | "quoteEmailFields"
   | "quoteTerms"
+  | "quoteReminderDays"
 >;
 
 /**
@@ -192,6 +195,15 @@ export function useSaveBillingSettings() {
       queryClient.invalidateQueries({ queryKey: ["billing-settings"] });
       queryClient.invalidateQueries({ queryKey: ["price-policies"] });
     },
+  });
+}
+
+/** When an unanswered quote is reminded by itself. Null turns it off. */
+export function useSaveQuoteReminder() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (days: number | null) => api.put<BillingSettings>("billing-settings/soumission-relance", { days }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["billing-settings"] }),
   });
 }
 

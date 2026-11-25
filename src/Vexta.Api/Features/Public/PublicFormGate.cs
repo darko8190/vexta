@@ -17,6 +17,9 @@ public record PublicFormContext(
     string? SuccessMessage,
     bool RequiresIdentification = false);
 
+/// <summary>A form reached by its own link, with what its page needs to look like the company's.</summary>
+public record SharedFormContext(PublicFormContext Form, string CompanyName, string? BrandColor, string? LogoETag);
+
 /// <summary>
 /// The one gate every public form route passes through, written once because reading a form and
 /// filing it must agree about what is reachable. Two copies would eventually disagree, and the
@@ -53,6 +56,42 @@ public static class PublicFormGate
             .Select(f => new PublicFormContext(
                 f.TenantId, f.Id, f.Title, f.Description, f.Kind, f.SuccessMessage, f.RequiresIdentification))
             .FirstOrDefaultAsync(ct);
+    }
+
+    /// <summary>
+    /// A form reached by its own link (/f/{id}), sent by the company to somebody in particular.
+    ///
+    /// Fewer gates than the page, on purpose: the company's page is a storefront it may never
+    /// open, and sharing one form must not oblige it to. What remains is what a link cannot do
+    /// without: the company is paying (or on a trial still running), the form is published, and
+    /// it asks for no file — a visitor with no account has nowhere to upload one.
+    /// </summary>
+    public static async Task<SharedFormContext?> ResolveSharedAsync(
+        VextaDbContext db, Guid formId, CancellationToken ct)
+    {
+        var now = DateTimeOffset.UtcNow;
+
+        var found = await db.FormTemplates.IgnoreQueryFilters().AsNoTracking()
+            .Where(f => f.Id == formId && f.IsPublished)
+            .Join(db.Tenants.IgnoreQueryFilters(), f => f.TenantId, t => t.Id, (f, t) => new { f, t })
+            .Where(x => x.t.Kind == TenantKind.Business
+                && (x.t.SubscriptionStatus == TenantSubscriptionStatus.Active
+                    || (x.t.SubscriptionStatus == TenantSubscriptionStatus.Trialing && x.t.TrialEndsAt > now)))
+            .Select(x => new SharedFormContext(
+                new PublicFormContext(
+                    x.f.TenantId, x.f.Id, x.f.Title, x.f.Description, x.f.Kind, x.f.SuccessMessage,
+                    x.f.RequiresIdentification),
+                x.t.Name,
+                x.t.BrandColor,
+                x.t.Logo != null ? x.t.Logo.ETag : null))
+            .FirstOrDefaultAsync(ct);
+
+        if (found is null) return null;
+
+        var asksForFile = await db.FormFields.IgnoreQueryFilters().AsNoTracking()
+            .AnyAsync(f => f.FormTemplateId == formId && f.Type == FormFieldType.Fichier, ct);
+
+        return asksForFile ? null : found;
     }
 
     /// <summary>

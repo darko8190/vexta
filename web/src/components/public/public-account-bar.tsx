@@ -86,9 +86,9 @@ export function SignInToOrder({ slug }: { slug: string }) {
 }
 
 /** A form that files on the visitor's own customer record, and so needs to know who they are. */
-export function SignInToFill({ slug }: { slug: string }) {
+export function SignInToFill({ back }: { back: string }) {
   return (
-    <SignInPrompt slug={slug}>
+    <SignInPrompt back={back}>
       Ce formulaire s&apos;ajoute à votre dossier client : connectez-vous avec votre compte Vexta
       — gratuit — pour que l&apos;entreprise sache qu&apos;il vient de vous.
     </SignInPrompt>
@@ -102,9 +102,12 @@ export function SignInToFill({ slug }: { slug: string }) {
  * the links are the same everywhere, and the only thing that differs is the sentence above
  * them — which is exactly the part each caller should own.
  */
-function SignInPrompt({ slug, children }: { slug: string; children: React.ReactNode }) {
-  const back = `/e/${encodeURIComponent(slug)}`;
-
+function SignInPrompt({ slug, back = `/e/${encodeURIComponent(slug ?? "")}`, children }: {
+  slug?: string;
+  /** Where to come back to after signing in. The company's page unless the caller says otherwise. */
+  back?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">{children}</p>

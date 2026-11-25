@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.IO.Compression;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -58,7 +57,7 @@ public class QuoteSendController(
             .FirstOrDefaultAsync(q => q.Id == id, ct);
         if (quote is null) return NotFound();
 
-        var recipients = await RecipientsAsync(quote, ct);
+        var recipients = await QuoteMail.RecipientsAsync(db, quote, ct);
 
         var employees = await db.Employees.AsNoTracking()
             .Where(e => e.Email != "")
@@ -72,35 +71,11 @@ public class QuoteSendController(
             .Select(d => new InvoiceAttachmentOptionDto(d.Id, d.Title, d.MediaAsset!.FileName, d.MediaAsset!.OriginalSizeBytes))
             .ToListAsync(ct);
 
-        var company = await CompanyNameAsync(ct);
+        var company = await QuoteMail.CompanyNameAsync(db, currentUser.TenantId, ct);
         var settings = await db.BillingSettings.AsNoTracking()
             .FirstOrDefaultAsync(b => b.TenantId == quote.TenantId, ct);
-        var totals = Totals(quote, settings);
-
-        // A customer who can sign in gets the portal link in {{acceptation}}.
-        var hasPortal = quote.Client?.UserId is not null
-            || await db.ClientContacts.AnyAsync(c => c.ClientId == quote.ClientId && c.UserId != null, ct);
-
-        // Dates the way the PDF prints them, so the message and the attachment agree.
-        var validUntil = quote.ValidUntil?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-        var values = new Dictionary<string, string>
-        {
-            ["numero"] = quote.Label,
-            ["entreprise"] = company,
-            ["client"] = quote.Client?.Name ?? "",
-            ["contact"] = recipients.FirstOrDefault()?.Name ?? quote.Client?.Name ?? "",
-            ["description"] = quote.Description ?? "",
-            ["total"] = InvoiceEmailTemplate.Money(totals.Subtotal + totals.Taxes),
-            ["sous_total"] = InvoiceEmailTemplate.Money(totals.Subtotal),
-            ["taxes"] = InvoiceEmailTemplate.Money(totals.Taxes),
-            ["date_emission"] = (quote.IssuedOn ?? DateOnly.FromDateTime(quote.CreatedAt.UtcDateTime))
-                .ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-            ["date_validite"] = validUntil ?? "",
-            ["validite"] = QuoteEmailTemplate.Validity(validUntil),
-            ["devise"] = Currency(settings?.Currency),
-            [QuoteEmailTemplate.AcceptField] = QuoteEmailTemplate.AcceptParagraph(
-                hasPortal ? $"{FrontendUrl}/soumissions/{quote.Id}" : null)
-        };
+        var values = await QuoteMail.ValuesAsync(
+            db, quote, settings, company, recipients.FirstOrDefault()?.Name ?? quote.Client?.Name ?? "", FrontendUrl, ct);
 
         // A reminder (relance) has its own wording; everything else about the message is the same.
         var subjectTemplate = relance
@@ -159,7 +134,7 @@ public class QuoteSendController(
 
         var attachments = new List<EmailAttachment>
         {
-            new($"Soumission-{quote.Label.Replace(" rév. ", "-rev")}.pdf", "application/pdf", document.Bytes)
+            new(QuoteMail.AttachmentName(quote), "application/pdf", document.Bytes)
         };
 
         var extras = await AttachmentSourcesAsync(id, request, ct);
@@ -197,7 +172,7 @@ public class QuoteSendController(
         {
             await mailgun.SendWithAttachmentsAsync(
                 to,
-                await DisplayNameAsync(quote, to, ct),
+                await QuoteMail.DisplayNameAsync(db, quote, to, ct),
                 subject,
                 body,
                 cc,
@@ -205,7 +180,7 @@ public class QuoteSendController(
                 ct,
                 // From the company that gives the price, read from the tenant: a super admin
                 // inside a company sends on its behalf.
-                await CompanyNameAsync(ct));
+                await QuoteMail.CompanyNameAsync(db, currentUser.TenantId, ct));
         }
         catch (InvalidOperationException ex)
         {
@@ -214,6 +189,7 @@ public class QuoteSendController(
         }
 
         quote.SentAt = DateTimeOffset.UtcNow;
+        quote.SentTo = to;
         if (quote.Status == QuoteStatus.Brouillon) quote.Status = QuoteStatus.Envoyee;
         // An expired quote sent again with a new date is out with the client again.
         if (quote.Status == QuoteStatus.Expiree && quote.ProjectId is null && quote.InvoiceId is null
@@ -234,69 +210,8 @@ public class QuoteSendController(
         && string.Equals(parsed.Address, value, StringComparison.OrdinalIgnoreCase)
         && parsed.Host.Contains('.');
 
-    private Task<string> CompanyNameAsync(CancellationToken ct) =>
-        db.Tenants.IgnoreQueryFilters().AsNoTracking()
-            .Where(t => t.Id == currentUser.TenantId)
-            .Select(t => t.Name)
-            .FirstOrDefaultAsync(ct)!;
-
-    /// <summary>The same arithmetic as the PDF, so the message and the attachment agree.</summary>
-    private static (decimal Subtotal, decimal Taxes) Totals(Quote quote, Domain.BillingSettings? settings)
-    {
-        var totals = InvoiceTotals.For(
-            quote.Lines.Where(l => l.Counts).Select(l => new InvoiceTotals.Line(l.Quantity, l.UnitPrice, true)),
-            settings?.GstRate ?? 0m,
-            settings?.QstRate ?? 0m,
-            quote.IsTaxExempt);
-        return (totals.Subtotal, quote.IsTaxExempt ? 0m : totals.TaxTotal);
-    }
-
-    private static string Currency(string? value) =>
-        string.IsNullOrWhiteSpace(value) ? "CAD" : value.Trim().ToUpperInvariant();
-
     private static string? Template(string? stored) =>
         string.IsNullOrWhiteSpace(stored) ? null : stored;
-
-    /// <summary>The client's own address, then its contacts — the billing contact first.</summary>
-    private async Task<List<InvoiceRecipientDto>> RecipientsAsync(Quote quote, CancellationToken ct)
-    {
-        var recipients = new List<InvoiceRecipientDto>();
-        if (quote.Client?.Email?.Trim() is { Length: > 0 } clientEmail)
-            recipients.Add(new InvoiceRecipientDto(null, quote.Client.Name, clientEmail, "Fiche du client"));
-
-        var contacts = await db.ClientContacts.AsNoTracking()
-            .Where(c => c.ClientId == quote.ClientId && c.Email != null && c.Email != "")
-            .OrderBy(c => c.FirstName).ThenBy(c => c.LastName)
-            .Select(c => new { c.Id, c.FirstName, c.LastName, c.Role, c.Email })
-            .ToListAsync(ct);
-
-        recipients.AddRange(contacts.Select(c => new InvoiceRecipientDto(
-            c.Id, $"{c.FirstName} {c.LastName}".Trim(), c.Email!.Trim(),
-            string.IsNullOrWhiteSpace(c.Role) ? null : c.Role.Trim())));
-
-        if (quote.Client?.BillingContactId is { } billingId
-            && recipients.FindIndex(r => r.Id == billingId) is var index and > 0)
-        {
-            var billing = recipients[index];
-            recipients.RemoveAt(index);
-            recipients.Insert(0, billing with { Role = "Responsable facturation" });
-        }
-
-        return recipients;
-    }
-
-    private async Task<string> DisplayNameAsync(Quote quote, string to, CancellationToken ct)
-    {
-        if (string.Equals(quote.Client?.Email?.Trim(), to, StringComparison.OrdinalIgnoreCase))
-            return quote.Client!.Name;
-
-        var contact = await db.ClientContacts.AsNoTracking()
-            .Where(c => c.ClientId == quote.ClientId && c.Email != null && c.Email.ToLower() == to.ToLower())
-            .Select(c => c.FirstName + " " + c.LastName)
-            .FirstOrDefaultAsync(ct);
-
-        return contact?.Trim() is { Length: > 0 } name ? name : to;
-    }
 
     /// <summary>
     /// Uploads from the form, and documents of this quote chosen by id — checked against the

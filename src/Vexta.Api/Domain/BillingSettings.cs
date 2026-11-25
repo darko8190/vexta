@@ -101,6 +101,13 @@ public class BillingSettings
     /// </summary>
     public string? QuoteTerms { get; set; }
 
+    /// <summary>
+    /// Days after a quote is emailed without an answer before Vexta sends the reminder on its
+    /// own. Null for never: an email in the company's name only goes out by itself once the
+    /// company has asked for it.
+    /// </summary>
+    public int? QuoteReminderDays { get; set; }
+
     /// <summary>The line at the bottom: late fees, how to pay, a thank you.</summary>
     public string? FooterNote { get; set; }
 

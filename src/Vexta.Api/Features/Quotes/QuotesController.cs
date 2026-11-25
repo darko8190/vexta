@@ -35,7 +35,12 @@ public class QuotesController(
     private const string Locked = "Cette soumission est devenue un projet ou une facture : ses prix ne changent plus.";
 
     /// <summary>Made a project or billed directly: either way the price is settled.</summary>
-    private static bool IsLocked(Quote quote) => quote.ProjectId is not null || quote.InvoiceId is not null;
+    /// <summary>
+    /// Its prices became those of a job or of an invoice — a deposit billed counts, since the
+    /// deposit was worked out from them.
+    /// </summary>
+    private static bool IsLocked(Quote quote) =>
+        quote.ProjectId is not null || quote.InvoiceId is not null || quote.DepositInvoiceId is not null;
     private const int MaxResponseNoteLength = 2000;
 
     private string FrontendUrl => configuration["Frontend:BaseUrl"]?.TrimEnd('/') ?? "http://localhost:3000";
@@ -212,12 +217,16 @@ public class QuotesController(
             TaxLabel("TVQ", settings?.QstRate ?? 0m), tax2,
             Round(subtotal + tax1 + tax2), quote.IsTaxExempt);
 
+        // An empty cost reads as free, which makes the margin look better than it is.
+        var withoutCost = quote.Lines.Count(l => l.Counts && l.UnitCost is null && l.UnitPrice > 0);
+
         return Ok(new QuoteSummaryDto(
             quote.Lines.Count(l => l.Kind == QuoteLineKind.Tache),
             quote.Lines.Count(l => l.Kind == QuoteLineKind.Materiel),
             quote.Lines.Count(l => l.Kind == QuoteLineKind.Frais),
             documentsAndNotes,
-            costs));
+            costs,
+            withoutCost));
     }
 
     [HttpPost]
@@ -587,6 +596,7 @@ public class QuotesController(
 
         var converted = await CreateProjectAsync(quote);
         await CreateDepositInvoiceAsync(quote, converted);
+        await AttachDepositAsync(quote, converted);
         await db.SaveChangesAsync();
         return Ok(await GetDtoAsync(id));
     }
@@ -747,7 +757,8 @@ public class QuotesController(
     /// A new version of a quote that is out with the client (sent, refused or expired): the same
     /// number, the next revision, as a draft with the same lines to change. The version it
     /// replaces stays readable as « Remplacée » — the trace of what was proposed — and can no
-    /// longer be answered. Documents and notes stay with the version they were filed on.
+    /// longer be answered. Its documents and notes come along — the plan and the visit notes
+    /// are still what the new price is built on — the files pointed at again, never copied.
     /// </summary>
     [HttpPost("{id:guid}/reviser")]
     [Authorize(Roles = Roles.Managers)]
@@ -755,7 +766,9 @@ public class QuotesController(
     [RequireBusinessTenant]
     public async Task<ActionResult<QuoteDto>> Revise(Guid id, CancellationToken ct)
     {
-        var source = await db.Quotes.Include(q => q.Lines).FirstOrDefaultAsync(q => q.Id == id, ct);
+        var source = await db.Quotes
+            .Include(q => q.Lines).Include(q => q.Documents).Include(q => q.Notes)
+            .FirstOrDefaultAsync(q => q.Id == id, ct);
         if (source is null) return NotFound();
         if (IsLocked(source) || source.Status == QuoteStatus.Acceptee)
             return BadRequest(new { message = "Une soumission acceptée ne se révise plus : ses prix sont devenus ceux du travail." });
@@ -806,6 +819,24 @@ public class QuotesController(
                 UnitPrice = l.UnitPrice,
                 IsOptional = l.IsOptional,
                 SortOrder = l.SortOrder
+            })],
+            // Dated as filed, so the thread still reads in the order things were said.
+            Documents = [.. source.Documents.Select(d => new QuoteDocument
+            {
+                TenantId = source.TenantId,
+                Title = d.Title,
+                Category = d.Category,
+                MediaAssetId = d.MediaAssetId,
+                UploadedById = d.UploadedById,
+                CreatedAt = d.CreatedAt
+            })],
+            Notes = [.. source.Notes.Select(n => new QuoteNote
+            {
+                TenantId = source.TenantId,
+                Body = n.Body,
+                CreatedById = n.CreatedById,
+                CreatedAt = n.CreatedAt,
+                UpdatedAt = n.UpdatedAt
             })]
         };
 
@@ -843,6 +874,15 @@ public class QuotesController(
         if (settings?.ConfiguredAt is null)
             return BadRequest(new { message = "Remplissez les paramètres de facturation avant de créer une facture." });
 
+        // A deposit already billed comes off, as on a project's final invoice: one line at the
+        // deposit's own amount before taxes, so its taxes come off with it. Not if cancelled.
+        var deposit = quote.DepositInvoiceId is { } depositId
+            ? await db.Invoices.AsNoTracking()
+                .Where(i => i.Id == depositId && i.Status != InvoiceStatus.Annulee)
+                .Select(i => new { i.Number, Amount = i.Lines.Sum(l => Math.Round(l.Quantity * l.UnitPrice, 2)) })
+                .FirstOrDefaultAsync(ct)
+            : null;
+
         var today = BusinessDay.Today;
         var invoice = new Invoice
         {
@@ -875,6 +915,18 @@ public class QuotesController(
                 SortOrder = index
             })]
         };
+        if (deposit is { Amount: > 0 })
+        {
+            invoice.Lines.Add(new InvoiceLine
+            {
+                Kind = InvoiceLineKind.Autre,
+                Description = $"Moins : acompte facturé ({deposit.Number})",
+                Quantity = 1,
+                UnitPrice = -deposit.Amount,
+                IsTaxable = !quote.IsTaxExempt,
+                SortOrder = invoice.Lines.Count
+            });
+        }
 
         settings.NextInvoiceNumber++;
         db.Invoices.Add(invoice);
@@ -892,7 +944,7 @@ public class QuotesController(
     /// not set up yet — numbering and taxes are the company's to decide, never guessed here.
     /// Does not save.
     /// </summary>
-    private async Task<Invoice?> CreateDepositInvoiceAsync(Quote quote, Project project)
+    private async Task<Invoice?> CreateDepositInvoiceAsync(Quote quote, Project? project)
     {
         if (quote.DepositPercent is not { } percent || percent <= 0 || quote.DepositInvoiceId is not null) return null;
 
@@ -909,7 +961,7 @@ public class QuotesController(
             TenantId = quote.TenantId,
             Number = Vexta.Api.Features.BillingSettings.InvoiceNumbering.Format(settings.InvoicePrefix, settings.NextInvoiceNumber),
             ClientId = quote.ClientId,
-            ProjectId = project.Id,
+            ProjectId = project?.Id,
             Status = InvoiceStatus.Brouillon,
             IssueDate = today,
             DueDate = today.AddDays(settings.PaymentTermsDays),
@@ -935,6 +987,102 @@ public class QuotesController(
         db.Invoices.Add(invoice);
         quote.DepositInvoiceId = invoice.Id;
         return invoice;
+    }
+
+    /// <summary>
+    /// Bills the deposit of a quote that is not becoming a project — the small job billed
+    /// directly later with « Facturer sans projet », which then takes it off. The client said
+    /// yes by agreeing to pay it, so the quote becomes Acceptée and its prices freeze.
+    /// </summary>
+    [HttpPost("{id:guid}/acompte")]
+    [Authorize(Roles = Roles.Managers)]
+    [StaffOnly]
+    [RequireBusinessTenant]
+    public async Task<ActionResult<QuoteDto>> InvoiceDeposit(Guid id, CancellationToken ct)
+    {
+        var quote = await db.Quotes.Include(q => q.Lines).Include(q => q.Client).FirstOrDefaultAsync(q => q.Id == id, ct);
+        if (quote is null) return NotFound();
+        if (quote.DepositInvoiceId is not null) return BadRequest(new { message = "L'acompte de cette soumission a déjà été facturé." });
+        if (quote.ProjectId is not null || quote.InvoiceId is not null)
+            return BadRequest(new { message = "Cette soumission a déjà été convertie ou facturée." });
+        if (quote.DepositPercent is not > 0)
+            return BadRequest(new { message = "Cette soumission ne demande pas d'acompte." });
+        if (quote.Status is QuoteStatus.Refusee or QuoteStatus.Expiree or QuoteStatus.Remplacee)
+            return BadRequest(new { message = "Une soumission refusée, expirée ou remplacée ne se facture pas." });
+        if (quote.Client!.WorkRefusal() is { } refusal) return BadRequest(new { message = refusal });
+        if (!quote.Lines.Any(l => l.Counts)) return BadRequest(new { message = "Ajoutez des lignes avant de facturer." });
+
+        if (await db.BillingSettings.AnyAsync(b => b.TenantId == quote.TenantId && b.ConfiguredAt != null, ct) is false)
+            return BadRequest(new { message = "Remplissez les paramètres de facturation avant de créer une facture." });
+
+        if (await CreateDepositInvoiceAsync(quote, null) is null)
+            return BadRequest(new { message = "Le montant de l'acompte est nul : vérifiez les lignes de la soumission." });
+
+        quote.Status = QuoteStatus.Acceptee;
+        quote.UpdatedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(ct);
+        return Ok(await GetDtoAsync(id));
+    }
+
+    /// <summary>
+    /// A deposit billed before the quote became a project belongs to that project from now on,
+    /// so the project's final invoice finds it and takes it off. Does not save.
+    /// </summary>
+    private async Task AttachDepositAsync(Quote quote, Project project)
+    {
+        if (quote.DepositInvoiceId is not { } depositId) return;
+        var deposit = await db.Invoices.FirstOrDefaultAsync(i => i.Id == depositId);
+        if (deposit is { ProjectId: null }) deposit.ProjectId = project.Id;
+    }
+
+    /// <summary>
+    /// What changed from the version this one revises: each line added, removed or changed, and
+    /// the two totals. Lines are matched by section and description — a revision copies them
+    /// under new ids, and the description is what the client reads.
+    /// </summary>
+    [HttpGet("{id:guid}/comparaison")]
+    [StaffOnly]
+    public async Task<ActionResult<QuoteComparisonDto>> Compare(Guid id, CancellationToken ct)
+    {
+        var quote = await db.Quotes.AsNoTracking().Include(q => q.Lines).FirstOrDefaultAsync(q => q.Id == id, ct);
+        if (quote is null) return NotFound();
+        if (quote.ReplacesId is not { } previousId)
+            return BadRequest(new { message = "Cette soumission n'est pas une révision." });
+        var previous = await db.Quotes.AsNoTracking().Include(q => q.Lines).FirstOrDefaultAsync(q => q.Id == previousId, ct);
+        if (previous is null) return NotFound();
+
+        static string Key(QuoteLine l) => $"{(int)l.Kind}|{l.Description.Trim().ToLowerInvariant()}";
+        static QuoteLineSnapshotDto Snap(QuoteLine l) =>
+            new(l.Quantity, l.Unit, l.UnitPrice, LineTotal(l), l.IsOptional, l.IsSelected);
+        static IEnumerable<QuoteLine> Ordered(Quote q) => q.Lines.OrderBy(l => l.Kind).ThenBy(l => l.SortOrder);
+
+        // Same description twice in one section pairs up in order, first with first.
+        var before = Ordered(previous).GroupBy(Key).ToDictionary(g => g.Key, g => new Queue<QuoteLine>(g));
+        var changes = new List<QuoteLineChangeDto>();
+        foreach (var line in Ordered(quote))
+        {
+            var old = before.TryGetValue(Key(line), out var queue) && queue.Count > 0 ? queue.Dequeue() : null;
+            var after = Snap(line);
+            if (old is null)
+            {
+                changes.Add(new QuoteLineChangeDto(line.Kind, line.Description, QuoteLineChange.Ajoutee, null, after));
+                continue;
+            }
+            var was = Snap(old);
+            var same = was.Quantity == after.Quantity && was.UnitPrice == after.UnitPrice
+                && was.IsOptional == after.IsOptional && was.Unit == after.Unit;
+            changes.Add(new QuoteLineChangeDto(line.Kind, line.Description,
+                same ? QuoteLineChange.Inchangee : QuoteLineChange.Modifiee, was, after));
+        }
+        changes.AddRange(before.Values.SelectMany(q => q).OrderBy(l => l.Kind).ThenBy(l => l.SortOrder)
+            .Select(l => new QuoteLineChangeDto(l.Kind, l.Description, QuoteLineChange.Retiree, Snap(l), null)));
+
+        return Ok(new QuoteComparisonDto(
+            previous.Id,
+            previous.Label,
+            Round(previous.Lines.Where(l => l.Counts).Sum(LineTotal)),
+            Round(quote.Lines.Where(l => l.Counts).Sum(LineTotal)),
+            changes));
     }
 
     /// <summary>
@@ -1261,5 +1409,6 @@ public class QuotesController(
         q.ReplacesId,
         q.Revisions.OrderByDescending(r => r.Revision).Select(r => (Guid?)r.Id).FirstOrDefault(),
         q.InvoiceId,
-        q.Invoice == null ? null : q.Invoice.Number);
+        q.Invoice == null ? null : q.Invoice.Number,
+        q.ReminderSentAt);
 }

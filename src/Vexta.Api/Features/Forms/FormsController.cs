@@ -20,7 +20,12 @@ namespace Vexta.Api.Features.Forms;
 [StaffOnly]
 [Authorize(Roles = Roles.Staff)]
 [RequireActiveSubscription]
-public class FormsController(VextaDbContext db, ICurrentUserService currentUser) : ControllerBase
+public class FormsController(
+    VextaDbContext db,
+    ICurrentUserService currentUser,
+    Vexta.Api.Services.IMailgunService mail,
+    FormInvitation invitation,
+    IConfiguration configuration) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<List<FormTemplateDto>>> List(CancellationToken ct)
@@ -70,38 +75,101 @@ public class FormsController(VextaDbContext db, ICurrentUserService currentUser)
     }
 
     /// <summary>
-    /// The link to share. It exists only when every one of the public page's gates is open (see
-    /// PublicFormGate), so a link copied here is a link that works; otherwise the first closed
-    /// gate is named, so the person knows what to switch on.
+    /// The form's own link (/f/{id}), which works without the company's public page: plenty of
+    /// companies never open that page, and sharing one form must not oblige them to. When the
+    /// link would not work yet, the reason is named instead, so a copied link is a working one.
     /// </summary>
     [HttpGet("{id:guid}/lien")]
     public async Task<ActionResult<FormPublicLinkDto>> PublicLink(Guid id, CancellationToken ct)
     {
-        var form = await db.FormTemplates.AsNoTracking()
-            .Where(f => f.Id == id)
-            .Select(f => new { f.TenantId, f.IsPublished, f.ShowOnPublicPage })
-            .FirstOrDefaultAsync(ct);
-        if (form is null) return NotFound();
-
-        var slug = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
-            .Where(t => t.Id == form.TenantId)
-            .Select(t => t.Slug)
-            .FirstOrDefaultAsync(ct);
-        var page = await db.PublicPages.AsNoTracking()
-            .Where(p => p.TenantId == form.TenantId)
-            .Select(p => new { p.IsPublished, p.ShowForms })
-            .FirstOrDefaultAsync(ct);
-
-        var missing =
-            !form.IsPublished ? "Publiez le formulaire pour obtenir son lien."
-            : !form.ShowOnPublicPage ? "Cochez « Sur ma page publique » dans « Modifier la fiche » pour obtenir son lien."
-            : string.IsNullOrWhiteSpace(slug) || page is not { IsPublished: true } ? "Publiez la page publique de l'entreprise (Entreprise › Page publique) pour obtenir le lien."
-            : !page.ShowForms ? "Affichez les formulaires sur la page publique (Entreprise › Page publique) pour obtenir le lien."
-            : null;
+        var (found, missing) = await LinkProblemAsync(id, ct);
+        if (!found) return NotFound();
 
         return Ok(missing is null
-            ? new FormPublicLinkDto($"/e/{Uri.EscapeDataString(slug!)}?formulaire={id}", null)
+            ? new FormPublicLinkDto(LinkPath(id), null)
             : new FormPublicLinkDto(null, missing));
+    }
+
+    /// <summary>
+    /// Sends the form's link to one person by e-mail, from the company's name. The address is
+    /// typed by whoever sends it: a form often goes to somebody who is not a client yet.
+    /// </summary>
+    [HttpPost("{id:guid}/envoyer")]
+    public async Task<ActionResult<SendFormLinkResultDto>> SendLink(Guid id, SendFormLinkRequest request, CancellationToken ct)
+    {
+        if (currentUser.TenantId is not { } tenantId) return Forbid();
+
+        var (found, missing) = await LinkProblemAsync(id, ct);
+        if (!found) return NotFound();
+        if (missing is not null) return BadRequest(new { message = missing });
+
+        var to = request.Email?.Trim() ?? "";
+        if (!System.Net.Mail.MailAddress.TryCreate(to, out var parsed) || parsed.Address != to || to.Length > 254)
+        {
+            return BadRequest(new { message = "Indiquez une adresse courriel valide." });
+        }
+
+        var message = request.Message?.Trim();
+        if (message is { Length: > 2000 }) return BadRequest(new { message = "Le message ne peut pas dépasser 2000 caractères." });
+
+        var form = await db.FormTemplates.Where(f => f.Id == id)
+            .Select(f => new { f.Title, f.RequiresIdentification }).FirstAsync(ct);
+        var title = form.Title;
+
+        // The address goes into the link, signed: a form that files on the client's record then
+        // opens on that client's record without a sign-in, when the address is one of theirs.
+        var url = $"{FrontendUrl}{LinkPath(id)}?jeton={Uri.EscapeDataString(invitation.Seal(id, to))}";
+        var client = form.RequiresIdentification ? await FormInvitation.ClientForAsync(db, tenantId, to, ct) : null;
+        var companyName = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
+            .Where(t => t.Id == tenantId).Select(t => t.Name).FirstAsync(ct);
+        var name = string.IsNullOrWhiteSpace(request.Name) ? to : request.Name.Trim();
+
+        try
+        {
+            await mail.SendAsync(
+                to,
+                name,
+                $"{title} — {companyName}",
+                FormLinkEmail.Build(companyName, title, message, url),
+                ct,
+                fromName: companyName);
+        }
+        catch (InvalidOperationException ex)
+        {
+            // Mailgun is unconfigured or refused it. Said plainly: a "sent" toast here would
+            // leave the office waiting for answers to a form nobody received.
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { message = ex.Message });
+        }
+
+        return Ok(new SendFormLinkResultDto(client?.Name, form.RequiresIdentification));
+    }
+
+    private string FrontendUrl => configuration["Frontend:BaseUrl"]?.TrimEnd('/') ?? "http://localhost:3000";
+
+    private static string LinkPath(Guid id) => $"/f/{id}";
+
+    /// <summary>
+    /// Whether the form exists, and why its link would not work yet (null when it does). The same checks as the public side
+    /// (PublicFormGate.ResolveSharedAsync), said in words the office can act on.
+    /// </summary>
+    private async Task<(bool Found, string? Missing)> LinkProblemAsync(Guid id, CancellationToken ct)
+    {
+        var form = await db.FormTemplates.AsNoTracking()
+            .Where(f => f.Id == id)
+            .Select(f => new
+            {
+                f.IsPublished,
+                HasQuestions = db.FormFields.Any(x => x.FormTemplateId == f.Id),
+                AsksForFile = db.FormFields.Any(x => x.FormTemplateId == f.Id && x.Type == FormFieldType.Fichier)
+            })
+            .FirstOrDefaultAsync(ct);
+
+        if (form is null) return (false, null);
+
+        return (true, !form.IsPublished ? "Publiez le formulaire pour obtenir son lien."
+            : !form.HasQuestions ? "Ajoutez au moins une question pour obtenir son lien."
+            : form.AsksForFile ? "Ce formulaire demande un fichier : il ne peut pas être rempli par lien, car une personne sans compte ne peut rien téléverser."
+            : null);
     }
 
     [HttpGet("{id:guid}")]

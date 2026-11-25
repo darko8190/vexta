@@ -427,6 +427,9 @@ namespace Vexta.Api.Data.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
 
+                    b.Property<int?>("QuoteReminderDays")
+                        .HasColumnType("integer");
+
                     b.Property<string>("QuoteTerms")
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
@@ -3778,6 +3781,9 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<Guid?>("ProjectId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset?>("ReminderSentAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid?>("ReplacesId")
                         .HasColumnType("uuid");
 
@@ -3789,6 +3795,9 @@ namespace Vexta.Api.Data.Migrations
 
                     b.Property<DateTimeOffset?>("SentAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("SentTo")
+                        .HasColumnType("text");
 
                     b.Property<Guid?>("SiteAddressId")
                         .HasColumnType("uuid");

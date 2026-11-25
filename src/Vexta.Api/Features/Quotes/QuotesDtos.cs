@@ -61,7 +61,9 @@ public record QuoteDto(
     Guid? ReplacedById,
     /// <summary>The invoice this quote was billed by directly, without a project.</summary>
     Guid? InvoiceId,
-    string? InvoiceNumber);
+    string? InvoiceNumber,
+    /// <summary>When the automatic reminder went out, if it did.</summary>
+    DateTimeOffset? ReminderSentAt);
 
 public record QuoteOptionDto(Guid Id, string Description, decimal Total, bool IsSelected);
 
@@ -158,4 +160,26 @@ public record SaveQuoteLineRequest(
     bool IsSelected = false);
 
 /// <summary>The rows behind each section, and the money, in the project's cost-table shape.</summary>
-public record QuoteSummaryDto(int Tasks, int Materials, int ExtraCharges, int DocumentsAndNotes, ProjectCostTableDto Costs);
+/// <param name="LinesWithoutCost">Lines in the price with no cost entered: the margin counts them as free.</param>
+public record QuoteSummaryDto(
+    int Tasks, int Materials, int ExtraCharges, int DocumentsAndNotes, ProjectCostTableDto Costs, int LinesWithoutCost);
+
+public enum QuoteLineChange
+{
+    Inchangee = 0,
+    Ajoutee = 1,
+    Retiree = 2,
+    Modifiee = 3
+}
+
+/// <summary>One line as it stood in one version.</summary>
+public record QuoteLineSnapshotDto(
+    decimal Quantity, string? Unit, decimal UnitPrice, decimal Total, bool IsOptional, bool IsSelected);
+
+/// <summary>A line of the comparison: null <c>Before</c> for an added line, null <c>After</c> for a removed one.</summary>
+public record QuoteLineChangeDto(
+    QuoteLineKind Kind, string Description, QuoteLineChange Change, QuoteLineSnapshotDto? Before, QuoteLineSnapshotDto? After);
+
+/// <summary>A revision set against the version it replaces. Totals are before taxes.</summary>
+public record QuoteComparisonDto(
+    Guid PreviousId, string PreviousLabel, decimal PreviousSubtotal, decimal Subtotal, IReadOnlyList<QuoteLineChangeDto> Lines);

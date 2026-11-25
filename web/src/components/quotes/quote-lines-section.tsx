@@ -14,6 +14,7 @@ import { LoadErrorState } from "@/components/layout/load-error-state";
 import { QuoteLineFormSheet, quoteLineCopy } from "@/components/quotes/quote-line-form-sheet";
 import { useDeleteQuoteLine, useQuoteLinesQuery } from "@/hooks/use-quotes";
 import { ApiError } from "@/lib/api";
+import { marginPercent } from "@/components/projects/detail/project-cost-table";
 import { formatAmount } from "@/lib/money";
 import type { QuoteLine, QuoteLineKind } from "@/lib/types";
 import type { LucideIcon } from "lucide-react";
@@ -125,6 +126,7 @@ export function QuoteLinesSection({
                 <TableHead className="text-right">Coûtant</TableHead>
                 <TableHead className="text-right">Vendant</TableHead>
                 <TableHead className="text-right">Total</TableHead>
+                <TableHead className="text-right">Marge</TableHead>
                 {!locked && <TableHead className="w-10" />}
               </TableRow>
             </TableHeader>
@@ -150,6 +152,12 @@ export function QuoteLinesSection({
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{formatAmount(line.unitPrice)}</TableCell>
                     <TableCell className="text-right font-medium tabular-nums">{formatAmount(line.total)}</TableCell>
+                    <TableCell
+                      className="text-right tabular-nums text-muted-foreground"
+                      title={line.unitCost == null ? "Pas de coûtant : la marge ne peut pas être calculée." : undefined}
+                    >
+                      {line.unitCost == null ? "—" : marginPercent(line.unitPrice - line.unitCost, line.unitPrice)}
+                    </TableCell>
                   </>
                 );
                 return locked ? (
@@ -185,6 +193,10 @@ export function QuoteLinesSection({
                 <TableCell className="text-right tabular-nums">{formatAmount(Math.round(cost * 100) / 100)}</TableCell>
                 <TableCell />
                 <TableCell className="text-right font-semibold tabular-nums">{formatAmount(total)}</TableCell>
+                <TableCell className="text-right tabular-nums text-muted-foreground">
+                  {/* A line with no cost would count as free and inflate the section's margin. */}
+                  {counted.some((line) => line.unitCost == null) ? "—" : marginPercent(total - cost, total)}
+                </TableCell>
                 {!locked && <TableCell />}
               </TableRow>
             </TableFooter>

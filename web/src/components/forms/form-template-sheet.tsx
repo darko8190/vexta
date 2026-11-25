@@ -274,9 +274,9 @@ export function FormTemplateSheet({
                     </div>
                     <FieldDescription>
                       Offert aux visiteurs de votre page, sans compte. Il faut aussi que le
-                      formulaire soit publié et que la page affiche les formulaires. Un
-                      formulaire qui demande un fichier ne peut pas y aller : un visiteur sans
-                      compte n&apos;a nulle part pour téléverser.
+                      formulaire soit publié et que la page affiche les formulaires. Pas
+                      nécessaire pour partager le formulaire : son lien et l&apos;envoi par
+                      courriel fonctionnent sans la page publique.
                     </FieldDescription>
                   </Field>
                 )}

@@ -123,7 +123,7 @@ export function FormSubmissionsSection({ formId }: { formId: string }) {
                     {submission.fromPublicPage && (
                       <Badge variant="outline">
                         <Globe className="size-3" />
-                        Page publique
+                        En ligne
                       </Badge>
                     )}
                   </div>

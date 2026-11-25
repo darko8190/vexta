@@ -14,6 +14,12 @@ function money(amount: number): string {
   }).format(amount);
 }
 
+/** The share of the price left once the cost is paid: « 35,2 % », or « — » with nothing sold. */
+export function marginPercent(profit: number, revenue: number): string {
+  if (revenue <= 0) return "—";
+  return `${((profit / revenue) * 100).toLocaleString("fr-CA", { maximumFractionDigits: 1 })} %`;
+}
+
 /**
  * What the job costs, what it sells for, and what is left.
  *
@@ -38,6 +44,7 @@ export function ProjectCostTable({ costs, isLoading }: { costs?: CostTable; isLo
             <TableHead className="text-right">Coût</TableHead>
             <TableHead className="text-right">Vendant</TableHead>
             <TableHead className="text-right">Bénéfice</TableHead>
+            <TableHead className="text-right">Marge</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -53,6 +60,9 @@ export function ProjectCostTable({ costs, isLoading }: { costs?: CostTable; isLo
               <TableCell className={cn("text-right tabular-nums", profitTone(line.profit))}>
                 {money(line.profit)}
               </TableCell>
+              <TableCell className={cn("text-right tabular-nums", profitTone(line.profit))}>
+                {marginPercent(line.profit, line.revenue)}
+              </TableCell>
             </TableRow>
           ))}
 
@@ -64,6 +74,9 @@ export function ProjectCostTable({ costs, isLoading }: { costs?: CostTable; isLo
             <TableCell className="text-right font-semibold tabular-nums">{money(costs.subtotal)}</TableCell>
             <TableCell className={cn("text-right font-semibold tabular-nums", profitTone(costs.profit))}>
               {money(costs.profit)}
+            </TableCell>
+            <TableCell className={cn("text-right font-semibold tabular-nums", profitTone(costs.profit))}>
+              {marginPercent(costs.profit, costs.subtotal)}
             </TableCell>
           </TableRow>
         </TableBody>

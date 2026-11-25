@@ -1823,6 +1823,17 @@ export interface PublicForm {
   requiresIdentification: boolean;
 }
 
+/** A form opened from its own link (/f/{id}), with the company it belongs to. */
+export interface SharedForm {
+  form: PublicForm;
+  tenantId: string;
+  companyName: string;
+  brandColor: string | null;
+  logoETag: string | null;
+  /** The client an e-mailed link fills this form for, without a sign-in. */
+  invitedAs: string | null;
+}
+
 export interface PublicProduct {
   id: string;
   number: number;
@@ -3062,6 +3073,8 @@ export interface QuoteRecord {
   /** The invoice this quote was billed by directly, without a project. */
   invoiceId: string | null;
   invoiceNumber: string | null;
+  /** When the automatic reminder went out, if it did. */
+  reminderSentAt: string | null;
 }
 
 export interface QuoteOption {
@@ -3142,6 +3155,39 @@ export interface QuoteSummary {
   extraCharges: number;
   documentsAndNotes: number;
   costs: ProjectCostTable;
+  /** Lines in the price with no cost entered: the margin counts them as free. */
+  linesWithoutCost: number;
+}
+
+export type QuoteLineChange = "Inchangee" | "Ajoutee" | "Retiree" | "Modifiee";
+
+/** One line as it stood in one version. */
+export interface QuoteLineSnapshot {
+  quantity: number;
+  unit: string | null;
+  unitPrice: number;
+  total: number;
+  isOptional: boolean;
+  isSelected: boolean;
+}
+
+export interface QuoteLineChangeRow {
+  kind: QuoteLineKind;
+  description: string;
+  change: QuoteLineChange;
+  /** Null for an added line. */
+  before: QuoteLineSnapshot | null;
+  /** Null for a removed line. */
+  after: QuoteLineSnapshot | null;
+}
+
+/** A revision set against the version it replaces. Totals before taxes. */
+export interface QuoteComparison {
+  previousId: string;
+  previousLabel: string;
+  previousSubtotal: number;
+  subtotal: number;
+  lines: QuoteLineChangeRow[];
 }
 
 /** How many quotes this person can see in one status. */

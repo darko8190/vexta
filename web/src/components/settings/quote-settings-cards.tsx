@@ -1,16 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { ClipboardPen, FileText, Trash2 } from "lucide-react";
+import { BellRing, ClipboardPen, FileText, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
-import { useBillingSettingsQuery, useSaveQuoteTerms } from "@/hooks/use-billing-settings";
+import { useBillingSettingsQuery, useSaveQuoteReminder, useSaveQuoteTerms } from "@/hooks/use-billing-settings";
 import { useDeleteQuoteTemplate, useQuoteTemplatesQuery } from "@/hooks/use-quotes";
 import { ApiError } from "@/lib/api";
 import { formatAmount } from "@/lib/money";
@@ -69,6 +71,90 @@ export function QuoteTermsCard() {
       </CardContent>
       <CardFooter>
         <Button onClick={onSave} disabled={save.isPending || draft === null}>
+          {save.isPending && <Spinner />}
+          Enregistrer
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+}
+
+const DEFAULT_REMINDER_DAYS = 7;
+
+/**
+ * The reminder sent by itself to a client who has not answered. Off until turned on: an email
+ * in the company's name only leaves on its own once the company has asked for it.
+ */
+export function QuoteReminderCard() {
+  const { data: settings, isLoading } = useBillingSettingsQuery();
+  const save = useSaveQuoteReminder();
+  // Null until changed, so the saved value shows through without being copied into state.
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+  const [days, setDays] = useState<string | null>(null);
+
+  const saved = settings?.quoteReminderDays ?? null;
+  const on = enabled ?? saved != null;
+  const daysText = days ?? String(saved ?? DEFAULT_REMINDER_DAYS);
+  const parsed = Number(daysText);
+  const valid = Number.isInteger(parsed) && parsed >= 1 && parsed <= 90;
+  const next = on ? parsed : null;
+  const dirty = next !== saved;
+
+  async function onSave() {
+    try {
+      await save.mutateAsync(next);
+      toast.success(next == null ? "Relance automatique désactivée." : "Relance automatique enregistrée.");
+      setEnabled(null);
+      setDays(null);
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Impossible d'enregistrer la relance.");
+    }
+  }
+
+  if (isLoading || !settings) return <Skeleton className="h-48 max-w-3xl" />;
+
+  return (
+    <Card className="max-w-3xl">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <BellRing className="size-4" />
+          Relance automatique
+        </CardTitle>
+        <CardDescription>
+          Une soumission envoyée qui reste sans réponse est relancée une fois, toute seule, à la
+          personne qui l&apos;a reçue, avec le PDF. Pas si elle est expirée, acceptée ou refusée.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <Field>
+          <div className="flex items-center gap-3">
+            <Checkbox id="quote-reminder-on" checked={on} onCheckedChange={(checked) => setEnabled(checked === true)} />
+            <FieldLabel htmlFor="quote-reminder-on" className="font-normal">
+              Relancer automatiquement les soumissions sans réponse
+            </FieldLabel>
+          </div>
+        </Field>
+        {on && (
+          <Field className="max-w-xs">
+            <FieldLabel htmlFor="quote-reminder-days">Délai après l&apos;envoi (jours)</FieldLabel>
+            <Input
+              id="quote-reminder-days"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={90}
+              value={daysText}
+              onChange={(event) => setDays(event.target.value)}
+              aria-invalid={!valid}
+            />
+            <FieldDescription>
+              {valid ? "Entre 1 et 90 jours, comptés à partir du dernier envoi." : "Indiquez un nombre de jours entre 1 et 90."}
+            </FieldDescription>
+          </Field>
+        )}
+      </CardContent>
+      <CardFooter>
+        <Button onClick={onSave} disabled={save.isPending || !dirty || (on && !valid)}>
           {save.isPending && <Spinner />}
           Enregistrer
         </Button>

@@ -97,13 +97,14 @@ public class InvoicePdfService(VextaDbContext db, ICurrentUserService currentUse
     }
 
     /// <summary>The company's local day and time of an online signature, as the paper prints them.</summary>
-    private static InvoicePdfSignature Signed(string name, DateTimeOffset at)
+    private static InvoicePdfSignature Signed(string name, DateTimeOffset at, byte[]? drawn)
     {
         var local = BusinessDay.ToLocal(at);
         return new InvoicePdfSignature(
             name,
             local.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-            $"Signée électroniquement dans le portail client par {name}, le {local:yyyy-MM-dd} à {local:HH} h {local:mm}.");
+            $"Signée électroniquement dans le portail client par {name}, le {local:yyyy-MM-dd} à {local:HH} h {local:mm}.",
+            drawn);
     }
 
     public async Task<(byte[] Bytes, string Label)?> RenderQuoteAsync(Guid quoteId, CancellationToken ct = default)
@@ -187,7 +188,7 @@ public class InvoicePdfService(VextaDbContext db, ICurrentUserService currentUse
             Options = options,
             Wording = InvoicePdfWording.Quote,
             Signature = quote.ClientSignature is { } typed && quote.ClientRespondedAt is { } at
-                ? Signed(typed, at)
+                ? Signed(typed, at, quote.ClientSignaturePng)
                 : null,
         };
 

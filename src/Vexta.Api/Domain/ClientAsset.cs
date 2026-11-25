@@ -115,3 +115,53 @@ public class ClientAssetType
 
     public List<ClientAsset> Assets { get; set; } = [];
 }
+
+/// <summary>
+/// Work that comes back on a schedule for one asset: the furnace's yearly cleaning, the
+/// truck's oil change every six months. Vexta keeps the next date, and — when the company asks
+/// for it — writes to the client ahead of it so the appointment is booked rather than forgotten.
+///
+/// Counted in months because that is how every trade says it ("aux six mois", "une fois par
+/// année"); a date the trade counts in hours of use goes in the label and is moved by hand.
+/// </summary>
+public class AssetMaintenance
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid TenantId { get; set; }
+
+    public Guid ClientAssetId { get; set; }
+    public ClientAsset? ClientAsset { get; set; }
+
+    /// <summary>The asset's owner, kept here so the client's own filter can narrow these rows.</summary>
+    public Guid ClientId { get; set; }
+
+    /// <summary>What is done: "Entretien annuel", "Changement d'huile".</summary>
+    public required string Label { get; set; }
+
+    /// <summary>Months between two visits. The next date moves by this much when one is marked done.</summary>
+    public int IntervalMonths { get; set; } = 12;
+
+    /// <summary>When the next one is due.</summary>
+    public DateOnly NextDue { get; set; }
+
+    /// <summary>
+    /// Days before <see cref="NextDue"/> to write to the client. Null for no email: some
+    /// companies call their clients themselves and only want the date kept.
+    /// </summary>
+    public int? RemindDaysBefore { get; set; }
+
+    /// <summary>
+    /// The due date the last reminder was about. One reminder per due date: marking it done or
+    /// moving the date makes the next one eligible.
+    /// </summary>
+    public DateOnly? RemindedFor { get; set; }
+    public DateTimeOffset? RemindedAt { get; set; }
+
+    /// <summary>When it was last marked done.</summary>
+    public DateOnly? LastDoneOn { get; set; }
+
+    public string? Notes { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+}

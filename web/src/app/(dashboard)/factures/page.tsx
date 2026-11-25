@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { FileText, ReceiptText, Undo2, Wallet } from "lucide-react";
+import { FileText, ReceiptText, Repeat, Undo2, Wallet } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { SectionNav, type NavSection } from "@/components/layout/section-nav";
 import { useSectionCountsQuery } from "@/hooks/use-section-counts";
 import { CreditsSection } from "@/components/invoices/credits-section";
 import { InvoicesSection } from "@/components/invoices/invoices-section";
 import { PaymentsSection } from "@/components/invoices/payments-section";
+import { RecurringInvoicesSection } from "@/components/invoices/recurring-invoices-section";
 import { RefundsSection } from "@/components/invoices/refunds-section";
 import { useIsClientUser } from "@/hooks/use-can-create";
 
@@ -32,6 +33,7 @@ export default function BillingPage() {
     { key: "paiements", label: "Paiements", count: counts?.payments ?? 0, icon: Wallet },
     { key: "credits", label: "Crédits", count: counts?.credits ?? 0, icon: ReceiptText },
     { key: "remboursements", label: "Remboursements", count: counts?.refunds ?? 0, icon: Undo2 },
+    { key: "recurrentes", label: "Récurrentes", icon: Repeat },
   ];
 
   if (isClient) {
@@ -64,6 +66,7 @@ export default function BillingPage() {
           {section === "paiements" && <PaymentsSection />}
           {section === "credits" && <CreditsSection />}
           {section === "remboursements" && <RefundsSection />}
+          {section === "recurrentes" && <RecurringInvoicesSection />}
         </div>
       </div>
     </div>

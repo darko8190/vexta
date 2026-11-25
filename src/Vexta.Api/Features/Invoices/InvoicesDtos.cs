@@ -52,7 +52,8 @@ public record InvoiceDto(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     /// <summary>When the automatic reminder went out for the current sending, if it did.</summary>
-    DateTimeOffset? ReminderSentAt = null);
+    DateTimeOffset? ReminderSentAt = null,
+    int ReminderCount = 0);
 
 /// <summary>
 /// Description is nullable so that a line being typed can still be previewed. A non-nullable

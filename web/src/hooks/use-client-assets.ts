@@ -64,3 +64,60 @@ export function useDeleteClientAsset(clientId: string) {
     onSuccess: () => invalidate(queryClient),
   });
 }
+
+/** The maintenance planned on one asset: what, how often, and when next. */
+export interface AssetMaintenance {
+  id: string;
+  label: string;
+  intervalMonths: number;
+  nextDue: string;
+  /** Days ahead the client is written to; null for no email. */
+  remindDaysBefore: number | null;
+  /** When the client was written to about the current due date, if they were. */
+  remindedAt: string | null;
+  lastDoneOn: string | null;
+  notes: string | null;
+}
+
+export interface SaveAssetMaintenanceValues {
+  label: string;
+  intervalMonths: number;
+  nextDue: string;
+  remindDaysBefore: number | null;
+  notes: string | null;
+}
+
+export function useAssetMaintenanceQuery(clientId: string, assetId: string) {
+  return useQuery({
+    queryKey: ["clients", "actif-entretiens", clientId, assetId],
+    queryFn: () => api.get<AssetMaintenance[]>(`clients/${clientId}/actifs/${assetId}/entretiens`),
+  });
+}
+
+export function useSaveAssetMaintenance(clientId: string, assetId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, values }: { id?: string; values: SaveAssetMaintenanceValues }) =>
+      id
+        ? api.put<AssetMaintenance>(`clients/${clientId}/actifs/${assetId}/entretiens/${id}`, values)
+        : api.post<AssetMaintenance>(`clients/${clientId}/actifs/${assetId}/entretiens`, values),
+    onSuccess: () => invalidate(queryClient),
+  });
+}
+
+export function useMarkMaintenanceDone(clientId: string, assetId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, doneOn }: { id: string; doneOn: string | null }) =>
+      api.post<AssetMaintenance>(`clients/${clientId}/actifs/${assetId}/entretiens/${id}/fait`, { doneOn }),
+    onSuccess: () => invalidate(queryClient),
+  });
+}
+
+export function useDeleteAssetMaintenance(clientId: string, assetId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`clients/${clientId}/actifs/${assetId}/entretiens/${id}`),
+    onSuccess: () => invalidate(queryClient),
+  });
+}

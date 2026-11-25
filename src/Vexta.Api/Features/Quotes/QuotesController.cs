@@ -172,6 +172,23 @@ public class QuotesController(
     }
 
     /// <summary>
+    /// The signature the client drew when accepting, for the screens that show it. Read through
+    /// the same visibility as the quote: a client sees their own, staff their company's.
+    /// </summary>
+    [HttpGet("{id:guid}/signature")]
+    public async Task<IActionResult> DrawnSignature(Guid id, CancellationToken ct)
+    {
+        var png = await Visible().AsNoTracking()
+            .Where(q => q.Id == id)
+            .Select(q => q.ClientSignaturePng)
+            .FirstOrDefaultAsync(ct);
+        if (png is null) return NotFound();
+        // Never changes once given, but private: kept by this browser only.
+        Response.Headers.CacheControl = "private, max-age=86400";
+        return File(png, "image/png");
+    }
+
+    /// <summary>
     /// The quote's cost table, in the same shape as a project's so the same table draws both:
     /// labour, materials and extra charges, what each costs, what each sells for, and the taxes.
     /// </summary>
@@ -627,6 +644,8 @@ public class QuotesController(
             return BadRequest(new { message = "Tapez votre nom complet pour signer l'acceptation." });
         if (signature.Length > 200)
             return BadRequest(new { message = "Le nom est limité à 200 caractères." });
+        if (SignaturePng.Read(request.SignatureImage) is not { } drawn)
+            return BadRequest(new { message = "Signez dans le cadre avec le doigt ou la souris." });
 
         // The options taken, checked against this quote's own optional lines: an id from
         // anywhere else is refused rather than ignored, so the client never accepts a total
@@ -639,6 +658,7 @@ public class QuotesController(
 
         await RecordResponseAsync(quote, request, ct);
         quote.ClientSignature = signature;
+        quote.ClientSignaturePng = drawn;
         var project = await CreateProjectAsync(quote);
         var deposit = await CreateDepositInvoiceAsync(quote, project);
         await db.SaveChangesAsync(ct);
@@ -1397,6 +1417,7 @@ public class QuotesController(
         q.ClientRespondedBy,
         q.ClientResponseNote,
         q.ClientSignature,
+        q.ClientSignaturePng != null,
         q.DepositPercent,
         q.DepositInvoiceId,
         q.DepositInvoice == null ? null : q.DepositInvoice.Number,
@@ -1410,5 +1431,6 @@ public class QuotesController(
         q.Revisions.OrderByDescending(r => r.Revision).Select(r => (Guid?)r.Id).FirstOrDefault(),
         q.InvoiceId,
         q.Invoice == null ? null : q.Invoice.Number,
-        q.ReminderSentAt);
+        q.ReminderSentAt,
+        q.ReminderCount);
 }

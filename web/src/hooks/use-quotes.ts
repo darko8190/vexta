@@ -190,6 +190,7 @@ export function useRespondToQuote() {
       answer,
       note,
       signature = null,
+      signatureImage = null,
       optionIds = [],
     }: {
       id: string;
@@ -197,9 +198,11 @@ export function useRespondToQuote() {
       note: string | null;
       /** The typed full name that signs an acceptance. */
       signature?: string | null;
+      /** The signature drawn on the pad, as a PNG data URL. */
+      signatureImage?: string | null;
       /** The optional lines taken along with the acceptance. */
       optionIds?: string[];
-    }) => api.post<QuoteRecord>(`soumissions/${id}/${answer}`, { note, signature, optionIds }),
+    }) => api.post<QuoteRecord>(`soumissions/${id}/${answer}`, { note, signature, signatureImage, optionIds }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["quotes"] });
       queryClient.invalidateQueries({ queryKey: ["projects"] });

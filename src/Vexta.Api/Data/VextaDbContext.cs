@@ -91,6 +91,8 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
     public DbSet<ProjectTask> ProjectTasks => Set<ProjectTask>();
     public DbSet<Report> Reports => Set<Report>();
     public DbSet<ClientAsset> ClientAssets => Set<ClientAsset>();
+    public DbSet<AssetMaintenance> AssetMaintenances => Set<AssetMaintenance>();
+    public DbSet<RecurringInvoice> RecurringInvoices => Set<RecurringInvoice>();
     public DbSet<ClientAccountEntry> ClientAccountEntries => Set<ClientAccountEntry>();
     public DbSet<InvoicePayment> InvoicePayments => Set<InvoicePayment>();
     public DbSet<InvoiceRefund> InvoiceRefunds => Set<InvoiceRefund>();
@@ -286,6 +288,45 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             // nobody else's, which is the same promise the client record itself makes.
             e.HasQueryFilter(a => a.TenantId == CurrentTenantId
                 && (CurrentClientId == null || a.ClientId == CurrentClientId));
+        });
+
+        builder.Entity<RecurringInvoice>(e =>
+        {
+            e.HasOne(r => r.Client).WithMany()
+                .HasForeignKey(r => r.ClientId).OnDelete(DeleteBehavior.Cascade);
+
+            // Cascade: the schedule is a copy of this invoice and means nothing without it.
+            e.HasOne(r => r.SourceInvoice).WithMany()
+                .HasForeignKey(r => r.SourceInvoiceId).OnDelete(DeleteBehavior.Cascade);
+
+            // SetNull: deleting the last draft it made does not end the schedule.
+            e.HasOne(r => r.LastInvoice).WithMany()
+                .HasForeignKey(r => r.LastInvoiceId).OnDelete(DeleteBehavior.SetNull);
+
+            e.Property(r => r.LastProblem).HasMaxLength(500);
+
+            e.HasIndex(r => r.SourceInvoiceId).IsUnique();
+            e.HasIndex(r => new { r.TenantId, r.IsActive, r.NextIssueDate });
+
+            e.HasQueryFilter(r => r.TenantId == CurrentTenantId && CurrentClientId == null);
+        });
+
+        builder.Entity<AssetMaintenance>(e =>
+        {
+            // Cascade: a schedule means nothing without the thing it is for.
+            e.HasOne(m => m.ClientAsset).WithMany()
+                .HasForeignKey(m => m.ClientAssetId).OnDelete(DeleteBehavior.Cascade);
+
+            e.Property(m => m.Label).HasMaxLength(200);
+            e.Property(m => m.Notes).HasMaxLength(2000);
+
+            e.HasIndex(m => m.ClientAssetId);
+            // The reminder pass reads by date across the company.
+            e.HasIndex(m => new { m.TenantId, m.NextDue });
+
+            // The asset's own promise: a customer sees the schedules on their own things only.
+            e.HasQueryFilter(m => m.TenantId == CurrentTenantId
+                && (CurrentClientId == null || m.ClientId == CurrentClientId));
         });
 
         builder.Entity<ClientAccountEntry>(e =>

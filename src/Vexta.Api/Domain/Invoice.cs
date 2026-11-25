@@ -40,10 +40,15 @@ public class Invoice
     public string? SentTo { get; set; }
 
     /// <summary>
-    /// When the automatic reminder for an unpaid invoice went out. One per sending: sending the
-    /// invoice again makes it eligible again (see InvoiceReminderService).
+    /// When the last automatic reminder for an unpaid invoice went out (see InvoiceReminderService).
     /// </summary>
     public DateTimeOffset? ReminderSentAt { get; set; }
+
+    /// <summary>
+    /// Reminders sent since the invoice was last emailed. Back to zero on each sending, so a
+    /// copy sent by hand starts the count again rather than eating into it.
+    /// </summary>
+    public int ReminderCount { get; set; }
 
     /// <summary>
     /// What the "payer en ligne" link in the email carries, or null for an invoice that has
@@ -103,4 +108,64 @@ public class InvoiceLine
     public bool IsTaxable { get; set; } = true;
 
     public int SortOrder { get; set; }
+}
+
+/// <summary>
+/// An invoice that comes back on a schedule: the monthly maintenance contract, the yearly
+/// inspection. Built from an invoice the company already wrote — its client, lines and taxes are
+/// copied into a new invoice each period — so there is no second invoice editor to keep in step
+/// with the first.
+///
+/// Each new invoice is either left as a draft for the company to check, or sent straight to
+/// the client with the usual message, the PDF and the pay button (<see cref="AutoSend"/>).
+/// </summary>
+public class RecurringInvoice
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid TenantId { get; set; }
+
+    public Guid ClientId { get; set; }
+    public Client? Client { get; set; }
+
+    /// <summary>The invoice copied each time. One schedule per invoice.</summary>
+    public Guid SourceInvoiceId { get; set; }
+    public Invoice? SourceInvoice { get; set; }
+
+    /// <summary>Months between two invoices: 1, 3, 6, 12.</summary>
+    public int IntervalMonths { get; set; } = 1;
+
+    /// <summary>
+    /// The date the schedule counts from. Each date is computed from it — not from the last one —
+    /// so an invoice on the 31st falls on the last day of February and comes back to the 31st in
+    /// March instead of drifting to the 28th for good.
+    /// </summary>
+    public DateOnly StartDate { get; set; }
+
+    /// <summary>How many invoices have been issued since <see cref="StartDate"/>.</summary>
+    public int Periods { get; set; }
+
+    /// <summary>When the next one is issued: StartDate plus Periods intervals. Stored to be queried.</summary>
+    public DateOnly NextIssueDate { get; set; }
+
+    /// <summary>The last day an invoice may be issued on; null for until stopped.</summary>
+    public DateOnly? EndDate { get; set; }
+
+    /// <summary>Sent to the client on its own, rather than left as a draft to check.</summary>
+    public bool AutoSend { get; set; }
+
+    /// <summary>False once stopped or past its end date.</summary>
+    public bool IsActive { get; set; } = true;
+
+    public Guid? LastInvoiceId { get; set; }
+    public Invoice? LastInvoice { get; set; }
+    public DateTimeOffset? LastIssuedAt { get; set; }
+
+    /// <summary>
+    /// Why the last invoice was left as a draft although it was to be sent — no address on file,
+    /// the mail service refused — so the screen can say so instead of looking like it worked.
+    /// </summary>
+    public string? LastProblem { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

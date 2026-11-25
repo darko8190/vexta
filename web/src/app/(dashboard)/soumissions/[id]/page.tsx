@@ -82,6 +82,7 @@ import { quoteStatusBadgeVariant, quoteStatusLabels } from "@/lib/labels";
 import { formatAmount } from "@/lib/money";
 import { formatProjectNumber, formatQuoteNumber, type QuoteRecord } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { DrawnSignature } from "@/components/quotes/signature-pad";
 
 /**
  * One quote, laid out like a project because it is the project before it is sold: its details
@@ -280,7 +281,10 @@ function StaffQuoteDetail({ id }: { id: string }) {
               {quote.sentAt && (
                 <span className="text-xs text-muted-foreground">
                   Envoyée le {formatMoment(quote.sentAt)}
-                  {remindedAt && ` · relancée automatiquement le ${formatMoment(remindedAt)}`}
+                  {remindedAt &&
+                    (quote.reminderCount > 1
+                      ? ` · relancée automatiquement ${quote.reminderCount} fois, la dernière le ${formatMoment(remindedAt)}`
+                      : ` · relancée automatiquement le ${formatMoment(remindedAt)}`)}
                 </span>
               )}
               {quote.validUntil && (
@@ -390,6 +394,7 @@ function StaffQuoteDetail({ id }: { id: string }) {
                 <span className="font-medium text-foreground italic">{quote.clientSignature}</span>.
               </span>
             )}
+            {quote.hasDrawnSignature && <DrawnSignature quoteId={quote.id} className="mt-2 block" />}
             {quote.clientResponseNote && (
               <span className="mt-1 block whitespace-pre-line text-foreground">« {quote.clientResponseNote} »</span>
             )}

@@ -98,7 +98,8 @@ public record InvoicePdfWording(
 /// <param name="Name">The name as the customer typed it to sign.</param>
 /// <param name="Date">The day, as the paper prints dates.</param>
 /// <param name="Statement">The sentence that says how and when it was signed.</param>
-public record InvoicePdfSignature(string Name, string Date, string Statement);
+/// <param name="Drawn">The signature drawn on screen, as a PNG, when there is one.</param>
+public record InvoicePdfSignature(string Name, string Date, string Statement, byte[]? Drawn = null);
 
 public record InvoicePdfParty(string Name, IReadOnlyList<string> Lines, string? Email);
 

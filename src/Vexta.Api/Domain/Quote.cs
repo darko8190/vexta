@@ -87,10 +87,16 @@ public class Quote
     public string? SentTo { get; set; }
 
     /// <summary>
-    /// When the automatic reminder went out. One per sending: a reminder older than
-    /// <see cref="SentAt"/> belongs to an earlier sending, so the next one may go.
+    /// When the last automatic reminder went out. A reminder older than <see cref="SentAt"/>
+    /// belongs to an earlier sending.
     /// </summary>
     public DateTimeOffset? ReminderSentAt { get; set; }
+
+    /// <summary>
+    /// Reminders sent since the quote was last emailed. Back to zero on each sending, so the
+    /// company's limit counts per sending.
+    /// </summary>
+    public int ReminderCount { get; set; }
 
     /// <summary>
     /// The client's own answer, given from their portal: when, who pressed the button, and what
@@ -106,6 +112,13 @@ public class Quote
     /// they wrote it, kept apart from the account name. Printed on the PDF of the accepted quote.
     /// </summary>
     public string? ClientSignature { get; set; }
+
+    /// <summary>
+    /// The signature drawn on screen with a finger or the mouse, as a PNG. Printed on the PDF
+    /// above the line, where the pen would go. Null for a quote accepted before the pad existed
+    /// or by staff.
+    /// </summary>
+    public byte[]? ClientSignaturePng { get; set; }
 
     /// <summary>
     /// The share of the price asked up front, in percent. Null for none. When the quote becomes

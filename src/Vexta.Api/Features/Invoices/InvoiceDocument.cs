@@ -272,7 +272,10 @@ public class InvoiceDocument(InvoicePdfModel model) : IDocument
         {
             row.RelativeItem(3).Column(signature =>
             {
-                if (signed is not null)
+                // The drawn stroke where the pen would go; the typed name when there is none.
+                if (signed?.Drawn is { } drawn)
+                    signature.Item().Height(44).AlignLeft().Image(drawn).FitHeight();
+                else if (signed is not null)
                     signature.Item().PaddingBottom(2).Text(signed.Name).FontSize(13).Italic().FontColor(Blue);
                 signature.Item().LineHorizontal(0.5f).LineColor(Grey);
                 signature.Item().PaddingTop(4).Text($"Signature — {model.BillTo.Name}").FontSize(8).FontColor(Grey);

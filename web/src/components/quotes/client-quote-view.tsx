@@ -31,6 +31,7 @@ import { quoteStatusBadgeVariant, quoteStatusLabels } from "@/lib/labels";
 import { formatAmount } from "@/lib/money";
 import { formatProjectNumber, formatQuoteNumber, type QuoteRecord } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { DrawnSignature, SignaturePad } from "@/components/quotes/signature-pad";
 
 type Answer = "accepter" | "refuser";
 
@@ -153,6 +154,7 @@ function ResponseLine({ quote, expired }: { quote: QuoteRecord; expired: boolean
             <span className="font-medium text-foreground italic">{quote.clientSignature}</span>.
           </span>
         )}
+        {quote.hasDrawnSignature && <DrawnSignature quoteId={quote.id} className="mt-2 block" />}
         {quote.clientResponseNote && (
           <span className="mt-1 block whitespace-pre-line text-foreground">« {quote.clientResponseNote} »</span>
         )}
@@ -203,14 +205,15 @@ function AnswerDialog({ quote, answer, onClose }: { quote: QuoteRecord; answer: 
   const respond = useRespondToQuote();
   const [note, setNote] = useState("");
   const [signature, setSignature] = useState("");
+  const [drawn, setDrawn] = useState<string | null>(null);
   const [chosen, setChosen] = useState<string[]>([]);
   const accepting = answer === "accepter";
   // The total the customer is agreeing to: the base, plus the options ticked here.
   const total =
     quote.subtotal + quote.options.filter((option) => chosen.includes(option.id)).reduce((sum, option) => sum + option.total, 0);
   const deposit = quote.depositPercent ? Math.round(total * quote.depositPercent) / 100 : null;
-  // Typing one's name is the signature, so the button waits for one.
-  const signed = signature.trim().length >= 2;
+  // The name typed and the signature drawn: the button waits for both.
+  const signed = signature.trim().length >= 2 && drawn !== null;
   const number = formatQuoteNumber(quote.number, quote.revision);
 
   async function submit() {
@@ -220,6 +223,7 @@ function AnswerDialog({ quote, answer, onClose }: { quote: QuoteRecord; answer: 
         answer,
         note: note.trim() || null,
         signature: accepting ? signature.trim() : null,
+        signatureImage: accepting ? drawn : null,
         optionIds: accepting ? chosen : [],
       });
       toast.success(
@@ -282,8 +286,14 @@ function AnswerDialog({ quote, answer, onClose }: { quote: QuoteRecord; answer: 
                 onChange={(event) => setSignature(event.target.value)}
                 className="italic"
               />
+            </Field>
+          )}
+          {accepting && (
+            <Field>
+              <FieldLabel>Votre signature</FieldLabel>
+              <SignaturePad onChange={setDrawn} />
               <FieldDescription>
-                En tapant votre nom, vous signez l&apos;acceptation. Votre signature, la date et
+                En signant, vous acceptez la soumission. Votre signature, votre nom, la date et
                 l&apos;heure s&apos;impriment sur la soumission.
               </FieldDescription>
             </Field>

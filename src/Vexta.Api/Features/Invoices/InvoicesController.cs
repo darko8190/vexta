@@ -508,6 +508,7 @@ public class InvoicesController(
 
         invoice.SentAt = DateTimeOffset.UtcNow;
         invoice.SentTo = to;
+        invoice.ReminderCount = 0;
 
         // A paid invoice that is sent again stays paid: the status says where the money is, and
         // re-sending a copy does not unmake a payment.
@@ -1133,6 +1134,6 @@ public class InvoicesController(
             RateLabel("TPS", gstRate), totals.Gst,
             RateLabel("TVQ", qstRate), totals.Qst,
             totals.TaxTotal, totals.Total,
-            lines, invoice.CreatedAt, invoice.UpdatedAt, invoice.ReminderSentAt);
+            lines, invoice.CreatedAt, invoice.UpdatedAt, invoice.ReminderSentAt, invoice.ReminderCount);
     }
 }

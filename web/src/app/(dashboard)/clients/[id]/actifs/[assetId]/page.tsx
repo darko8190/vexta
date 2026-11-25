@@ -3,7 +3,7 @@
 import { use, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Car, FolderKanban, Info, ListChecks, Plus } from "lucide-react";
+import { ArrowLeft, Car, FolderKanban, Info, ListChecks, Plus, Wrench } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { InlineSheet } from "@/components/ui/sheet";
@@ -13,6 +13,7 @@ import { LoadErrorState } from "@/components/layout/load-error-state";
 import { SectionNav, type NavSection } from "@/components/layout/section-nav";
 import { rowOpenClassName, rowOpenProps } from "@/components/layout/row-open";
 import { AssetFormSheet } from "@/components/clients/detail/asset-form-sheet";
+import { AssetMaintenanceSection } from "@/components/clients/detail/asset-maintenance-section";
 import { ProjectFormSheet } from "@/components/projects/project-form-sheet";
 import { useCanCreate } from "@/hooks/use-can-create";
 import { useAssetTasksQuery, useClientAssetQuery } from "@/hooks/use-client-assets";
@@ -248,6 +249,7 @@ export default function ClientAssetPage({
 
   const sections: NavSection[] = [
     { key: "details", label: "Détails", icon: Info },
+    { key: "entretiens", label: "Entretiens", icon: Wrench },
     { key: "projets", label: "Projets", icon: FolderKanban },
     { key: "taches", label: "Tâches", icon: ListChecks },
   ];
@@ -308,6 +310,7 @@ export default function ClientAssetPage({
               </InlineSheet>
             </div>
           )}
+          {section === "entretiens" && <AssetMaintenanceSection clientId={clientId} assetId={asset.id} />}
           {section === "projets" && <AssetProjects clientId={clientId} assetId={asset.id} />}
           {section === "taches" && <AssetTasks clientId={clientId} assetId={asset.id} />}
         </div>

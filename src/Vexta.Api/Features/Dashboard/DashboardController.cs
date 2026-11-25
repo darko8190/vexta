@@ -31,6 +31,9 @@ public class DashboardController(VextaDbContext db, ICurrentUserService currentU
     /// <summary>How far ahead a card about to expire is worth warning about.</summary>
     private const int CredentialWarningDays = 30;
 
+    /// <summary>The overdue invoices listed under the buckets: enough for the calls to make today.</summary>
+    private const int OldestOverdueShown = 6;
+
     [HttpGet]
     public async Task<ActionResult<DashboardDto>> Get(CancellationToken ct)
     {
@@ -107,6 +110,18 @@ public class DashboardController(VextaDbContext db, ICurrentUserService currentU
         var outstanding = rows.Where(r => r.Balance > 0).ToList();
         var overdue = outstanding.Where(r => r.DueDate < today).ToList();
 
+        int DaysLate(DateOnly due) => today.DayNumber - due.DayNumber;
+        var receivables = new DashboardReceivablesDto(
+            outstanding.Where(r => r.DueDate >= today).Sum(r => r.Balance),
+            overdue.Where(r => DaysLate(r.DueDate) <= 30).Sum(r => r.Balance),
+            overdue.Where(r => DaysLate(r.DueDate) is > 30 and <= 60).Sum(r => r.Balance),
+            overdue.Where(r => DaysLate(r.DueDate) > 60).Sum(r => r.Balance),
+            [.. overdue
+                .OrderBy(r => r.DueDate).ThenBy(r => r.Number)
+                .Take(OldestOverdueShown)
+                .Select(r => new DashboardOverdueInvoiceDto(
+                    r.Id, r.Number, r.ClientName, r.DueDate, DaysLate(r.DueDate), r.Balance))]);
+
         // Cost, not selling price: this figure is what the company spent, and the selling price
         // is what it hopes to get back. An expense whose cost is still blank counts as nothing
         // rather than as its eventual price.
@@ -171,7 +186,8 @@ public class DashboardController(VextaDbContext db, ICurrentUserService currentU
             hours,
             attention,
             recent,
-            tasks));
+            tasks,
+            receivables));
     }
 
     private async Task<(decimal Gst, decimal Qst)> RatesAsync(CancellationToken ct)

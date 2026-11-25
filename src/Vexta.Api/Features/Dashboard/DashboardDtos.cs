@@ -39,7 +39,32 @@ public record DashboardDto(
     List<DashboardInvoiceDto> RecentInvoices,
 
     /// <summary>The nearest due dates among what is not finished.</summary>
-    List<DashboardTaskDto> UpcomingTasks);
+    List<DashboardTaskDto> UpcomingTasks,
+
+    /// <summary>What is owed, by how late it is, and the invoices furthest behind.</summary>
+    DashboardReceivablesDto Receivables);
+
+/// <summary>
+/// The money still owed, sorted by age. The total alone says how much; the buckets say how
+/// worried to be — 2 000 $ owed since last week and 2 000 $ owed since spring are not the same
+/// phone call.
+/// </summary>
+public record DashboardReceivablesDto(
+    /// <summary>Owed and not yet due.</summary>
+    decimal NotDue,
+    decimal Late1To30,
+    decimal Late31To60,
+    decimal LateOver60,
+    /// <summary>The overdue invoices, oldest due date first; a handful, not the whole list.</summary>
+    List<DashboardOverdueInvoiceDto> Oldest);
+
+public record DashboardOverdueInvoiceDto(
+    Guid Id,
+    string Number,
+    string ClientName,
+    DateOnly DueDate,
+    int DaysLate,
+    decimal Balance);
 
 /// <summary>
 /// The short list of things somebody has to do something about. Each is a number and a place to

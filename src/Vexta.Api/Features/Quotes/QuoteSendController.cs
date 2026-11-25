@@ -190,6 +190,7 @@ public class QuoteSendController(
 
         quote.SentAt = DateTimeOffset.UtcNow;
         quote.SentTo = to;
+        quote.ReminderCount = 0;
         if (quote.Status == QuoteStatus.Brouillon) quote.Status = QuoteStatus.Envoyee;
         // An expired quote sent again with a new date is out with the client again.
         if (quote.Status == QuoteStatus.Expiree && quote.ProjectId is null && quote.InvoiceId is null

@@ -10,8 +10,9 @@ namespace Vexta.Api.Features.Invoices;
 
 /// <summary>
 /// Reminds clients of unpaid invoices, for the companies that asked for it
-/// (<see cref="Domain.BillingSettings.InvoiceReminderDays"/> days past the due date). Once per
-/// sending, to the address the invoice went to, with the PDF, the balance still owed and — when
+/// (<see cref="Domain.BillingSettings.InvoiceReminderDays"/> days past the due date, then as
+/// many more as <see cref="Domain.BillingSettings.InvoiceReminderCount"/> allows, each that many
+/// days after the last). Counted per sending, to the address the invoice went to, with the PDF, the balance still owed and — when
 /// the company takes cards — the same « Payer en ligne » button as the original message.
 ///
 /// Built like the quote's reminder (QuoteReminderService): each company in turn, as if signed in
@@ -48,31 +49,31 @@ public class InvoiceReminderService(
 
     private async Task RunOnceAsync(CancellationToken ct)
     {
-        List<(Guid TenantId, int Days)> companies;
+        List<(Guid TenantId, int Days, int Count)> companies;
         using (var scope = scopes.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<VextaDbContext>();
             var now = DateTimeOffset.UtcNow;
             var rows = await db.BillingSettings.IgnoreQueryFilters().AsNoTracking()
                 .Where(b => b.InvoiceReminderDays != null)
-                .Join(db.Tenants.IgnoreQueryFilters(), b => b.TenantId, t => t.Id, (b, t) => new { b.TenantId, b.InvoiceReminderDays, t })
+                .Join(db.Tenants.IgnoreQueryFilters(), b => b.TenantId, t => t.Id, (b, t) => new { b.TenantId, b.InvoiceReminderDays, b.InvoiceReminderCount, t })
                 .Where(x => x.t.Kind == TenantKind.Business
                     && (x.t.SubscriptionStatus == TenantSubscriptionStatus.Active
                         || (x.t.SubscriptionStatus == TenantSubscriptionStatus.Trialing && x.t.TrialEndsAt > now)))
-                .Select(x => new { x.TenantId, Days = x.InvoiceReminderDays!.Value })
+                .Select(x => new { x.TenantId, Days = x.InvoiceReminderDays!.Value, Count = x.InvoiceReminderCount })
                 .ToListAsync(ct);
-            companies = [.. rows.Select(r => (r.TenantId, r.Days))];
+            companies = [.. rows.Select(r => (r.TenantId, r.Days, r.Count))];
         }
 
         var budget = MaxPerRun;
-        foreach (var (tenantId, days) in companies)
+        foreach (var (tenantId, days, count) in companies)
         {
             if (budget <= 0) break;
-            budget -= await RemindForTenantAsync(tenantId, days, budget, ct);
+            budget -= await RemindForTenantAsync(tenantId, days, count, budget, ct);
         }
     }
 
-    private async Task<int> RemindForTenantAsync(Guid tenantId, int days, int budget, CancellationToken ct)
+    private async Task<int> RemindForTenantAsync(Guid tenantId, int days, int count, int budget, CancellationToken ct)
     {
         using var scope = scopes.CreateScope();
 
@@ -94,14 +95,16 @@ public class InvoiceReminderService(
             var features = scope.ServiceProvider.GetRequiredService<IFeatureService>();
 
             var lastDueDate = BusinessDay.Today.AddDays(-days);
+            var cutoff = DateTimeOffset.UtcNow.AddDays(-days);
             var candidates = await db.Invoices
                 .Include(i => i.Client)
                 .Include(i => i.Lines)
                 .Where(i => i.TenantId == tenantId
                     && (i.Status == InvoiceStatus.Envoyee || i.Status == InvoiceStatus.EnRetard)
                     && i.SentTo != null && i.SentAt != null
-                    && i.DueDate <= lastDueDate
-                    && (i.ReminderSentAt == null || i.ReminderSentAt < i.SentAt))
+                    && i.ReminderCount < count
+                    // The first one counts from the due date, each next one from the last.
+                    && (i.ReminderCount == 0 ? i.DueDate <= lastDueDate : i.ReminderSentAt <= cutoff))
                 .OrderBy(i => i.DueDate)
                 .Take(budget)
                 .ToListAsync(ct);
@@ -166,6 +169,7 @@ public class InvoiceReminderService(
                 }
 
                 invoice.ReminderSentAt = DateTimeOffset.UtcNow;
+                invoice.ReminderCount++;
                 // Past due and unpaid is what « En retard » means; a reminder is the moment it is
                 // said out loud, so the list says it too.
                 if (invoice.Status == InvoiceStatus.Envoyee) invoice.Status = InvoiceStatus.EnRetard;

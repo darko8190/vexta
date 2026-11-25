@@ -22,6 +22,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { QuoteStatsCard } from "@/components/dashboard/quote-stats-card";
+import { ReceivablesCard } from "@/components/dashboard/receivables-card";
 import { LoadErrorState } from "@/components/layout/load-error-state";
 import { useDashboardQuery } from "@/hooks/use-dashboard";
 import { formatDateOnly } from "@/lib/dates";
@@ -279,6 +280,8 @@ export function DashboardStats() {
           />
         )}
       </div>
+
+      <ReceivablesCard data={data.receivables} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>

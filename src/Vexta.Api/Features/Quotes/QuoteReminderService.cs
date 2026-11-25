@@ -10,7 +10,8 @@ namespace Vexta.Api.Features.Quotes;
 
 /// <summary>
 /// Sends the reminder for quotes left unanswered, for the companies that asked for it
-/// (<see cref="Domain.BillingSettings.QuoteReminderDays"/>). Once per sending, to the address
+/// (<see cref="Domain.BillingSettings.QuoteReminderDays"/> days apart, up to
+/// <see cref="Domain.BillingSettings.QuoteReminderCount"/> times). Counted per sending, to the address
 /// the quote went to, with the built-in reminder wording and the PDF — what « Relancer » in the
 /// send form would have sent.
 ///
@@ -51,33 +52,33 @@ public class QuoteReminderService(
 
     private async Task RunOnceAsync(CancellationToken ct)
     {
-        List<(Guid TenantId, int Days)> companies;
+        List<(Guid TenantId, int Days, int Count)> companies;
         using (var scope = scopes.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<VextaDbContext>();
             var now = DateTimeOffset.UtcNow;
             var rows = await db.BillingSettings.IgnoreQueryFilters().AsNoTracking()
                 .Where(b => b.QuoteReminderDays != null)
-                .Join(db.Tenants.IgnoreQueryFilters(), b => b.TenantId, t => t.Id, (b, t) => new { b.TenantId, b.QuoteReminderDays, t })
+                .Join(db.Tenants.IgnoreQueryFilters(), b => b.TenantId, t => t.Id, (b, t) => new { b.TenantId, b.QuoteReminderDays, b.QuoteReminderCount, t })
                 // The same rule as the subscription gate: a company that cannot open its
                 // quotes does not have them chased in its name either.
                 .Where(x => x.t.Kind == TenantKind.Business
                     && (x.t.SubscriptionStatus == TenantSubscriptionStatus.Active
                         || (x.t.SubscriptionStatus == TenantSubscriptionStatus.Trialing && x.t.TrialEndsAt > now)))
-                .Select(x => new { x.TenantId, Days = x.QuoteReminderDays!.Value })
+                .Select(x => new { x.TenantId, Days = x.QuoteReminderDays!.Value, Count = x.QuoteReminderCount })
                 .ToListAsync(ct);
-            companies = [.. rows.Select(r => (r.TenantId, r.Days))];
+            companies = [.. rows.Select(r => (r.TenantId, r.Days, r.Count))];
         }
 
         var budget = MaxPerRun;
-        foreach (var (tenantId, days) in companies)
+        foreach (var (tenantId, days, count) in companies)
         {
             if (budget <= 0) break;
-            budget -= await RemindForTenantAsync(tenantId, days, budget, ct);
+            budget -= await RemindForTenantAsync(tenantId, days, count, budget, ct);
         }
     }
 
-    private async Task<int> RemindForTenantAsync(Guid tenantId, int days, int budget, CancellationToken ct)
+    private async Task<int> RemindForTenantAsync(Guid tenantId, int days, int count, int budget, CancellationToken ct)
     {
         using var scope = scopes.CreateScope();
 
@@ -107,8 +108,10 @@ public class QuoteReminderService(
                 .Where(q => q.TenantId == tenantId
                     && q.Status == QuoteStatus.Envoyee
                     && q.ProjectId == null && q.InvoiceId == null
-                    && q.SentTo != null && q.SentAt != null && q.SentAt <= cutoff
-                    && (q.ReminderSentAt == null || q.ReminderSentAt < q.SentAt)
+                    && q.SentTo != null && q.SentAt != null
+                    && q.ReminderCount < count
+                    // The first one counts from the sending, each next one from the last.
+                    && (q.ReminderCount == 0 ? q.SentAt <= cutoff : q.ReminderSentAt <= cutoff)
                     // A quote past its date is expiring, not waiting: a reminder would offer a
                     // price that no longer holds.
                     && (q.ValidUntil == null || q.ValidUntil >= today))
@@ -148,6 +151,7 @@ public class QuoteReminderService(
                 }
 
                 quote.ReminderSentAt = DateTimeOffset.UtcNow;
+                quote.ReminderCount++;
                 await db.SaveChangesAsync(ct);
                 sent++;
             }

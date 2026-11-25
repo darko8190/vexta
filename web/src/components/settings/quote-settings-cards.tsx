@@ -85,24 +85,26 @@ export function QuoteTermsCard() {
 }
 
 const DEFAULT_REMINDER_DAYS = 7;
+/** The API's ceiling: past a few, it is no longer a reminder. */
+const MAX_REMINDERS = 5;
 
 /** The wording that differs between the two reminders; everything else is the same card. */
 const reminderCopy = {
   soumission: {
     title: "Relance automatique",
     description:
-      "Une soumission envoyée qui reste sans réponse est relancée une fois, toute seule, à la personne qui l'a reçue, avec le PDF. Pas si elle est expirée, acceptée ou refusée.",
+      "Une soumission envoyée qui reste sans réponse est relancée toute seule, à la personne qui l'a reçue, avec le PDF. Pas si elle est expirée, acceptée ou refusée.",
     checkbox: "Relancer automatiquement les soumissions sans réponse",
     days: "Délai après l'envoi (jours)",
-    hint: "Entre 1 et 90 jours, comptés à partir du dernier envoi.",
+    hint: "Entre 1 et 90 jours, comptés depuis l'envoi, puis depuis la relance précédente.",
   },
   facture: {
     title: "Relance des factures impayées",
     description:
-      "Une facture envoyée qui n'est pas payée après son échéance est relancée une fois, toute seule, à la personne qui l'a reçue : le PDF, le solde dû et le bouton de paiement en ligne si vous l'offrez.",
+      "Une facture envoyée qui n'est pas payée après son échéance est relancée toute seule, à la personne qui l'a reçue : le PDF, le solde dû et le bouton de paiement en ligne si vous l'offrez.",
     checkbox: "Relancer automatiquement les factures impayées",
     days: "Délai après l'échéance (jours)",
-    hint: "Entre 1 et 90 jours après la date d'échéance.",
+    hint: "Entre 1 et 90 jours après l'échéance, puis après la relance précédente.",
   },
 } as const;
 
@@ -128,6 +130,7 @@ function ReminderCard({ kind }: { kind: keyof typeof reminderCopy }) {
   // Null until changed, so the saved value shows through without being copied into state.
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [days, setDays] = useState<string | null>(null);
+  const [count, setCount] = useState<string | null>(null);
 
   const saved = (kind === "facture" ? settings?.invoiceReminderDays : settings?.quoteReminderDays) ?? null;
   const on = enabled ?? saved != null;
@@ -135,14 +138,19 @@ function ReminderCard({ kind }: { kind: keyof typeof reminderCopy }) {
   const parsed = Number(daysText);
   const valid = Number.isInteger(parsed) && parsed >= 1 && parsed <= 90;
   const next = on ? parsed : null;
-  const dirty = next !== saved;
+  const savedCount = (kind === "facture" ? settings?.invoiceReminderCount : settings?.quoteReminderCount) ?? 1;
+  const countText = count ?? String(savedCount);
+  const parsedCount = Number(countText);
+  const countValid = Number.isInteger(parsedCount) && parsedCount >= 1 && parsedCount <= MAX_REMINDERS;
+  const dirty = next !== saved || (on && parsedCount !== savedCount);
 
   async function onSave() {
     try {
-      await save.mutateAsync(next);
+      await save.mutateAsync({ days: next, count: on ? parsedCount : undefined });
       toast.success(next == null ? "Relance automatique désactivée." : "Relance automatique enregistrée.");
       setEnabled(null);
       setDays(null);
+      setCount(null);
     } catch (error) {
       toast.error(error instanceof ApiError ? error.message : "Impossible d'enregistrer la relance.");
     }
@@ -169,26 +177,46 @@ function ReminderCard({ kind }: { kind: keyof typeof reminderCopy }) {
           </div>
         </Field>
         {on && (
-          <Field className="max-w-xs">
-            <FieldLabel htmlFor={`${kind}-reminder-days`}>{copy.days}</FieldLabel>
-            <Input
-              id={`${kind}-reminder-days`}
-              type="number"
-              inputMode="numeric"
-              min={1}
-              max={90}
-              value={daysText}
-              onChange={(event) => setDays(event.target.value)}
-              aria-invalid={!valid}
-            />
-            <FieldDescription>
-              {valid ? copy.hint : "Indiquez un nombre de jours entre 1 et 90."}
-            </FieldDescription>
-          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field>
+              <FieldLabel htmlFor={`${kind}-reminder-count`}>Nombre de relances</FieldLabel>
+              <Input
+                id={`${kind}-reminder-count`}
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={MAX_REMINDERS}
+                value={countText}
+                onChange={(event) => setCount(event.target.value)}
+                aria-invalid={!countValid}
+              />
+              <FieldDescription>
+                {countValid
+                  ? `Par envoi, entre 1 et ${MAX_REMINDERS}. Renvoyer à la main remet le compte à zéro.`
+                  : `Indiquez un nombre entre 1 et ${MAX_REMINDERS}.`}
+              </FieldDescription>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={`${kind}-reminder-days`}>{copy.days}</FieldLabel>
+              <Input
+                id={`${kind}-reminder-days`}
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={90}
+                value={daysText}
+                onChange={(event) => setDays(event.target.value)}
+                aria-invalid={!valid}
+              />
+              <FieldDescription>
+                {valid ? copy.hint : "Indiquez un nombre de jours entre 1 et 90."}
+              </FieldDescription>
+            </Field>
+          </div>
         )}
       </CardContent>
       <CardFooter>
-        <Button onClick={onSave} disabled={save.isPending || !dirty || (on && !valid)}>
+        <Button onClick={onSave} disabled={save.isPending || !dirty || (on && (!valid || !countValid))}>
           {save.isPending && <Spinner />}
           Enregistrer
         </Button>

@@ -25,6 +25,7 @@ import { InvoiceCreditsSection } from "@/components/invoices/invoice-credits-sec
 import { InvoiceRefundsSection } from "@/components/invoices/invoice-refunds-section";
 import { PdfViewer } from "@/components/layout/pdf-viewer";
 import { InvoiceSendDialog } from "@/components/invoices/invoice-send-dialog";
+import { InvoiceRecurrenceCard } from "@/components/invoices/invoice-recurrence-card";
 import { useIsClientUser } from "@/hooks/use-can-create";
 import { useDeleteInvoice, useInvoiceQuery } from "@/hooks/use-invoices";
 import { usePdfDocument } from "@/hooks/use-pdf-document";
@@ -195,7 +196,11 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           )}
           {invoice.reminderSentAt && (
             <div>
-              <dt className="text-muted-foreground">Relancée automatiquement le</dt>
+              <dt className="text-muted-foreground">
+                {(invoice.reminderCount ?? 0) > 1
+                  ? `Relancée automatiquement ${invoice.reminderCount} fois, la dernière le`
+                  : "Relancée automatiquement le"}
+              </dt>
               <dd className="text-foreground">{formatDateOnly(invoice.reminderSentAt)}</dd>
             </div>
           )}
@@ -293,6 +298,11 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             </Table>
           </CardContent>
         </Card>
+
+        {/* Staff only: a client does not schedule their own bills. */}
+        {!isClient && invoice.status !== "Annulee" && (
+          <InvoiceRecurrenceCard invoiceId={invoice.id} invoiceNumber={invoice.number} />
+        )}
 
         {/* Under the lines, in the same column: the money that came in belongs beside the
             money that was asked for, and a customer reading their own invoice sees what they

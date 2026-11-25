@@ -43,6 +43,8 @@ public record QuoteDto(
     string? ClientResponseNote,
     /// <summary>The name typed to sign the acceptance, when accepted from the portal.</summary>
     string? ClientSignature,
+    /// <summary>Whether a drawn signature goes with it; the image itself is at /signature.</summary>
+    bool HasDrawnSignature,
     /// <summary>The share asked up front, in percent, and the invoice drafted for it.</summary>
     decimal? DepositPercent,
     Guid? DepositInvoiceId,
@@ -62,8 +64,10 @@ public record QuoteDto(
     /// <summary>The invoice this quote was billed by directly, without a project.</summary>
     Guid? InvoiceId,
     string? InvoiceNumber,
-    /// <summary>When the automatic reminder went out, if it did.</summary>
-    DateTimeOffset? ReminderSentAt);
+    /// <summary>When the last automatic reminder went out, if one did.</summary>
+    DateTimeOffset? ReminderSentAt,
+    /// <summary>Automatic reminders since the last sending.</summary>
+    int ReminderCount);
 
 public record QuoteOptionDto(Guid Id, string Description, decimal Total, bool IsSelected);
 
@@ -91,7 +95,9 @@ public record QuoteStatsDto(
 /// The customer's full name, typed to sign. Required to accept, ignored on a refusal.
 /// </param>
 /// <param name="OptionIds">The optional lines the customer takes along with the acceptance.</param>
-public record QuoteResponseRequest(string? Note, string? Signature = null, IReadOnlyList<Guid>? OptionIds = null);
+/// <param name="SignatureImage">The drawn signature, as the pad's PNG data URL.</param>
+public record QuoteResponseRequest(
+    string? Note, string? Signature = null, IReadOnlyList<Guid>? OptionIds = null, string? SignatureImage = null);
 
 /// <summary>A template as the list shows it: enough to choose one by.</summary>
 public record QuoteTemplateDto(

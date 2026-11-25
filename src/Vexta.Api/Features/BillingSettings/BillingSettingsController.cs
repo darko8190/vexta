@@ -73,7 +73,10 @@ public record BillingSettingsDto(
     /// <summary>Days before an unanswered quote is reminded automatically. Null for never.</summary>
     int? QuoteReminderDays,
     /// <summary>Days past due before an unpaid invoice is reminded automatically. Null for never.</summary>
-    int? InvoiceReminderDays);
+    int? InvoiceReminderDays,
+    /// <summary>How many reminders each one gets per sending, spaced by its delay.</summary>
+    int QuoteReminderCount,
+    int InvoiceReminderCount);
 
 /// <summary>One field a template may drop in, and what it stands for.</summary>
 public record InvoiceEmailFieldDto(string Field, string Description);
@@ -104,6 +107,9 @@ public record SaveBillingSettingsRequest(
 [RequireActiveSubscription]
 public class BillingSettingsController(VextaDbContext db, ICurrentUserService currentUser) : ControllerBase
 {
+    /// <summary>A ceiling on reminders per sending: past a few, it is no longer a reminder.</summary>
+    private const int MaxReminders = 5;
+
     /// <summary>Readable by anyone on the team: the invoice form needs the rates and the terms.</summary>
     [HttpGet]
     [Authorize]
@@ -272,6 +278,8 @@ public class BillingSettingsController(VextaDbContext db, ICurrentUserService cu
         if (currentUser.TenantId is not { } tenantId) return Forbid();
         if (request.Days is < 1 or > 90)
             return BadRequest(new { message = "Le délai de relance doit être entre 1 et 90 jours." });
+        if (request.Count is < 1 or > MaxReminders)
+            return BadRequest(new { message = $"Le nombre de relances doit être entre 1 et {MaxReminders}." });
 
         var settings = await db.BillingSettings.FirstOrDefaultAsync(b => b.TenantId == tenantId, ct);
         if (settings is null)
@@ -285,6 +293,7 @@ public class BillingSettingsController(VextaDbContext db, ICurrentUserService cu
         }
 
         settings.QuoteReminderDays = request.Days;
+        if (request.Count is { } quoteCount) settings.QuoteReminderCount = quoteCount;
         settings.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
         return Ok(ToDto(settings, settings.DefaultPricePolicyId));
@@ -298,6 +307,8 @@ public class BillingSettingsController(VextaDbContext db, ICurrentUserService cu
         if (currentUser.TenantId is not { } tenantId) return Forbid();
         if (request.Days is < 1 or > 90)
             return BadRequest(new { message = "Le délai de relance doit être entre 1 et 90 jours." });
+        if (request.Count is < 1 or > MaxReminders)
+            return BadRequest(new { message = $"Le nombre de relances doit être entre 1 et {MaxReminders}." });
 
         var settings = await db.BillingSettings.FirstOrDefaultAsync(b => b.TenantId == tenantId, ct);
         if (settings is null)
@@ -311,6 +322,7 @@ public class BillingSettingsController(VextaDbContext db, ICurrentUserService cu
         }
 
         settings.InvoiceReminderDays = request.Days;
+        if (request.Count is { } invoiceCount) settings.InvoiceReminderCount = invoiceCount;
         settings.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
         return Ok(ToDto(settings, settings.DefaultPricePolicyId));
@@ -600,7 +612,9 @@ public class BillingSettingsController(VextaDbContext db, ICurrentUserService cu
             [.. QuoteEmailTemplate.Fields.Select(f => new InvoiceEmailFieldDto(f.Field, f.Description))],
             model.QuoteTerms,
             model.QuoteReminderDays,
-            model.InvoiceReminderDays);
+            model.InvoiceReminderDays,
+            model.QuoteReminderCount,
+            model.InvoiceReminderCount);
     }
 }
 
@@ -614,7 +628,8 @@ public record SaveInvoiceEmailRequest(string? Subject, string? Body);
 public record SaveQuoteTermsRequest(string? Terms);
 
 /// <summary>Null turns the automatic reminder off.</summary>
-public record SaveQuoteReminderRequest(int? Days);
+/// <summary>Days for the delay, null for off; Count for how many, one when not given.</summary>
+public record SaveQuoteReminderRequest(int? Days, int? Count = null);
 
 /// <summary>
 /// The template to render a preview of. Taken from the request so the card can show what is

@@ -114,6 +114,15 @@ public class BillingSettings
     /// </summary>
     public int? InvoiceReminderDays { get; set; }
 
+    /// <summary>
+    /// How many reminders a quote gets per sending, each <see cref="QuoteReminderDays"/> days
+    /// after the one before. One by default: a second unasked-for email is the company's call.
+    /// </summary>
+    public int QuoteReminderCount { get; set; } = 1;
+
+    /// <summary>The same for an unpaid invoice, spaced by <see cref="InvoiceReminderDays"/>.</summary>
+    public int InvoiceReminderCount { get; set; } = 1;
+
     /// <summary>The line at the bottom: late fees, how to pay, a thank you.</summary>
     public string? FooterNote { get; set; }
 

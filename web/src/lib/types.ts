@@ -465,8 +465,10 @@ export interface InvoiceRecord {
   pricePolicyName: string | null;
   /** When it was emailed to the client, or null if it never was. */
   sentAt: string | null;
-  /** When the automatic reminder went out for the current sending, if it did. */
+  /** When the last automatic reminder went out, if one did. */
   reminderSentAt?: string | null;
+  /** Automatic reminders since the last sending. */
+  reminderCount?: number;
   subtotal: number;
   /** The two taxes, named and separate — "TPS (5 %)" and what it comes to. */
   tax1Label: string;
@@ -1116,6 +1118,25 @@ export interface DashboardSummary {
   attention: DashboardAttention;
   recentInvoices: DashboardInvoice[];
   upcomingTasks: DashboardTask[];
+  receivables: DashboardReceivables;
+}
+
+/** What is owed, by how late it is, and the invoices furthest behind. */
+export interface DashboardReceivables {
+  notDue: number;
+  late1To30: number;
+  late31To60: number;
+  lateOver60: number;
+  oldest: DashboardOverdueInvoice[];
+}
+
+export interface DashboardOverdueInvoice {
+  id: string;
+  number: string;
+  clientName: string;
+  dueDate: string;
+  daysLate: number;
+  balance: number;
 }
 
 /** Each of these is a count and somewhere to go. A zero is not shown at all. */
@@ -3059,6 +3080,8 @@ export interface QuoteRecord {
   clientResponseNote: string | null;
   /** The name the customer typed to sign the acceptance in their portal. */
   clientSignature: string | null;
+  /** Whether a drawn signature goes with it, served at soumissions/{id}/signature. */
+  hasDrawnSignature: boolean;
   /** Percent asked up front, and the invoice drafted for it on acceptance. */
   depositPercent: number | null;
   depositInvoiceId: string | null;
@@ -3075,8 +3098,10 @@ export interface QuoteRecord {
   /** The invoice this quote was billed by directly, without a project. */
   invoiceId: string | null;
   invoiceNumber: string | null;
-  /** When the automatic reminder went out, if it did. */
+  /** When the last automatic reminder went out, if one did. */
   reminderSentAt: string | null;
+  /** Automatic reminders since the last sending. */
+  reminderCount: number;
 }
 
 export interface QuoteOption {

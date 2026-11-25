@@ -349,6 +349,63 @@ namespace Vexta.Api.Data.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
+            modelBuilder.Entity("Vexta.Api.Domain.AssetMaintenance", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ClientAssetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ClientId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("IntervalMonths")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateOnly?>("LastDoneOn")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly>("NextDue")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<int?>("RemindDaysBefore")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("RemindedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly?>("RemindedFor")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClientAssetId");
+
+                    b.HasIndex("TenantId", "NextDue");
+
+                    b.ToTable("AssetMaintenances");
+                });
+
             modelBuilder.Entity("Vexta.Api.Domain.BillingSettings", b =>
                 {
                     b.Property<Guid>("TenantId")
@@ -399,6 +456,9 @@ namespace Vexta.Api.Data.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
 
+                    b.Property<int>("InvoiceReminderCount")
+                        .HasColumnType("integer");
+
                     b.Property<int?>("InvoiceReminderDays")
                         .HasColumnType("integer");
 
@@ -429,6 +489,9 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<string>("QuoteEmailSubject")
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
+
+                    b.Property<int>("QuoteReminderCount")
+                        .HasColumnType("integer");
 
                     b.Property<int?>("QuoteReminderDays")
                         .HasColumnType("integer");
@@ -2041,6 +2104,9 @@ namespace Vexta.Api.Data.Migrations
 
                     b.Property<Guid?>("ProjectId")
                         .HasColumnType("uuid");
+
+                    b.Property<int>("ReminderCount")
+                        .HasColumnType("integer");
 
                     b.Property<DateTimeOffset?>("ReminderSentAt")
                         .HasColumnType("timestamp with time zone");
@@ -3803,6 +3869,9 @@ namespace Vexta.Api.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<byte[]>("ClientSignaturePng")
+                        .HasColumnType("bytea");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -3838,6 +3907,9 @@ namespace Vexta.Api.Data.Migrations
 
                     b.Property<Guid?>("ProjectId")
                         .HasColumnType("uuid");
+
+                    b.Property<int>("ReminderCount")
+                        .HasColumnType("integer");
 
                     b.Property<DateTimeOffset?>("ReminderSentAt")
                         .HasColumnType("timestamp with time zone");
@@ -4182,6 +4254,72 @@ namespace Vexta.Api.Data.Migrations
                     b.HasIndex("TenantId", "CreatedAt");
 
                     b.ToTable("ReceiptScans");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.RecurringInvoice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("AutoSend")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("ClientId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly?>("EndDate")
+                        .HasColumnType("date");
+
+                    b.Property<int>("IntervalMonths")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid?>("LastInvoiceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("LastIssuedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastProblem")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateOnly>("NextIssueDate")
+                        .HasColumnType("date");
+
+                    b.Property<int>("Periods")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("SourceInvoiceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClientId");
+
+                    b.HasIndex("LastInvoiceId");
+
+                    b.HasIndex("SourceInvoiceId")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "IsActive", "NextIssueDate");
+
+                    b.ToTable("RecurringInvoices");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.Report", b =>
@@ -4868,6 +5006,17 @@ namespace Vexta.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade);
 
                     b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.AssetMaintenance", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.ClientAsset", "ClientAsset")
+                        .WithMany()
+                        .HasForeignKey("ClientAssetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ClientAsset");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.BillingSettings", b =>
@@ -6001,6 +6150,32 @@ namespace Vexta.Api.Data.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("MediaAsset");
+                });
+
+            modelBuilder.Entity("Vexta.Api.Domain.RecurringInvoice", b =>
+                {
+                    b.HasOne("Vexta.Api.Domain.Client", "Client")
+                        .WithMany()
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Vexta.Api.Domain.Invoice", "LastInvoice")
+                        .WithMany()
+                        .HasForeignKey("LastInvoiceId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Vexta.Api.Domain.Invoice", "SourceInvoice")
+                        .WithMany()
+                        .HasForeignKey("SourceInvoiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Client");
+
+                    b.Navigation("LastInvoice");
+
+                    b.Navigation("SourceInvoice");
                 });
 
             modelBuilder.Entity("Vexta.Api.Domain.Report", b =>

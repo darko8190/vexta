@@ -11,6 +11,7 @@ import {
   IdCard,
   Lock,
   MapPin,
+  Send,
   UserRound,
   Wallet,
 } from "lucide-react";
@@ -29,6 +30,7 @@ import { ClientAccountSection } from "@/components/clients/detail/client-account
 import { ClientAssetsSection } from "@/components/clients/detail/client-assets-section";
 import { ClientContactsSection } from "@/components/clients/detail/client-contacts-section";
 import { ClientDetailsSection } from "@/components/clients/detail/client-details-section";
+import { ClientFormsSection } from "@/components/clients/detail/client-forms-section";
 import { SectionNav, type NavSection } from "@/components/layout/section-nav";
 import {
   ClientAddressesSection,
@@ -84,6 +86,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
     { key: "soumissions", label: "Soumissions", icon: ClipboardPen },
     { key: "projets", label: "Projets", count: client.projectCount, icon: FolderKanban },
     { key: "factures", label: "Factures", count: client.invoiceCount, icon: FileText },
+    { key: "formulaires", label: "Formulaires", icon: Send },
     // No count: a balance is one figure, not a number of things, and it is shown on the card
     // above rather than squeezed into a badge.
     { key: "compte", label: "Compte", icon: Wallet },
@@ -205,6 +208,9 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
           {section === "soumissions" && <ClientQuotesSection clientId={client.id} />}
           {section === "projets" && <ClientProjectsSection clientId={client.id} />}
           {section === "factures" && <ClientInvoicesSection clientId={client.id} />}
+          {section === "formulaires" && (
+            <ClientFormsSection clientId={client.id} clientName={client.name} clientEmail={client.email} />
+          )}
         </div>
       </div>
 

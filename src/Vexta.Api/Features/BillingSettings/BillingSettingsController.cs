@@ -71,7 +71,9 @@ public record BillingSettingsDto(
     /// <summary>The conditions printed on quotes above the signature. Null for none.</summary>
     string? QuoteTerms,
     /// <summary>Days before an unanswered quote is reminded automatically. Null for never.</summary>
-    int? QuoteReminderDays);
+    int? QuoteReminderDays,
+    /// <summary>Days past due before an unpaid invoice is reminded automatically. Null for never.</summary>
+    int? InvoiceReminderDays);
 
 /// <summary>One field a template may drop in, and what it stands for.</summary>
 public record InvoiceEmailFieldDto(string Field, string Description);
@@ -283,6 +285,32 @@ public class BillingSettingsController(VextaDbContext db, ICurrentUserService cu
         }
 
         settings.QuoteReminderDays = request.Days;
+        settings.UpdatedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(ct);
+        return Ok(ToDto(settings, settings.DefaultPricePolicyId));
+    }
+
+    /// <summary>The same switch for unpaid invoices: days past the due date, or null for off.</summary>
+    [HttpPut("facture-relance")]
+    [Authorize(Roles = Roles.Owner)]
+    public async Task<ActionResult<BillingSettingsDto>> SaveInvoiceReminder(SaveQuoteReminderRequest request, CancellationToken ct)
+    {
+        if (currentUser.TenantId is not { } tenantId) return Forbid();
+        if (request.Days is < 1 or > 90)
+            return BadRequest(new { message = "Le délai de relance doit être entre 1 et 90 jours." });
+
+        var settings = await db.BillingSettings.FirstOrDefaultAsync(b => b.TenantId == tenantId, ct);
+        if (settings is null)
+        {
+            settings = new Domain.BillingSettings
+            {
+                TenantId = tenantId,
+                DefaultPricePolicyId = await DefaultPolicyIdAsync(null, ct)
+            };
+            db.BillingSettings.Add(settings);
+        }
+
+        settings.InvoiceReminderDays = request.Days;
         settings.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
         return Ok(ToDto(settings, settings.DefaultPricePolicyId));
@@ -571,7 +599,8 @@ public class BillingSettingsController(VextaDbContext db, ICurrentUserService cu
             QuoteEmailTemplate.DefaultBody,
             [.. QuoteEmailTemplate.Fields.Select(f => new InvoiceEmailFieldDto(f.Field, f.Description))],
             model.QuoteTerms,
-            model.QuoteReminderDays);
+            model.QuoteReminderDays,
+            model.InvoiceReminderDays);
     }
 }
 

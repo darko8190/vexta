@@ -507,6 +507,7 @@ public class InvoicesController(
         }
 
         invoice.SentAt = DateTimeOffset.UtcNow;
+        invoice.SentTo = to;
 
         // A paid invoice that is sent again stays paid: the status says where the money is, and
         // re-sending a copy does not unmake a payment.
@@ -584,10 +585,14 @@ public class InvoicesController(
     private async Task<string?> PaymentBlockAsync(Invoice invoice, CancellationToken ct)
     {
         var url = await PayLinkAsync(invoice, ct);
-        if (url is null) return null;
+        return url is null ? null : await PaymentBlock(db, invoice.TenantId, url, ct);
+    }
 
+    /// <summary>The "Payer en ligne" button for a link already made. Shared with the automatic reminder.</summary>
+    internal static async Task<string> PaymentBlock(VextaDbContext db, Guid tenantId, string url, CancellationToken ct)
+    {
         var brand = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
-            .Where(t => t.Id == invoice.TenantId)
+            .Where(t => t.Id == tenantId)
             .Select(t => t.BrandColor)
             .FirstOrDefaultAsync(ct);
 
@@ -1128,6 +1133,6 @@ public class InvoicesController(
             RateLabel("TPS", gstRate), totals.Gst,
             RateLabel("TVQ", qstRate), totals.Qst,
             totals.TaxTotal, totals.Total,
-            lines, invoice.CreatedAt, invoice.UpdatedAt);
+            lines, invoice.CreatedAt, invoice.UpdatedAt, invoice.ReminderSentAt);
     }
 }

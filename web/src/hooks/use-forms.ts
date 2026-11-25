@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { api, buildQuery } from "@/lib/api";
 import type {
   FormResponsesSummary,
   FormSubmission,
@@ -65,9 +65,44 @@ export interface SendFormLinkResult {
 
 /** E-mails the form's link to one person, from the company's name. */
 export function useSendFormLink() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, email, message }: { id: string; email: string; message: string | null }) =>
       api.post<SendFormLinkResult>(`formulaires/${id}/envoyer`, { email, message }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["formulaires", "envois"] }),
+  });
+}
+
+/** One form e-mailed to one address, and whether it came back. */
+export interface FormShare {
+  id: string;
+  formId: string;
+  formTitle: string;
+  email: string;
+  clientId: string | null;
+  clientName: string | null;
+  sentByName: string | null;
+  sentAt: string;
+  lastSentAt: string;
+  sendCount: number;
+  /** When a reply came back through this link. Null while it is still waited for. */
+  answeredAt: string | null;
+}
+
+/** The forms sent, for one form or one client. Under "formulaires", so a reply refreshes it. */
+export function useFormSharesQuery(filter: { formId?: string; clientId?: string }) {
+  return useQuery({
+    queryKey: ["formulaires", "envois", filter.formId ?? null, filter.clientId ?? null],
+    queryFn: () => api.get<FormShare[]>(`formulaires/envois${buildQuery(filter)}`),
+  });
+}
+
+/** The same message again, to somebody who has not answered yet. */
+export function useResendFormShare() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (shareId: string) => api.post<FormShare>(`formulaires/envois/${shareId}/renvoyer`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["formulaires", "envois"] }),
   });
 }
 

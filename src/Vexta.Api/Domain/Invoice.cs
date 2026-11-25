@@ -36,6 +36,15 @@ public class Invoice
     /// <summary>When it was emailed to the client, or null if it never was.</summary>
     public DateTimeOffset? SentAt { get; set; }
 
+    /// <summary>The address it was last emailed to: where an automatic reminder goes.</summary>
+    public string? SentTo { get; set; }
+
+    /// <summary>
+    /// When the automatic reminder for an unpaid invoice went out. One per sending: sending the
+    /// invoice again makes it eligible again (see InvoiceReminderService).
+    /// </summary>
+    public DateTimeOffset? ReminderSentAt { get; set; }
+
     /// <summary>
     /// What the "payer en ligne" link in the email carries, or null for an invoice that has
     /// never been sent with one.

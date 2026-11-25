@@ -465,6 +465,8 @@ export interface InvoiceRecord {
   pricePolicyName: string | null;
   /** When it was emailed to the client, or null if it never was. */
   sentAt: string | null;
+  /** When the automatic reminder went out for the current sending, if it did. */
+  reminderSentAt?: string | null;
   subtotal: number;
   /** The two taxes, named and separate — "TPS (5 %)" and what it comes to. */
   tax1Label: string;

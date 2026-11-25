@@ -95,7 +95,22 @@ public class PublicFormsController(
         var shared = await PublicFormGate.ResolveSharedAsync(db, formId, ct);
         if (shared is null) return NotFound();
 
-        return await FileAsync(shared.Form, request, ct, await InvitedClientAsync(shared.Form, request.Invitation, ct));
+        var result = await FileAsync(shared.Form, request, ct, await InvitedClientAsync(shared.Form, request.Invitation, ct));
+
+        // Filed through an e-mailed link: that send is answered. After the reply is down, and
+        // only when it is — a refused reply leaves the office still waiting, which it is.
+        if (result.Result is OkObjectResult && invitation.Open(request.Invitation, formId)?.ShareId is { } shareId)
+        {
+            var share = await db.FormShares.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(x => x.Id == shareId && x.FormTemplateId == formId && x.TenantId == shared.Form.TenantId, ct);
+            if (share is { AnsweredAt: null })
+            {
+                share.AnsweredAt = DateTimeOffset.UtcNow;
+                await db.SaveChangesAsync(ct);
+            }
+        }
+
+        return result;
     }
 
     private async Task<PublicFormDto?> ReadAsync(PublicFormContext context, CancellationToken ct)
@@ -245,9 +260,9 @@ public class PublicFormsController(
     private async Task<Client?> InvitedClientAsync(PublicFormContext form, string? token, CancellationToken ct)
     {
         if (!form.RequiresIdentification) return null;
-        if (invitation.Open(token, form.FormId) is not { } email) return null;
+        if (invitation.Open(token, form.FormId) is not { } opened) return null;
 
-        return await FormInvitation.ClientForAsync(db, form.TenantId, email, ct);
+        return await FormInvitation.ClientForAsync(db, form.TenantId, opened.Email, ct);
     }
 
     private Task<List<PublicFormFieldDto>> FieldsAsync(Guid formId, CancellationToken ct) =>

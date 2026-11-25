@@ -61,6 +61,20 @@ public record SendFormLinkRequest(string? Email, string? Name, string? Message);
 /// </summary>
 public record SendFormLinkResultDto(string? ClientName, bool FilesOnClient);
 
+/// <summary>One form e-mailed to one address, and whether it came back.</summary>
+public record FormShareDto(
+    Guid Id,
+    Guid FormId,
+    string FormTitle,
+    string Email,
+    Guid? ClientId,
+    string? ClientName,
+    string? SentByName,
+    DateTimeOffset SentAt,
+    DateTimeOffset LastSentAt,
+    int SendCount,
+    DateTimeOffset? AnsweredAt);
+
 /// <summary>The whole form: the record, its questions and what a filled copy sets off.</summary>
 public record FormTemplateDetailDto(
     FormTemplateDto Form,

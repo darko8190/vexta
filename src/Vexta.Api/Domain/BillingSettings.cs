@@ -108,6 +108,12 @@ public class BillingSettings
     /// </summary>
     public int? QuoteReminderDays { get; set; }
 
+    /// <summary>
+    /// Days past an invoice's due date before Vexta reminds the client on its own, while money
+    /// is still owed. Null for never, for the same reason as the quote's.
+    /// </summary>
+    public int? InvoiceReminderDays { get; set; }
+
     /// <summary>The line at the bottom: late fees, how to pay, a thank you.</summary>
     public string? FooterNote { get; set; }
 

@@ -12,7 +12,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
-import { useBillingSettingsQuery, useSaveQuoteReminder, useSaveQuoteTerms } from "@/hooks/use-billing-settings";
+import {
+  useBillingSettingsQuery,
+  useSaveInvoiceReminder,
+  useSaveQuoteReminder,
+  useSaveQuoteTerms,
+} from "@/hooks/use-billing-settings";
 import { useDeleteQuoteTemplate, useQuoteTemplatesQuery } from "@/hooks/use-quotes";
 import { ApiError } from "@/lib/api";
 import { formatAmount } from "@/lib/money";
@@ -81,18 +86,50 @@ export function QuoteTermsCard() {
 
 const DEFAULT_REMINDER_DAYS = 7;
 
+/** The wording that differs between the two reminders; everything else is the same card. */
+const reminderCopy = {
+  soumission: {
+    title: "Relance automatique",
+    description:
+      "Une soumission envoyée qui reste sans réponse est relancée une fois, toute seule, à la personne qui l'a reçue, avec le PDF. Pas si elle est expirée, acceptée ou refusée.",
+    checkbox: "Relancer automatiquement les soumissions sans réponse",
+    days: "Délai après l'envoi (jours)",
+    hint: "Entre 1 et 90 jours, comptés à partir du dernier envoi.",
+  },
+  facture: {
+    title: "Relance des factures impayées",
+    description:
+      "Une facture envoyée qui n'est pas payée après son échéance est relancée une fois, toute seule, à la personne qui l'a reçue : le PDF, le solde dû et le bouton de paiement en ligne si vous l'offrez.",
+    checkbox: "Relancer automatiquement les factures impayées",
+    days: "Délai après l'échéance (jours)",
+    hint: "Entre 1 et 90 jours après la date d'échéance.",
+  },
+} as const;
+
 /**
  * The reminder sent by itself to a client who has not answered. Off until turned on: an email
  * in the company's name only leaves on its own once the company has asked for it.
  */
 export function QuoteReminderCard() {
+  return <ReminderCard kind="soumission" />;
+}
+
+/** The same, for invoices still unpaid past their due date. */
+export function InvoiceReminderCard() {
+  return <ReminderCard kind="facture" />;
+}
+
+function ReminderCard({ kind }: { kind: keyof typeof reminderCopy }) {
+  const copy = reminderCopy[kind];
   const { data: settings, isLoading } = useBillingSettingsQuery();
-  const save = useSaveQuoteReminder();
+  const saveQuote = useSaveQuoteReminder();
+  const saveInvoice = useSaveInvoiceReminder();
+  const save = kind === "facture" ? saveInvoice : saveQuote;
   // Null until changed, so the saved value shows through without being copied into state.
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [days, setDays] = useState<string | null>(null);
 
-  const saved = settings?.quoteReminderDays ?? null;
+  const saved = (kind === "facture" ? settings?.invoiceReminderDays : settings?.quoteReminderDays) ?? null;
   const on = enabled ?? saved != null;
   const daysText = days ?? String(saved ?? DEFAULT_REMINDER_DAYS);
   const parsed = Number(daysText);
@@ -118,27 +155,24 @@ export function QuoteReminderCard() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <BellRing className="size-4" />
-          Relance automatique
+          {copy.title}
         </CardTitle>
-        <CardDescription>
-          Une soumission envoyée qui reste sans réponse est relancée une fois, toute seule, à la
-          personne qui l&apos;a reçue, avec le PDF. Pas si elle est expirée, acceptée ou refusée.
-        </CardDescription>
+        <CardDescription>{copy.description}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <Field>
           <div className="flex items-center gap-3">
-            <Checkbox id="quote-reminder-on" checked={on} onCheckedChange={(checked) => setEnabled(checked === true)} />
-            <FieldLabel htmlFor="quote-reminder-on" className="font-normal">
-              Relancer automatiquement les soumissions sans réponse
+            <Checkbox id={`${kind}-reminder-on`} checked={on} onCheckedChange={(checked) => setEnabled(checked === true)} />
+            <FieldLabel htmlFor={`${kind}-reminder-on`} className="font-normal">
+              {copy.checkbox}
             </FieldLabel>
           </div>
         </Field>
         {on && (
           <Field className="max-w-xs">
-            <FieldLabel htmlFor="quote-reminder-days">Délai après l&apos;envoi (jours)</FieldLabel>
+            <FieldLabel htmlFor={`${kind}-reminder-days`}>{copy.days}</FieldLabel>
             <Input
-              id="quote-reminder-days"
+              id={`${kind}-reminder-days`}
               type="number"
               inputMode="numeric"
               min={1}
@@ -148,7 +182,7 @@ export function QuoteReminderCard() {
               aria-invalid={!valid}
             />
             <FieldDescription>
-              {valid ? "Entre 1 et 90 jours, comptés à partir du dernier envoi." : "Indiquez un nombre de jours entre 1 et 90."}
+              {valid ? copy.hint : "Indiquez un nombre de jours entre 1 et 90."}
             </FieldDescription>
           </Field>
         )}

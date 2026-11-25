@@ -216,3 +216,81 @@
 .vx-hero-accent {
   color: var(--vx-hero-accent);
 }
+
+/*
+ * Motion on Vexta's own public pages (the home page and the sign-in cards). Three things only:
+ * the opening lines rise in once, sections rise in as they scroll into view, and cards lift
+ * under the pointer. The halo drifts slowly behind it all.
+ *
+ * All of it sits behind prefers-reduced-motion, and the scroll reveal behind @supports too: a
+ * browser that cannot tie an animation to scrolling shows the page as it always was, rather
+ * than hiding content until a script decides to show it.
+ *
+ * The reveal moves `translate` and the lift moves `transform`, two separate properties, so a
+ * card can do both without the finished reveal pinning the hover in place.
+ */
+@keyframes vx-rise {
+  from {
+    opacity: 0;
+    translate: 0 16px;
+  }
+  to {
+    opacity: 1;
+    translate: none;
+  }
+}
+
+@keyframes vx-halo-drift {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(-36px, 24px) scale(1.08);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .vx-intro > *,
+  .vx-rise {
+    animation: vx-rise 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .vx-intro > :nth-child(2) {
+    animation-delay: 100ms;
+  }
+  .vx-intro > :nth-child(3) {
+    animation-delay: 200ms;
+  }
+  .vx-intro > :nth-child(n + 4) {
+    animation-delay: 300ms;
+  }
+  .vx-rise-late {
+    animation-delay: 120ms;
+  }
+
+  .vx-glow::after {
+    animation: vx-halo-drift 18s ease-in-out infinite;
+  }
+
+  .vx-lift {
+    transition:
+      transform 200ms ease-out,
+      box-shadow 200ms ease-out,
+      border-color 200ms ease-out;
+  }
+  .vx-lift:hover {
+    transform: translateY(-4px);
+    border-color: color-mix(in oklch, var(--primary) 35%, var(--border));
+    box-shadow: 0 16px 32px -16px oklch(0.3 0.06 258 / 30%);
+  }
+}
+
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .vx-reveal {
+      animation: vx-rise linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 35%;
+    }
+  }
+}

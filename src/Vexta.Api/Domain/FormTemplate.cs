@@ -361,3 +361,36 @@ public class FormAnswer
 
     public int SortOrder { get; set; }
 }
+
+/// <summary>
+/// One form e-mailed to one address: who it went to, who sent it, and whether it came back.
+///
+/// Its id travels in the link (see Features.Forms.FormInvitation), so a reply filed through that
+/// link marks this row answered — the office sees which clients have filled what they were sent
+/// and which still need a nudge, without matching names by eye.
+/// </summary>
+public class FormShare
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid TenantId { get; set; }
+
+    public Guid FormTemplateId { get; set; }
+    public FormTemplate? FormTemplate { get; set; }
+
+    public required string Email { get; set; }
+
+    /// <summary>The client this address belonged to when it was sent, if any.</summary>
+    public Guid? ClientId { get; set; }
+    public Client? Client { get; set; }
+
+    /// <summary>The note typed with it, kept so sending it again says the same thing.</summary>
+    public string? Message { get; set; }
+
+    public string? SentByName { get; set; }
+    public DateTimeOffset SentAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset LastSentAt { get; set; } = DateTimeOffset.UtcNow;
+    public int SendCount { get; set; } = 1;
+
+    /// <summary>When a reply came back through this link. Null while it is still waited for.</summary>
+    public DateTimeOffset? AnsweredAt { get; set; }
+}

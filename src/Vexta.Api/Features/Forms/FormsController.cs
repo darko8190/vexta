@@ -114,25 +114,110 @@ public class FormsController(
 
         var form = await db.FormTemplates.Where(f => f.Id == id)
             .Select(f => new { f.Title, f.RequiresIdentification }).FirstAsync(ct);
-        var title = form.Title;
 
-        // The address goes into the link, signed: a form that files on the client's record then
-        // opens on that client's record without a sign-in, when the address is one of theirs.
-        var url = $"{FrontendUrl}{LinkPath(id)}?jeton={Uri.EscapeDataString(invitation.Seal(id, to))}";
-        var client = form.RequiresIdentification ? await FormInvitation.ClientForAsync(db, tenantId, to, ct) : null;
+        // Who the address belongs to, kept on the record of the send whatever the form: the list
+        // reads "Constructions Lafleur" rather than an address somebody has to recognise.
+        var client = await FormInvitation.ClientForAsync(db, tenantId, to, ct);
+        var sender = await db.Users.AsNoTracking()
+            .Where(u => u.Id == currentUser.UserId)
+            .Select(u => (u.FirstName + " " + u.LastName).Trim())
+            .FirstOrDefaultAsync(ct);
+
+        var share = new FormShare
+        {
+            TenantId = tenantId,
+            FormTemplateId = id,
+            Email = to,
+            ClientId = client?.Id,
+            Message = string.IsNullOrEmpty(message) ? null : message,
+            SentByName = string.IsNullOrWhiteSpace(sender) ? null : sender
+        };
+
+        var name = string.IsNullOrWhiteSpace(request.Name) ? client?.Name ?? to : request.Name.Trim();
+        if (await MailShareAsync(share, form.Title, name, ct) is { } failure) return failure;
+
+        // Saved only once it has left: a row for a message that never went would be a client
+        // shown as "en attente" for a form they never received.
+        db.FormShares.Add(share);
+        await db.SaveChangesAsync(ct);
+
+        return Ok(new SendFormLinkResultDto(form.RequiresIdentification ? client?.Name : null, form.RequiresIdentification));
+    }
+
+    /// <summary>
+    /// The forms sent so far, newest first: for one form, for one client, or both. Whether each
+    /// came back is read from the link it carried.
+    /// </summary>
+    [HttpGet("envois")]
+    public async Task<ActionResult<List<FormShareDto>>> Shares(
+        [FromQuery] Guid? formId, [FromQuery] Guid? clientId, CancellationToken ct)
+    {
+        var shares = db.FormShares.AsNoTracking();
+        if (formId is { } f) shares = shares.Where(x => x.FormTemplateId == f);
+        if (clientId is { } c) shares = shares.Where(x => x.ClientId == c);
+
+        return Ok(await shares
+            .OrderByDescending(x => x.LastSentAt)
+            .Take(200)
+            .Select(x => new FormShareDto(
+                x.Id, x.FormTemplateId, x.FormTemplate!.Title, x.Email, x.ClientId,
+                x.Client != null ? x.Client.Name : null, x.SentByName, x.SentAt, x.LastSentAt,
+                x.SendCount, x.AnsweredAt))
+            .ToListAsync(ct));
+    }
+
+    /// <summary>
+    /// The same message again, with the same link, to the same address: a nudge for somebody
+    /// who has not answered yet.
+    /// </summary>
+    [HttpPost("envois/{shareId:guid}/renvoyer")]
+    public async Task<ActionResult<FormShareDto>> Resend(Guid shareId, CancellationToken ct)
+    {
+        var share = await db.FormShares.Include(x => x.Client).FirstOrDefaultAsync(x => x.Id == shareId, ct);
+        if (share is null) return NotFound();
+
+        if (share.AnsweredAt is not null)
+        {
+            return BadRequest(new { message = "Ce formulaire a déjà été rempli par cette personne." });
+        }
+
+        var (_, missing) = await LinkProblemAsync(share.FormTemplateId, ct);
+        if (missing is not null) return BadRequest(new { message = missing });
+
+        var title = await db.FormTemplates.Where(f => f.Id == share.FormTemplateId).Select(f => f.Title).FirstAsync(ct);
+        if (await MailShareAsync(share, title, share.Client?.Name ?? share.Email, ct) is { } failure) return failure;
+
+        share.LastSentAt = DateTimeOffset.UtcNow;
+        share.SendCount++;
+        await db.SaveChangesAsync(ct);
+
+        return Ok(new FormShareDto(
+            share.Id, share.FormTemplateId, title, share.Email, share.ClientId, share.Client?.Name,
+            share.SentByName, share.SentAt, share.LastSentAt, share.SendCount, share.AnsweredAt));
+    }
+
+    /// <summary>
+    /// Sends one share's message. The link carries the address and the share's id, signed: the
+    /// first lets a form that files on a client's record open on it without a sign-in, the
+    /// second marks this share answered when the reply comes back. Null when it left.
+    /// </summary>
+    private async Task<ObjectResult?> MailShareAsync(FormShare share, string title, string name, CancellationToken ct)
+    {
         var companyName = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
-            .Where(t => t.Id == tenantId).Select(t => t.Name).FirstAsync(ct);
-        var name = string.IsNullOrWhiteSpace(request.Name) ? to : request.Name.Trim();
+            .Where(t => t.Id == share.TenantId).Select(t => t.Name).FirstAsync(ct);
+        var token = invitation.Seal(share.FormTemplateId, share.Email, share.Id);
+        var url = $"{FrontendUrl}{LinkPath(share.FormTemplateId)}?jeton={Uri.EscapeDataString(token)}";
 
         try
         {
             await mail.SendAsync(
-                to,
+                share.Email,
                 name,
                 $"{title} — {companyName}",
-                FormLinkEmail.Build(companyName, title, message, url),
+                FormLinkEmail.Build(companyName, title, share.Message, url),
                 ct,
                 fromName: companyName);
+            return null;
         }
         catch (InvalidOperationException ex)
         {
@@ -140,8 +225,6 @@ public class FormsController(
             // leave the office waiting for answers to a form nobody received.
             return StatusCode(StatusCodes.Status503ServiceUnavailable, new { message = ex.Message });
         }
-
-        return Ok(new SendFormLinkResultDto(client?.Name, form.RequiresIdentification));
     }
 
     private string FrontendUrl => configuration["Frontend:BaseUrl"]?.TrimEnd('/') ?? "http://localhost:3000";

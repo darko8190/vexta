@@ -3,7 +3,7 @@
 import { use, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ClipboardPen, IdCard, Inbox, Link2, ListPlus, Mail, Pencil, PenLine, Trash2, Zap } from "lucide-react";
+import { ArrowLeft, ClipboardPen, IdCard, Inbox, Link2, ListPlus, Mail, Pencil, PenLine, Send, Trash2, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -15,11 +15,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Spinner } from "@/components/ui/spinner";
-import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
@@ -29,11 +26,13 @@ import { FillFormSheet } from "@/components/forms/fill-form-sheet";
 import { FormActionsSection } from "@/components/forms/form-actions-section";
 import { FormDetailsSection } from "@/components/forms/form-details-section";
 import { FormQuestionsSection } from "@/components/forms/form-questions-section";
+import { FormSharesList } from "@/components/forms/form-shares-list";
 import { FormSubmissionsSection } from "@/components/forms/form-submissions-section";
+import { SendFormDialog } from "@/components/forms/send-form-dialog";
 import { FormTemplateSheet } from "@/components/forms/form-template-sheet";
 import { useCanManage } from "@/hooks/use-can-create";
 import { ApiError } from "@/lib/api";
-import { useDeleteForm, useFormPublicLinkQuery, useFormQuery, useSendFormLink } from "@/hooks/use-forms";
+import { useDeleteForm, useFormPublicLinkQuery, useFormQuery } from "@/hooks/use-forms";
 
 /**
  * Pattern 2 — Detail / Record: one form, with its questions, its actions and its replies in the
@@ -102,6 +101,7 @@ export default function FormBuilderPage({ params }: { params: Promise<{ id: stri
     { key: "questions", label: "Questions", count: fields.length, icon: ListPlus },
     { key: "actions", label: "Actions", count: actions.length, icon: Zap },
     { key: "reponses", label: "Réponses", count: form.submissionCount, icon: Inbox },
+    { key: "envois", label: "Envois", icon: Send },
   ];
 
   return (
@@ -193,6 +193,17 @@ export default function FormBuilderPage({ params }: { params: Promise<{ id: stri
             />
           )}
           {section === "reponses" && <FormSubmissionsSection formId={form.id} />}
+          {section === "envois" && (
+            <div>
+              <div className="mb-4">
+                <h2 className="text-base font-semibold text-foreground">Envois</h2>
+                <p className="text-sm text-muted-foreground">
+                  À qui ce formulaire a été envoyé par courriel, et qui l&apos;a rempli.
+                </p>
+              </div>
+              <FormSharesList formId={form.id} />
+            </div>
+          )}
         </div>
       </div>
 
@@ -274,122 +285,18 @@ function CopyLinkButton({ formId }: { formId: string }) {
   );
 }
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-/**
- * Sends the form's link to one person, from the company's name. The address is typed rather than
- * picked from the clients: a form often goes to somebody who is not a client yet.
- *
- * When the form cannot be filled by link yet, the dialog names the missing step instead of
- * offering a send that would be refused.
- */
+/** Opens the send dialog for this form. Disabled until the link is known, like « Copier le lien ». */
 function SendLinkButton({ formId }: { formId: string }) {
   const { data: link } = useFormPublicLinkQuery(formId);
-  const send = useSendFormLink();
   const [open, setOpen] = useState(false);
-  const [email, setEmail] = useState("");
-  const [message, setMessage] = useState("");
-  const [touched, setTouched] = useState(false);
-
-  const emailValid = EMAIL_PATTERN.test(email.trim());
-  const showEmailError = touched && !emailValid;
-
-  function onOpenChange(next: boolean) {
-    setOpen(next);
-    if (next) {
-      setEmail("");
-      setMessage("");
-      setTouched(false);
-    }
-  }
-
-  async function onSubmit(event: React.FormEvent) {
-    event.preventDefault();
-    setTouched(true);
-    if (!emailValid) return;
-    try {
-      const result = await send.mutateAsync({ id: formId, email: email.trim(), message: message.trim() || null });
-      // Said here, once, because it decides whose record the answers land on.
-      toast.success("Formulaire envoyé.", {
-        description: !result.filesOnClient
-          ? email.trim()
-          : result.clientName
-            ? `Les réponses iront au dossier de ${result.clientName}, sans connexion.`
-            : "Cette adresse n'est celle d'aucun client : la personne devra se connecter pour le remplir.",
-      });
-      setOpen(false);
-    } catch (error) {
-      toast.error(error instanceof ApiError ? error.message : "Le formulaire n'a pas pu être envoyé.");
-    }
-  }
 
   return (
     <>
-      <Button variant="outline" disabled={!link} onClick={() => onOpenChange(true)}>
+      <Button variant="outline" disabled={!link} onClick={() => setOpen(true)}>
         <Mail />
         Envoyer par courriel
       </Button>
-
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-md">
-          {link && !link.path ? (
-            <>
-              <DialogHeader>
-                <DialogTitle>Ce formulaire ne peut pas encore être envoyé</DialogTitle>
-                <DialogDescription>{link.missing ?? "Ce formulaire n'a pas encore de lien."}</DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <DialogClose render={<Button type="button" variant="outline" />}>Fermer</DialogClose>
-              </DialogFooter>
-            </>
-          ) : (
-            <form onSubmit={onSubmit} noValidate>
-              <DialogHeader>
-                <DialogTitle>Envoyer le formulaire</DialogTitle>
-                <DialogDescription>
-                  La personne reçoit un courriel au nom de votre entreprise, avec un bouton pour
-                  remplir le formulaire. Si l&apos;adresse est celle d&apos;un de vos clients, ce
-                  qu&apos;elle remplit va à son dossier sans qu&apos;elle ait à se connecter.
-                </DialogDescription>
-              </DialogHeader>
-              <FieldGroup className="px-4 py-4">
-                <Field data-invalid={showEmailError || undefined}>
-                  <FieldLabel htmlFor="send-form-email">Courriel</FieldLabel>
-                  <Input
-                    id="send-form-email"
-                    type="email"
-                    autoComplete="off"
-                    autoFocus
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    onBlur={() => setTouched(true)}
-                    aria-invalid={showEmailError}
-                  />
-                  {showEmailError && <FieldError>Indiquez une adresse courriel valide.</FieldError>}
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="send-form-message">Message</FieldLabel>
-                  <Textarea
-                    id="send-form-message"
-                    rows={4}
-                    maxLength={2000}
-                    value={message}
-                    onChange={(event) => setMessage(event.target.value)}
-                  />
-                  <FieldDescription>Facultatif : ajouté au courriel, au-dessus du bouton.</FieldDescription>
-                </Field>
-              </FieldGroup>
-              <DialogFooter>
-                <DialogClose render={<Button type="button" variant="outline" />}>Annuler</DialogClose>
-                <Button type="submit" disabled={send.isPending}>
-                  {send.isPending && <Spinner />}
-                  Envoyer
-                </Button>
-              </DialogFooter>
-            </form>
-          )}
-        </DialogContent>
-      </Dialog>
+      <SendFormDialog open={open} onOpenChange={setOpen} formId={formId} />
     </>
   );
 }

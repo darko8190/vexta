@@ -27,24 +27,31 @@ public class FormInvitation(IDataProtectionProvider protection)
     private ITimeLimitedDataProtector Protector =>
         protection.CreateProtector("Vexta.Forms.Invitation").ToTimeLimitedDataProtector();
 
-    public string Seal(Guid formId, string email) =>
-        Protector.Protect($"{formId:N}|{email.Trim().ToLowerInvariant()}", Lifetime);
+    public string Seal(Guid formId, string email, Guid shareId) =>
+        Protector.Protect($"{formId:N}|{email.Trim().ToLowerInvariant()}|{shareId:N}", Lifetime);
 
-    /// <summary>The address the link was sent to, when the token is genuine, current, and for this form.</summary>
-    public string? Open(string? token, Guid formId)
+    /// <summary>
+    /// The address the link was sent to and the send it belongs to, when the token is genuine,
+    /// current, and for this form. Links sent before sends were recorded carry no send id.
+    /// </summary>
+    public Opened? Open(string? token, Guid formId)
     {
         if (string.IsNullOrWhiteSpace(token)) return null;
 
         try
         {
-            var parts = Protector.Unprotect(token).Split('|', 2);
-            return parts.Length == 2 && parts[0] == formId.ToString("N") ? parts[1] : null;
+            var parts = Protector.Unprotect(token).Split('|');
+            if (parts.Length < 2 || parts[0] != formId.ToString("N")) return null;
+
+            return new Opened(parts[1], parts.Length > 2 && Guid.TryParse(parts[2], out var share) ? share : null);
         }
         catch (CryptographicException)
         {
             return null;
         }
     }
+
+    public record Opened(string Email, Guid? ShareId);
 
     /// <summary>
     /// The company's client who owns this address: the client's own e-mail first, then one of its

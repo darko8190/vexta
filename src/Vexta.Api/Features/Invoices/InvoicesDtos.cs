@@ -50,7 +50,9 @@ public record InvoiceDto(
     decimal Total,
     List<InvoiceLineDto> Lines,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    /// <summary>When the automatic reminder went out for the current sending, if it did.</summary>
+    DateTimeOffset? ReminderSentAt = null);
 
 /// <summary>
 /// Description is nullable so that a line being typed can still be previewed. A non-nullable

@@ -99,6 +99,7 @@ builder.Services.AddScoped<IWorkbookService, WorkbookService>();
 builder.Services.AddScoped<IAssistantService, AssistantService>();
 // Chases unanswered quotes for the companies that turned it on.
 builder.Services.AddHostedService<Vexta.Api.Features.Quotes.QuoteReminderService>();
+builder.Services.AddHostedService<Vexta.Api.Features.Invoices.InvoiceReminderService>();
 
 builder.Services
     .AddIdentityCore<ApplicationUser>(options =>

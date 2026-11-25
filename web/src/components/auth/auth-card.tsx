@@ -14,13 +14,13 @@ export function AuthCard({ children }: { children: React.ReactNode }) {
         <ThemeToggle />
       </div>
 
-      <div className="mb-8 flex flex-col items-center gap-2">
+      <div className="vx-rise mb-8 flex flex-col items-center gap-2">
         <Link href="/" aria-label="Vexta — accueil" className="transition-opacity hover:opacity-70">
           <VextaLogo className="w-44" priority />
         </Link>
       </div>
 
-      <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-8 shadow-sm">{children}</div>
+      <div className="vx-rise vx-rise-late w-full max-w-sm rounded-2xl border border-border bg-card p-8 shadow-sm">{children}</div>
     </div>
   );
 }

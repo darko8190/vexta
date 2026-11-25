@@ -193,6 +193,12 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
               <dd className="text-foreground">{formatDateOnly(invoice.sentAt)}</dd>
             </div>
           )}
+          {invoice.reminderSentAt && (
+            <div>
+              <dt className="text-muted-foreground">Relancée automatiquement le</dt>
+              <dd className="text-foreground">{formatDateOnly(invoice.reminderSentAt)}</dd>
+            </div>
+          )}
           <div>
             <dt className="text-muted-foreground">Total</dt>
             <dd className="font-medium text-foreground">{money(invoice.total, invoice.currency)}</dd>

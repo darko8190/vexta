@@ -159,13 +159,13 @@ function RegisterForm({
         <ThemeToggle />
       </div>
 
-      <div className="mb-8 flex flex-col items-center gap-2">
+      <div className="vx-rise mb-8 flex flex-col items-center gap-2">
         <Link href="/" aria-label="Vexta — accueil" className="transition-opacity hover:opacity-70">
           <VextaLogo className="w-44" priority />
         </Link>
       </div>
 
-      <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 shadow-sm">
+      <div className="vx-rise vx-rise-late w-full max-w-md rounded-2xl border border-border bg-card p-8 shadow-sm">
         <h1 className="text-center text-xl font-semibold text-card-foreground">Créer votre espace Vexta</h1>
         <p className="mt-1 text-center text-sm text-muted-foreground">
           {isPersonal

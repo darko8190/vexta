@@ -21,7 +21,12 @@ import { EmailTemplateCard } from "@/components/settings/email-template-card";
 import { MarginModeCard } from "@/components/settings/margin-mode-card";
 import { OnlinePaymentsCard } from "@/components/settings/online-payments-card";
 import { PricePoliciesCard } from "@/components/settings/price-policies-card";
-import { QuoteReminderCard, QuoteTemplatesCard, QuoteTermsCard } from "@/components/settings/quote-settings-cards";
+import {
+  InvoiceReminderCard,
+  QuoteReminderCard,
+  QuoteTemplatesCard,
+  QuoteTermsCard,
+} from "@/components/settings/quote-settings-cards";
 import { WageClassificationsCard } from "@/components/settings/wage-classifications-card";
 import { useBillingStateQuery, type BillingState } from "@/hooks/use-billing";
 import { usePublicPlansQuery } from "@/hooks/use-catalog";
@@ -390,7 +395,12 @@ export default function SettingsPage() {
               ) : (
                 <BusinessSubscription state={data} />
               ))}
-            {active === "facturation" && <BillingSettingsCard />}
+            {active === "facturation" && (
+              <div className="space-y-6">
+                <BillingSettingsCard />
+                <InvoiceReminderCard />
+              </div>
+            )}
             {active === "soumissions" && (
               <div className="space-y-6">
                 <QuoteTermsCard />

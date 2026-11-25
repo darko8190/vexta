@@ -106,6 +106,7 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
     public DbSet<FormAction> FormActions => Set<FormAction>();
     public DbSet<FormSubmission> FormSubmissions => Set<FormSubmission>();
     public DbSet<FormAnswer> FormAnswers => Set<FormAnswer>();
+    public DbSet<FormShare> FormShares => Set<FormShare>();
     public DbSet<ReceiptScan> ReceiptScans => Set<ReceiptScan>();
     public DbSet<EmployeeAddress> EmployeeAddresses => Set<EmployeeAddress>();
     public DbSet<EmergencyContact> EmergencyContacts => Set<EmergencyContact>();
@@ -947,6 +948,24 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
 
             e.HasIndex(s => new { s.FormTemplateId, s.CreatedAt });
             e.HasQueryFilter(s => s.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<FormShare>(e =>
+        {
+            e.HasOne(x => x.FormTemplate).WithMany()
+                .HasForeignKey(x => x.FormTemplateId).OnDelete(DeleteBehavior.Cascade);
+
+            // SetNull: deleting the client does not unsay that the form was sent.
+            e.HasOne(x => x.Client).WithMany()
+                .HasForeignKey(x => x.ClientId).OnDelete(DeleteBehavior.SetNull);
+
+            e.Property(x => x.Email).HasMaxLength(254);
+            e.Property(x => x.Message).HasMaxLength(2000);
+            e.Property(x => x.SentByName).HasMaxLength(200);
+
+            e.HasIndex(x => new { x.FormTemplateId, x.SentAt });
+            e.HasIndex(x => new { x.ClientId, x.SentAt });
+            e.HasQueryFilter(x => x.TenantId == CurrentTenantId);
         });
 
         builder.Entity<FormAnswer>(e =>

@@ -74,7 +74,7 @@ async function ModulesSection() {
   return (
     <section id="fonctionnalites" className="border-t border-border bg-card/30">
       <div className="mx-auto w-full max-w-6xl px-4 py-20 sm:px-6">
-        <h2 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+        <h2 className="vx-reveal text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
           Tout ce qu&apos;il faut pour suivre un mandat, de la première adresse à la facture payée.
         </h2>
 
@@ -82,7 +82,7 @@ async function ModulesSection() {
           {modules.map((module) => {
             const Icon = moduleIcon(module.icon);
             return (
-              <div key={module.id} className="rounded-xl border border-border bg-card p-6">
+              <div key={module.id} className="vx-reveal vx-lift rounded-xl border border-border bg-card p-6">
                 <Icon className="size-5 text-primary" />
                 <h3 className="mt-4 text-base font-medium text-foreground">{module.title}</h3>
                 <p className="mt-2 text-sm text-muted-foreground">{module.description}</p>
@@ -101,7 +101,7 @@ async function PricingSection() {
   return (
     <section id="tarif" className="vx-glow vx-glow-mirrored border-t border-border">
       <div className="mx-auto w-full max-w-6xl px-4 py-20 sm:px-6">
-        <div className="mx-auto max-w-xl text-center">
+        <div className="vx-reveal mx-auto max-w-xl text-center">
           <h2 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
             {plans.length > 1 ? "Choisissez votre forfait." : "Un forfait, tout inclus."}
           </h2>
@@ -129,7 +129,7 @@ async function PricingSection() {
             {plans.map((plan) => (
               <div
                 key={plan.id}
-                className="flex flex-col rounded-2xl border border-border bg-card p-8"
+                className="vx-reveal vx-lift flex flex-col rounded-2xl border border-border bg-card p-8"
               >
                 <p className="text-sm font-medium text-muted-foreground">{plan.name}</p>
                 <p className="mt-3 flex items-baseline gap-2">
@@ -198,7 +198,7 @@ export default function HomePage() {
 
       <main className="flex-1">
         <section className="vx-glow">
-          <div className="mx-auto w-full max-w-6xl px-4 pt-20 pb-24 text-center sm:px-6 md:pt-28">
+          <div className="vx-intro mx-auto w-full max-w-6xl px-4 pt-20 pb-24 text-center sm:px-6 md:pt-28">
             {/* sm:block puts the accent on its own line, one sentence per line as on the
                 reference; below sm it flows inline so a phone does not get a lonely short line. */}
             <h1 className="mx-auto max-w-4xl text-4xl font-semibold tracking-tight text-balance text-foreground sm:text-5xl">
@@ -240,13 +240,13 @@ export default function HomePage() {
 
         <section id="faq" className="border-t border-border bg-card/30">
           <div className="mx-auto w-full max-w-6xl px-4 py-20 sm:px-6">
-            <h2 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+            <h2 className="vx-reveal text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
               Questions fréquentes
             </h2>
 
             <dl className="mt-12 grid gap-10 md:grid-cols-2">
               {faq.map((item) => (
-                <div key={item.question}>
+                <div key={item.question} className="vx-reveal">
                   <dt className="text-base font-medium text-foreground">{item.question}</dt>
                   <dd className="mt-2 text-sm text-muted-foreground">{item.answer}</dd>
                 </div>
@@ -256,7 +256,7 @@ export default function HomePage() {
         </section>
 
         <section className="vx-glow vx-glow-band border-t border-border">
-          <div className="mx-auto w-full max-w-6xl px-4 py-20 text-center sm:px-6">
+          <div className="vx-reveal mx-auto w-full max-w-6xl px-4 py-20 text-center sm:px-6">
             <h2 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
               Prêt à mettre de l&apos;ordre dans votre facturation ?
             </h2>

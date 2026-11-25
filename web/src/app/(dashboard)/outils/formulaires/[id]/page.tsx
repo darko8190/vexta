@@ -6,6 +6,16 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, ClipboardPen, IdCard, Inbox, Link2, ListPlus, Pencil, PenLine, Trash2, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
@@ -199,16 +209,21 @@ export default function FormBuilderPage({ params }: { params: Promise<{ id: stri
 
 /**
  * Copies the address where a client or a stranger fills this form. The API only gives a path
- * when every gate of the public page is open, so a copied link always works; otherwise the
- * button says which switch is missing instead of copying a link that would answer 404.
+ * when every gate of the public page is open, so a copied link always works.
+ *
+ * When there is no link yet, a dialog says so and names the missing step. A passing toast was
+ * not enough: it was missed, and whatever was already on the clipboard got pasted as if it were
+ * this form's link.
  */
 function CopyLinkButton({ formId }: { formId: string }) {
   const { data: link } = useFormPublicLinkQuery(formId);
+  // Either the reason there is no link, or a link the clipboard refused to take.
+  const [shown, setShown] = useState<{ missing: string } | { url: string } | null>(null);
 
   async function copy() {
     if (!link) return;
     if (!link.path) {
-      toast.info(link.missing ?? "Ce formulaire n'a pas encore de lien public.");
+      setShown({ missing: link.missing ?? "Ce formulaire n'a pas encore de lien public." });
       return;
     }
     const url = `${window.location.origin}${link.path}`;
@@ -216,15 +231,40 @@ function CopyLinkButton({ formId }: { formId: string }) {
       await navigator.clipboard.writeText(url);
       toast.success("Lien copié.", { description: url });
     } catch {
-      // Clipboard refused (an http page, a browser setting): the link is still given to read.
-      toast.info("Copiez ce lien :", { description: url });
+      // Clipboard refused (a browser setting): the link is shown to copy by hand.
+      setShown({ url });
     }
   }
 
   return (
-    <Button variant="outline" disabled={!link} onClick={copy}>
-      <Link2 />
-      Copier le lien
-    </Button>
+    <>
+      <Button variant="outline" disabled={!link} onClick={copy}>
+        <Link2 />
+        Copier le lien
+      </Button>
+
+      <Dialog open={shown !== null} onOpenChange={(next) => !next && setShown(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {shown && "missing" in shown ? "Ce formulaire n'a pas encore de lien" : "Lien du formulaire"}
+            </DialogTitle>
+            <DialogDescription>
+              {shown && "missing" in shown
+                ? `${shown.missing} Rien n'a été copié.`
+                : "Votre navigateur n'a pas permis la copie. Sélectionnez le lien et copiez-le."}
+            </DialogDescription>
+          </DialogHeader>
+          {shown && "url" in shown && (
+            <div className="px-4">
+              <Input readOnly value={shown.url} aria-label="Lien du formulaire" onFocus={(event) => event.target.select()} autoFocus />
+            </div>
+          )}
+          <DialogFooter>
+            <DialogClose render={<Button type="button" variant="outline" />}>Fermer</DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

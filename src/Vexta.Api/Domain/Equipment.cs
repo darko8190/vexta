@@ -21,8 +21,12 @@ public enum EquipmentUnit
 /// lift, the excavator, the truck. Distinct from a product: a product is sold and leaves the
 /// shelf; equipment comes back, and what the client pays for is its time.
 /// </summary>
-public class Equipment
+public class Equipment : ISoftDeletable
 {
+    // ---- Corbeille ----
+    public DateTimeOffset? DeletedAt { get; set; }
+    public Guid? DeletedByUserId { get; set; }
+
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid TenantId { get; set; }
 

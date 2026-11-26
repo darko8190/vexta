@@ -54,7 +54,7 @@ export function TableFiltersSheet({
         onOpenChange(next);
       }}
     >
-      <SheetContent>
+      <SheetContent layout="dialog">
         <SheetHeader>
           <SheetTitle>Filtres</SheetTitle>
           <SheetDescription>Selon les colonnes affichées. Laissez vide pour ne pas filtrer.</SheetDescription>

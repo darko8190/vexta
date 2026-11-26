@@ -7,6 +7,7 @@ using Vexta.Api.Auth;
 using Vexta.Api.Common;
 using Vexta.Api.Data;
 using Vexta.Api.Domain;
+using Vexta.Api.Services;
 
 namespace Vexta.Api.Features.Mcp;
 
@@ -28,8 +29,13 @@ public record CreateMcpKeyRequest(string? Name, bool CanWrite);
 [Authorize(Roles = Roles.Managers)]
 [StaffOnly]
 [RequireBusinessTenant]
-public class McpKeysController(VextaDbContext db, ICurrentUserService currentUser) : ControllerBase
+public class McpKeysController(VextaDbContext db, ICurrentUserService currentUser, IFeatureService features) : ControllerBase
 {
+    /// <summary>Whether the company's plan includes MCP keys, for the settings card.</summary>
+    [HttpGet("disponibilite")]
+    public async Task<ActionResult<object>> Availability(CancellationToken ct) =>
+        Ok(new { included = await features.IsEnabledAsync(FeatureKeys.Mcp, ct) });
+
     public const string KeyStart = "vxk_";
 
     [HttpGet]
@@ -46,6 +52,12 @@ public class McpKeysController(VextaDbContext db, ICurrentUserService currentUse
     [HttpPost]
     public async Task<ActionResult<CreatedMcpKeyDto>> Create(CreateMcpKeyRequest request, CancellationToken ct)
     {
+        if (!await features.IsEnabledAsync(FeatureKeys.Mcp, ct))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden,
+                new { message = "Les clés MCP ne font pas partie de votre forfait." });
+        }
+
         var name = request.Name?.Trim();
         if (string.IsNullOrEmpty(name)) return BadRequest(new { message = "Donnez un nom à la clé, pour savoir à quoi elle sert." });
         if (name.Length > 100) return BadRequest(new { message = "Le nom est trop long." });

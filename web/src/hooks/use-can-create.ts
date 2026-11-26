@@ -60,3 +60,28 @@ export function useIsOwner() {
 
   return user.role === "TenantAdmin" || (user.role === "SuperAdmin" && user.isImpersonating);
 }
+
+/**
+ * Whether the person sees the crew's application: an employee (TenantUser) in a company, or a
+ * manager who switched to the employee view. The crew has no dashboard, no project list and no
+ * tools: their day starts from their assignments.
+ */
+export function useIsCrewView() {
+  const { user } = useAuth();
+  const viewMode = useViewMode();
+  if (!user || user.tenantKind === "Personal" || user.role === "Client") return false;
+  if (user.role === "TenantUser") return true;
+  if (user.role === "SuperAdmin" && !user.isImpersonating) return false;
+  return viewMode === "employe";
+}
+
+/** Routes the crew does not open. A project's own page stays reachable from an assignment. */
+export const CREW_HIDDEN_ROUTES = ["/tableau-de-bord", "/outils"];
+export const CREW_HIDDEN_EXACT = ["/projets"];
+
+export function isCrewHiddenRoute(pathname: string) {
+  return (
+    CREW_HIDDEN_EXACT.includes(pathname) ||
+    CREW_HIDDEN_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`))
+  );
+}

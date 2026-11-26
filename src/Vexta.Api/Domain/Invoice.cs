@@ -1,7 +1,11 @@
 namespace Vexta.Api.Domain;
 
-public class Invoice
+public class Invoice : ISoftDeletable
 {
+    // ---- Corbeille ----
+    public DateTimeOffset? DeletedAt { get; set; }
+    public Guid? DeletedByUserId { get; set; }
+
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid TenantId { get; set; }
 

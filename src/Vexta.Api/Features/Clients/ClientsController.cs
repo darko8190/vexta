@@ -46,12 +46,24 @@ public class ClientsController(
                 || (c.Email != null && EF.Functions.ILike(c.Email, pattern)));
         }
 
-        clients = ApplyColumnFilters(clients, new ListFilter(Request.Query));
+        var filter = new ListFilter(Request.Query);
+        clients = ApplyColumnFilters(clients, filter);
 
         var totalCount = await clients.CountAsync();
 
-        var items = await clients
-            .OrderByDescending(c => c.Number)
+        var items = await filter.Sort(clients, new Dictionary<string, System.Linq.Expressions.LambdaExpression>
+            {
+                ["numero"] = ListFilter.By<Client, int>(c => c.Number),
+                ["nom"] = ListFilter.By<Client, string>(c => c.Name),
+                ["entreprise"] = ListFilter.By<Client, string?>(c => c.CompanyName),
+                ["prenom"] = ListFilter.By<Client, string?>(c => c.FirstName),
+                ["nomFamille"] = ListFilter.By<Client, string?>(c => c.LastName),
+                ["statut"] = ListFilter.By<Client, ClientStatus>(c => c.Status),
+                ["courriel"] = ListFilter.By<Client, string?>(c => c.Email),
+                ["telephone"] = ListFilter.By<Client, string?>(c => c.Phone),
+                ["projets"] = ListFilter.By<Client, int>(c => c.Projects.Count),
+                ["factures"] = ListFilter.By<Client, int>(c => c.Invoices.Count),
+            }, ListFilter.By<Client, int>(c => c.Number))
             .Skip((query.Page - 1) * query.PageSize)
             .Take(query.PageSize)
             .Select(ToDto())
@@ -144,10 +156,10 @@ public class ClientsController(
         db.Clients.Add(client);
         ApplyPrimaryAddress(client, request.PrimaryAddress, tenantId);
 
-        // A company is reached through a person, and the one named here is the first of its
-        // contacts. Filed as one, so they can be picked as a project's contact or its billing
-        // contact like anybody added later, instead of existing only as fields on the company.
-        if (client.Type == ClientType.Entreprise && (client.FirstName is not null || client.LastName is not null))
+        // The person named here is the client's first contact, whether the client is a company
+        // reached through them or the person themselves. Filed as one, so they can be picked as a
+        // project's contact or its billing contact like anybody added later.
+        if (client.FirstName is not null || client.LastName is not null)
         {
             db.ClientContacts.Add(new ClientContact
             {

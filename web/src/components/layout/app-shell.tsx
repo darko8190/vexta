@@ -20,6 +20,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { AssistantButton } from "@/components/assistant/assistant-panel";
 import { VextaIcon, VextaLockup } from "@/components/brand/vexta-logo";
+import { isCrewHiddenRoute } from "@/hooks/use-can-create";
+import { GlobalSearch } from "@/components/layout/global-search";
 import { dashboardNavItem, employeeModeNavItems, getNavItems, type NavItem } from "@/components/layout/nav-config";
 import { ViewModeToggle } from "@/components/layout/view-mode-toggle";
 import { useViewMode } from "@/lib/view-mode";
@@ -81,22 +83,21 @@ function useTenantNavItems(): { items: NavItem[]; pending: boolean } {
   // The crew's menu, whatever the plan's modules say: the point of the mode is a short one.
   if (employeeMode) return { items: employeeModeNavItems(), pending: false };
 
+  // An employee never gets the dashboard, the project list or the tools, whichever menu applies.
+  const isCrew = user?.role === "TenantUser" && user.tenantKind !== "Personal";
+  const crewFilter = (items: NavItem[]) =>
+    isCrew ? items.filter((item) => !isCrewHiddenRoute(item.href)) : items;
+
   // A fixed menu has nothing in flight, so it draws at once.
-  if (!fromModules) return { items: builtIn, pending: false };
+  if (!fromModules) return { items: crewFilter(builtIn), pending: false };
 
-  // Unknown is not empty, and this is the difference that made tabs flash. Falling back to the
-  // built-in menu while the plan's own list was still in the air drew every tab the application
-  // has, for as long as the request took, and then took most of them away. The fallback is for a
-  // company whose plan defines no modules — a fact only the answer can establish.
-  //
-  // Tableau de bord draws immediately regardless: it is never a module and never withheld, so
-  // showing it early cannot turn out to have been wrong.
-  if (isPending) return { items: [dashboardNavItem], pending: true };
+  if (isPending) return { items: isCrew ? [] : [dashboardNavItem], pending: true };
 
-  if (!data || data.length === 0) return { items: builtIn, pending: false };
+  if (!data || data.length === 0) return { items: crewFilter(builtIn), pending: false };
 
-  return { items: [dashboardNavItem, ...flatten(data)], pending: false };
+  return { items: crewFilter([dashboardNavItem, ...flatten(data)]), pending: false };
 }
+
 
 /**
  * The rail while the menu is still unknown.
@@ -252,6 +253,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <VextaLockup iconClassName="size-7" />
           </button>
           <div className="flex-1" />
+          <GlobalSearch shortcut={false} />
           {/* First of the four: it says which space everything else in the bar acts on. */}
           <WorkspaceSwitcher />
           {/* Before the theme toggle on purpose: it is the one control here somebody opens on
@@ -264,6 +266,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <UserAvatarMenu />
         </header>
         <header className="hidden h-16 items-center justify-end gap-2 border-b border-border px-6 md:flex">
+          {/* The search takes the left of the bar: the one control here used many times a day. */}
+          <div className="mr-auto">
+            <GlobalSearch />
+          </div>
           <WorkspaceSwitcher />
           <InstallPrompt />
           <AssistantButton />
@@ -334,7 +340,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   and what is my company", which is exactly what the card answers. A personal
                   space is not a company and has no such card. */}
               {user!.tenantKind !== "Personal" && (
-                <DropdownMenuItem render={<Link href="/entreprise" />}>
+                <DropdownMenuItem render={<Link href="/parametres?section=entreprise" />}>
                   <Building2 />
                   Fiche entreprise
                 </DropdownMenuItem>

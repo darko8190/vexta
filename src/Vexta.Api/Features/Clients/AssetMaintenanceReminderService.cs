@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Vexta.Api.Common;
 using Vexta.Api.Data;
 using Vexta.Api.Domain;
+using Vexta.Api.Features.Sends;
 using Vexta.Api.Services;
 
 namespace Vexta.Api.Features.Clients;
@@ -125,6 +126,9 @@ public class AssetMaintenanceReminderService(
                 logger.LogWarning("Maintenance reminder for {MaintenanceId} not sent: {Reason}", maintenance.Id, ex.Message);
                 continue;
             }
+
+            SendHistory.Add(db, maintenance.TenantId, "actif", maintenance.ClientAssetId, "Rappel d'entretien",
+                to, $"Entretien à prévoir : {asset} — {company.Name}");
 
             maintenance.RemindedFor = maintenance.NextDue;
             maintenance.RemindedAt = DateTimeOffset.UtcNow;

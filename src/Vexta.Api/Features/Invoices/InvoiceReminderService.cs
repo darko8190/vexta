@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Vexta.Api.Common;
 using Vexta.Api.Data;
 using Vexta.Api.Domain;
+using Vexta.Api.Features.Sends;
 using Vexta.Api.Services;
 
 namespace Vexta.Api.Features.Invoices;
@@ -100,7 +101,8 @@ public class InvoiceReminderService(
                 .Include(i => i.Client)
                 .Include(i => i.Lines)
                 .Where(i => i.TenantId == tenantId
-                    && (i.Status == InvoiceStatus.Envoyee || i.Status == InvoiceStatus.EnRetard)
+                    && (i.Status == InvoiceStatus.Envoyee || i.Status == InvoiceStatus.EnRetard
+                        || i.Status == InvoiceStatus.PartiellementPayee)
                     && i.SentTo != null && i.SentAt != null
                     && i.ReminderCount < count
                     // The first one counts from the due date, each next one from the last.
@@ -167,6 +169,9 @@ public class InvoiceReminderService(
                     logger.LogWarning("Invoice reminder for {InvoiceId} not sent: {Reason}", invoice.Id, ex.Message);
                     continue;
                 }
+
+                SendHistory.Add(db, invoice.TenantId, "facture", invoice.Id, "Relance",
+                    to, $"Rappel : facture {invoice.Number} — {tenant.Name}");
 
                 invoice.ReminderSentAt = DateTimeOffset.UtcNow;
                 invoice.ReminderCount++;

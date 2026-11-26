@@ -7,6 +7,7 @@ import * as z from "zod";
 import { ImagePlus, Plus, ScanText, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { RequiredMark } from "@/components/ui/required-mark";
@@ -45,6 +46,7 @@ const formSchema = z.object({
   sellingPrice: z.string(),
   spentOn: z.string(),
   projectTaskId: z.string(),
+  isBillable: z.boolean(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -117,6 +119,7 @@ export function ExpenseFormSheet({
       sellingPrice: "",
       spentOn: "",
       projectTaskId: "",
+      isBillable: true,
     },
   });
 
@@ -132,6 +135,7 @@ export function ExpenseFormSheet({
       // Today for a new one: most expenses are entered the day they are paid.
       spentOn: expense?.spentOn ?? todayIso(),
       projectTaskId: expense ? (expense.projectTaskId ?? "") : (defaultTaskId ?? ""),
+      isBillable: expense?.isBillable ?? true,
     });
 
   }, [open, expense, form, defaultTaskId]);
@@ -263,6 +267,7 @@ export function ExpenseFormSheet({
           sellingPrice,
           spentOn: values.spentOn || null,
           projectTaskId: values.projectTaskId || null,
+          isBillable: values.isBillable,
           mediaAssetIds: attachments.map((photo) => photo.mediaAssetId),
         },
       });
@@ -290,7 +295,7 @@ export function ExpenseFormSheet({
         onOpenChange(next);
       }}
     >
-      <SheetContent className="sm:max-w-lg">
+      <SheetContent layout="dialog" className="sm:max-w-lg">
         <SheetHeader>
           <SheetTitle>{isEditing ? "Modifier la dépense" : "Nouvelle dépense"}</SheetTitle>
           <SheetDescription>
@@ -561,6 +566,18 @@ export function ExpenseFormSheet({
               </FieldDescription>
             </Field>
 
+            <Controller
+              name="isBillable"
+              control={form.control}
+              render={({ field }) => (
+                <Field orientation="horizontal">
+                  <Checkbox id="expense-billable" checked={field.value} onCheckedChange={(v) => field.onChange(Boolean(v))} />
+                  <FieldLabel htmlFor="expense-billable" className="font-normal">
+                    Facturer au projet (ajoutée à la facture)
+                  </FieldLabel>
+                </Field>
+              )}
+            />
           </FieldGroup>
         </form>
 

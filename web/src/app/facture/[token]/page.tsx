@@ -3,7 +3,7 @@
 import { Suspense, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Ban, CheckCircle2, CreditCard, Lock, Receipt } from "lucide-react";
+import { Ban, CheckCircle2, CreditCard, Lock, Receipt, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { formatAmount } from "@/lib/money";
@@ -50,7 +50,7 @@ function Shell({ children, accent }: { children: React.ReactNode; accent?: strin
         </div>
         <p className="mt-4 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
           <Lock className="size-3" />
-          Paiement traité par Stripe. Vexta ne voit jamais votre numéro de carte.
+          Paiement traité par Stripe ou PayPal. Vexta ne voit jamais votre numéro de carte.
         </p>
       </div>
     </main>
@@ -67,6 +67,8 @@ function InvoicePayment() {
 
   const returned = search.get("paiement");
   const sessionId = returned === "succes" ? search.get("session_id") : null;
+  // PayPal sends the customer back with its order id in « token ».
+  const paypalOrder = search.get("paypal") === "succes" ? search.get("token") : null;
 
   /**
    * The invoice — read, or recorded first when Stripe has just sent somebody back.
@@ -77,7 +79,7 @@ function InvoicePayment() {
    * bare URL simply reads.
    */
   const { data: invoice, isLoading, error: failure, refetch, isRefetching } = useQuery({
-    queryKey: ["public-invoice", token, sessionId],
+    queryKey: ["public-invoice", token, sessionId, paypalOrder],
     retry: false,
     queryFn: async () => {
       const base = `/api/public/factures/${encodeURIComponent(token)}`;
@@ -89,7 +91,14 @@ function InvoicePayment() {
             body: JSON.stringify({ sessionId }),
             cache: "no-store",
           })
-        : await fetch(base, { cache: "no-store" });
+        : paypalOrder
+          ? await fetch(`${base}/paypal/confirmation`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ orderId: paypalOrder }),
+              cache: "no-store",
+            })
+          : await fetch(base, { cache: "no-store" });
 
       if (response.status === 404) throw new InvoiceNotFound();
       if (!response.ok) throw new Error("Cette facture n'a pas pu être lue.");
@@ -98,12 +107,13 @@ function InvoicePayment() {
     },
   });
 
-  async function pay() {
+  async function pay(provider: "stripe" | "paypal" = "stripe") {
     setError(null);
     setStarting(true);
 
     try {
-      const response = await fetch(`/api/public/factures/${encodeURIComponent(token)}/paiement`, {
+      const path = provider === "paypal" ? "paypal" : "paiement";
+      const response = await fetch(`/api/public/factures/${encodeURIComponent(token)}/${path}`, {
         method: "POST",
         cache: "no-store",
       });
@@ -214,7 +224,7 @@ function InvoicePayment() {
             Cette facture est réglée. Merci — {invoice.companyName} en a reçu la confirmation.
           </span>
         </p>
-      ) : invoice.canPayOnline ? (
+      ) : invoice.canPayOnline || invoice.canPayPayPal ? (
         <>
           {returned === "annule" && (
             <p className="mt-5 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
@@ -228,10 +238,23 @@ function InvoicePayment() {
             </p>
           )}
 
-          <Button className="mt-5 w-full" onClick={() => void pay()} disabled={starting}>
-            {starting ? <Spinner /> : <CreditCard className="size-4" />}
-            Payer {formatAmount(invoice.outstanding, invoice.currency)}
-          </Button>
+          {invoice.canPayOnline && (
+            <Button className="mt-5 w-full" onClick={() => void pay("stripe")} disabled={starting}>
+              {starting ? <Spinner /> : <CreditCard className="size-4" />}
+              Payer {formatAmount(invoice.outstanding, invoice.currency)} par carte
+            </Button>
+          )}
+          {invoice.canPayPayPal && (
+            <Button
+              variant={invoice.canPayOnline ? "outline" : "default"}
+              className="mt-3 w-full"
+              onClick={() => void pay("paypal")}
+              disabled={starting}
+            >
+              {starting ? <Spinner /> : <Wallet className="size-4" />}
+              Payer {formatAmount(invoice.outstanding, invoice.currency)} avec PayPal
+            </Button>
+          )}
         </>
       ) : (
         <p className="mt-5 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">

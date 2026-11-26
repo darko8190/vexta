@@ -4,6 +4,9 @@ import { useState } from "react";
 import Link from "next/link";
 import { CalendarClock, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Field, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { EmployeeMultiSelect } from "@/components/team/employee-multi-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/layout/empty-state";
@@ -11,6 +14,8 @@ import { LoadErrorState } from "@/components/layout/load-error-state";
 import { useWorkTimesheetsQuery } from "@/hooks/use-work";
 import { formatDateOnly, todayIso } from "@/lib/dates";
 import { formatProjectNumber } from "@/lib/types";
+import { SortableHead } from "@/components/layout/sortable-head";
+import { byKeys, sortRows, type SortState } from "@/lib/table-sort";
 
 /** The Monday of the week a day falls in — the week a Québec payroll runs on. */
 function mondayOf(iso: string): string {
@@ -64,15 +69,26 @@ function weekday(iso: string): string {
  * fortnight without saying so.
  */
 export function WorkTimesheetsSection() {
-  const [week, setWeek] = useState(() => mondayOf(todayIso()));
-  // Monday to Sunday, both ends inclusive — the API filters with >= and <=, so handing it the
-  // next Monday would quietly bill eight days as a week.
-  const { data, isLoading, isError, error, refetch } = useWorkTimesheetsQuery({
-    from: week,
-    to: addDays(week, 6),
-  });
+  // A period, the current week to start: Monday to Sunday, both ends inclusive — the API filters
+  // with >= and <=, so handing it the next Monday would quietly bill eight days as a week.
+  const [from, setFrom] = useState(() => mondayOf(todayIso()));
+  const [to, setTo] = useState(() => addDays(mondayOf(todayIso()), 6));
+  const [employees, setEmployees] = useState<string[]>([]);
+  const { data, isLoading, isError, error, refetch } = useWorkTimesheetsQuery({ from, to });
 
-  const rows = data?.rows ?? [];
+  const rows = (data?.rows ?? []).filter(
+    (row) => employees.length === 0 || (row.employeeId != null && employees.includes(row.employeeId)),
+  );
+  // With people picked, the total is theirs; otherwise the server's, which counts past 200 rows.
+  const total = employees.length > 0 ? rows.reduce((sum, row) => sum + row.hours, 0) : (data?.totalHours ?? 0);
+  const week = mondayOf(from);
+
+  function moveWeek(weeks: number) {
+    const monday = shiftWeek(week, weeks);
+    setFrom(monday);
+    setTo(addDays(monday, 6));
+  }
+  const [sort, setSort] = useState<SortState | null>(null);
   const thisWeek = mondayOf(todayIso());
 
   return (
@@ -82,7 +98,7 @@ export function WorkTimesheetsSection() {
           <h2 className="text-base font-semibold text-foreground">Poinçons</h2>
           <p className="text-sm text-muted-foreground">
             {data
-              ? `Du ${formatDateOnly(data.from)} au ${formatDateOnly(data.to)} · ${hours(data.totalHours)} au total`
+              ? `Du ${formatDateOnly(data.from)} au ${formatDateOnly(data.to)} · ${hours(total)} au total`
               : "Les heures de toute l'équipe, toutes les feuilles ensemble."}
           </p>
         </div>
@@ -92,15 +108,18 @@ export function WorkTimesheetsSection() {
             variant="outline"
             size="icon"
             aria-label="Semaine précédente"
-            onClick={() => setWeek(shiftWeek(week, -1))}
+            onClick={() => moveWeek(-1)}
           >
             <ChevronLeft />
           </Button>
           <Button
             variant="outline"
             size="sm"
-            disabled={week === thisWeek}
-            onClick={() => setWeek(thisWeek)}
+            disabled={from === thisWeek && to === addDays(thisWeek, 6)}
+            onClick={() => {
+              setFrom(thisWeek);
+              setTo(addDays(thisWeek, 6));
+            }}
           >
             Cette semaine
           </Button>
@@ -108,11 +127,23 @@ export function WorkTimesheetsSection() {
             variant="outline"
             size="icon"
             aria-label="Semaine suivante"
-            onClick={() => setWeek(shiftWeek(week, 1))}
+            onClick={() => moveWeek(1)}
           >
             <ChevronRight />
           </Button>
         </div>
+      </div>
+
+      <div className="mb-4 flex flex-wrap items-end gap-3">
+        <Field className="w-auto">
+          <FieldLabel htmlFor="punch-from">Du</FieldLabel>
+          <Input id="punch-from" type="date" value={from} onChange={(event) => event.target.value && setFrom(event.target.value)} />
+        </Field>
+        <Field className="w-auto">
+          <FieldLabel htmlFor="punch-to">Au</FieldLabel>
+          <Input id="punch-to" type="date" value={to} onChange={(event) => event.target.value && setTo(event.target.value)} />
+        </Field>
+        <EmployeeMultiSelect value={employees} onChange={setEmployees} />
       </div>
 
       {isLoading ? (
@@ -140,15 +171,15 @@ export function WorkTimesheetsSection() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Jour</TableHead>
-                  <TableHead>Employé</TableHead>
-                  <TableHead>Projet</TableHead>
-                  <TableHead>Plage</TableHead>
-                  <TableHead className="text-right">Heures</TableHead>
+                  <SortableHead label="Jour" sortKey="jour" sort={sort} onSort={setSort} />
+                  <SortableHead label="Employé" sortKey="employe" sort={sort} onSort={setSort} />
+                  <SortableHead label="Projet" sortKey="projet" sort={sort} onSort={setSort} />
+                  <SortableHead label="Plage" sortKey="plage" sort={sort} onSort={setSort} />
+                  <SortableHead label="Heures" sortKey="heures" sort={sort} onSort={setSort} className="text-right" />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((row) => (
+                {sortRows(rows, sort, byKeys((row) => ({ jour: row.startDate, employe: row.employeeName, projet: row.projectNumber, plage: row.startTime, heures: row.hours }))).map((row) => (
                   <TableRow key={row.id}>
                     <TableCell className="whitespace-nowrap">
                       <span className="text-muted-foreground">{weekday(row.startDate)}</span>{" "}

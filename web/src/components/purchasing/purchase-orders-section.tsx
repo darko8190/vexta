@@ -36,6 +36,8 @@ import { purchaseOrderStatusBadgeVariant, purchaseOrderStatusLabels } from "@/li
 import { formatAmount } from "@/lib/money";
 import { formatProjectNumber } from "@/lib/types";
 import type { PurchaseOrder, PurchaseOrderStatus } from "@/lib/types";
+import { SortableHead } from "@/components/layout/sortable-head";
+import { byKeys, sortRows, type SortState } from "@/lib/table-sort";
 
 /** Base UI needs a value for every item, and "" is not one. */
 const ALL_STATUSES = "tous";
@@ -104,6 +106,7 @@ export function PurchaseOrdersSection() {
   );
 
   const items = data?.items ?? [];
+  const [sort, setSort] = useState<SortState | null>({ key: "numero", dir: "desc" });
   const filtered = Boolean(debounced || status);
 
   return (
@@ -189,17 +192,17 @@ export function PurchaseOrdersSection() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Commande</TableHead>
-                  <TableHead className="hidden sm:table-cell">Fournisseur</TableHead>
-                  <TableHead className="hidden lg:table-cell">Projet</TableHead>
-                  <TableHead className="hidden md:table-cell">Statut</TableHead>
-                  <TableHead className="hidden lg:table-cell">Promise</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
+                  <SortableHead label="Commande" sortKey="numero" sort={sort} onSort={setSort} />
+                  <SortableHead label="Fournisseur" sortKey="fournisseur" sort={sort} onSort={setSort} className="hidden sm:table-cell" />
+                  <SortableHead label="Projet" sortKey="projet" sort={sort} onSort={setSort} className="hidden lg:table-cell" />
+                  <SortableHead label="Statut" sortKey="statut" sort={sort} onSort={setSort} className="hidden md:table-cell" />
+                  <SortableHead label="Promise" sortKey="promise" sort={sort} onSort={setSort} className="hidden lg:table-cell" />
+                  <SortableHead label="Total" sortKey="total" sort={sort} onSort={setSort} className="text-right" />
                   <TableHead className="w-10" />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.map((order) => (
+                {sortRows(items, sort, byKeys((order) => ({ numero: order.number, fournisseur: order.supplierName, projet: order.projectNumber, statut: order.status, promise: order.expectedOn, total: order.total }))).map((order) => (
                   <TableRow key={order.id}>
                     <TableCell>
                       <span className="font-medium tabular-nums text-foreground">{order.number}</span>

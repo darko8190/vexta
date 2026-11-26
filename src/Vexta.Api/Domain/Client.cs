@@ -1,7 +1,11 @@
 namespace Vexta.Api.Domain;
 
-public class Client : IInvitable
+public class Client : IInvitable, ISoftDeletable
 {
+    // ---- Corbeille ----
+    public DateTimeOffset? DeletedAt { get; set; }
+    public Guid? DeletedByUserId { get; set; }
+
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid TenantId { get; set; }
     public Tenant? Tenant { get; set; }

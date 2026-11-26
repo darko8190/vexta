@@ -117,7 +117,11 @@ public enum InvoiceStatus
     Envoyee = 1,
     Payee = 2,
     EnRetard = 3,
-    Annulee = 4
+    Annulee = 4,
+    /// <summary>Some money in, not all of it.</summary>
+    PartiellementPayee = 5,
+    /// <summary>Paid and handed over to the accounting system: closed for good.</summary>
+    TransfereeComptabilite = 6
 }
 
 /// <summary>

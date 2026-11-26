@@ -34,7 +34,11 @@ public record PublicInvoiceDto(
     decimal Outstanding,
     bool IsPaid,
     bool IsCancelled,
-    bool CanPayOnline);
+    bool CanPayOnline,
+    bool CanPayPayPal = false);
+
+/// <summary>The order id PayPal appends to the URL it sends the customer back to.</summary>
+public record ConfirmPayPalRequest(string OrderId);
 
 /// <summary>The session id Stripe appends to the URL it sends the customer back to.</summary>
 public record ConfirmInvoicePaymentRequest(string SessionId);
@@ -61,6 +65,7 @@ public record ConfirmInvoicePaymentRequest(string SessionId);
 public class PublicInvoicePaymentController(
     VextaDbContext db,
     IStripeConnectService connect,
+    IPayPalService paypal,
     IFeatureService features,
     IConfiguration configuration,
     ILogger<PublicInvoicePaymentController> logger) : ControllerBase
@@ -129,6 +134,105 @@ public class PublicInvoicePaymentController(
     }
 
     /// <summary>
+    /// Starts a PayPal payment on the company's own PayPal account and hands back PayPal's page.
+    /// The amount is the invoice's outstanding figure, never one the caller names.
+    /// </summary>
+    [HttpPost("{token}/paypal")]
+    public async Task<ActionResult<object>> StartPayPal(string token, CancellationToken ct)
+    {
+        var found = await LoadAsync(token, ct);
+        if (found is null) return NotFound();
+
+        var (invoice, tenant) = found.Value;
+        var state = await BuildAsync(invoice, tenant, ct);
+        if (!state.CanPayPayPal)
+        {
+            return BadRequest(new { message = state.IsPaid ? "Cette facture est déjà réglée." : "Le paiement PayPal n'est pas offert pour cette facture." });
+        }
+
+        try
+        {
+            var (_, url) = await paypal.CreateOrderAsync(
+                tenant,
+                invoice.Id,
+                $"Facture {invoice.Number}",
+                state.Outstanding,
+                invoice.Currency,
+                returnUrl: $"{InvoicePayLink.Url(FrontendUrl, token)}?paypal=succes",
+                cancelUrl: $"{InvoicePayLink.Url(FrontendUrl, token)}?paiement=annule",
+                ct);
+            return Ok(new { url });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (HttpRequestException ex)
+        {
+            logger.LogWarning(ex, "PayPal injoignable pour la facture {Invoice}.", invoice.Id);
+            return BadRequest(new { message = "PayPal ne répond pas. Réessayez dans un instant." });
+        }
+    }
+
+    /// <summary>
+    /// Captures the PayPal order on the way back and records the payment, once. PayPal is asked
+    /// whether the order completed and for which invoice; the browser's word is not taken.
+    /// </summary>
+    [HttpPost("{token}/paypal/confirmation")]
+    public async Task<ActionResult<PublicInvoiceDto>> ConfirmPayPal(string token, ConfirmPayPalRequest request, CancellationToken ct)
+    {
+        var found = await LoadAsync(token, ct);
+        if (found is null) return NotFound();
+        var (invoice, tenant) = found.Value;
+
+        if (!string.IsNullOrWhiteSpace(request.OrderId) && request.OrderId.Length <= 64)
+        {
+            try
+            {
+                var capture = await paypal.CaptureOrderAsync(tenant, request.OrderId.Trim(), ct);
+                if (capture is not null && capture.InvoiceId == invoice.Id.ToString() && capture.Amount > 0)
+                {
+                    var reference = $"paypal:{capture.CaptureId}";
+                    var already = await db.InvoicePayments.IgnoreQueryFilters()
+                        .AnyAsync(p => p.InvoiceId == invoice.Id && p.Reference == reference, ct);
+                    if (!already)
+                    {
+                        db.InvoicePayments.Add(new Domain.InvoicePayment
+                        {
+                            TenantId = invoice.TenantId,
+                            InvoiceId = invoice.Id,
+                            Date = DateOnly.FromDateTime(DateTime.Now),
+                            Amount = InvoiceTotals.Round(capture.Amount),
+                            Method = Domain.PaymentMethod.PayPal,
+                            Reference = reference,
+                            Note = "Payé en ligne avec PayPal",
+                        });
+
+                        var billing = await db.BillingSettings.IgnoreQueryFilters().AsNoTracking()
+                            .FirstOrDefaultAsync(b => b.TenantId == invoice.TenantId, ct);
+                        var total = InvoiceTotals.For(invoice.Lines, billing, invoice.IsTaxExempt).Total;
+                        var takenBefore = await db.InvoicePayments.IgnoreQueryFilters()
+                            .Where(p => p.InvoiceId == invoice.Id).SumAsync(p => (decimal?)p.Amount, ct) ?? 0m;
+                        var paidBefore = InvoiceSettlement.Net(
+                            takenBefore, await InvoiceSettlement.RefundedAsync(db.InvoiceRefunds.IgnoreQueryFilters(), invoice.Id, ct));
+                        var credited = await InvoiceSettlement.CreditedAsync(db.InvoiceCredits.IgnoreQueryFilters(), invoice.Id, ct);
+                        InvoiceStatusRules.ApplyPaid(invoice, paidBefore + capture.Amount, total, credited);
+
+                        await db.SaveChangesAsync(ct);
+                        logger.LogInformation("Paiement PayPal de {Amount} enregistré sur la facture {Invoice}.", capture.Amount, invoice.Id);
+                    }
+                }
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or HttpRequestException)
+            {
+                logger.LogWarning(ex, "Confirmation PayPal impossible pour la facture {Invoice}.", invoice.Id);
+            }
+        }
+
+        return Ok(await BuildAsync(invoice, tenant, ct));
+    }
+
+    /// <summary>
     /// Records the payment on the way back from Stripe, so the page says "payé" without waiting
     /// for the webhook.
     ///
@@ -178,7 +282,7 @@ public class PublicInvoicePaymentController(
 
         var invoice = await db.Invoices.IgnoreQueryFilters()
             .Include(i => i.Lines)
-            .FirstOrDefaultAsync(i => i.PayToken == token, ct);
+            .FirstOrDefaultAsync(i => i.PayToken == token && i.DeletedAt == null, ct);
 
         if (invoice is null) return null;
 
@@ -237,6 +341,11 @@ public class PublicInvoicePaymentController(
                 && outstanding > 0
                 && included
                 && tenant.StripeChargesEnabled
-                && tenant.StripeAccountId is not null);
+                && tenant.StripeAccountId is not null,
+            CanPayPayPal: !cancelled
+                && outstanding > 0
+                && invoice.Status != InvoiceStatus.TransfereeComptabilite
+                && tenant.PayPalSecretProtected is not null
+                && await features.IsEnabledAsync(FeatureKeys.PayPal, invoice.TenantId, ct));
     }
 }

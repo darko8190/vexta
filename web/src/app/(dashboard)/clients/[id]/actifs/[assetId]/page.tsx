@@ -3,7 +3,8 @@
 import { use, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Car, FolderKanban, Info, ListChecks, Plus, Wrench } from "lucide-react";
+import { ArrowLeft, Car, FolderKanban, History, Info, ListChecks, Plus, Wrench } from "lucide-react";
+import { SendHistoryCard } from "@/components/layout/send-history-card";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { InlineSheet } from "@/components/ui/sheet";
@@ -252,6 +253,7 @@ export default function ClientAssetPage({
     { key: "entretiens", label: "Entretiens", icon: Wrench },
     { key: "projets", label: "Projets", icon: FolderKanban },
     { key: "taches", label: "Tâches", icon: ListChecks },
+    { key: "envois", label: "Historique d'envois", icon: History },
   ];
 
   return (
@@ -313,6 +315,7 @@ export default function ClientAssetPage({
           {section === "entretiens" && <AssetMaintenanceSection clientId={clientId} assetId={asset.id} />}
           {section === "projets" && <AssetProjects clientId={clientId} assetId={asset.id} />}
           {section === "taches" && <AssetTasks clientId={clientId} assetId={asset.id} />}
+          {section === "envois" && <SendHistoryCard type="actif" id={asset.id} className="max-w-2xl" />}
         </div>
       </div>
     </div>

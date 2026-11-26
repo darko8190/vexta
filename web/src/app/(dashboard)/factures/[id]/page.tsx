@@ -3,7 +3,7 @@
 import { use, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowUpRight, FileText, Pencil, Send, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, FileText, FolderKanban, Pencil, Send, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -25,6 +25,7 @@ import { InvoiceCreditsSection } from "@/components/invoices/invoice-credits-sec
 import { InvoiceRefundsSection } from "@/components/invoices/invoice-refunds-section";
 import { PdfViewer } from "@/components/layout/pdf-viewer";
 import { InvoiceSendDialog } from "@/components/invoices/invoice-send-dialog";
+import { SendHistoryCard } from "@/components/layout/send-history-card";
 import { InvoiceRecurrenceCard } from "@/components/invoices/invoice-recurrence-card";
 import { useIsClientUser } from "@/hooks/use-can-create";
 import { useDeleteInvoice, useInvoiceQuery } from "@/hooks/use-invoices";
@@ -122,6 +123,16 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
               {invoice.clientName}
             </h1>
           </div>
+
+          {invoice.projectId && (
+            <Link
+              href={`/projets/${invoice.projectId}`}
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }), isClient ? "" : "order-first sm:order-none")}
+            >
+              <FolderKanban />
+              Voir le projet
+            </Link>
+          )}
 
           {!isClient && (
             <div className="flex items-center gap-2">
@@ -221,7 +232,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       {/* The preview moves beside the lines only at 2xl, the same width the invoice form
           switches at: a 30rem document next to a table of amounts clips one of the two, and a
           total nobody can read is worse than a document further down the page. */}
-      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_30rem]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(34rem,46%)]">
         {/* One grid child, two stacked panels. Placing the payments with col-start would leave
             the preview to auto-place itself beside them instead of beside the lines. */}
         <div className="min-w-0 space-y-6">
@@ -304,6 +315,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           <InvoiceRecurrenceCard invoiceId={invoice.id} invoiceNumber={invoice.number} />
         )}
 
+        {!isClient && <SendHistoryCard type="facture" id={invoice.id} />}
+
         {/* Under the lines, in the same column: the money that came in belongs beside the
             money that was asked for, and a customer reading their own invoice sees what they
             have paid on it. A draft has nothing to pay yet — the API refuses it and says why,
@@ -322,7 +335,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
 
         {/* Beside the lines on a wide screen, under them otherwise. Sticky so the document
             stays in view while a long list of lines is being read. */}
-        <aside className="2xl:sticky 2xl:top-6 2xl:self-start">
+        <aside className="xl:sticky xl:top-6 xl:self-start">
           <PdfViewer
             url={pdf.url}
             loading={pdf.loading}
@@ -341,7 +354,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         open={confirmDelete}
         onOpenChange={setConfirmDelete}
         title="Supprimer cette facture ?"
-        description={`La facture ${invoice.number} sera supprimée définitivement.`}
+        description={`La facture ${invoice.number} ira à la corbeille (Paramètres). Vous pourrez la restaurer.`}
         onConfirm={onDelete}
         pending={deleteInvoice.isPending}
       />

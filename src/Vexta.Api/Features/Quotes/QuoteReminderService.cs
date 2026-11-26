@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Vexta.Api.Common;
 using Vexta.Api.Data;
 using Vexta.Api.Domain;
+using Vexta.Api.Features.Sends;
 using Vexta.Api.Features.Invoices;
 using Vexta.Api.Services;
 
@@ -149,6 +150,8 @@ public class QuoteReminderService(
                     logger.LogWarning("Quote reminder for {QuoteId} not sent: {Reason}", quote.Id, ex.Message);
                     continue;
                 }
+
+                SendHistory.Add(db, quote.TenantId, "soumission", quote.Id, "Relance", to, subject);
 
                 quote.ReminderSentAt = DateTimeOffset.UtcNow;
                 quote.ReminderCount++;

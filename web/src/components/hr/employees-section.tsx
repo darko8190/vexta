@@ -34,6 +34,8 @@ import {
 import { ApiError } from "@/lib/api";
 import { userRoleLabels } from "@/lib/labels";
 import type { AccessGranted, Employee } from "@/lib/types";
+import { SortableHead } from "@/components/layout/sortable-head";
+import { byKeys, sortRows, type SortState } from "@/lib/table-sort";
 
 function message(error: unknown, fallback: string): string {
   return error instanceof ApiError ? error.message : fallback;
@@ -99,6 +101,7 @@ export function EmployeesSection() {
 
   const seats = data?.seats;
   const employees = data?.employees ?? [];
+  const [sort, setSort] = useState<SortState | null>(null);
 
   const blockedReason =
     seats?.limitReason ??
@@ -230,17 +233,17 @@ export function EmployeesSection() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Employé</TableHead>
-                <TableHead>Courriel</TableHead>
-                <TableHead>Titre</TableHead>
-                <TableHead className="w-36">Rôle</TableHead>
+                <SortableHead label="Employé" sortKey="nom" sort={sort} onSort={setSort} />
+                <SortableHead label="Courriel" sortKey="courriel" sort={sort} onSort={setSort} />
+                <SortableHead label="Titre" sortKey="titre" sort={sort} onSort={setSort} />
+                <SortableHead label="Rôle" sortKey="role" sort={sort} onSort={setSort} className="w-36" />
                 <TableHead className="w-20 text-center">Accès</TableHead>
                 <TableHead className="w-40">État</TableHead>
                 <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {employees.map((employee) => (
+              {sortRows(employees, sort, byKeys((employee) => ({ nom: `${employee.lastName} ${employee.firstName}`, courriel: employee.email, titre: employee.jobTitle, role: employee.role }))).map((employee) => (
                 <ClickableRow
                   key={employee.id}
                   label={`Ouvrir la fiche de ${employee.firstName} ${employee.lastName}`}

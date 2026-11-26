@@ -19,6 +19,9 @@ public enum PaymentMethod
     /// </summary>
     PorteAuCompte = 5,
 
+    /// <summary>Paid through the company's PayPal account, online.</summary>
+    PayPal = 7,
+
     Autre = 6
 }
 

@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { isCrewHiddenRoute, useIsCrewView } from "@/hooks/use-can-create";
 import { Lock } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,7 +27,17 @@ const CLIENT_ROUTES = ["/tableau-de-bord", "/projets", "/soumissions", "/facture
 export function ClientRouteGuard({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const pathname = usePathname();
+  const router = useRouter();
+  const isCrew = useIsCrewView();
+  const crewBlocked = isCrew && isCrewHiddenRoute(pathname);
 
+  // The crew's day starts from their assignments: the dashboard, the project list and the tools
+  // belong to the office, and a bookmark or the logo should not land them there.
+  useEffect(() => {
+    if (crewBlocked) router.replace("/mes-assignations");
+  }, [crewBlocked, router]);
+
+  if (crewBlocked) return null;
   if (user?.role !== "Client") return children;
   if (CLIENT_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`))) {
     return children;

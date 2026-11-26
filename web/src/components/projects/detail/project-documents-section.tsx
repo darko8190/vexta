@@ -22,6 +22,8 @@ import { NoteThread } from "@/components/projects/detail/note-thread";
 import { useDeleteProjectDocument, useProjectDocumentsQuery, type FileOwner } from "@/hooks/use-project-files";
 import { useIsClientUser } from "@/hooks/use-can-create";
 import { ApiError } from "@/lib/api";
+import { matchesSearch } from "@/lib/text-match";
+import { SearchInput } from "@/components/layout/search-input";
 import { formatDateOnly } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 import type { ProjectDocument } from "@/lib/types";
@@ -62,7 +64,10 @@ export function ProjectDocumentsSection({ projectId }: { projectId: string | Fil
   const [editing, setEditing] = useState<ProjectDocument | undefined>(undefined);
   const [deleteTarget, setDeleteTarget] = useState<ProjectDocument | undefined>(undefined);
 
-  const documents = data ?? [];
+  const [search, setSearch] = useState("");
+  const documents = (data ?? []).filter((document) =>
+    matchesSearch(search, document.title, document.category, document.fileName),
+  );
 
   function openCreate() {
     setEditing(undefined);
@@ -99,6 +104,12 @@ export function ProjectDocumentsSection({ projectId }: { projectId: string | Fil
         </div>
         {!isClient && addButton}
       </div>
+
+      {(data?.length ?? 0) > 0 && (
+        <div className="mb-4">
+          <SearchInput value={search} onChange={setSearch} placeholder="Rechercher un document…" />
+        </div>
+      )}
 
       {isLoading ? (
         <div className="space-y-2">

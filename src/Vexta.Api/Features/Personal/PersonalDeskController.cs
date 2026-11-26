@@ -40,6 +40,28 @@ public record MyJobDto(
 /// The payment link, when the company gave the invoice one and still takes cards. Null
 /// otherwise, and the row then simply has no button.
 /// </param>
+public record MyInvoiceLineDto(string Description, decimal Quantity, decimal UnitPrice, decimal Total);
+
+/// <summary>One invoice in full, for the person it is addressed to.</summary>
+public record MyInvoiceDetailDto(
+    Guid Id,
+    string Number,
+    string CompanyName,
+    string ClientName,
+    DateOnly IssueDate,
+    DateOnly DueDate,
+    string Currency,
+    InvoiceStatus Status,
+    string? Notes,
+    IReadOnlyList<MyInvoiceLineDto> Lines,
+    decimal Subtotal,
+    decimal Gst,
+    decimal Qst,
+    decimal Total,
+    decimal Paid,
+    decimal Outstanding,
+    string? PayToken);
+
 public record MyInvoiceDto(
     Guid Id,
     string Number,
@@ -141,43 +163,12 @@ public class PersonalDeskController(VextaDbContext db, ICurrentUserService curre
     {
         if (currentUser.UserId is not { } userId) return Forbid();
 
-        // Which customer file this person is, in which company. A membership with no ClientId is
-        // somebody who works there, and their employer's whole invoice book is not theirs to
-        // read from here.
-        var clientIds = await db.TenantMemberships.IgnoreQueryFilters().AsNoTracking()
-            .Where(m => m.UserId == userId && m.Role == UserRole.Client && m.ClientId != null)
-            .Select(m => m.ClientId!.Value)
-            .ToListAsync(ct);
+        var mine = await MyClientIdsAsync(userId, ct);
 
-        // A client record can also carry the account directly, which is how a particulier was
-        // invited before memberships existed. Both are counted, and the set removes the overlap.
-        var direct = await db.Clients.IgnoreQueryFilters().AsNoTracking()
-            .Where(c => c.UserId == userId)
-            .Select(c => c.Id)
-            .ToListAsync(ct);
-
-        // And a customer file carrying this person's address, once they have proved the address
-        // is theirs. A company that typed it on the file sent its invoices there; somebody who
-        // later signs up with it is that customer, but only the inbox can say so.
-        var byEmail = new List<Guid>();
-        var account = await db.Users.AsNoTracking()
-            .Where(u => u.Id == userId)
-            .Select(u => new { u.Email, u.EmailConfirmed })
-            .FirstOrDefaultAsync(ct);
-        if (account is { EmailConfirmed: true, Email: { Length: > 0 } email })
-        {
-            var normalized = email.Trim().ToLower();
-            byEmail = await db.Clients.IgnoreQueryFilters().AsNoTracking()
-                .Where(c => c.Email != null && c.Email.Trim().ToLower() == normalized)
-                .Select(c => c.Id)
-                .ToListAsync(ct);
-        }
-
-        var mine = clientIds.Concat(direct).Concat(byEmail).ToHashSet();
         if (mine.Count == 0) return Ok(new List<MyInvoiceDto>());
 
         var rows = await db.Invoices.IgnoreQueryFilters().AsNoTracking()
-            .Where(i => mine.Contains(i.ClientId) && i.Status != InvoiceStatus.Brouillon)
+            .Where(i => mine.Contains(i.ClientId) && i.Status != InvoiceStatus.Brouillon && i.DeletedAt == null)
             .Select(i => new
             {
                 i.Id,
@@ -199,7 +190,7 @@ public class PersonalDeskController(VextaDbContext db, ICurrentUserService curre
 
         var companies = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
             .Where(t => tenantIds.Contains(t.Id))
-            .Select(t => new { t.Id, t.Name, t.Slug, t.StripeChargesEnabled, t.StripeAccountId })
+            .Select(t => new { t.Id, t.Name, t.Slug, t.StripeChargesEnabled, t.StripeAccountId, PayPal = t.PayPalSecretProtected != null })
             .ToDictionaryAsync(t => t.Id, t => t, ct);
 
         var published = await PublishedSlugsAsync(tenantIds, ct);
@@ -246,8 +237,7 @@ public class PersonalDeskController(VextaDbContext db, ICurrentUserService curre
                 // The link is offered only when pressing it would work: the company has an
                 // account that can take cards, and there is something left to pay.
                 var canPay = company is not null
-                    && company.StripeAccountId is not null
-                    && company.StripeChargesEnabled
+                    && ((company.StripeAccountId is not null && company.StripeChargesEnabled) || company.PayPal)
                     && outstanding > 0
                     && r.Status != InvoiceStatus.Annulee;
 
@@ -272,6 +262,110 @@ public class PersonalDeskController(VextaDbContext db, ICurrentUserService curre
             .ToList();
 
         return Ok(items);
+    }
+
+    /// <summary>
+    /// Which customer files are this person's, in every company: by membership, by the account
+    /// on the file, and by a confirmed address matching the file's.
+    /// </summary>
+    private async Task<HashSet<Guid>> MyClientIdsAsync(Guid userId, CancellationToken ct)
+    {
+        // Which customer file this person is, in which company. A membership with no ClientId is
+        // somebody who works there, and their employer's whole invoice book is not theirs to
+        // read from here.
+        var clientIds = await db.TenantMemberships.IgnoreQueryFilters().AsNoTracking()
+            .Where(m => m.UserId == userId && m.Role == UserRole.Client && m.ClientId != null)
+            .Select(m => m.ClientId!.Value)
+            .ToListAsync(ct);
+
+        // A client record can also carry the account directly, which is how a particulier was
+        // invited before memberships existed. Both are counted, and the set removes the overlap.
+        var direct = await db.Clients.IgnoreQueryFilters().AsNoTracking()
+            .Where(c => c.UserId == userId)
+            .Select(c => c.Id)
+            .ToListAsync(ct);
+
+        // And a customer file carrying this person's address, once they have proved the address
+        // is theirs. A company that typed it on the file sent its invoices there; somebody who
+        // later signs up with it is that customer, but only the inbox can say so.
+        var byEmail = new List<Guid>();
+        var account = await db.Users.AsNoTracking()
+            .Where(u => u.Id == userId)
+            .Select(u => new { u.Email, u.EmailConfirmed })
+            .FirstOrDefaultAsync(ct);
+        if (account is { EmailConfirmed: true, Email: { Length: > 0 } email })
+        {
+            var normalized = email.Trim().ToLower();
+            byEmail = await db.Clients.IgnoreQueryFilters().AsNoTracking()
+                .Where(c => c.Email != null && c.Email.Trim().ToLower() == normalized)
+                .Select(c => c.Id)
+                .ToListAsync(ct);
+        }
+
+        return clientIds.Concat(direct).Concat(byEmail).ToHashSet();
+    }
+
+    /// <summary>
+    /// One of this person's invoices, with its lines, to read in full from their space. When it
+    /// can be paid online, the pay link is made on the spot if the invoice never had one.
+    /// </summary>
+    [HttpGet("factures/{id:guid}")]
+    public async Task<ActionResult<MyInvoiceDetailDto>> InvoiceDetail(Guid id, CancellationToken ct)
+    {
+        if (currentUser.UserId is not { } userId) return Forbid();
+        var mine = await MyClientIdsAsync(userId, ct);
+
+        var invoice = await db.Invoices.IgnoreQueryFilters()
+            .Include(i => i.Lines)
+            .FirstOrDefaultAsync(i => i.Id == id && mine.Contains(i.ClientId) && i.Status != InvoiceStatus.Brouillon && i.DeletedAt == null, ct);
+        if (invoice is null) return NotFound();
+
+        var company = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
+            .Where(t => t.Id == invoice.TenantId)
+            .Select(t => new { t.Name, t.StripeAccountId, t.StripeChargesEnabled, PayPal = t.PayPalSecretProtected != null })
+            .FirstAsync(ct);
+        var settings = await db.BillingSettings.IgnoreQueryFilters().AsNoTracking()
+            .FirstOrDefaultAsync(b => b.TenantId == invoice.TenantId, ct);
+        var clientName = await db.Clients.IgnoreQueryFilters().AsNoTracking()
+            .Where(c => c.Id == invoice.ClientId).Select(c => c.Name).FirstOrDefaultAsync(ct) ?? "";
+
+        var totals = InvoiceTotals.For(invoice.Lines, settings, invoice.IsTaxExempt);
+        var paidRows = await db.InvoicePayments.IgnoreQueryFilters().AsNoTracking()
+            .Where(p => p.InvoiceId == id).SumAsync(p => (decimal?)p.Amount, ct) ?? 0m;
+        var refunded = await InvoiceSettlement.RefundedAsync(db.InvoiceRefunds.IgnoreQueryFilters().AsNoTracking(), id, ct);
+        var credited = await InvoiceSettlement.CreditedAsync(db.InvoiceCredits.IgnoreQueryFilters().AsNoTracking(), id, ct);
+        var paid = InvoiceSettlement.Net(paidRows, refunded);
+        var outstanding = InvoiceSettlement.Outstanding(totals.Total, credited, paid);
+
+        var canPay = ((company.StripeAccountId is not null && company.StripeChargesEnabled) || company.PayPal)
+            && outstanding > 0 && invoice.Status is not (InvoiceStatus.Annulee or InvoiceStatus.TransfereeComptabilite);
+        string? token = null;
+        if (canPay)
+        {
+            var hadToken = !string.IsNullOrWhiteSpace(invoice.PayToken);
+            token = InvoicePayLink.EnsureToken(invoice);
+            if (!hadToken) await db.SaveChangesAsync(ct);
+        }
+
+        return Ok(new MyInvoiceDetailDto(
+            invoice.Id,
+            invoice.Number,
+            company.Name,
+            clientName,
+            invoice.IssueDate,
+            invoice.DueDate,
+            invoice.Currency,
+            invoice.Status,
+            invoice.Notes,
+            [.. invoice.Lines.OrderBy(l => l.SortOrder).Select(l => new MyInvoiceLineDto(
+                l.Description, l.Quantity, l.UnitPrice, InvoiceTotals.Round(l.Quantity * l.UnitPrice)))],
+            totals.Subtotal,
+            totals.Gst,
+            totals.Qst,
+            InvoiceTotals.Round(totals.Total),
+            InvoiceTotals.Round(paid),
+            outstanding,
+            token));
     }
 
     /// <summary>

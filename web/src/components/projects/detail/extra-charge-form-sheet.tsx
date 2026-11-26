@@ -6,6 +6,7 @@ import { Controller, useForm } from "react-hook-form";
 import * as z from "zod";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { RequiredMark } from "@/components/ui/required-mark";
@@ -28,6 +29,7 @@ import { ApiError } from "@/lib/api";
 import { marginPercentFrom, sellingPriceFrom } from "@/lib/pricing";
 import type { MarginMode, ProjectExtraCharge } from "@/lib/types";
 import { ex } from "@/lib/placeholders";
+import { todayIso } from "@/lib/dates";
 
 const formSchema = z.object({
   name: z.string().trim().min(1, "Le nom est requis.").max(200, "200 caractères maximum."),
@@ -37,6 +39,7 @@ const formSchema = z.object({
   sellingPrice: z.string(),
   chargedOn: z.string(),
   projectTaskId: z.string(),
+  isBillable: z.boolean(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -71,8 +74,10 @@ function toFormValues(mode: MarginMode, charge?: ProjectExtraCharge, defaultTask
     cost: amountField(charge?.cost),
     marginPercent: margin == null ? "" : decimalField(margin),
     sellingPrice: amountField(charge?.sellingPrice),
-    chargedOn: charge?.chargedOn ?? "",
+    // Today for a new one: a charge is nearly always filed the day it is incurred.
+    chargedOn: charge ? (charge.chargedOn ?? "") : todayIso(),
     projectTaskId: charge ? (charge.projectTaskId ?? "") : (defaultTaskId ?? ""),
+    isBillable: charge?.isBillable ?? true,
   };
 }
 
@@ -150,6 +155,7 @@ export function ExtraChargeFormSheet({
           sellingPrice,
           chargedOn: values.chargedOn || null,
           projectTaskId: values.projectTaskId || null,
+          isBillable: values.isBillable,
         },
       });
 
@@ -162,7 +168,7 @@ export function ExtraChargeFormSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-lg">
+      <SheetContent layout="dialog" className="sm:max-w-lg">
         <SheetHeader>
           <SheetTitle>{isEditing ? "Modifier le frais" : "Nouveau frais"}</SheetTitle>
           <SheetDescription>
@@ -182,6 +188,17 @@ export function ExtraChargeFormSheet({
           noValidate
         >
           <FieldGroup>
+            <Controller
+              name="chargedOn"
+              control={form.control}
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel htmlFor="charge-date">Date</FieldLabel>
+                  <Input {...field} id="charge-date" type="date" />
+                </Field>
+              )}
+            />
+
             <Controller
               name="name"
               control={form.control}
@@ -288,17 +305,6 @@ export function ExtraChargeFormSheet({
             </FieldDescription>
 
             <Controller
-              name="chargedOn"
-              control={form.control}
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel htmlFor="charge-date">Date</FieldLabel>
-                  <Input {...field} id="charge-date" type="date" />
-                </Field>
-              )}
-            />
-
-            <Controller
               name="projectTaskId"
               control={form.control}
               render={({ field }) => (
@@ -308,6 +314,19 @@ export function ExtraChargeFormSheet({
                   value={field.value || null}
                   onChange={(taskId) => field.onChange(taskId ?? "")}
                 />
+              )}
+            />
+
+            <Controller
+              name="isBillable"
+              control={form.control}
+              render={({ field }) => (
+                <Field orientation="horizontal">
+                  <Checkbox id="charge-billable" checked={field.value} onCheckedChange={(v) => field.onChange(Boolean(v))} />
+                  <FieldLabel htmlFor="charge-billable" className="font-normal">
+                    Facturer au projet (ajouté à la facture)
+                  </FieldLabel>
+                </Field>
               )}
             />
           </FieldGroup>

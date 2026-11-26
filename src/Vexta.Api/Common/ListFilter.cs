@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Linq.Expressions;
 using Microsoft.AspNetCore.Http;
 
 namespace Vexta.Api.Common;
@@ -35,6 +36,40 @@ public class ListFilter(IQueryCollection query)
     /// <summary>An ILike pattern for "contains", or null when nothing was typed.</summary>
     public string? Contains(string key) =>
         Raw(key) is { } text ? $"%{text.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_")}%" : null;
+
+    /// <summary>The column the list is sorted by (<c>tri</c>), or null for the list's default.</summary>
+    public string? SortKey =>
+        query.TryGetValue("tri", out var value) && !string.IsNullOrWhiteSpace(value) ? value.ToString().Trim() : null;
+
+    /// <summary>Descending unless <c>ordre=asc</c>: the newest, the largest first.</summary>
+    public bool SortDescending =>
+        !(query.TryGetValue("ordre", out var value) && string.Equals(value.ToString(), "asc", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>A sort key, typed, for the table of keys handed to <see cref="Sort{T}"/>.</summary>
+    public static LambdaExpression By<T, TKey>(Expression<Func<T, TKey>> key) => key;
+
+    /// <summary>
+    /// Orders the list by the column asked for when the list knows it, by its default otherwise.
+    /// The keys are the screen's column names, like the filters.
+    /// </summary>
+    public IQueryable<T> Sort<T>(
+        IQueryable<T> source,
+        IReadOnlyDictionary<string, LambdaExpression> keys,
+        LambdaExpression fallback,
+        bool fallbackDescending = true)
+    {
+        var (expression, descending) = SortKey is { } key && keys.TryGetValue(key, out var chosen)
+            ? (chosen, SortDescending)
+            : (fallback, fallbackDescending);
+
+        var call = Expression.Call(
+            typeof(Queryable),
+            descending ? nameof(Queryable.OrderByDescending) : nameof(Queryable.OrderBy),
+            [typeof(T), expression.ReturnType],
+            source.Expression,
+            Expression.Quote(expression));
+        return source.Provider.CreateQuery<T>(call);
+    }
 
     private static decimal? Number(string? raw) =>
         raw is not null && decimal.TryParse(raw.Replace(',', '.'), NumberStyles.Number, CultureInfo.InvariantCulture, out var n) ? n : null;

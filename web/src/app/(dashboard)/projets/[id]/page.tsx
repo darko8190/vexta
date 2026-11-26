@@ -13,8 +13,10 @@ import {
   Info,
   ListChecks,
   MapPin,
+  Package,
   Plus,
   Receipt,
+  UserRound,
   Wrench,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +27,7 @@ import { EmptyState } from "@/components/layout/empty-state";
 import { SectionNav, type NavSection } from "@/components/layout/section-nav";
 import { ProjectFormSheet } from "@/components/projects/project-form-sheet";
 import { ProjectStatusSelect } from "@/components/projects/project-status-select";
+import { BilledNotice } from "@/components/projects/detail/billed-notice";
 import { ProjectCostTable } from "@/components/projects/detail/project-cost-table";
 import { ProjectDocumentsSection } from "@/components/projects/detail/project-documents-section";
 import { ProjectEquipmentSection } from "@/components/projects/detail/project-equipment-section";
@@ -34,7 +37,7 @@ import { ProjectMaterialsSection } from "@/components/projects/detail/project-ma
 import { ProjectTasksSection } from "@/components/projects/detail/project-tasks-section";
 import { ProjectTimesheetsSection } from "@/components/projects/detail/project-timesheets-section";
 import { ProjectInvoicesSection } from "@/components/projects/detail/project-invoices-section";
-import { SectionPlaceholder } from "@/components/projects/detail/section-placeholder";
+import { ProjectAssembliesSection } from "@/components/projects/detail/project-assemblies-section";
 import { useIsClientUser } from "@/hooks/use-can-create";
 import { useProjectQuery, useProjectSummaryQuery } from "@/hooks/use-projects";
 import { projectStatusBadgeVariant, projectStatusLabels } from "@/lib/labels";
@@ -201,8 +204,28 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             )}
           </div>
 
+          {/* Straight to the records this job hangs off. */}
+          {!isClient && (
+            <div className="flex flex-wrap gap-2">
+              <Link href={`/clients/${project.clientId}`} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+                <UserRound />
+                Fiche du client
+              </Link>
+              {project.clientAssetId && (
+                <Link
+                  href={`/clients/${project.clientId}/actifs/${project.clientAssetId}`}
+                  className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+                >
+                  <Package />
+                  Fiche de l&apos;actif
+                </Link>
+              )}
+            </div>
+          )}
         </div>
       </div>
+
+      {locked && !isClient && <BilledNotice projectId={project.id} className="mb-6" />}
 
       {/* The rail sits beside the content from md up and becomes a scrollable row below it.
           From xl, the money joins them as a third column: the job's figures stay in view
@@ -263,7 +286,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                     <dt className="text-muted-foreground">Actif</dt>
                     <dd className="text-foreground">
                       <Link
-                        href={`/clients/${project.clientId}`}
+                        href={project.clientAssetId ? `/clients/${project.clientId}/actifs/${project.clientAssetId}` : `/clients/${project.clientId}`}
                         className="underline-offset-4 hover:underline"
                       >
                         {project.clientAssetLabel}
@@ -321,13 +344,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
           {section === "equipements" && <ProjectEquipmentSection projectId={project.id} locked={locked} />}
 
-          {section === "assemblages" && (
-            <SectionPlaceholder
-              icon={Blocks}
-              title="Assemblages"
-              description="Les ensembles préparés d'avance et installés tels quels."
-            />
-          )}
+          {section === "assemblages" && <ProjectAssembliesSection projectId={project.id} locked={locked} />}
 
           {section === "feuilles-de-temps" && (
             <ProjectTimesheetsSection projectId={project.id} locked={locked} />
@@ -349,9 +366,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         {!isClient && (
           <aside
             aria-label="Montants du projet"
-            // Tighter cells than in the page body: five columns of money in a side column, where
-            // the default padding would push the margin out of view behind a scrollbar.
-            className="hidden w-96 shrink-0 self-start xl:sticky xl:top-0 xl:block 2xl:w-[28rem] [&_td]:px-1.5 [&_td]:text-xs [&_th]:px-1.5 [&_th]:text-xs"
+            // Wide enough for five columns of money at the body size: the sub-tab rail is now a
+            // strip of icons, and the room it gave back goes to the figures.
+            className="hidden w-[30rem] shrink-0 self-start xl:sticky xl:top-0 xl:block 2xl:w-[36rem] [&_td]:px-2 [&_th]:px-2"
           >
             <h2 className="mb-3 text-base font-semibold text-foreground">Montants</h2>
             <ProjectCostTable costs={summary?.costs} isLoading={summaryLoading} />

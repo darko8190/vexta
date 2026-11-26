@@ -17,12 +17,15 @@ import { ClickableRow } from "@/components/layout/clickable-row";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
 import { LoadErrorState } from "@/components/layout/load-error-state";
-import { BilledNotice } from "@/components/projects/detail/billed-notice";
 import { ExpenseFormSheet } from "@/components/projects/detail/expense-form-sheet";
 import { useDeleteExpense, useExpensesQuery } from "@/hooks/use-expenses";
 import { ApiError } from "@/lib/api";
+import { matchesSearch } from "@/lib/text-match";
+import { SearchInput } from "@/components/layout/search-input";
 import { formatDateOnly } from "@/lib/dates";
 import type { ProjectExpense } from "@/lib/types";
+import { SortableHead } from "@/components/layout/sortable-head";
+import { byKeys, sortRows, type SortState } from "@/lib/table-sort";
 
 function money(amount: number | null): string {
   if (amount == null) return "—";
@@ -68,7 +71,11 @@ export function ProjectExpensesSection({
   const [editing, setEditing] = useState<ProjectExpense | undefined>(undefined);
   const [deleteTarget, setDeleteTarget] = useState<ProjectExpense | undefined>(undefined);
 
-  const expenses = (data ?? []).filter((expense) => !taskId || expense.projectTaskId === taskId);
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<SortState | null>(null);
+  const expenses = (data ?? []).filter(
+    (expense) => (!taskId || expense.projectTaskId === taskId) && matchesSearch(search, expense.name, expense.description, expense.expenseTypeName, expense.projectTaskTitle),
+  );
 
   // Both still check the lock although neither has a button when it is on: the guard is what
   // makes the panel unreachable, rather than it merely having nothing left to press.
@@ -114,7 +121,11 @@ export function ProjectExpensesSection({
         {createButton}
       </div>
 
-      {locked && <BilledNotice />}
+      {(data?.length ?? 0) > 0 && (
+        <div className="mb-4">
+          <SearchInput value={search} onChange={setSearch} placeholder="Rechercher une dépense…" />
+        </div>
+      )}
 
       {isLoading ? (
         <div className="space-y-2">
@@ -141,21 +152,26 @@ export function ProjectExpensesSection({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Dépense</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead className="w-28">Date</TableHead>
-                <TableHead className="w-28 text-right">Coût</TableHead>
-                <TableHead className="w-28 text-right">Vendant</TableHead>
-                <TableHead className="w-20 text-center">Photos</TableHead>
+                <SortableHead label="Dépense" sortKey="nom" sort={sort} onSort={setSort} />
+                <SortableHead label="Type" sortKey="type" sort={sort} onSort={setSort} />
+                <SortableHead label="Date" sortKey="date" sort={sort} onSort={setSort} className="w-28" />
+                <SortableHead label="Coût" sortKey="cout" sort={sort} onSort={setSort} className="w-28 text-right" />
+                <SortableHead label="Vendant" sortKey="vendant" sort={sort} onSort={setSort} className="w-28 text-right" />
+                <SortableHead label="Photos" sortKey="photos" sort={sort} onSort={setSort} className="w-20 text-center" />
                 {!locked && <TableHead className="w-10" />}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {expenses.map((expense) => {
+              {sortRows(expenses, sort, byKeys((expense) => ({ nom: expense.name, type: expense.expenseTypeName, date: expense.spentOn, cout: expense.cost, vendant: expense.sellingPrice, photos: expense.photoCount }))).map((expense) => {
                 const cells = (
                   <>
                     <TableCell className="font-medium">
                       {expense.name}
+                      {!expense.isBillable && (
+                        <Badge variant="outline" className="ml-2 font-normal">
+                          Non facturé
+                        </Badge>
+                      )}
                       {expense.description && (
                         <div className="line-clamp-1 text-xs font-normal text-muted-foreground">
                           {expense.description}

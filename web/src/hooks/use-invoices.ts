@@ -58,12 +58,14 @@ export function useInvoicesQuery(
   clientId?: string,
   status?: InvoiceStatus,
   projectId?: string,
+  /** The sort, already as query parameters (see sortToQuery). */
+  sort: Record<string, string> = {},
 ) {
   return useQuery({
-    queryKey: ["invoices", page, search, clientId, status, projectId],
+    queryKey: ["invoices", page, search, clientId, status, projectId, sort],
     queryFn: () =>
       api.get<PagedResult<InvoiceRecord>>(
-        `invoices${buildQuery({ page, search, clientId, status, projectId })}`,
+        `invoices${buildQuery({ page, search, clientId, status, projectId, ...sort })}`,
       ),
     placeholderData: (previous) => previous,
   });
@@ -149,7 +151,9 @@ export function useSendInvoice(base: SendBase = "invoices") {
   return useMutation({
     mutationFn: ({ id, values }: { id: string; values: SendInvoiceValues }) =>
       api.post<{ email: string; sentAt: string; status: InvoiceStatus }>(`${base}/${id}/send`, values),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: base === "invoices" ? ["invoices"] : ["quotes"] }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["envois"] });
+      return queryClient.invalidateQueries({ queryKey: base === "invoices" ? ["invoices"] : ["quotes"] });
+    },
   });
 }

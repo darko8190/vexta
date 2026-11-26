@@ -1,12 +1,12 @@
 "use client";
 
-import { StatusDot } from "@/components/layout/section-nav";
+import { SetupFraction, type SetupProgress } from "@/components/layout/section-nav";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export interface SettingsTab {
   value: string;
   label: string;
-  status?: "ok" | "todo";
+  status?: SetupProgress;
   content: React.ReactNode;
 }
 
@@ -26,7 +26,7 @@ export function SettingsTabs({ tabs }: { tabs: SettingsTab[] }) {
           {tabs.map((tab) => (
             <TabsTrigger key={tab.value} value={tab.value} className="gap-2 px-2.5">
               {tab.label}
-              {tab.status && <StatusDot status={tab.status} />}
+              {tab.status && <SetupFraction progress={tab.status} />}
             </TabsTrigger>
           ))}
         </TabsList>

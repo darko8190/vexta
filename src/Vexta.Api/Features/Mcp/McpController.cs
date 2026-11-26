@@ -31,6 +31,7 @@ public class McpController(
     ITokenService tokens,
     IHttpClientFactory httpClientFactory,
     IServer server,
+    IFeatureService features,
     ILogger<McpController> logger) : ControllerBase
 {
     private const string LatestProtocol = "2025-06-18";
@@ -169,6 +170,9 @@ public class McpController(
         var hash = McpKeysController.Hash(secret);
         var key = await db.McpKeys.IgnoreQueryFilters().FirstOrDefaultAsync(k => k.KeyHash == hash && k.RevokedAt == null, ct);
         if (key is null) return null;
+
+        // The plan decides: a key made before the feature was taken off still stops working.
+        if (!await features.IsEnabledAsync(FeatureKeys.Mcp, key.TenantId, ct)) return null;
 
         // A company that is no longer paying is closed to its integrations as to its people.
         var now = DateTimeOffset.UtcNow;

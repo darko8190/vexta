@@ -134,7 +134,8 @@ public class ProjectExpensesController(
             Cost = request.Cost,
             SellingPrice = request.SellingPrice,
             SpentOn = request.SpentOn,
-            ProjectTaskId = request.ProjectTaskId
+            ProjectTaskId = request.ProjectTaskId,
+            IsBillable = request.IsBillable ?? true
         };
 
         db.ProjectExpenses.Add(expense);
@@ -181,6 +182,7 @@ public class ProjectExpensesController(
         expense.SellingPrice = request.SellingPrice;
         expense.SpentOn = request.SpentOn;
         expense.ProjectTaskId = request.ProjectTaskId;
+        expense.IsBillable = request.IsBillable ?? expense.IsBillable;
         expense.UpdatedAt = DateTimeOffset.UtcNow;
 
         db.ProjectExpensePhotos.RemoveRange(expense.Photos);
@@ -341,7 +343,8 @@ public class ProjectExpensesController(
             x.UpdatedAt,
             x.Status,
             x.Project!.Number,
-            x.Project!.Client!.Name);
+            x.Project!.Client!.Name,
+            x.IsBillable);
 }
 
 /// <summary>

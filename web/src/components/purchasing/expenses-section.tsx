@@ -36,6 +36,8 @@ import { useExpenseTypesQuery } from "@/hooks/use-expenses";
 import { useAllExpensesQuery } from "@/hooks/use-purchasing";
 import { formatDateOnly } from "@/lib/dates";
 import { formatAmount } from "@/lib/money";
+import { SortableHead } from "@/components/layout/sortable-head";
+import { byKeys, sortRows, type SortState } from "@/lib/table-sort";
 
 /** Base UI needs a value for every item, and "" is not one. */
 const ALL_TYPES = "tous";
@@ -82,6 +84,7 @@ export function ExpensesSection() {
   const router = useRouter();
 
   const items = data?.page.items ?? [];
+  const [sort, setSort] = useState<SortState | null>(null);
   const totals = data?.totals;
   const filtered = Boolean(debouncedSearch || type || from || to || status);
 
@@ -242,19 +245,19 @@ export function ExpensesSection() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Dépense</TableHead>
+                  <SortableHead label="Dépense" sortKey="name" sort={sort} onSort={setSort} />
                   {/* Hidden on narrow screens: what it was and what it cost are what the list
                       is read for, and the rest is one tap away on the project. */}
-                  <TableHead className="hidden md:table-cell">Projet</TableHead>
-                  <TableHead className="hidden sm:table-cell">Type</TableHead>
-                  <TableHead className="hidden lg:table-cell">Date</TableHead>
-                  <TableHead>État</TableHead>
-                  <TableHead className="text-right">Coût</TableHead>
-                  <TableHead className="hidden text-right sm:table-cell">Facturé</TableHead>
+                  <SortableHead label="Projet" sortKey="projet" sort={sort} onSort={setSort} className="hidden md:table-cell" />
+                  <SortableHead label="Type" sortKey="type" sort={sort} onSort={setSort} className="hidden sm:table-cell" />
+                  <SortableHead label="Date" sortKey="date" sort={sort} onSort={setSort} className="hidden lg:table-cell" />
+                  <SortableHead label="État" sortKey="etat" sort={sort} onSort={setSort} />
+                  <SortableHead label="Coût" sortKey="cout" sort={sort} onSort={setSort} className="text-right" />
+                  <SortableHead label="Facturé" sortKey="facture" sort={sort} onSort={setSort} className="hidden text-right sm:table-cell" />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.map((expense) => (
+                {sortRows(items, sort, byKeys((expense) => ({ name: expense.name, projet: expense.projectNumber, type: expense.expenseTypeName, date: expense.spentOn, etat: expense.status, cout: expense.cost, facture: expense.sellingPrice }))).map((expense) => (
                   <ClickableRow
                     key={expense.id}
                     label={`Ouvrir la dépense ${expense.name}`}

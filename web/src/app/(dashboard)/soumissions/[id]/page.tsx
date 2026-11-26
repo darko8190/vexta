@@ -12,10 +12,11 @@ import {
   Copy,
   FileDiff,
   FilePen,
-  FolderKanban,
   FileText,
+  FolderKanban,
   FolderOpen,
   HardHat,
+  History,
   Info,
   ListChecks,
   PiggyBank,
@@ -55,6 +56,7 @@ import { EmptyState } from "@/components/layout/empty-state";
 import { SectionNav, type NavSection } from "@/components/layout/section-nav";
 import { InvoiceSendDialog } from "@/components/invoices/invoice-send-dialog";
 import { PdfViewer } from "@/components/layout/pdf-viewer";
+import { SendHistoryCard } from "@/components/layout/send-history-card";
 import { ProjectCostTable } from "@/components/projects/detail/project-cost-table";
 import { useCanManage, useIsClientUser } from "@/hooks/use-can-create";
 import { usePdfDocument } from "@/hooks/use-pdf-document";
@@ -226,6 +228,7 @@ function StaffQuoteDetail({ id }: { id: string }) {
     { key: "frais", label: "Frais supplémentaires", count: summary?.extraCharges ?? 0, icon: Plus },
     // The paper the client receives, drawn by the same code that attaches it to the email.
     { key: "apercu", label: "Aperçu PDF", icon: FileText },
+    { key: "envois", label: "Historique d'envois", icon: History },
     {
       key: "documents",
       label: "Documents et notes",
@@ -480,6 +483,7 @@ function StaffQuoteDetail({ id }: { id: string }) {
           {/* The same tab as a project's, pointed at the quote: they are carried over together
               when it is accepted. */}
           {section === "apercu" && <QuotePdfPreview key={quote.updatedAt} quote={quote} />}
+          {section === "envois" && <SendHistoryCard type="soumission" id={quote.id} className="max-w-2xl" />}
           {section === "documents" && (
             <ProjectDocumentsSection projectId={{ kind: "soumissions", id: quote.id }} />
           )}

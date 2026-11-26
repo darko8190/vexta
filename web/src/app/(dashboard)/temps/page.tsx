@@ -20,7 +20,7 @@ export default function TimePage() {
   const { data: counts } = useSectionCountsQuery();
 
   const sections: NavSection[] = [
-    { key: "journees", label: "Feuilles de temps de jour", icon: CalendarDays },
+    { key: "journees", label: "Feuilles de temps de jour", count: counts?.workDays ?? 0, icon: CalendarDays },
     { key: "poincons", label: "Poinçons", count: counts?.timesheets ?? 0, icon: Fingerprint },
   ];
 

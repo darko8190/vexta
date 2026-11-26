@@ -6,8 +6,12 @@ namespace Vexta.Api.Domain;
 /// Deliberately thin. What matters about a supplier is how to reach them and what has been
 /// ordered from them, and a card with twenty empty fields on it is a card nobody fills in.
 /// </summary>
-public class Supplier
+public class Supplier : ISoftDeletable
 {
+    // ---- Corbeille ----
+    public DateTimeOffset? DeletedAt { get; set; }
+    public Guid? DeletedByUserId { get; set; }
+
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid TenantId { get; set; }
 

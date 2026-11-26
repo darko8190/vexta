@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -16,15 +17,18 @@ import { ClickableRow } from "@/components/layout/clickable-row";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
 import { LoadErrorState } from "@/components/layout/load-error-state";
-import { BilledNotice } from "@/components/projects/detail/billed-notice";
 import { ExtraChargeFormSheet } from "@/components/projects/detail/extra-charge-form-sheet";
 import { useDeleteExtraCharge, useExtraChargesQuery } from "@/hooks/use-extra-charges";
 import { useMarginMode } from "@/hooks/use-products";
 import { ApiError } from "@/lib/api";
+import { matchesSearch } from "@/lib/text-match";
+import { SearchInput } from "@/components/layout/search-input";
 import { formatDateOnly } from "@/lib/dates";
 import { formatAmount } from "@/lib/money";
 import { marginPercentFrom } from "@/lib/pricing";
 import type { ProjectExtraCharge } from "@/lib/types";
+import { SortableHead } from "@/components/layout/sortable-head";
+import { byKeys, sortRows, type SortState } from "@/lib/table-sort";
 
 /**
  * What was added to this project's bill beyond the quote. Pressing a row opens the charge.
@@ -57,7 +61,11 @@ export function ProjectExtraChargesSection({
   const [editing, setEditing] = useState<ProjectExtraCharge | undefined>(undefined);
   const [deleteTarget, setDeleteTarget] = useState<ProjectExtraCharge | undefined>(undefined);
 
-  const charges = (data ?? []).filter((charge) => !taskId || charge.projectTaskId === taskId);
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<SortState | null>(null);
+  const charges = (data ?? []).filter(
+    (charge) => (!taskId || charge.projectTaskId === taskId) && matchesSearch(search, charge.name, charge.description, charge.projectTaskTitle),
+  );
 
   function openCreate() {
     if (locked) return;
@@ -103,7 +111,11 @@ export function ProjectExtraChargesSection({
         {createButton}
       </div>
 
-      {locked && <BilledNotice />}
+      {(data?.length ?? 0) > 0 && (
+        <div className="mb-4">
+          <SearchInput value={search} onChange={setSearch} placeholder="Rechercher un frais…" />
+        </div>
+      )}
 
       {isLoading ? (
         <div className="space-y-2">
@@ -130,21 +142,26 @@ export function ProjectExtraChargesSection({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Frais</TableHead>
-                <TableHead className="w-28">Date</TableHead>
-                <TableHead className="w-28 text-right">Coût</TableHead>
+                <SortableHead label="Frais" sortKey="nom" sort={sort} onSort={setSort} />
+                <SortableHead label="Date" sortKey="date" sort={sort} onSort={setSort} className="w-28" />
+                <SortableHead label="Coût" sortKey="cout" sort={sort} onSort={setSort} className="w-28 text-right" />
                 <TableHead className="w-20 text-right">Marge</TableHead>
-                <TableHead className="w-28 text-right">Vendant</TableHead>
+                <SortableHead label="Vendant" sortKey="vendant" sort={sort} onSort={setSort} className="w-28 text-right" />
                 {!locked && <TableHead className="w-10" />}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {charges.map((charge) => {
+              {sortRows(charges, sort, byKeys((charge) => ({ nom: charge.name, date: charge.chargedOn, cout: charge.cost, vendant: charge.sellingPrice }))).map((charge) => {
                 const margin = marginPercentFrom(charge.cost, charge.sellingPrice, marginMode);
                 const cells = (
                   <>
                     <TableCell className="font-medium">
                       {charge.name}
+                      {!charge.isBillable && (
+                        <Badge variant="outline" className="ml-2 font-normal">
+                          Non facturé
+                        </Badge>
+                      )}
                       {charge.description && (
                         <div className="line-clamp-1 text-xs font-normal text-muted-foreground">
                           {charge.description}

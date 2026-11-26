@@ -35,6 +35,7 @@ import { quoteStatusBadgeVariant, quoteStatusLabels } from "@/lib/labels";
 import { formatAmount } from "@/lib/money";
 import { formatProjectNumber, formatQuoteNumber, type QuoteRecord, type QuoteStatus } from "@/lib/types";
 import { filtersToQuery, type TableFilters } from "@/lib/table-filters";
+import { NUMBER_DESC, sortToQuery, type SortState } from "@/lib/table-sort";
 import { useClientSummaryQuery } from "@/hooks/use-clients";
 import { StatusPills } from "@/components/layout/status-pills";
 
@@ -63,12 +64,13 @@ export default function QuotesPage() {
   const debouncedSearch = useDebouncedValue(search);
 
   const [filters, setFilters] = useState<TableFilters>({});
+  const [sort, setSort] = useState<SortState>(NUMBER_DESC);
   const { data, isLoading } = useQuotesQuery(
     page,
     debouncedSearch,
     statusFilter === "Toutes" ? undefined : statusFilter,
     undefined,
-    filtersToQuery(filters),
+    { ...filtersToQuery(filters), ...sortToQuery(sort) },
   );
   const { data: clientOptions } = useClientSummaryQuery(!isClient);
   const { data: counts } = useQuoteStatusCountsQuery();
@@ -97,6 +99,7 @@ export default function QuotesPage() {
   const columns: DataColumn<QuoteRecord>[] = [
     {
       key: "numero",
+      sortable: true,
       filter: { type: "number" },
       label: "Numéro",
       locked: true,
@@ -104,9 +107,11 @@ export default function QuotesPage() {
       cellClassName: "font-mono text-xs font-medium tabular-nums",
       cell: (quote) => formatQuoteNumber(quote.number, quote.revision),
     },
-    { key: "client", filter: isClient ? undefined : { type: "select", options: (clientOptions ?? []).map((c) => ({ value: c.id, label: c.name })) }, label: "Client", cellClassName: "font-medium", cell: (quote) => quote.clientName },
+    { key: "client",
+      sortable: true, filter: isClient ? undefined : { type: "select", options: (clientOptions ?? []).map((c) => ({ value: c.id, label: c.name })) }, label: "Client", cellClassName: "font-medium", cell: (quote) => quote.clientName },
     {
       key: "description",
+      sortable: true,
       filter: { type: "text" },
       label: "Description",
       cellClassName: "max-w-xs truncate text-muted-foreground",
@@ -115,6 +120,7 @@ export default function QuotesPage() {
     },
     {
       key: "statut",
+      sortable: true,
       filter: { type: "select", options: (Object.keys(quoteStatusLabels) as QuoteStatus[]).map((status) => ({ value: status, label: quoteStatusLabels[status] })) },
       label: "Statut",
       cell: (quote) => (
@@ -128,6 +134,7 @@ export default function QuotesPage() {
     },
     {
       key: "date",
+      sortable: true,
       filter: { type: "date" },
       label: "Date",
       cellClassName: "text-muted-foreground",
@@ -136,6 +143,7 @@ export default function QuotesPage() {
     },
     {
       key: "validite",
+      sortable: true,
       filter: { type: "date" },
       label: "Valide jusqu'au",
       cellClassName: "text-muted-foreground",
@@ -144,6 +152,7 @@ export default function QuotesPage() {
     },
     {
       key: "po",
+      sortable: true,
       filter: { type: "text" },
       label: "PO",
       hiddenByDefault: true,
@@ -255,6 +264,11 @@ export default function QuotesPage() {
         <DataTable
           id="soumissions"
           filters={filters}
+          sort={sort}
+          onSortChange={(next) => {
+            setSort(next);
+            setPage(1);
+          }}
           onFiltersChange={(next) => {
             setFilters(next);
             setPage(1);

@@ -51,6 +51,12 @@ public class ProjectExtraCharge
     public decimal? Cost { get; set; }
     public decimal? SellingPrice { get; set; }
 
+    /// <summary>
+    /// Charged to the project: whether it goes onto the invoice generated from the job. Off for
+    /// a cost the company absorbs; it still counts in the job's cost either way.
+    /// </summary>
+    public bool IsBillable { get; set; } = true;
+
     /// <summary>The day it was incurred, which is rarely the day the row is created.</summary>
     public DateOnly? ChargedOn { get; set; }
 

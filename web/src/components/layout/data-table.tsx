@@ -18,6 +18,8 @@ import { Spinner } from "@/components/ui/spinner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ClickableRow } from "@/components/layout/clickable-row";
+import { SortableHead } from "@/components/layout/sortable-head";
+import type { SortState } from "@/lib/table-sort";
 import { TableFiltersSheet, type FilterableColumn } from "@/components/layout/table-filters-sheet";
 import { isActive, type ColumnFilterType, type ColumnFilterValue, type TableFilters } from "@/lib/table-filters";
 import { useTableLayout } from "@/hooks/use-table-layout";
@@ -43,6 +45,8 @@ export interface DataColumn<T> {
   locked?: boolean;
   /** Editable in the table's edit mode. */
   edit?: DataColumnEdit<T>;
+  /** Sortable from its heading. The list sends the key to the API as tri / ordre. */
+  sortable?: boolean;
   /** Filterable, with a field of this kind. The list sends it to the API under the column's key. */
   filter?: { type: ColumnFilterType; options?: { value: string; label: string }[] };
 }
@@ -86,6 +90,8 @@ export function DataTable<T>({
   toolbarStart,
   filters,
   onFiltersChange,
+  sort,
+  onSortChange,
 }: {
   /** Names the stored column layout. */
   id: string;
@@ -103,6 +109,9 @@ export function DataTable<T>({
   /** The column filters, held by the page because they go to the API with the page's query. */
   filters?: TableFilters;
   onFiltersChange?: (filters: TableFilters) => void;
+  /** The sort, held by the page like the filters, because it goes to the API. */
+  sort?: SortState;
+  onSortChange?: (sort: SortState) => void;
 }) {
   const { layout, save } = useTableLayout(
     id,
@@ -199,11 +208,22 @@ export function DataTable<T>({
         <Table>
           <TableHeader>
             <TableRow>
-              {visible.map((column) => (
-                <TableHead key={column.key} className={column.headClassName}>
-                  {column.label}
-                </TableHead>
-              ))}
+              {visible.map((column) =>
+                column.sortable && onSortChange && !editing ? (
+                  <SortableHead
+                    key={column.key}
+                    label={column.label}
+                    sortKey={column.key}
+                    sort={sort}
+                    onSort={onSortChange}
+                    className={column.headClassName}
+                  />
+                ) : (
+                  <TableHead key={column.key} className={column.headClassName}>
+                    {column.label}
+                  </TableHead>
+                ),
+              )}
               {(actions || editing) && <TableHead className="w-10" />}
             </TableRow>
           </TableHeader>

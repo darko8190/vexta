@@ -92,7 +92,7 @@ const tenantNav: NavItem[] = [
  */
 const tenantAdminNav: NavItem[] = [
   { href: "/ressources-humaines", label: "Ressources humaines", icon: UsersRound },
-  { href: "/entreprise", label: "Entreprise", icon: Building2 },
+  // The company card now opens Paramètres, as its first section.
 ];
 
 /**
@@ -154,7 +154,7 @@ const superAdminNav: NavItem[] = [
  * The menu of « mode employé »: what someone working on the jobs opens, for an owner or a
  * project manager who is, today, one of the crew.
  */
-const EMPLOYEE_MODE_HREFS = ["/tableau-de-bord", "/mes-assignations", "/mes-feuilles-de-temps", "/projets", "/outils"];
+const EMPLOYEE_MODE_HREFS = ["/mes-assignations", "/mes-feuilles-de-temps"];
 
 export function employeeModeNavItems(): NavItem[] {
   return EMPLOYEE_MODE_HREFS.map((href) => tenantNav.find((item) => item.href === href)).filter(

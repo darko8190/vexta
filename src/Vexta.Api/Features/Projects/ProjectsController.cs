@@ -5,6 +5,7 @@ using Vexta.Api.Common;
 using Vexta.Api.Data;
 using Vexta.Api.Auth;
 using Vexta.Api.Domain;
+using Vexta.Api.Features.Invoices;
 
 namespace Vexta.Api.Features.Projects;
 
@@ -48,12 +49,22 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
                 || (number != null && p.Number == number));
         }
 
-        projects = ApplyColumnFilters(projects, new ListFilter(Request.Query));
+        var filter = new ListFilter(Request.Query);
+        projects = ApplyColumnFilters(projects, filter);
 
         var totalCount = await projects.CountAsync();
 
-        var items = await projects
-            .OrderByDescending(p => p.CreatedAt)
+        var items = await filter.Sort(projects, new Dictionary<string, System.Linq.Expressions.LambdaExpression>
+            {
+                ["numero"] = ListFilter.By<Project, int>(p => p.Number),
+                ["client"] = ListFilter.By<Project, string>(p => p.Client!.Name),
+                ["description"] = ListFilter.By<Project, string?>(p => p.Description),
+                ["statut"] = ListFilter.By<Project, ProjectStatus>(p => p.Status),
+                ["debut"] = ListFilter.By<Project, DateOnly?>(p => p.StartDate),
+                ["fin"] = ListFilter.By<Project, DateOnly?>(p => p.EndDate),
+                ["budget"] = ListFilter.By<Project, decimal?>(p => p.Budget),
+                ["po"] = ListFilter.By<Project, string?>(p => p.PoNumber),
+            }, ListFilter.By<Project, int>(p => p.Number))
             .Skip((query.Page - 1) * query.PageSize)
             .Take(query.PageSize)
             .Select(ToDto())
@@ -128,6 +139,11 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
             .Select(x => new { x.Quantity, x.CostRate, x.SellingRate })
             .ToListAsync();
 
+        var assemblies = await db.ProjectAssemblies.AsNoTracking()
+            .Where(x => x.ProjectId == id)
+            .Select(x => new { x.Quantity, x.UnitCost, x.UnitPrice })
+            .ToListAsync();
+
         var hours = await db.TimesheetEntries.AsNoTracking()
             .Where(t => t.ProjectId == id)
             .SumAsync(t => (decimal?)t.Hours) ?? 0m;
@@ -139,7 +155,7 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
             OpenTasks: project.OpenTasks,
             Materials: project.Materials,
             Equipment: project.Equipment,
-            Assemblies: 0,
+            Assemblies: assemblies.Count,
             Timesheets: project.Timesheets,
             Expenses: project.Expenses,
             ExtraCharges: extraCharges.Count,
@@ -162,7 +178,9 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
             new("equipements", "Équipements",
                 equipment.Sum(x => x.Quantity * (x.CostRate ?? 0m)),
                 equipment.Sum(x => x.Quantity * (x.SellingRate ?? 0m))),
-            new("assemblages", "Assemblages", 0m, 0m),
+            new("assemblages", "Assemblages",
+                assemblies.Sum(x => x.Quantity * x.UnitCost),
+                assemblies.Sum(x => x.Quantity * x.UnitPrice)),
             new("feuilles-de-temps", "Poinçons", 0m, labourRevenue),
             new("depenses", "Dépenses",
                 expenses.Sum(x => x.Cost ?? 0m),
@@ -183,6 +201,26 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
         var tax1 = Round(subtotal * gstRate / 100m);
         var tax2 = Round(subtotal * qstRate / 100m);
 
+        // What has been billed and settled on this job. Cancelled invoices do not count: they
+        // were undone. Drafts do: the project is billed the moment its invoice is generated.
+        var invoices = await db.Invoices.AsNoTracking()
+            .Where(i => i.ProjectId == id && i.Status != InvoiceStatus.Annulee)
+            .Include(i => i.Lines)
+            .ToListAsync();
+        var invoiceIds = invoices.Select(i => i.Id).ToList();
+        var invoiced = Round(invoices.Sum(i => InvoiceTotals.For(i.Lines, settings, i.IsTaxExempt).Total));
+        var paidRows = await db.InvoicePayments.AsNoTracking()
+            .Where(p => invoiceIds.Contains(p.InvoiceId))
+            .SumAsync(p => (decimal?)p.Amount) ?? 0m;
+        var refunded = await db.InvoiceRefunds.AsNoTracking()
+            .Where(r => invoiceIds.Contains(r.InvoiceId))
+            .SumAsync(r => (decimal?)r.Amount) ?? 0m;
+        var credited = await db.InvoiceCredits.AsNoTracking()
+            .Where(c => invoiceIds.Contains(c.InvoiceId))
+            .SumAsync(c => (decimal?)c.Amount) ?? 0m;
+        var paid = InvoiceSettlement.Net(paidRows, refunded);
+        var projectTotal = Round(subtotal + tax1 + tax2);
+
         var costs = new ProjectCostTableDto(
             lines,
             totalCost,
@@ -192,8 +230,12 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
             tax1,
             TaxLabel("TVQ", settings?.QstRate ?? 0m),
             tax2,
-            Round(subtotal + tax1 + tax2),
-            project.IsTaxExempt);
+            projectTotal,
+            project.IsTaxExempt,
+            invoiced,
+            Math.Max(0m, Round(projectTotal - invoiced)),
+            Round(paid),
+            Math.Max(0m, Round(invoiced - credited - paid)));
 
         return Ok(new ProjectSummaryDto(counts, costs));
     }

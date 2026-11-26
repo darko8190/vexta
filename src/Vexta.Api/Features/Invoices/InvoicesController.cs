@@ -6,6 +6,7 @@ using Vexta.Api.Common;
 using Vexta.Api.Data;
 using Vexta.Api.Auth;
 using Vexta.Api.Domain;
+using Vexta.Api.Features.Sends;
 using Vexta.Api.Services;
 using Vexta.Api.Features.BillingSettings;
 
@@ -74,8 +75,14 @@ public class InvoicesController(
 
         var totalCount = await invoices.CountAsync();
 
-        var entities = await invoices
-            .OrderByDescending(i => i.IssueDate).ThenByDescending(i => i.Number)
+        var entities = await new ListFilter(Request.Query).Sort(invoices, new Dictionary<string, System.Linq.Expressions.LambdaExpression>
+            {
+                ["numero"] = ListFilter.By<Invoice, string>(i => i.Number),
+                ["client"] = ListFilter.By<Invoice, string>(i => i.Client!.Name),
+                ["statut"] = ListFilter.By<Invoice, InvoiceStatus>(i => i.Status),
+                ["echeance"] = ListFilter.By<Invoice, DateOnly>(i => i.DueDate),
+                ["date"] = ListFilter.By<Invoice, DateOnly>(i => i.IssueDate),
+            }, ListFilter.By<Invoice, string>(i => i.Number))
             .Skip((query.Page - 1) * query.PageSize)
             .Take(query.PageSize)
             .Include(i => i.Client)
@@ -227,10 +234,41 @@ public class InvoicesController(
             hourlyRate,
             taxable)));
 
+        var assemblies = await db.ProjectAssemblies.AsNoTracking()
+            .Where(x => x.ProjectId == projectId)
+            .OrderBy(x => x.CreatedAt)
+            .Select(x => new { x.Name, x.Quantity, x.UnitCost, x.UnitPrice })
+            .ToListAsync(ct);
+
+        lines.AddRange(assemblies.Where(x => x.Quantity > 0).Select(x => new InvoiceDraftLineDto(
+            InvoiceLineKind.Materiaux,
+            null,
+            $"Assemblage : {x.Name.Trim()}",
+            x.Quantity,
+            x.UnitCost,
+            null,
+            x.UnitPrice,
+            taxable)));
+
+        var equipment = await db.ProjectEquipment.AsNoTracking()
+            .Where(x => x.ProjectId == projectId)
+            .OrderBy(x => x.UsedOn).ThenBy(x => x.CreatedAt)
+            .Select(x => new { x.EquipmentId, x.Name, x.Unit, x.Quantity, x.CostRate, x.SellingRate })
+            .ToListAsync(ct);
+
+        lines.AddRange(equipment.Where(x => x.Quantity > 0).Select(x => new InvoiceDraftLineDto(
+            InvoiceLineKind.Equipement,
+            null,
+            WithUnit(x.Name.Trim(), EquipmentUnitLabel(x.Unit)),
+            x.Quantity,
+            x.CostRate,
+            null,
+            x.SellingRate ?? 0m,
+            taxable)));
+
         var expenses = await db.ProjectExpenses.AsNoTracking()
-            // Only what has a selling price. An expense filed on site before anyone decided what
-            // to charge for it is a receipt, not a line — and zero would bill it as free.
-            .Where(e => e.ProjectId == projectId && e.SellingPrice != null)
+            // Only what is charged to the project. A refused expense is not billed either.
+            .Where(e => e.ProjectId == projectId && e.IsBillable && e.Status != ExpenseStatus.Refusee)
             .OrderBy(e => e.SpentOn).ThenBy(e => e.CreatedAt)
             .Select(e => new { e.Name, e.Cost, e.SellingPrice })
             .ToListAsync(ct);
@@ -243,7 +281,24 @@ public class InvoicesController(
             1m,
             e.Cost,
             null,
-            e.SellingPrice!.Value,
+            // No selling price yet: billed at what it cost, which the line can still change.
+            e.SellingPrice ?? e.Cost ?? 0m,
+            taxable)));
+
+        var extraCharges = await db.ProjectExtraCharges.AsNoTracking()
+            .Where(x => x.ProjectId == projectId && x.IsBillable)
+            .OrderBy(x => x.ChargedOn).ThenBy(x => x.CreatedAt)
+            .Select(x => new { x.Name, x.Cost, x.SellingPrice })
+            .ToListAsync(ct);
+
+        lines.AddRange(extraCharges.Select(x => new InvoiceDraftLineDto(
+            InvoiceLineKind.FraisSupplementaires,
+            null,
+            x.Name.Trim(),
+            1m,
+            x.Cost,
+            null,
+            x.SellingPrice ?? x.Cost ?? 0m,
             taxable)));
 
         // Deposits already invoiced for this job are taken off what is left to bill: one line
@@ -514,6 +569,9 @@ public class InvoicesController(
             return StatusCode(StatusCodes.Status503ServiceUnavailable, new { message = ex.Message });
         }
 
+        SendHistory.Add(db, invoice.TenantId, "facture", invoice.Id, invoice.SentAt is null ? "Envoi" : "Renvoi",
+            to, subject, cc, currentUser.UserId, await SendHistory.NameOfAsync(db, currentUser.UserId, ct));
+
         invoice.SentAt = DateTimeOffset.UtcNow;
         invoice.SentTo = to;
         invoice.ReminderCount = 0;
@@ -570,7 +628,7 @@ public class InvoicesController(
     /// </summary>
     private async Task<string?> PayLinkAsync(Invoice invoice, CancellationToken ct)
     {
-        if (invoice.Status is InvoiceStatus.Annulee or InvoiceStatus.Payee) return null;
+        if (invoice.Status is InvoiceStatus.Annulee or InvoiceStatus.Payee or InvoiceStatus.TransfereeComptabilite) return null;
         if (!await features.IsEnabledAsync(FeatureKeys.Payments, ct)) return null;
 
         var account = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
@@ -699,6 +757,7 @@ public class InvoicesController(
 
         if (LineProblem(request) is { } lineError) return BadRequest(new { message = lineError });
 
+        var previousProjectId = invoice.ProjectId;
         invoice.ClientId = request.ClientId;
         invoice.ProjectId = request.ProjectId;
         invoice.Status = request.Status;
@@ -724,9 +783,12 @@ public class InvoicesController(
         foreach (var line in replacements) line.InvoiceId = invoice.Id;
         db.InvoiceLines.AddRange(replacements);
 
-        // Also on an edit: an invoice can be attached to its project after the fact, and a
-        // project that is only now being pointed at is a project that is only now billed.
-        await MarkProjectInvoicedAsync(invoice.ProjectId, invoice.Status);
+        // Also on an edit, but only when the invoice is newly attached to the project: a project
+        // somebody unlocked to correct must not lock again because the invoice was touched.
+        if (invoice.ProjectId != previousProjectId)
+        {
+            await MarkProjectInvoicedAsync(invoice.ProjectId, invoice.Status);
+        }
 
         await db.SaveChangesAsync();
 
@@ -957,6 +1019,14 @@ public class InvoicesController(
     /// The description a material carries onto the invoice, with its unit when it has one:
     /// "Contreplaqué 3/4 (pi²)".
     /// </summary>
+    private static string EquipmentUnitLabel(EquipmentUnit unit) => unit switch
+    {
+        EquipmentUnit.Heure => "h",
+        EquipmentUnit.Jour => "jour",
+        EquipmentUnit.Semaine => "semaine",
+        _ => "unité"
+    };
+
     private static string WithUnit(string description, string? unit)
     {
         var text = description.Trim();
@@ -983,13 +1053,9 @@ public class InvoicesController(
         string.IsNullOrWhiteSpace(settings.Currency) ? "CAD" : settings.Currency.Trim().ToUpperInvariant();
 
     /// <summary>
-    /// Sending an invoice is what marks the job billed — nobody comes back to a status list to
-    /// say so, which is the whole reason <see cref="ProjectStatus.Facture"/> exists.
-    ///
-    /// A draft does not count, and that is the point: a draft is a document being prepared, and
-    /// preparing it freezes nothing. The job is billed when the invoice has left — which also
-    /// means the figures behind it are now the ones a client is holding, and that is exactly the
-    /// moment they must stop moving.
+    /// Generating an invoice for a job marks it billed and freezes its figures, so what the
+    /// invoice says and what the project counts cannot drift apart. Unlocking the project (moving
+    /// it out of Facturé) is how somebody corrects it afterwards.
     ///
     /// Tracks the project rather than issuing an UPDATE, so it is saved with the invoice.
     /// </summary>
@@ -997,12 +1063,10 @@ public class InvoicesController(
     {
         if (projectId is not { } id) return;
 
-        // Sent, paid or overdue: all three say the invoice is out. A draft says it is not, and a
-        // cancelled one says a billing was undone — neither tells the job it has been charged.
-        if (invoiceStatus is not (InvoiceStatus.Envoyee or InvoiceStatus.Payee or InvoiceStatus.EnRetard))
-        {
-            return;
-        }
+        // Any invoice but a cancelled one, a draft included: the job's figures are frozen the
+        // moment its invoice is generated, so what goes out matches what was counted. Somebody
+        // who needs to change them unlocks the project first.
+        if (invoiceStatus is InvoiceStatus.Annulee) return;
 
         var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == id);
         if (project is null) return;

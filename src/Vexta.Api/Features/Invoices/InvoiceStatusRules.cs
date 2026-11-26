@@ -31,10 +31,13 @@ public static class InvoiceStatusRules
     /// </param>
     public static void ApplyPaid(Invoice invoice, decimal paid, decimal total, decimal credited)
     {
-        if (invoice.Status is InvoiceStatus.Annulee or InvoiceStatus.Brouillon) return;
+        if (invoice.Status is InvoiceStatus.Annulee or InvoiceStatus.Brouillon
+            or InvoiceStatus.TransfereeComptabilite) return;
 
         invoice.Status = paid + credited >= total && total > 0
             ? InvoiceStatus.Payee
+            : paid + credited > 0
+                ? InvoiceStatus.PartiellementPayee
             // Back to what it was before it was paid: sent, or late if its due date has passed.
             // An invoice whose payment is undone must not stay green.
             : invoice.DueDate < DateOnly.FromDateTime(DateTime.Now)

@@ -24,7 +24,8 @@ public record ProjectExtraChargeDto(
     Guid? ProjectTaskId,
     string? ProjectTaskTitle,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    bool IsBillable = true);
 
 public record SaveProjectExtraChargeRequest(
     string Name,
@@ -33,7 +34,9 @@ public record SaveProjectExtraChargeRequest(
     decimal? SellingPrice,
     DateOnly? ChargedOn,
     /// <summary>Optional: the task this charge belongs to.</summary>
-    Guid? ProjectTaskId = null);
+    Guid? ProjectTaskId = null,
+    /// <summary>Charged to the project. Null keeps what it was (true for a new one).</summary>
+    bool? IsBillable = null);
 
 /// <summary>
 /// The extra charges added to one project.
@@ -105,7 +108,8 @@ public class ProjectExtraChargesController(
             Cost = request.Cost,
             SellingPrice = request.SellingPrice,
             ChargedOn = request.ChargedOn,
-            ProjectTaskId = request.ProjectTaskId
+            ProjectTaskId = request.ProjectTaskId,
+            IsBillable = request.IsBillable ?? true
         };
 
         db.ProjectExtraCharges.Add(charge);
@@ -140,6 +144,7 @@ public class ProjectExtraChargesController(
         charge.SellingPrice = request.SellingPrice;
         charge.ChargedOn = request.ChargedOn;
         charge.ProjectTaskId = request.ProjectTaskId;
+        charge.IsBillable = request.IsBillable ?? charge.IsBillable;
         charge.UpdatedAt = DateTimeOffset.UtcNow;
 
         await db.SaveChangesAsync(ct);
@@ -190,5 +195,6 @@ public class ProjectExtraChargesController(
             x.ProjectTaskId,
             x.ProjectTask == null ? null : x.ProjectTask.Title,
             x.CreatedAt,
-            x.UpdatedAt);
+            x.UpdatedAt,
+            x.IsBillable);
 }

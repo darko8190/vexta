@@ -6,6 +6,7 @@ using Vexta.Api.Auth;
 using Vexta.Api.Common;
 using Vexta.Api.Data;
 using Vexta.Api.Domain;
+using Vexta.Api.Features.Sends;
 using Vexta.Api.Features.Invoices;
 using Vexta.Api.Services;
 
@@ -190,6 +191,9 @@ public class QuoteSendController(
             // Nothing was delivered, so the quote stays as it was.
             return StatusCode(StatusCodes.Status503ServiceUnavailable, new { message = ex.Message });
         }
+
+        SendHistory.Add(db, quote.TenantId, "soumission", quote.Id, quote.SentAt is null ? "Envoi" : "Renvoi",
+            to, subject, cc, currentUser.UserId, await SendHistory.NameOfAsync(db, currentUser.UserId, ct));
 
         quote.SentAt = DateTimeOffset.UtcNow;
         quote.SentTo = to;

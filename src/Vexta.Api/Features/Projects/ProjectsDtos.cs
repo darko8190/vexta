@@ -130,6 +130,12 @@ public record ProjectCostTableDto(
     string Tax2Label,
     decimal Tax2,
     decimal Total,
-    bool IsTaxExempt);
+    bool IsTaxExempt,
+    // Billing against the job: what its invoices add up to (cancelled ones aside), what is left
+    // to bill against the total above, what came in on them, and what is still owed.
+    decimal? Invoiced = null,
+    decimal? RemainingToInvoice = null,
+    decimal? Paid = null,
+    decimal? RemainingToPay = null);
 
 public record ProjectSummaryDto(ProjectSectionCountsDto Counts, ProjectCostTableDto Costs);

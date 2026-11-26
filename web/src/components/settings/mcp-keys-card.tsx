@@ -20,7 +20,8 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
-import { useCreateMcpKey, useMcpEndpointQuery, useMcpKeysQuery, useRevokeMcpKey, type McpKey } from "@/hooks/use-mcp-keys";
+import { useCreateMcpKey, useMcpAvailabilityQuery,
+  useMcpEndpointQuery, useMcpKeysQuery, useRevokeMcpKey, type McpKey } from "@/hooks/use-mcp-keys";
 import { ApiError } from "@/lib/api";
 import { ex } from "@/lib/placeholders";
 
@@ -56,6 +57,7 @@ function CopyField({ label, value, id }: { label: string; value: string; id: str
 export function McpKeysCard() {
   const { data: keys, isLoading } = useMcpKeysQuery();
   const { data: endpoint } = useMcpEndpointQuery();
+  const { data: availability } = useMcpAvailabilityQuery();
   const create = useCreateMcpKey();
   const revoke = useRevokeMcpKey();
 
@@ -116,6 +118,12 @@ export function McpKeysCard() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {availability && !availability.included && (
+          <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-foreground">
+            Les clés MCP ne font pas partie de votre forfait. Les clés existantes ne fonctionnent pas tant que la
+            fonctionnalité n&apos;est pas ajoutée.
+          </p>
+        )}
         {endpoint && <CopyField id="mcp-endpoint" label="Adresse du serveur MCP" value={endpoint} />}
 
         {isLoading ? (
@@ -148,7 +156,7 @@ export function McpKeysCard() {
           </ul>
         )}
 
-        <Button variant="outline" onClick={() => setCreateOpen(true)}>
+        <Button variant="outline" onClick={() => setCreateOpen(true)} disabled={availability ? !availability.included : false}>
           <Plus />
           Créer une clé
         </Button>

@@ -73,7 +73,9 @@ export default function MyInvoicesPage() {
               >
                 <div className="min-w-0">
                   <p className="font-medium text-foreground">
-                    {invoice.number}
+                    <Link href={`/mes-factures/${invoice.id}`} className="hover:underline">
+                      {invoice.number}
+                    </Link>
                     <span className="font-normal text-muted-foreground">
                       {" · "}
                       {invoice.companySlug ? (
@@ -108,6 +110,14 @@ export default function MyInvoicesPage() {
                   <Badge variant={invoiceStatusBadgeVariant[invoice.status]}>
                     {invoiceStatusLabels[invoice.status]}
                   </Badge>
+
+                  <Link
+                    href={`/mes-factures/${invoice.id}`}
+                    className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+                  >
+                    <FileText className="size-4" />
+                    Consulter
+                  </Link>
 
                   {invoice.payToken && (
                     <Link

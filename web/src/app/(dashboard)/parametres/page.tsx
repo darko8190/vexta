@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Building2, ClipboardPen, Clock, CreditCard, KeyRound, Mail, Percent, Receipt, Sparkles, Wallet } from "lucide-react";
+import { Building2, ClipboardPen, Clock, CreditCard, KeyRound, Mail, Percent, Receipt, Sparkles, Trash2, Wallet } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +20,7 @@ import { HourlyRateCard } from "@/components/settings/hourly-rate-card";
 import { EmailTemplateCard } from "@/components/settings/email-template-card";
 import { MarginModeCard } from "@/components/settings/margin-mode-card";
 import { OnlinePaymentsCard } from "@/components/settings/online-payments-card";
+import { PayPalCard, usePayPalStateQuery } from "@/components/settings/paypal-card";
 import { PricePoliciesCard } from "@/components/settings/price-policies-card";
 import {
   InvoiceReminderCard,
@@ -30,14 +31,14 @@ import {
 import { WageClassificationsCard } from "@/components/settings/wage-classifications-card";
 import { SettingsTabs } from "@/components/settings/settings-tabs";
 import { McpKeysCard } from "@/components/settings/mcp-keys-card";
-import { useMcpKeysQuery } from "@/hooks/use-mcp-keys";
+import { CompanySettings } from "@/components/company/company-settings";
+import { TrashCard } from "@/components/settings/trash-card";
 import { useBillingSettingsQuery } from "@/hooks/use-billing-settings";
 import { useOnlinePaymentsQuery } from "@/hooks/use-online-payments";
 import { useAiSettingsQuery } from "@/hooks/use-assistant";
 import { useWageClassificationsQuery } from "@/hooks/use-wage-classifications";
 import { useBillingStateQuery, type BillingState } from "@/hooks/use-billing";
 import { usePublicPlansQuery } from "@/hooks/use-catalog";
-import { usePricePoliciesQuery } from "@/hooks/use-price-policies";
 import { ApiError, api } from "@/lib/api";
 import { tenantStatusBadgeVariant, tenantStatusLabels } from "@/lib/labels";
 import { formatCents } from "@/lib/money";
@@ -342,18 +343,23 @@ export default function SettingsPage() {
   // they can read rather than a rail of empty panels.
   const canManage = data?.kind === "Business" && data.canManage;
 
-  // Asked for here for the badge, and skipped entirely for anyone who may not read it.
-  const { data: policies } = usePricePoliciesQuery(canManage === true);
   // Read here only to say, on each section, whether it is set up. The cards read the same
   // queries, so this costs no request of its own.
   const { data: billing } = useBillingSettingsQuery(canManage === true);
   const { data: payments } = useOnlinePaymentsQuery(canManage === true);
+  const { data: paypal } = usePayPalStateQuery(canManage === true);
   const { data: ai } = useAiSettingsQuery(canManage === true);
   const { data: classifications } = useWageClassificationsQuery(canManage === true);
-  const { data: mcpKeys } = useMcpKeysQuery(canManage === true);
 
-  const done = (configured: boolean | undefined): "ok" | "todo" | undefined =>
-    configured === undefined ? undefined : configured ? "ok" : "todo";
+  type Progress = { done: number; total: number } | undefined;
+  /** One part: set up or not, unknown while its query is in flight. */
+  const done = (configured: boolean | undefined): Progress =>
+    configured === undefined ? undefined : { done: configured ? 1 : 0, total: 1 };
+  /** Several parts added up into « 1/2 ». Unknown until every part is known. */
+  const all = (...parts: Progress[]): Progress =>
+    parts.some((p) => p === undefined)
+      ? undefined
+      : parts.reduce<{ done: number; total: number }>((sum, p) => ({ done: sum.done + p!.done, total: sum.total + p!.total }), { done: 0, total: 0 });
 
   const billingStatus = done(billing?.configured);
   const quoteTermsStatus = done(billing ? Boolean(billing.quoteTerms?.trim()) : undefined);
@@ -363,37 +369,39 @@ export default function SettingsPage() {
   const quoteEmailStatus = done(billing ? Boolean(billing.quoteEmailBody || billing.quoteEmailSubject) : undefined);
   const hourlyStatus = done(billing ? billing.defaultHourlyRate != null : undefined);
   const classificationsStatus = done(classifications ? classifications.length > 0 : undefined);
-  const policiesStatus = done(policies ? policies.length > 0 : undefined);
+  const stripeStatus = payments && payments.included ? done(payments.chargesEnabled) : undefined;
+  const paypalStatus = paypal && paypal.included ? done(paypal.connected) : undefined;
+  const paymentParts = [stripeStatus, paypalStatus].filter((part) => part !== undefined);
+  const paymentsStatus = paymentParts.length > 0 ? all(...paymentParts) : undefined;
 
-  /** A section is set up when everything in it is; one part left undone is still something to do. */
-  const all = (...parts: ("ok" | "todo" | undefined)[]): "ok" | "todo" | undefined =>
-    parts.some((p) => p === undefined) ? undefined : parts.every((p) => p === "ok") ? "ok" : "todo";
-  const any = (...parts: ("ok" | "todo" | undefined)[]): "ok" | "todo" | undefined =>
-    parts.some((p) => p === undefined) ? undefined : parts.some((p) => p === "ok") ? "ok" : "todo";
-
-  const [section, setSection] = useState("abonnement");
+  // ?section=entreprise from the old Fiche entreprise links. Read once; the server render shows
+  // the skeleton either way, so the first client render cannot disagree with it.
+  const [section, setSection] = useState<string | null>(() =>
+    typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("section"),
+  );
 
   const sections: NavSection[] = [
+    // First: the company's own card, the page every other setting is about.
+    ...(canManage ? [{ key: "entreprise", label: "Entreprise", icon: Building2 }] : []),
     { key: "abonnement", label: "Abonnement", icon: CreditCard },
     ...(canManage
       ? [
-          { key: "facturation", label: "Facturation", icon: Receipt, status: billingStatus },
-          { key: "soumissions", label: "Soumissions", icon: ClipboardPen, status: quoteTermsStatus },
+          { key: "facturation", label: "Facturation", icon: Receipt, status: all(billingStatus, invoiceReminderStatus) },
+          { key: "soumissions", label: "Soumissions", icon: ClipboardPen, status: all(quoteTermsStatus, quoteReminderStatus) },
           // The built-in messages work; the section is "done" once either has been made the
           // company's own.
-          { key: "courriel", label: "Courriel", icon: Mail, status: any(invoiceEmailStatus, quoteEmailStatus) },
+          { key: "courriel", label: "Courriel", icon: Mail, status: all(invoiceEmailStatus, quoteEmailStatus) },
           // Beside Facturation rather than beside Abonnement, which is the money going the
           // other way: this one is the company being paid, not the company paying Vexta.
           {
             key: "paiements",
             label: "Paiements",
             icon: Wallet,
-            // No dot when the plan does not offer it: there is nothing to set up.
-            status: payments && payments.included ? done(payments.chargesEnabled) : undefined,
+            // Only what the plan offers counts: there is nothing to set up otherwise.
+            status: paymentsStatus,
           },
           { key: "taux", label: "Taux", icon: Clock, status: all(hourlyStatus, classificationsStatus) },
-          // The only count that means anything on this page; the others are one thing each.
-          { key: "marge", label: "Marge et prix", count: policies?.length ?? 0, icon: Percent, status: policiesStatus },
+          { key: "marge", label: "Marge et prix", icon: Percent },
           // Last, because it is the one section that is set up once and then forgotten.
           {
             key: "assistant",
@@ -401,21 +409,23 @@ export default function SettingsPage() {
             icon: Sparkles,
             status: ai && ai.featureIncluded ? done(ai.hasApiKey && ai.isEnabled) : undefined,
           },
-          // Optional, so a count rather than an amber dot: no key is not something left undone.
-          { key: "integrations", label: "Intégrations", icon: KeyRound, count: mcpKeys?.length ?? 0 },
+          { key: "integrations", label: "Intégrations", icon: KeyRound },
+          // Last: what was deleted, to look at again, restore or erase for good.
+          { key: "corbeille", label: "Corbeille", icon: Trash2 },
         ]
       : []),
   ];
 
   // Derived rather than corrected in an effect: a section that stops existing while it is open
   // falls back to the one every account has.
-  const active = sections.some((item) => item.key === section) ? section : "abonnement";
+  const fallback = canManage ? "entreprise" : "abonnement";
+  const active = section && sections.some((item) => item.key === section) ? section : fallback;
 
   return (
     <div>
       <PageHeader
         title="Paramètres"
-        description="Votre espace Vexta, son abonnement et vos règles de prix."
+        description="Votre entreprise, son abonnement et vos règles de travail."
       />
 
       <Suspense fallback={null}>
@@ -437,6 +447,7 @@ export default function SettingsPage() {
           )}
 
           <div className="min-w-0 flex-1">
+            {active === "entreprise" && <CompanySettings canEdit />}
             {active === "abonnement" &&
               (data.kind === "Personal" ? (
                 <PersonalSpace state={data} />
@@ -473,7 +484,14 @@ export default function SettingsPage() {
                 ]}
               />
             )}
-            {active === "paiements" && <OnlinePaymentsCard />}
+            {active === "paiements" && (
+              <SettingsTabs
+                tabs={[
+                  { value: "stripe", label: "Carte (Stripe)", status: stripeStatus, content: <OnlinePaymentsCard /> },
+                  { value: "paypal", label: "PayPal", status: paypalStatus, content: <PayPalCard /> },
+                ]}
+              />
+            )}
             {active === "taux" && (
               <SettingsTabs
                 tabs={[
@@ -489,11 +507,12 @@ export default function SettingsPage() {
             )}
             {active === "assistant" && <AiAssistantCard />}
             {active === "integrations" && <McpKeysCard />}
+            {active === "corbeille" && <TrashCard />}
             {active === "marge" && (
               <SettingsTabs
                 tabs={[
                   { value: "mode", label: "Calcul de la marge", content: <MarginModeCard /> },
-                  { value: "politiques", label: "Politiques de prix", status: policiesStatus, content: <PricePoliciesCard /> },
+                  { value: "politiques", label: "Politiques de prix", content: <PricePoliciesCard /> },
                 ]}
               />
             )}

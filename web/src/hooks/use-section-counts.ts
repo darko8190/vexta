@@ -12,6 +12,7 @@ export interface SectionCounts {
   purchaseOrders: number;
   goodsReceipts: number;
   timesheets: number;
+  workDays: number;
 }
 
 /** One request for every badge; refreshed after any write by the query provider. */

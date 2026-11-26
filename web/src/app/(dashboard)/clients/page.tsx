@@ -29,6 +29,7 @@ import { storedClientValues, useClientsQuery, useDeleteClient, useUpdateClient }
 import { clientStatusBadge, clientStatusLabels } from "@/lib/labels";
 import { formatClientNumber, type ClientRecord, type ClientStatus } from "@/lib/types";
 import { filtersToQuery, type TableFilters } from "@/lib/table-filters";
+import { NUMBER_DESC, sortToQuery, type SortState } from "@/lib/table-sort";
 import { StatusPills, useStatusCountsQuery } from "@/components/layout/status-pills";
 
 /** The filter's own values: the three states, the lock, and everybody. */
@@ -51,11 +52,12 @@ export default function ClientsPage() {
   const debouncedSearch = useDebouncedValue(search);
 
   const [filters, setFilters] = useState<TableFilters>({});
+  const [sort, setSort] = useState<SortState>(NUMBER_DESC);
   const { data, isLoading } = useClientsQuery(
     page,
     debouncedSearch,
     statusFilter === "Tous" ? undefined : statusFilter,
-    filtersToQuery(filters),
+    { ...filtersToQuery(filters), ...sortToQuery(sort) },
   );
   const { data: statusCounts } = useStatusCountsQuery("clients", "clients/statuts");
   const deleteClient = useDeleteClient();
@@ -89,6 +91,7 @@ export default function ClientsPage() {
   const columns: DataColumn<ClientRecord>[] = [
     {
       key: "numero",
+      sortable: true,
       filter: { type: "number" },
       label: "Numéro",
       locked: true,
@@ -98,6 +101,7 @@ export default function ClientsPage() {
     },
     {
       key: "nom",
+      sortable: true,
       filter: { type: "text" },
       label: "Nom",
       cell: (clientItem) => (
@@ -117,6 +121,7 @@ export default function ClientsPage() {
     },
     {
       key: "entreprise",
+      sortable: true,
       filter: { type: "text" },
       label: "Nom de l'entreprise",
       hiddenByDefault: true,
@@ -126,6 +131,7 @@ export default function ClientsPage() {
     },
     {
       key: "prenom",
+      sortable: true,
       filter: { type: "text" },
       label: "Prénom",
       hiddenByDefault: true,
@@ -135,6 +141,7 @@ export default function ClientsPage() {
     },
     {
       key: "nomFamille",
+      sortable: true,
       filter: { type: "text" },
       label: "Nom de famille",
       hiddenByDefault: true,
@@ -144,6 +151,7 @@ export default function ClientsPage() {
     },
     {
       key: "statut",
+      sortable: true,
       filter: { type: "select", options: (Object.keys(clientStatusLabels) as ClientStatus[]).map((status) => ({ value: status, label: clientStatusLabels[status] })) },
       label: "État",
       hiddenByDefault: true,
@@ -159,6 +167,7 @@ export default function ClientsPage() {
     },
     {
       key: "courriel",
+      sortable: true,
       filter: { type: "text" },
       label: "Courriel",
       cellClassName: "text-muted-foreground",
@@ -167,6 +176,7 @@ export default function ClientsPage() {
     },
     {
       key: "telephone",
+      sortable: true,
       filter: { type: "text" },
       label: "Téléphone",
       cellClassName: "text-muted-foreground",
@@ -183,6 +193,7 @@ export default function ClientsPage() {
     },
     {
       key: "projets",
+      sortable: true,
       filter: { type: "number" },
       label: "Projets",
       headClassName: "text-center",
@@ -191,6 +202,7 @@ export default function ClientsPage() {
     },
     {
       key: "factures",
+      sortable: true,
       filter: { type: "number" },
       label: "Factures",
       headClassName: "text-center",
@@ -281,6 +293,11 @@ export default function ClientsPage() {
         <DataTable
           id="clients"
           filters={filters}
+          sort={sort}
+          onSortChange={(next) => {
+            setSort(next);
+            setPage(1);
+          }}
           onFiltersChange={(next) => {
             setFilters(next);
             setPage(1);
@@ -323,7 +340,7 @@ export default function ClientsPage() {
         open={Boolean(deleteTarget)}
         onOpenChange={(open) => !open && setDeleteTarget(undefined)}
         title="Supprimer ce client ?"
-        description={`« ${deleteTarget?.name} » et toutes ses adresses, projets et factures associés seront supprimés définitivement.`}
+        description={`« ${deleteTarget?.name} » ira à la corbeille (Paramètres), avec ses projets et factures. Vous pourrez le restaurer.`}
         onConfirm={confirmDelete}
         pending={deleteClient.isPending}
       />

@@ -19,6 +19,8 @@ import { formatDateOnly } from "@/lib/dates";
 import { paymentMethodLabels } from "@/lib/labels";
 import { formatAmount } from "@/lib/money";
 import type { PaymentMethod } from "@/lib/types";
+import { SortableHead } from "@/components/layout/sortable-head";
+import { byKeys, sortRows, type SortState } from "@/lib/table-sort";
 
 /** Base UI needs a value for every item, and "" is not one. */
 const ALL_METHODS = "tous";
@@ -51,6 +53,7 @@ export function PaymentsSection() {
   );
 
   const items = data?.page.items ?? [];
+  const [sort, setSort] = useState<SortState | null>(null);
   const totals = data?.totals;
   const filtered = Boolean(debouncedSearch || method || from || to);
 
@@ -183,16 +186,16 @@ export function PaymentsSection() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Facture</TableHead>
-                  <TableHead className="hidden sm:table-cell">Client</TableHead>
-                  <TableHead className="hidden lg:table-cell">Date</TableHead>
-                  <TableHead className="hidden md:table-cell">Mode</TableHead>
-                  <TableHead className="hidden lg:table-cell">Référence</TableHead>
-                  <TableHead className="text-right">Montant</TableHead>
+                  <SortableHead label="Facture" sortKey="facture" sort={sort} onSort={setSort} />
+                  <SortableHead label="Client" sortKey="client" sort={sort} onSort={setSort} className="hidden sm:table-cell" />
+                  <SortableHead label="Date" sortKey="date" sort={sort} onSort={setSort} className="hidden lg:table-cell" />
+                  <SortableHead label="Mode" sortKey="mode" sort={sort} onSort={setSort} className="hidden md:table-cell" />
+                  <SortableHead label="Référence" sortKey="reference" sort={sort} onSort={setSort} className="hidden lg:table-cell" />
+                  <SortableHead label="Montant" sortKey="montant" sort={sort} onSort={setSort} className="text-right" />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.map((payment) => (
+                {sortRows(items, sort, byKeys((payment) => ({ facture: payment.invoiceNumber, client: payment.clientName, date: payment.date, mode: payment.method, reference: payment.reference, montant: payment.amount }))).map((payment) => (
                   <TableRow key={payment.id}>
                     <TableCell>
                       <Link

@@ -29,6 +29,8 @@ import type { InvoiceRecord } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { StatusPills, useStatusCountsQuery } from "@/components/layout/status-pills";
 import type { InvoiceStatus } from "@/lib/types";
+import { SortableHead } from "@/components/layout/sortable-head";
+import { NUMBER_DESC, sortToQuery, type SortState } from "@/lib/table-sort";
 
 function formatCurrency(amount: number, currency: string) {
   return new Intl.NumberFormat("fr-CA", { style: "currency", currency }).format(amount);
@@ -43,7 +45,12 @@ export function InvoicesSection() {
   const debouncedSearch = useDebouncedValue(search);
 
   const [status, setStatus] = useState<InvoiceStatus | "">("");
-  const { data, isLoading } = useInvoicesQuery(page, debouncedSearch, undefined, status || undefined);
+  const [sort, setSort] = useState<SortState>(NUMBER_DESC);
+  const { data, isLoading } = useInvoicesQuery(page, debouncedSearch, undefined, status || undefined, undefined, sortToQuery(sort));
+  const sortBy = (next: SortState) => {
+    setSort(next);
+    setPage(1);
+  };
   const { data: statusCounts } = useStatusCountsQuery("invoices", "invoices/statuts");
   const deleteInvoice = useDeleteInvoice();
   const [deleteTarget, setDeleteTarget] = useState<InvoiceRecord | undefined>(undefined);
@@ -129,10 +136,10 @@ export function InvoicesSection() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Numéro</TableHead>
-                <TableHead>Client</TableHead>
-                <TableHead>Statut</TableHead>
-                <TableHead>Échéance</TableHead>
+                <SortableHead label="Numéro" sortKey="numero" sort={sort} onSort={sortBy} />
+                <SortableHead label="Client" sortKey="client" sort={sort} onSort={sortBy} />
+                <SortableHead label="Statut" sortKey="statut" sort={sort} onSort={sortBy} />
+                <SortableHead label="Échéance" sortKey="echeance" sort={sort} onSort={sortBy} />
                 <TableHead className="text-right">Total</TableHead>
                 {/* Nothing to offer a customer here: every action behind it is refused. */}
                 {!isClient && <TableHead className="w-10" />}
@@ -196,7 +203,7 @@ export function InvoicesSection() {
         open={Boolean(deleteTarget)}
         onOpenChange={(open) => !open && setDeleteTarget(undefined)}
         title="Supprimer cette facture ?"
-        description={`La facture « ${deleteTarget?.number} » sera supprimée définitivement.`}
+        description={`La facture « ${deleteTarget?.number} » ira à la corbeille (Paramètres). Vous pourrez la restaurer.`}
         onConfirm={confirmDelete}
         pending={deleteInvoice.isPending}
       />

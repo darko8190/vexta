@@ -1,3 +1,4 @@
+import type { InvoiceStatus } from "@/lib/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type {
@@ -121,6 +122,35 @@ export function useMyInvoicesQuery(enabled = true) {
     queryKey: ["mon-espace", "factures"],
     queryFn: () => api.get<MyInvoice[]>("mon-espace/factures"),
     enabled,
+  });
+}
+
+export interface MyInvoiceDetail {
+  id: string;
+  number: string;
+  companyName: string;
+  clientName: string;
+  issueDate: string;
+  dueDate: string;
+  currency: string;
+  status: InvoiceStatus;
+  notes: string | null;
+  lines: { description: string; quantity: number; unitPrice: number; total: number }[];
+  subtotal: number;
+  gst: number;
+  qst: number;
+  total: number;
+  paid: number;
+  outstanding: number;
+  /** Set when the invoice can be paid online: the company's Stripe account takes cards. */
+  payToken: string | null;
+}
+
+/** One of the person's invoices in full, to read from their space. */
+export function useMyInvoiceQuery(id: string) {
+  return useQuery({
+    queryKey: ["mon-espace", "factures", id],
+    queryFn: () => api.get<MyInvoiceDetail>(`mon-espace/factures/${id}`),
   });
 }
 

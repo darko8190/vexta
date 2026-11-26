@@ -8,8 +8,12 @@ namespace Vexta.Api.Domain;
 /// two of everything and discovering, the first time someone sells a variant, that half the
 /// application cannot see it.
 /// </summary>
-public class Product
+public class Product : ISoftDeletable
 {
+    // ---- Corbeille ----
+    public DateTimeOffset? DeletedAt { get; set; }
+    public Guid? DeletedByUserId { get; set; }
+
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid TenantId { get; set; }
 

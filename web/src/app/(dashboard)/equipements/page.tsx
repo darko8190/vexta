@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MoreHorizontal, Pencil, Plus, Trash2, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -26,8 +26,10 @@ import {
   useEquipmentListQuery,
   type Equipment,
 } from "@/hooks/use-equipment";
-import { ApiError } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
 import { formatAmount } from "@/lib/money";
+import { SortableHead } from "@/components/layout/sortable-head";
+import { byKeys, sortRows, type SortState } from "@/lib/table-sort";
 
 function rate(value: number | null, unit: Equipment["unit"]) {
   return value == null ? "—" : `${formatAmount(value)} / ${equipmentUnitLabels[unit]}`;
@@ -41,6 +43,7 @@ export default function EquipmentPage() {
   const canCreate = useCanCreate();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<SortState | null>({ key: "numero", dir: "desc" });
   const debounced = useDebouncedValue(search);
   const { data, isLoading, isError, error, refetch } = useEquipmentListQuery(page, debounced);
   const remove = useDeleteEquipment();
@@ -53,6 +56,19 @@ export default function EquipmentPage() {
     setEditing(equipment);
     setFormOpen(true);
   }
+
+  // ?id= from a project's equipment line: opens that equipment's file directly.
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("id");
+    if (!id) return;
+    api
+      .get<Equipment>(`equipements/${id}`)
+      .then((equipment) => {
+        setEditing(equipment);
+        setFormOpen(true);
+      })
+      .catch(() => toast.error("Cet équipement est introuvable."));
+  }, []);
 
   async function confirmDelete() {
     if (!deleteTarget) return;
@@ -109,17 +125,17 @@ export default function EquipmentPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-24">Numéro</TableHead>
-                <TableHead>Équipement</TableHead>
-                <TableHead>État</TableHead>
-                <TableHead className="text-right">Coûtant</TableHead>
-                <TableHead className="text-right">Vendant</TableHead>
-                <TableHead className="text-center">Projets</TableHead>
+                <SortableHead label="Numéro" sortKey="numero" sort={sort} onSort={setSort} className="w-24" />
+                <SortableHead label="Équipement" sortKey="nom" sort={sort} onSort={setSort} />
+                <SortableHead label="État" sortKey="etat" sort={sort} onSort={setSort} />
+                <SortableHead label="Coûtant" sortKey="cout" sort={sort} onSort={setSort} className="text-right" />
+                <SortableHead label="Vendant" sortKey="vendant" sort={sort} onSort={setSort} className="text-right" />
+                <SortableHead label="Projets" sortKey="projets" sort={sort} onSort={setSort} className="text-center" />
                 {canCreate && <TableHead className="w-10" />}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.items.map((equipment) => {
+              {sortRows(data.items, sort, byKeys((equipment) => ({ numero: equipment.number, nom: equipment.name, etat: equipment.status, cout: equipment.costRate, vendant: equipment.sellingRate, projets: equipment.projectCount }))).map((equipment) => {
                 const cells = (
                   <>
                     <TableCell className="font-mono text-xs text-muted-foreground">

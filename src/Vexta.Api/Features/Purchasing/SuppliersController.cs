@@ -5,6 +5,7 @@ using Vexta.Api.Auth;
 using Vexta.Api.Common;
 using Vexta.Api.Data;
 using Vexta.Api.Domain;
+using Vexta.Api.Features.Sends;
 using Vexta.Api.Services;
 
 namespace Vexta.Api.Features.Purchasing;
@@ -290,6 +291,10 @@ public class SuppliersController(
             // never going to arrive.
             return StatusCode(StatusCodes.Status503ServiceUnavailable, new { message = ex.Message });
         }
+
+        SendHistory.Add(db, tenantId, "fournisseur", supplier.Id, "Invitation",
+            supplier.Email!, $"{companyName} vous invite sur Vexta", null, currentUser.UserId,
+            await SendHistory.NameOfAsync(db, currentUser.UserId, ct));
 
         supplier.InvitationSentAt = DateTimeOffset.UtcNow;
         supplier.UpdatedAt = supplier.InvitationSentAt.Value;

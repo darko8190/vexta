@@ -18,6 +18,14 @@ export function useMcpKeysQuery(enabled = true) {
   return useQuery({ queryKey: key, queryFn: () => api.get<McpKey[]>("cles-mcp"), enabled });
 }
 
+/** Whether the company's plan includes MCP keys. */
+export function useMcpAvailabilityQuery() {
+  return useQuery({
+    queryKey: ["mcp-keys", "disponibilite"],
+    queryFn: () => api.get<{ included: boolean }>("cles-mcp/disponibilite"),
+  });
+}
+
 export function useMcpEndpointQuery() {
   return useQuery({
     queryKey: ["mcp-endpoint"],

@@ -243,6 +243,7 @@ export type PaymentMethod =
   | "Cheque"
   | "Virement"
   | "PorteAuCompte"
+  | "PayPal"
   | "Autre";
 
 export interface InvoicePayment {
@@ -455,7 +456,14 @@ export function formatProjectNumber(n: number): string {
   return `P-${String(n).padStart(4, "0")}`;
 }
 
-export type InvoiceStatus = "Brouillon" | "Envoyee" | "Payee" | "EnRetard" | "Annulee";
+export type InvoiceStatus =
+  | "Brouillon"
+  | "Envoyee"
+  | "PartiellementPayee"
+  | "Payee"
+  | "EnRetard"
+  | "TransfereeComptabilite"
+  | "Annulee";
 
 /** What a line is. The kind decides where its price comes from. */
 export type InvoiceLineKind =
@@ -923,6 +931,11 @@ export interface ProjectCostTable {
   tax2: number;
   total: number;
   isTaxExempt: boolean;
+  /** Only on a project's table: a quote has not been billed yet. */
+  invoiced?: number | null;
+  remainingToInvoice?: number | null;
+  paid?: number | null;
+  remainingToPay?: number | null;
 }
 
 export interface ProjectSummary {
@@ -1131,6 +1144,8 @@ export interface ProjectExpense {
   status: ExpenseStatus;
   projectNumber: number;
   clientName: string | null;
+  /** Charged to the project: goes onto the invoice generated from it. */
+  isBillable: boolean;
 }
 
 export interface ProjectExpenseDetail {
@@ -2929,6 +2944,8 @@ export interface ProjectExtraCharge {
   projectTaskTitle: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Charged to the project: goes onto the invoice generated from it. */
+  isBillable: boolean;
 }
 
 /**
@@ -2972,6 +2989,8 @@ export interface PublicInvoice {
   isCancelled: boolean;
   /** The company can take a card right now, for this invoice. */
   canPayOnline: boolean;
+  /** The company takes PayPal on this invoice. */
+  canPayPayPal: boolean;
 }
 
 /**

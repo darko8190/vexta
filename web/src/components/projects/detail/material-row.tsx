@@ -1,8 +1,9 @@
 "use client";
 
 import { useId } from "react";
-import { Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { ExternalLink, Trash2 } from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { RequiredMark } from "@/components/ui/required-mark";
@@ -17,7 +18,7 @@ import type { MarginMode, ProductSearchResult, SaveProjectMaterialValues } from 
  * uses, so each field carries its own label there instead.
  */
 export const MATERIAL_GRID =
-  "lg:grid-cols-[170px_minmax(0,1fr)_70px_80px_100px_80px_100px_110px_40px]";
+  "lg:grid-cols-[170px_minmax(0,1fr)_70px_80px_100px_80px_100px_110px_76px]";
 
 /** Once, so the row's total and the table's footer round and punctuate the same way. */
 export function formatMaterialAmount(amount: number): string {
@@ -110,6 +111,9 @@ export function MaterialReadRow({
       />
       <ReadCell label="Prix vendant" value={formatMaterialAmount(values.unitPrice)} numeric />
       <ReadCell label="Total" value={formatMaterialAmount(materialLineTotal(values))} numeric />
+      <div className="flex justify-end">
+        <ProductLink productId={values.productId} />
+      </div>
     </div>
   );
 }
@@ -357,17 +361,34 @@ export function MaterialRow({
         </span>
       </div>
 
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        aria-label={removeLabel}
-        disabled={disabled}
-        onClick={onRemove}
-        className="justify-self-end"
-      >
-        <Trash2 />
-      </Button>
+      <div className="flex items-center justify-end gap-1">
+        <ProductLink productId={values.productId} />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label={removeLabel}
+          disabled={disabled}
+          onClick={onRemove}
+        >
+          <Trash2 />
+        </Button>
+      </div>
     </div>
+  );
+}
+
+/** Straight to the catalogue file of the product a line was taken from. Nothing for a typed line. */
+function ProductLink({ productId }: { productId: string | null }) {
+  if (!productId) return null;
+  return (
+    <Link
+      href={`/inventaire/produits/${productId}`}
+      aria-label="Voir la fiche du produit"
+      title="Voir la fiche du produit"
+      className={buttonVariants({ variant: "ghost", size: "icon" })}
+    >
+      <ExternalLink />
+    </Link>
   );
 }

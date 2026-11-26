@@ -63,4 +63,16 @@ public static class FeatureKeys
     /// promise a cheap tier should be allowed not to make.
     /// </summary>
     public const string Payments = "paiements";
+
+    /// <summary>
+    /// Keys that let an outside assistant (Claude, ChatGPT, an automation) read and work in the
+    /// company's data through the MCP endpoint.
+    /// </summary>
+    public const string Mcp = "mcp";
+
+    /// <summary>
+    /// Getting paid through PayPal: the company connects its own PayPal business account, and its
+    /// invoices can be paid with PayPal beside the card.
+    /// </summary>
+    public const string PayPal = "paypal";
 }

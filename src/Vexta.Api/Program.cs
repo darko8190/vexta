@@ -78,6 +78,7 @@ builder.Services.AddScoped<IMailgunService, MailgunService>();
 builder.Services.AddSingleton<Vexta.Api.Features.Forms.FormInvitation>();
 builder.Services.AddScoped<IStripeService, StripeService>();
 builder.Services.AddScoped<IStripeConnectService, StripeConnectService>();
+builder.Services.AddScoped<IPayPalService, PayPalService>();
 builder.Services.AddScoped<ITenantSignupService, TenantSignupService>();
 builder.Services.AddScoped<ISupplierLinkService, SupplierLinkService>();
 builder.Services.AddScoped<IR2StorageService, R2StorageService>();

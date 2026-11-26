@@ -94,11 +94,20 @@ public class QuotesController(
                 || (number != null && q.Number == number));
         }
 
-        quotes = ApplyColumnFilters(quotes, new ListFilter(Request.Query));
+        var filter = new ListFilter(Request.Query);
+        quotes = ApplyColumnFilters(quotes, filter);
 
         var totalCount = await quotes.CountAsync();
-        var items = await quotes
-            .OrderByDescending(q => q.Number)
+        var items = await filter.Sort(quotes, new Dictionary<string, System.Linq.Expressions.LambdaExpression>
+            {
+                ["numero"] = ListFilter.By<Quote, int>(q => q.Number),
+                ["client"] = ListFilter.By<Quote, string>(q => q.Client!.Name),
+                ["description"] = ListFilter.By<Quote, string?>(q => q.Description),
+                ["statut"] = ListFilter.By<Quote, QuoteStatus>(q => q.Status),
+                ["date"] = ListFilter.By<Quote, DateOnly?>(q => q.IssuedOn),
+                ["validite"] = ListFilter.By<Quote, DateOnly?>(q => q.ValidUntil),
+                ["po"] = ListFilter.By<Quote, string?>(q => q.PoNumber),
+            }, ListFilter.By<Quote, int>(q => q.Number))
             .Skip((query.Page - 1) * query.PageSize)
             .Take(query.PageSize)
             .Select(ToDto())

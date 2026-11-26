@@ -10,6 +10,8 @@ export interface ExtraChargeFormValues {
   chargedOn: string | null;
   /** Optional: the task on this job it belongs to. */
   projectTaskId: string | null;
+  /** Charged to the project: goes onto the invoice generated from it. */
+  isBillable: boolean;
 }
 
 /**

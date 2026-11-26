@@ -36,8 +36,12 @@ public enum QuoteLineKind
 /// type twice. It is its own table rather than a project with a status: a quote can be refused,
 /// and a refused quote held among the jobs would sit in every figure that adds up the work.
 /// </summary>
-public class Quote
+public class Quote : ISoftDeletable
 {
+    // ---- Corbeille ----
+    public DateTimeOffset? DeletedAt { get; set; }
+    public Guid? DeletedByUserId { get; set; }
+
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid TenantId { get; set; }
 

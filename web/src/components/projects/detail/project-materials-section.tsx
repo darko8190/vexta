@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
-import { BilledNotice } from "@/components/projects/detail/billed-notice";
 import {
   MATERIAL_GRID,
   MaterialReadRow,
@@ -23,6 +22,8 @@ import {
   useUpdateProjectMaterial,
 } from "@/hooks/use-project-materials";
 import { ApiError } from "@/lib/api";
+import { matchesSearch } from "@/lib/text-match";
+import { SearchInput } from "@/components/layout/search-input";
 import type { ProjectMaterial, SaveProjectMaterialValues } from "@/lib/types";
 
 /** The fields of a saved material, as the row edits them. */
@@ -112,7 +113,12 @@ export function ProjectMaterialsSection({
   const posting = useRef(new Set<string>());
   const nextUid = useRef(0);
 
-  const materials = (data ?? []).filter((material) => !taskId || material.projectTaskId === taskId);
+  const [search, setSearch] = useState("");
+  const materials = (data ?? []).filter(
+    (material) =>
+      (!taskId || material.projectTaskId === taskId) &&
+      matchesSearch(search, material.description, material.code, material.unit, material.projectTaskTitle),
+  );
   const marginMode = settings?.marginMode ?? "Multiplication";
 
   function valuesOf(material: ProjectMaterial): SaveProjectMaterialValues {
@@ -215,7 +221,11 @@ export function ProjectMaterialsSection({
         {addButton}
       </div>
 
-      {locked && <BilledNotice />}
+      {(data?.length ?? 0) > 0 && (
+        <div className="mb-4">
+          <SearchInput value={search} onChange={setSearch} placeholder="Rechercher un matériau…" />
+        </div>
+      )}
 
       {isLoading ? (
         <div className="space-y-2">

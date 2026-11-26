@@ -342,7 +342,8 @@ export function InvoiceForm({
         await createInvoice.mutateAsync(payload);
         toast.success("Facture créée.");
       }
-      router.push("/factures");
+      // Started from a project: back to it, where the invoice was asked for.
+      router.push(defaultProjectId ? `/projets/${defaultProjectId}` : "/factures");
     } catch (error) {
       toast.error(error instanceof ApiError ? error.message : "Impossible d'enregistrer la facture.");
     }
@@ -375,7 +376,7 @@ export function InvoiceForm({
   // table and a 30rem document cannot both fit, and the card clips what overflows — so the
   // choice is between a document under the form and a Taxable box nobody can see.
   return (
-    <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_30rem]">
+    <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_minmax(36rem,44%)]">
     <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="space-y-6">
       <Card>
         <CardHeader>
@@ -618,7 +619,7 @@ export function InvoiceForm({
       </Card>
 
       <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" onClick={() => router.push("/factures")}>
+        <Button type="button" variant="outline" onClick={() => router.push(defaultProjectId ? `/projets/${defaultProjectId}` : "/factures")}>
           Annuler
         </Button>
         <Button type="submit" disabled={pending}>

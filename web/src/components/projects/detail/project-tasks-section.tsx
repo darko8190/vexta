@@ -38,6 +38,8 @@ import {
   useProjectTasksQuery,
 } from "@/hooks/use-project-tasks";
 import { ApiError } from "@/lib/api";
+import { matchesSearch } from "@/lib/text-match";
+import { SearchInput } from "@/components/layout/search-input";
 import { formatDateOnly } from "@/lib/dates";
 import { taskPriorityLabels, taskStatusBadgeVariant, taskStatusLabels } from "@/lib/labels";
 import type { ProjectTask, ProjectTaskStatus } from "@/lib/types";
@@ -86,7 +88,11 @@ export function ProjectTasksSection({ projectId }: { projectId: string }) {
   const [editing, setEditing] = useState<ProjectTask | undefined>(undefined);
   const [deleteTarget, setDeleteTarget] = useState<ProjectTask | undefined>(undefined);
 
-  const tasks = data ?? [];
+  const [search, setSearch] = useState("");
+  const allTasks = data ?? [];
+  const tasks = allTasks.filter((task) =>
+    matchesSearch(search, task.title, task.description, ...task.assignees.map((a) => a.name)),
+  );
   const open = tasks.filter((t) => t.status !== "Terminee").length;
   const late = tasks.filter((t) => t.isLate).length;
 
@@ -144,6 +150,12 @@ export function ProjectTasksSection({ projectId }: { projectId: string }) {
         </div>
         {createButton}
       </div>
+
+      {allTasks.length > 0 && (
+        <div className="mb-4">
+          <SearchInput value={search} onChange={setSearch} placeholder="Rechercher une tâche…" />
+        </div>
+      )}
 
       {late > 0 && (
         <p

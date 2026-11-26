@@ -80,6 +80,12 @@ public static class CatalogSeeder
         new(FeatureKeys.Payments, "Paiements en ligne",
             "L'entreprise branche son propre compte Stripe et se fait payer par carte : un lien de paiement sur les factures qu'elle envoie, et la caisse de sa page publique. L'argent va dans son compte, pas dans celui de Vexta.",
             "CreditCard"),
+        new(FeatureKeys.Mcp, "Clé MCP",
+            "Des clés qui permettent à un assistant externe (Claude, ChatGPT, une automatisation) de lire et de travailler dans les données de l'entreprise.",
+            "KeyRound"),
+        new(FeatureKeys.PayPal, "Paiements PayPal",
+            "L'entreprise branche son propre compte PayPal Business et ses clients peuvent payer leurs factures avec PayPal. L'argent va dans son compte.",
+            "Wallet"),
     ];
 
     public static async Task SeedAsync(IServiceProvider services, ILogger logger)

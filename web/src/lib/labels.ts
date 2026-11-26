@@ -256,6 +256,7 @@ export const paymentMethodLabels: Record<PaymentMethod, string> = {
   Cheque: "Chèque",
   Virement: "Virement",
   PorteAuCompte: "Porté au compte",
+  PayPal: "PayPal",
   Autre: "Autre",
 };
 
@@ -268,8 +269,10 @@ export const accountEntryKindLabels: Record<AccountEntryKind, string> = {
 export const invoiceStatusLabels: Record<InvoiceStatus, string> = {
   Brouillon: "Brouillon",
   Envoyee: "Envoyée",
+  PartiellementPayee: "Partiellement payée",
   Payee: "Payée",
   EnRetard: "En retard",
+  TransfereeComptabilite: "Transférée en comptabilité",
   Annulee: "Annulée",
 };
 
@@ -293,8 +296,10 @@ export const projectStatusBadgeVariant: Record<ProjectStatus, "default" | "secon
 export const invoiceStatusBadgeVariant: Record<InvoiceStatus, "default" | "secondary" | "destructive" | "outline"> = {
   Brouillon: "outline",
   Envoyee: "secondary",
+  PartiellementPayee: "secondary",
   Payee: "default",
   EnRetard: "destructive",
+  TransfereeComptabilite: "outline",
   Annulee: "destructive",
 };
 

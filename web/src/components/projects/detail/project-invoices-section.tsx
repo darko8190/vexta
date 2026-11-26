@@ -1,5 +1,8 @@
 "use client";
 
+import { useState } from "react";
+import { matchesSearch } from "@/lib/text-match";
+import { SearchInput } from "@/components/layout/search-input";
 import Link from "next/link";
 import { FileText, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -36,7 +39,10 @@ export function ProjectInvoicesSection({
     error: loadError,
     refetch,
   } = useInvoicesQuery(1, "", undefined, undefined, projectId);
-  const invoices = data?.items ?? [];
+  const [search, setSearch] = useState("");
+  const invoices = (data?.items ?? []).filter((invoice) =>
+    matchesSearch(search, invoice.number, invoice.clientName, invoice.status),
+  );
 
   // A styled link rather than a Button rendering one: Base UI drops native button semantics
   // when its render target is not a <button>, and this is a navigation.
@@ -59,6 +65,12 @@ export function ProjectInvoicesSection({
         </div>
         {createLink}
       </div>
+
+      {(data?.items.length ?? 0) > 0 && (
+        <div className="mb-4">
+          <SearchInput value={search} onChange={setSearch} placeholder="Rechercher une facture…" />
+        </div>
+      )}
 
       {isLoading ? (
         <div className="space-y-2">

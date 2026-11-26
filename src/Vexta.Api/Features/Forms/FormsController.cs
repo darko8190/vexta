@@ -5,6 +5,7 @@ using Vexta.Api.Auth;
 using Vexta.Api.Common;
 using Vexta.Api.Data;
 using Vexta.Api.Domain;
+using Vexta.Api.Features.Sends;
 
 namespace Vexta.Api.Features.Forms;
 
@@ -217,6 +218,8 @@ public class FormsController(
                 FormLinkEmail.Build(companyName, title, share.Message, url),
                 ct,
                 fromName: companyName);
+            SendHistory.Add(db, share.TenantId, "formulaire", share.FormTemplateId, "Invitation",
+                share.Email, $"{title} — {companyName}", null, null, share.SentByName);
             return null;
         }
         catch (InvalidOperationException ex)

@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/layout/empty-state";
 import { LoadErrorState } from "@/components/layout/load-error-state";
 import { WorkDaysTable } from "@/components/work/work-days-table";
+import { EmployeeMultiSelect } from "@/components/team/employee-multi-select";
 import { useWorkDaysQuery } from "@/hooks/use-work-days";
 import { dayIso, todayIso } from "@/lib/dates";
 
@@ -15,7 +16,9 @@ import { dayIso, todayIso } from "@/lib/dates";
 export function WorkDaysSection() {
   const [from, setFrom] = useState(dayIso(-13));
   const [to, setTo] = useState(todayIso());
-  const { data, isLoading, isError, error, refetch } = useWorkDaysQuery(from, to);
+  const [employees, setEmployees] = useState<string[]>([]);
+  const { data: all, isLoading, isError, error, refetch } = useWorkDaysQuery(from, to);
+  const data = all?.filter((day) => employees.length === 0 || employees.includes(day.employeeId));
 
   return (
     <div>
@@ -25,19 +28,20 @@ export function WorkDaysSection() {
           La journée de chaque employé, commencée et terminée par lui. Les heures sur les projets sont dans Poinçons.
         </p>
       </div>
-      <div className="mb-4 grid max-w-md grid-cols-2 gap-3">
-        <Field>
+      <div className="mb-4 flex flex-wrap items-end gap-3">
+        <Field className="w-auto">
           <FieldLabel htmlFor="days-from">Du</FieldLabel>
           <Input id="days-from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
         </Field>
-        <Field>
+        <Field className="w-auto">
           <FieldLabel htmlFor="days-to">Au</FieldLabel>
           <Input id="days-to" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
         </Field>
+        <EmployeeMultiSelect value={employees} onChange={setEmployees} />
       </div>
       {isLoading ? (
         <Skeleton className="h-32 w-full" />
-      ) : isError && !data ? (
+      ) : isError && !all ? (
         <LoadErrorState error={error} onRetry={() => void refetch()} />
       ) : !data || data.length === 0 ? (
         <EmptyState

@@ -74,7 +74,8 @@ public record ProjectExpenseDto(
     DateTimeOffset UpdatedAt,
     ExpenseStatus Status = ExpenseStatus.AApprouver,
     int ProjectNumber = 0,
-    string? ClientName = null);
+    string? ClientName = null,
+    bool IsBillable = true);
 
 public record SetExpenseStatusRequest(ExpenseStatus Status);
 
@@ -94,4 +95,6 @@ public record SaveProjectExpenseRequest(
     DateOnly? SpentOn,
     IReadOnlyList<Guid>? MediaAssetIds,
     /// <summary>Optional: the task this expense was incurred for.</summary>
-    Guid? ProjectTaskId = null);
+    Guid? ProjectTaskId = null,
+    /// <summary>Charged to the project. Null keeps what it was (true for a new one).</summary>
+    bool? IsBillable = null);

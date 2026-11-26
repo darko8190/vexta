@@ -28,6 +28,7 @@ import { useDeleteProject, useProjectsQuery, useUpdateProject } from "@/hooks/us
 import { projectStatusBadgeVariant, projectStatusLabels } from "@/lib/labels";
 import { formatProjectNumber, type ProjectRecord, type ProjectStatus } from "@/lib/types";
 import { filtersToQuery, type TableFilters } from "@/lib/table-filters";
+import { NUMBER_DESC, sortToQuery, type SortState } from "@/lib/table-sort";
 import { useClientSummaryQuery } from "@/hooks/use-clients";
 import { useProjectCategoriesQuery } from "@/hooks/use-project-categories";
 import { StatusPills, useStatusCountsQuery } from "@/components/layout/status-pills";
@@ -46,6 +47,7 @@ export default function ProjectsPage() {
   const debouncedSearch = useDebouncedValue(search);
 
   const [filters, setFilters] = useState<TableFilters>({});
+  const [sort, setSort] = useState<SortState>(NUMBER_DESC);
   const [status, setStatus] = useState<ProjectStatus | "">("");
   const { data, isLoading } = useProjectsQuery(
     page,
@@ -53,7 +55,7 @@ export default function ProjectsPage() {
     undefined,
     status || undefined,
     undefined,
-    filtersToQuery(filters),
+    { ...filtersToQuery(filters), ...sortToQuery(sort) },
   );
   const { data: statusCounts } = useStatusCountsQuery("projects", "projects/statuts");
   // The options of the two reference columns. A customer sees only their own jobs, so the
@@ -91,6 +93,7 @@ export default function ProjectsPage() {
   const columns: DataColumn<ProjectRecord>[] = [
     {
       key: "numero",
+      sortable: true,
       filter: { type: "number" },
       label: "Numéro",
       locked: true,
@@ -98,9 +101,11 @@ export default function ProjectsPage() {
       cellClassName: "font-mono text-xs font-medium tabular-nums",
       cell: (projectItem) => formatProjectNumber(projectItem.number),
     },
-    { key: "client", filter: isClient ? undefined : { type: "select", options: (clientOptions ?? []).map((c) => ({ value: c.id, label: c.name })) }, label: "Client", cellClassName: "font-medium", cell: (projectItem) => projectItem.clientName },
+    { key: "client",
+      sortable: true, filter: isClient ? undefined : { type: "select", options: (clientOptions ?? []).map((c) => ({ value: c.id, label: c.name })) }, label: "Client", cellClassName: "font-medium", cell: (projectItem) => projectItem.clientName },
     {
       key: "description",
+      sortable: true,
       filter: { type: "text" },
       label: "Description",
       cellClassName: "max-w-xs truncate text-muted-foreground",
@@ -109,6 +114,7 @@ export default function ProjectsPage() {
     },
     {
       key: "statut",
+      sortable: true,
       filter: { type: "select", options: (Object.keys(projectStatusLabels) as ProjectStatus[]).map((status) => ({ value: status, label: projectStatusLabels[status] })) },
       label: "Statut",
       cell: (projectItem) => (
@@ -127,6 +133,7 @@ export default function ProjectsPage() {
     },
     {
       key: "debut",
+      sortable: true,
       filter: { type: "date" },
       label: "Début",
       cellClassName: "text-muted-foreground",
@@ -135,6 +142,7 @@ export default function ProjectsPage() {
     },
     {
       key: "fin",
+      sortable: true,
       filter: { type: "date" },
       label: "Fin",
       cellClassName: "text-muted-foreground",
@@ -143,6 +151,7 @@ export default function ProjectsPage() {
     },
     {
       key: "budget",
+      sortable: true,
       filter: { type: "number" },
       label: "Budget",
       cellClassName: "text-muted-foreground tabular-nums",
@@ -151,6 +160,7 @@ export default function ProjectsPage() {
     },
     {
       key: "po",
+      sortable: true,
       filter: { type: "text" },
       label: "PO",
       hiddenByDefault: true,
@@ -256,6 +266,11 @@ export default function ProjectsPage() {
         <DataTable
           id="projets"
           filters={filters}
+          sort={sort}
+          onSortChange={(next) => {
+            setSort(next);
+            setPage(1);
+          }}
           onFiltersChange={(next) => {
             setFilters(next);
             setPage(1);

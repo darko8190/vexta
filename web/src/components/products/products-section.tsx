@@ -28,6 +28,8 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useDeleteProduct, useProductsQuery } from "@/hooks/use-products";
 import { ApiError } from "@/lib/api";
 import type { ProductRecord } from "@/lib/types";
+import { SortableHead } from "@/components/layout/sortable-head";
+import { byKeys, sortRows, type SortState } from "@/lib/table-sort";
 
 /**
  * What the shelf can still promise, with the two figures it comes from underneath.
@@ -60,6 +62,7 @@ export function ProductsSection() {
   const router = useRouter();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<SortState | null>({ key: "numero", dir: "desc" });
   const debouncedSearch = useDebouncedValue(search);
 
   const {
@@ -164,17 +167,17 @@ export function ProductsSection() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-24">Numéro</TableHead>
-                <TableHead className="hidden w-32 md:table-cell">Code</TableHead>
-                <TableHead>Titre</TableHead>
-                <TableHead className="hidden lg:table-cell">Catégorie</TableHead>
-                <TableHead className="w-28 text-right">Qté dispo</TableHead>
-                <TableHead className="w-32 text-right">Prix de vente</TableHead>
+                <SortableHead label="Numéro" sortKey="numero" sort={sort} onSort={setSort} className="w-24" />
+                <SortableHead label="Code" sortKey="code" sort={sort} onSort={setSort} className="hidden w-32 md:table-cell" />
+                <SortableHead label="Titre" sortKey="titre" sort={sort} onSort={setSort} />
+                <SortableHead label="Catégorie" sortKey="categorie" sort={sort} onSort={setSort} className="hidden lg:table-cell" />
+                <SortableHead label="Qté dispo" sortKey="dispo" sort={sort} onSort={setSort} className="w-28 text-right" />
+                <SortableHead label="Prix de vente" sortKey="prix" sort={sort} onSort={setSort} className="w-32 text-right" />
                 <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.items.map((product) => (
+              {sortRows(data.items, sort, byKeys((product) => ({ numero: product.number, code: product.code, titre: product.title, categorie: product.categoryName, dispo: product.quantityAvailable, prix: product.sellingPrice }))).map((product) => (
                 <ClickableRow
                   key={product.id}
                   label={`Ouvrir le produit ${formatProductNumber(product.number)}`}

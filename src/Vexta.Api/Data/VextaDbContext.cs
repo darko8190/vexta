@@ -36,6 +36,10 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
     public DbSet<Equipment> Equipment => Set<Equipment>();
     public DbSet<ProjectEquipment> ProjectEquipment => Set<ProjectEquipment>();
     public DbSet<McpKey> McpKeys => Set<McpKey>();
+    public DbSet<SendLog> SendLogs => Set<SendLog>();
+    public DbSet<Assembly> Assemblies => Set<Assembly>();
+    public DbSet<AssemblyItem> AssemblyItems => Set<AssemblyItem>();
+    public DbSet<ProjectAssembly> ProjectAssemblies => Set<ProjectAssembly>();
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<Client> Clients => Set<Client>();
     public DbSet<Address> Addresses => Set<Address>();
@@ -253,8 +257,8 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
                 .HasDefaultValue(ClientStatus.Client)
                 .HasSentinel((ClientStatus)(-1));
 
-            e.HasQueryFilter(c => c.TenantId == CurrentTenantId
-                && (CurrentClientId == null || c.Id == CurrentClientId));
+            e.HasQueryFilter(c => (c.TenantId == CurrentTenantId
+                && (CurrentClientId == null || c.Id == CurrentClientId)) && c.DeletedAt == null);
         });
 
         builder.Entity<ClientAsset>(e =>
@@ -478,8 +482,8 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
                 .HasForeignKey(p => p.SubCategoryId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne(p => p.WageClassification).WithMany(c => c.Projects)
                 .HasForeignKey(p => p.WageClassificationId).OnDelete(DeleteBehavior.SetNull);
-            e.HasQueryFilter(p => p.TenantId == CurrentTenantId
-                && (CurrentClientId == null || p.ClientId == CurrentClientId));
+            e.HasQueryFilter(p => (p.TenantId == CurrentTenantId
+                && (CurrentClientId == null || p.ClientId == CurrentClientId)) && p.DeletedAt == null);
         });
 
         builder.Entity<Invoice>(e =>
@@ -497,8 +501,8 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             // SetNull: retiring a policy must not take the invoices priced with it.
             e.HasOne(i => i.PricePolicy).WithMany()
                 .HasForeignKey(i => i.PricePolicyId).OnDelete(DeleteBehavior.SetNull);
-            e.HasQueryFilter(i => i.TenantId == CurrentTenantId
-                && (CurrentClientId == null || i.ClientId == CurrentClientId));
+            e.HasQueryFilter(i => (i.TenantId == CurrentTenantId
+                && (CurrentClientId == null || i.ClientId == CurrentClientId)) && i.DeletedAt == null);
         });
 
         builder.Entity<InvoiceLine>(e =>
@@ -742,7 +746,7 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.Property(s => s.Notes).HasMaxLength(4000);
 
             e.HasIndex(s => new { s.TenantId, s.Name });
-            e.HasQueryFilter(s => s.TenantId == CurrentTenantId);
+            e.HasQueryFilter(s => (s.TenantId == CurrentTenantId) && s.DeletedAt == null);
         });
 
         builder.Entity<PurchaseOrder>(e =>
@@ -1338,8 +1342,8 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.HasOne(q => q.WageClassification).WithMany().HasForeignKey(q => q.WageClassificationId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne(q => q.Project).WithMany().HasForeignKey(q => q.ProjectId).OnDelete(DeleteBehavior.SetNull);
 
-            e.HasQueryFilter(q => q.TenantId == CurrentTenantId
-                && (CurrentClientId == null || q.ClientId == CurrentClientId));
+            e.HasQueryFilter(q => (q.TenantId == CurrentTenantId
+                && (CurrentClientId == null || q.ClientId == CurrentClientId)) && q.DeletedAt == null);
         });
 
         builder.Entity<QuoteDocument>(e =>
@@ -1415,7 +1419,7 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.Property(x => x.CostRate).HasPrecision(12, 2);
             e.Property(x => x.SellingRate).HasPrecision(12, 2);
             e.HasIndex(x => new { x.TenantId, x.Number }).IsUnique();
-            e.HasQueryFilter(x => x.TenantId == CurrentTenantId);
+            e.HasQueryFilter(x => (x.TenantId == CurrentTenantId) && x.DeletedAt == null);
         });
 
         builder.Entity<ProjectEquipment>(e =>
@@ -1444,6 +1448,56 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             // One day per person per date: starting twice is the same day.
             e.HasIndex(x => new { x.EmployeeId, x.Date }).IsUnique();
             e.HasIndex(x => new { x.TenantId, x.Date });
+            e.HasQueryFilter(x => x.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<Assembly>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.Description).HasMaxLength(2000);
+            e.HasIndex(x => new { x.TenantId, x.Number }).IsUnique();
+            e.HasMany(x => x.Items).WithOne(i => i.Assembly!)
+                .HasForeignKey(i => i.AssemblyId).OnDelete(DeleteBehavior.Cascade);
+            e.HasQueryFilter(x => x.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<AssemblyItem>(e =>
+        {
+            e.Property(x => x.Description).HasMaxLength(500);
+            e.Property(x => x.Unit).HasMaxLength(30);
+            e.Property(x => x.Quantity).HasPrecision(12, 3);
+            e.Property(x => x.PurchasePrice).HasPrecision(12, 2);
+            e.Property(x => x.UnitPrice).HasPrecision(12, 2);
+            e.HasOne(x => x.Product).WithMany()
+                .HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.SetNull);
+            e.HasQueryFilter(x => x.Assembly!.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<ProjectAssembly>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.Quantity).HasPrecision(12, 2);
+            e.Property(x => x.UnitCost).HasPrecision(12, 2);
+            e.Property(x => x.UnitPrice).HasPrecision(12, 2);
+            e.HasOne(x => x.Project).WithMany()
+                .HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Assembly).WithMany()
+                .HasForeignKey(x => x.AssemblyId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(x => x.ProjectTask).WithMany()
+                .HasForeignKey(x => x.ProjectTaskId).OnDelete(DeleteBehavior.SetNull);
+            e.HasIndex(x => x.ProjectId);
+            e.HasQueryFilter(x => x.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<SendLog>(e =>
+        {
+            e.Property(x => x.EntityType).HasMaxLength(40);
+            e.Property(x => x.Kind).HasMaxLength(40);
+            e.Property(x => x.To).HasMaxLength(500);
+            e.Property(x => x.Cc).HasMaxLength(2000);
+            e.Property(x => x.Subject).HasMaxLength(300);
+            e.Property(x => x.SentByName).HasMaxLength(200);
+            e.HasIndex(x => new { x.TenantId, x.EntityType, x.EntityId });
             e.HasQueryFilter(x => x.TenantId == CurrentTenantId);
         });
 
@@ -1508,7 +1562,7 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
 
             e.HasIndex(p => new { p.TenantId, p.Number }).IsUnique();
             e.HasIndex(p => new { p.TenantId, p.Barcode });
-            e.HasQueryFilter(p => p.TenantId == CurrentTenantId);
+            e.HasQueryFilter(p => (p.TenantId == CurrentTenantId) && p.DeletedAt == null);
         });
 
         builder.Entity<ProductImage>(e =>
@@ -1799,10 +1853,51 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
     /// them is a rule one of them forgets. A project being created in the same save is left
     /// alone: copying a recurring job's tasks and crew is planning, not work.
     /// </summary>
+    /// <summary>
+    /// Set by the corbeille when it empties itself: a delete then really deletes. Everywhere
+    /// else a record that can go to the corbeille is stamped instead of removed.
+    /// </summary>
+    public bool HardDelete { get; set; }
+
     public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
+        SendDeletedToTrash();
         await StartTouchedProjectsAsync(cancellationToken);
         return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    /// <summary>
+    /// A deleted client, project, quote, invoice, product, equipment or supplier is kept and
+    /// stamped rather than removed, so the corbeille can show it and put it back. The cascade
+    /// waits for the save (see the constructor), so nothing under it is touched either.
+    /// </summary>
+    private void SendDeletedToTrash()
+    {
+        if (HardDelete) return;
+        var userId = Guid.TryParse(
+            httpContextAccessor.HttpContext?.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var id)
+            ? id
+            : (Guid?)null;
+
+        var trashed = new HashSet<object>(ReferenceEqualityComparer.Instance);
+        foreach (var entry in ChangeTracker.Entries<ISoftDeletable>().Where(e => e.State == EntityState.Deleted).ToList())
+        {
+            entry.State = EntityState.Modified;
+            entry.Entity.DeletedAt = DateTimeOffset.UtcNow;
+            entry.Entity.DeletedByUserId = userId;
+            trashed.Add(entry.Entity);
+        }
+        if (trashed.Count == 0) return;
+
+        // Rows the tracker cascaded onto from a record that went to the corbeille stay as they
+        // are: the record keeps them, and gets them back when it is restored.
+        foreach (var entry in ChangeTracker.Entries().Where(e => e.State == EntityState.Deleted).ToList())
+        {
+            if (entry.References.Any(r => r.CurrentValue is { } target && trashed.Contains(target)))
+            {
+                entry.State = EntityState.Unchanged;
+            }
+        }
     }
 
     private async Task StartTouchedProjectsAsync(CancellationToken ct)
@@ -1822,6 +1917,7 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
                 case ProjectMaterial m: projectIds.Add(m.ProjectId); break;
                 case ProjectExtraCharge c: projectIds.Add(c.ProjectId); break;
                 case ProjectEquipment q: projectIds.Add(q.ProjectId); break;
+                case ProjectAssembly a: projectIds.Add(a.ProjectId); break;
                 case ProjectDocument d: projectIds.Add(d.ProjectId); break;
                 case ProjectNote n: projectIds.Add(n.ProjectId); break;
                 case Dictionary<string, object> join

@@ -114,6 +114,31 @@ export function ProjectCostTable({ costs, isLoading }: { costs?: CostTable; isLo
           <dd className="font-semibold tabular-nums text-foreground">{money(costs.total)}</dd>
         </div>
       </dl>
+
+      {/* Where the billing stands: the question asked of a job once the work is in. */}
+      {costs.invoiced != null && (
+      <dl className="grid grid-cols-2 gap-px border-t border-border bg-border text-sm">
+        {[
+          { label: "Montant facturé", value: costs.invoiced ?? 0, tone: "text-foreground" },
+          {
+            label: "Restant à facturer",
+            value: costs.remainingToInvoice ?? 0,
+            tone: (costs.remainingToInvoice ?? 0) > 0 ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground",
+          },
+          { label: "Montant payé", value: costs.paid ?? 0, tone: "text-emerald-700 dark:text-emerald-400" },
+          {
+            label: "Reste à payer",
+            value: costs.remainingToPay ?? 0,
+            tone: (costs.remainingToPay ?? 0) > 0 ? "text-destructive" : "text-muted-foreground",
+          },
+        ].map((item) => (
+          <div key={item.label} className="bg-card p-3">
+            <dt className="text-muted-foreground">{item.label}</dt>
+            <dd className={cn("mt-0.5 text-base font-semibold tabular-nums", item.tone)}>{money(item.value)}</dd>
+          </div>
+        ))}
+      </dl>
+      )}
     </div>
   );
 }

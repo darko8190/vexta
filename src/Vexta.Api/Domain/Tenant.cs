@@ -79,6 +79,17 @@ public class Tenant
     /// <summary>When the three flags above were last taken from Stripe.</summary>
     public DateTimeOffset? StripeAccountCheckedAt { get; set; }
 
+    // ---- The company's own PayPal Business account, for charging its own customers ----
+
+    /// <summary>The REST app's client id, from developer.paypal.com. Null when not connected.</summary>
+    public string? PayPalClientId { get; set; }
+
+    /// <summary>The REST app's secret, encrypted. Never sent back to the browser.</summary>
+    public string? PayPalSecretProtected { get; set; }
+
+    /// <summary>The sandbox (test) environment rather than live payments.</summary>
+    public bool PayPalSandbox { get; set; }
+
     // ---- The company's own profile, shown on its documents and filled in by its owner ----
 
     public string? Description { get; set; }

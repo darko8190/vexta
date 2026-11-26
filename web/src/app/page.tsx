@@ -1,30 +1,16 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { connection } from "next/server";
-import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
+import { PlanCards, PlanOffers } from "@/components/marketing/plan-cards";
+import { PlanComparison } from "@/components/marketing/plan-comparison";
 import { SiteFooter } from "@/components/marketing/site-footer";
 import { ScrollReveal } from "@/components/marketing/scroll-reveal";
 import { SiteHeader } from "@/components/marketing/site-header";
 import { getPublishedModules, getPublishedPlans } from "@/lib/catalog-cache";
 import { moduleIcon } from "@/lib/module-icons";
 import type { PublicModule, PublicPlan } from "@/lib/types";
-
-/** "1 utilisateur", "Jusqu'à 5 utilisateurs", "De 3 à 10 utilisateurs". */
-function planSeats(min: number, max: number): string {
-  if (min === max) return max === 1 ? "1 utilisateur" : `${max} utilisateurs`;
-  if (min <= 1) return `Jusqu'à ${max} utilisateurs`;
-  return `De ${min} à ${max} utilisateurs`;
-}
-
-function formatPrice(amountCents: number, currency: string) {
-  return new Intl.NumberFormat("fr-CA", {
-    style: "currency",
-    currency,
-    minimumFractionDigits: amountCents % 100 === 0 ? 0 : 2,
-  }).format(amountCents / 100);
-}
 
 const faq = [
   {
@@ -97,7 +83,7 @@ async function ModulesSection() {
 }
 
 async function PricingSection() {
-  const { plans } = await readCatalog();
+  const { modules, plans } = await readCatalog();
 
   return (
     <section id="tarif" className="vx-glow vx-glow-mirrored border-t border-border">
@@ -110,6 +96,7 @@ async function PricingSection() {
             Pas de surprise à la fin du mois. Paiement sécurisé par Stripe.
           </p>
         </div>
+        <PlanOffers plans={plans} />
 
         {plans.length === 0 ? (
           <div className="mx-auto mt-12 max-w-md rounded-2xl border border-border bg-card p-8 text-center">
@@ -119,66 +106,14 @@ async function PricingSection() {
             </p>
           </div>
         ) : (
-          <div
-            className={cn(
-              "mx-auto mt-12 grid gap-6",
-              plans.length === 1 && "max-w-md",
-              plans.length === 2 && "max-w-3xl sm:grid-cols-2",
-              plans.length >= 3 && "lg:grid-cols-3",
-            )}
-          >
-            {plans.map((plan) => (
-              <div
-                key={plan.id}
-                className="vx-reveal vx-lift flex flex-col rounded-2xl border border-border bg-card p-8"
-              >
-                <p className="text-sm font-medium text-muted-foreground">{plan.name}</p>
-                <p className="mt-3 flex items-baseline gap-2">
-                  <span className="text-4xl font-semibold tracking-tight text-foreground">
-                    {formatPrice(plan.amountCents, plan.currency)}
-                  </span>
-                  <span className="text-sm text-muted-foreground">par mois</span>
-                </p>
-                {plan.description && (
-                  <p className="mt-3 text-sm text-muted-foreground">{plan.description}</p>
-                )}
-
-                {/* The seat count is the line that decides for a team, so it leads the
-                    feature list rather than sitting at the bottom of it. */}
-                <ul className="mt-8 space-y-3">
-                  <li className="flex items-start gap-3 text-sm text-foreground">
-                    <Check className="mt-0.5 size-4 shrink-0 text-primary" />
-                    {planSeats(plan.minUsers, plan.maxUsers)}
-                  </li>
-                </ul>
-
-                {plan.modules.length > 0 && (
-                  <ul className="mt-3 space-y-3">
-                    {plan.modules.map((module) => (
-                      <li key={module.id} className="flex items-start gap-3 text-sm text-foreground">
-                        <Check className="mt-0.5 size-4 shrink-0 text-primary" />
-                        {module.title}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-
-                {/* mt-auto on the wrapper, not the button: it lines the buttons up across
-                    cards of unequal height, and padding keeps a gap when a card is short. */}
-                <div className="mt-auto pt-8">
-                  <Link
-                    href={`/inscription?forfait=${plan.id}`}
-                    className={cn(buttonVariants(), "h-11 w-full px-6")}
-                  >
-                    Choisir ce forfait
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
+          <>
+            <PlanCards plans={plans} />
+            <PlanComparison plans={plans} catalogue={modules} />
+          </>
         )}
       </div>
-    </section>);
+    </section>
+  );
 }
 
 /** Holds the section's place while the catalogue loads, so the FAQ does not jump up and back. */

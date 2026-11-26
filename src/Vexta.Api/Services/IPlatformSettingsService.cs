@@ -84,8 +84,11 @@ public class PlatformSettingsService(
 
     public async Task SetManyAsync(Dictionary<string, string?> values, CancellationToken ct = default)
     {
-        foreach (var (key, value) in values)
+        foreach (var (key, raw) in values)
         {
+            // Keys are pasted from dashboards, and a trailing space or line break is invisible
+            // in a password field yet enough to make every signature wrong.
+            var value = raw?.Trim();
             if (string.IsNullOrEmpty(value))
             {
                 continue; // don't overwrite an existing secret with a blank field left untouched by the UI

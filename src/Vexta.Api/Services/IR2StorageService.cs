@@ -275,5 +275,19 @@ public class R2StorageService(IPlatformSettingsService settings) : IR2StorageSer
             throw new InvalidOperationException(
                 $"R2 a refusé la connexion : {ex.Message}", ex);
         }
+        // Everything short of an answer from R2: an account ID that names no endpoint, a network
+        // that cannot reach Cloudflare, a timeout. These used to escape as a bare server error,
+        // which told the person at the screen nothing they could act on.
+        catch (Exception ex) when (ex is AmazonClientException or HttpRequestException or TaskCanceledException
+                                       && !ct.IsCancellationRequested)
+        {
+            // The useful sentence is at the bottom: "Authentication failed, see inner exception"
+            // wraps the certificate error that actually says what went wrong.
+            var innermost = ex;
+            while (innermost.InnerException is not null) innermost = innermost.InnerException;
+            var detail = innermost.Message;
+            throw new InvalidOperationException(
+                $"R2 est injoignable à {config.AccountId}.r2.cloudflarestorage.com : {detail.TrimEnd('.')}. Vérifiez l'ID de compte.", ex);
+        }
     }
 }

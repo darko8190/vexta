@@ -22,6 +22,7 @@ import { AssistantButton } from "@/components/assistant/assistant-panel";
 import { VextaIcon, VextaLockup } from "@/components/brand/vexta-logo";
 import { dashboardNavItem, getNavItems, type NavItem } from "@/components/layout/nav-config";
 import { NavLinks } from "@/components/layout/nav-links";
+import { FeedbackButton } from "@/components/layout/feedback-button";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { TrialBanner } from "@/components/layout/trial-banner";
 import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
@@ -248,6 +249,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               purpose rather than once a year. It draws nothing unless the company has an
               assistant switched on. */}
           <AssistantButton />
+          <FeedbackButton />
           <ThemeToggle />
           <UserAvatarMenu />
         </header>
@@ -255,6 +257,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <WorkspaceSwitcher />
           <InstallPrompt />
           <AssistantButton />
+          <FeedbackButton />
           <ThemeToggle />
           <UserAvatarMenu />
         </header>

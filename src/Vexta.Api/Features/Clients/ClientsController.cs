@@ -46,6 +46,8 @@ public class ClientsController(
                 || (c.Email != null && EF.Functions.ILike(c.Email, pattern)));
         }
 
+        clients = ApplyColumnFilters(clients, new ListFilter(Request.Query));
+
         var totalCount = await clients.CountAsync();
 
         var items = await clients
@@ -56,6 +58,41 @@ public class ClientsController(
             .ToListAsync();
 
         return Ok(new PagedResult<ClientDto> { Items = items, Page = query.Page, PageSize = query.PageSize, TotalCount = totalCount });
+    }
+
+    /// <summary>The table's column filters, by the screen's column names.</summary>
+    private static IQueryable<Client> ApplyColumnFilters(IQueryable<Client> clients, ListFilter f)
+    {
+        if (f.Min("numero") is { } numberMin) clients = clients.Where(c => c.Number >= numberMin);
+        if (f.Max("numero") is { } numberMax) clients = clients.Where(c => c.Number <= numberMax);
+        if (f.Contains("nom") is { } name) clients = clients.Where(c => EF.Functions.ILike(c.Name, name));
+        if (f.Contains("entreprise") is { } company)
+            clients = clients.Where(c => c.CompanyName != null && EF.Functions.ILike(c.CompanyName, company));
+        if (f.Contains("prenom") is { } first) clients = clients.Where(c => c.FirstName != null && EF.Functions.ILike(c.FirstName, first));
+        if (f.Contains("nomFamille") is { } last) clients = clients.Where(c => c.LastName != null && EF.Functions.ILike(c.LastName, last));
+        if (f.Enums<ClientStatus>("statut") is { Count: > 0 } statuses) clients = clients.Where(c => statuses.Contains(c.Status));
+        if (f.Contains("courriel") is { } email) clients = clients.Where(c => c.Email != null && EF.Functions.ILike(c.Email, email));
+        if (f.Contains("telephone") is { } phone) clients = clients.Where(c => c.Phone != null && EF.Functions.ILike(c.Phone, phone));
+        if (f.Contains("ville") is { } city)
+            clients = clients.Where(c => c.Addresses.Any(a => a.IsPrimary && EF.Functions.ILike(a.City, city)));
+        if (f.Min("projets") is { } projectsMin) clients = clients.Where(c => c.Projects.Count >= projectsMin);
+        if (f.Max("projets") is { } projectsMax) clients = clients.Where(c => c.Projects.Count <= projectsMax);
+        if (f.Min("factures") is { } invoicesMin) clients = clients.Where(c => c.Invoices.Count >= invoicesMin);
+        if (f.Max("factures") is { } invoicesMax) clients = clients.Where(c => c.Invoices.Count <= invoicesMax);
+        return clients;
+    }
+
+    /// <summary>
+    /// Clients per state, and the barred ones as their own pill, for the row above the list.
+    /// </summary>
+    [HttpGet("statuts")]
+    public async Task<ActionResult<List<StatusCountDto>>> StatusCounts(CancellationToken ct)
+    {
+        var counts = (await db.Clients.AsNoTracking().GroupBy(c => c.Status)
+                .Select(g => new { g.Key, Count = g.Count() }).ToListAsync(ct))
+            .OrderBy(g => g.Key).Select(g => new StatusCountDto(g.Key.ToString(), g.Count)).ToList();
+        counts.Add(new StatusCountDto("Bloques", await db.Clients.CountAsync(c => c.IsBlocked, ct)));
+        return Ok(counts);
     }
 
     [HttpGet("summary")]
@@ -106,6 +143,22 @@ public class ClientsController(
 
         db.Clients.Add(client);
         ApplyPrimaryAddress(client, request.PrimaryAddress, tenantId);
+
+        // A company is reached through a person, and the one named here is the first of its
+        // contacts. Filed as one, so they can be picked as a project's contact or its billing
+        // contact like anybody added later, instead of existing only as fields on the company.
+        if (client.Type == ClientType.Entreprise && (client.FirstName is not null || client.LastName is not null))
+        {
+            db.ClientContacts.Add(new ClientContact
+            {
+                TenantId = tenantId,
+                ClientId = client.Id,
+                FirstName = client.FirstName ?? "",
+                LastName = client.LastName ?? "",
+                Email = client.Email,
+                Phone = client.Phone
+            });
+        }
 
         await db.SaveChangesAsync();
 
@@ -555,7 +608,8 @@ public class ClientsController(
             ? c.BillingContact.FirstName + " " + c.BillingContact.LastName
             : ((c.FirstName ?? "") + " " + (c.LastName ?? "")).Trim() == ""
                 ? null
-                : ((c.FirstName ?? "") + " " + (c.LastName ?? "")).Trim());
+                : ((c.FirstName ?? "") + " " + (c.LastName ?? "")).Trim(),
+        c.Quotes.Count(q => !q.Revisions.Any()));
 
     private static System.Linq.Expressions.Expression<Func<ClientContact, ClientContactDto>> ContactToDto() =>
         c => new ClientContactDto(

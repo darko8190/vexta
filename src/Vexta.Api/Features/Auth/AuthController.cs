@@ -21,6 +21,7 @@ public class AuthController(
     IWorkspaceService workspaces,
     ICurrentUserService currentUser,
     IPasswordResetService passwordReset,
+    IEmailConfirmationService emailConfirmation,
     IOptions<JwtOptions> jwtOptions) : ControllerBase
 {
     [HttpPost("login")]
@@ -101,6 +102,51 @@ public class AuthController(
         }
 
         return Ok(new { message = $"Un lien vient d'être envoyé à {user.Email}." });
+    }
+
+    /// <summary>Whether the signed-in person has proved their address yet.</summary>
+    [HttpGet("courriel")]
+    [Authorize]
+    public async Task<IActionResult> EmailStatus()
+    {
+        var user = await CurrentUserAsync();
+        if (user is null) return Unauthorized();
+
+        return Ok(new { email = user.Email, confirmed = user.EmailConfirmed });
+    }
+
+    /// <summary>Sends the signed-in person a link proving their address is theirs.</summary>
+    [HttpPost("courriel/verification")]
+    [Authorize]
+    public async Task<IActionResult> SendEmailConfirmation()
+    {
+        var user = await CurrentUserAsync();
+        if (user is null) return Unauthorized();
+        if (user.EmailConfirmed) return Ok(new { message = "Votre adresse est déjà confirmée." });
+
+        if (!await emailConfirmation.SendLinkAsync(user, HttpContext.RequestAborted))
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new
+            {
+                message = "Le courriel n'a pas pu être envoyé. Réessayez dans quelques minutes."
+            });
+        }
+
+        return Ok(new { message = $"Un lien vient d'être envoyé à {user.Email}." });
+    }
+
+    /// <summary>
+    /// Applies the link. Anonymous on purpose: the link may be opened on a phone where the
+    /// person is not signed in, and the token alone is the proof.
+    /// </summary>
+    [HttpPost("courriel/confirmer")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ConfirmEmail(ConfirmEmailRequest request)
+    {
+        var error = await emailConfirmation.ConfirmAsync(request.Token, HttpContext.RequestAborted);
+        if (error is not null) return BadRequest(new { message = error });
+
+        return Ok(new { message = "Votre adresse est confirmée." });
     }
 
     [HttpPost("reinitialiser-mot-de-passe")]

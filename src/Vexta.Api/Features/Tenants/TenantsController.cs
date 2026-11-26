@@ -142,9 +142,9 @@ public class TenantsController(
     /// leave every one of those rows in place, invisible to the filters and attached to a
     /// company that no longer exists.
     ///
-    /// The order is the one the remaining constraints impose: expenses before the expense types
-    /// they name, a product's parent link cleared before the products themselves. One
-    /// transaction, so a tenant is either gone or untouched.
+    /// Every table holding a TenantId column is emptied of the company's rows, in whatever order
+    /// the constraints allow (see the passes below). One transaction, so a tenant is either gone
+    /// or untouched.
     ///
     /// Stripe is not told. A subscription keeps billing until it is cancelled there, which is
     /// deliberate: this endpoint must never be able to end someone's billing by accident.
@@ -160,85 +160,21 @@ public class TenantsController(
         // part in a transaction it did not open — it has no way to replay work that has already
         // been committed halfway. Everything below therefore runs inside one retriable unit.
         var strategy = db.Database.CreateExecutionStrategy();
-        await strategy.ExecuteAsync(async () =>
+        try
         {
-            await using var transaction = await db.Database.BeginTransactionAsync(ct);
+            await strategy.ExecuteAsync(async () =>
+            {
+                await using var transaction = await db.Database.BeginTransactionAsync(ct);
 
-            async Task Wipe<T>(IQueryable<T> rows) where T : class =>
-                await rows.IgnoreQueryFilters().ExecuteDeleteAsync(ct);
+                await TenantEraser.EraseAsync(db, id, ct);
 
-            await Wipe(db.ProjectExpensePhotos.Where(x => x.TenantId == id));
-            await Wipe(db.ProjectMaterials.Where(x => x.TenantId == id));
-            await Wipe(db.TimesheetEntries.Where(x => x.TenantId == id));
-            await Wipe(db.ProjectDocuments.Where(x => x.TenantId == id));
-            await Wipe(db.ProjectNotes.Where(x => x.TenantId == id));
-            // Before Teams, which a task may point at, and before Employees, whose join
-            // rows go with the task.
-            await Wipe(db.ProjectTasks.Where(x => x.TenantId == id));
-            await Wipe(db.ProjectExpenses.Where(x => x.TenantId == id));
-            await Wipe(db.ExpenseTypes.Where(x => x.TenantId == id));
-
-            // Invoice lines go with their invoice, which does cascade.
-            // Before the invoices they hang off, and before the clients they belong to. Both
-            // would cascade from the database, but this sweep is explicit about everything so
-            // that reading it tells you what a deleted tenant takes with it.
-            // Refunds before the payments they point at, which they do not cascade from.
-            await Wipe(db.InvoiceRefunds.Where(x => x.TenantId == id));
-            await Wipe(db.InvoiceCredits.Where(x => x.TenantId == id));
-            await Wipe(db.InvoicePayments.Where(x => x.TenantId == id));
-            await Wipe(db.ClientAccountEntries.Where(x => x.TenantId == id));
-            await Wipe(db.Invoices.Where(x => x.TenantId == id));
-            await Wipe(db.Projects.Where(x => x.TenantId == id));
-
-            await Wipe(db.ProductImages.Where(x => x.TenantId == id));
-            await Wipe(db.ProductPriceEntries.Where(x => x.TenantId == id));
-            await Wipe(db.ProductStockEntries.Where(x => x.TenantId == id));
-            // A product can name another as its parent, and that link refuses the delete rather
-            // than following it, so it is cut first.
-            await db.Products.IgnoreQueryFilters()
-                .Where(x => x.TenantId == id && x.ParentProductId != null)
-                .ExecuteUpdateAsync(set => set.SetProperty(x => x.ParentProductId, (Guid?)null), ct);
-            await Wipe(db.Products.Where(x => x.TenantId == id));
-            await Wipe(db.ProductSubCategories.Where(x => x.TenantId == id));
-            await Wipe(db.ProjectSubCategories.Where(x => x.TenantId == id));
-            await Wipe(db.ProjectCategories.Where(x => x.TenantId == id));
-            await Wipe(db.WageClassificationSteps.Where(x => x.TenantId == id));
-            await Wipe(db.WageClassifications.Where(x => x.TenantId == id));
-            await Wipe(db.ProductCategories.Where(x => x.TenantId == id));
-
-            // A submission points at the client it created, and an answer at its question, so
-            // the four tables come down innermost first.
-            // Before the media assets they point at, which cascade with the tenant.
-            await Wipe(db.ReceiptScans.Where(x => x.TenantId == id));
-
-            await Wipe(db.FormAnswers.Where(x => x.TenantId == id));
-            await Wipe(db.FormSubmissions.Where(x => x.TenantId == id));
-            await Wipe(db.FormActions.Where(x => x.TenantId == id));
-            await Wipe(db.FormFields.Where(x => x.TenantId == id));
-            await Wipe(db.FormTemplates.Where(x => x.TenantId == id));
-
-            await Wipe(db.ClientContacts.Where(x => x.TenantId == id));
-            // Before the addresses some of them point at, and before the types they name.
-            await Wipe(db.ClientAssets.Where(x => x.TenantId == id));
-            await Wipe(db.ClientAssetTypes.Where(x => x.TenantId == id));
-            await Wipe(db.Addresses.Where(x => x.TenantId == id));
-            await Wipe(db.HrDocuments.Where(x => x.TenantId == id));
-            // Before the postings they answered. A candidate carries a name, a telephone number
-            // and a link to a CV, and nothing in the model takes them with the tenant — so a
-            // company deleted on request was leaving its applicants' details behind, invisible
-            // to every filter but still in the database.
-            await Wipe(db.Candidates.Where(x => x.TenantId == id));
-            await Wipe(db.JobPostings.Where(x => x.TenantId == id));
-            await Wipe(db.CompanyLocations.Where(x => x.TenantId == id));
-            await Wipe(db.Teams.Where(x => x.TenantId == id));
-            await Wipe(db.PricePolicies.Where(x => x.TenantId == id));
-
-            // The last of them cascade from the tenant row itself: users, memberships, employees,
-            // clients, billing settings, media, public pages and the logo.
-            await Wipe(db.Tenants.Where(t => t.Id == id));
-
-            await transaction.CommitAsync(ct);
-        });
+                await transaction.CommitAsync(ct);
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
 
         return NoContent();
     }

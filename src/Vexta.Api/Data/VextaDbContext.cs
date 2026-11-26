@@ -32,6 +32,10 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             ? id
             : null;
 
+    public DbSet<WorkDay> WorkDays => Set<WorkDay>();
+    public DbSet<Equipment> Equipment => Set<Equipment>();
+    public DbSet<ProjectEquipment> ProjectEquipment => Set<ProjectEquipment>();
+    public DbSet<McpKey> McpKeys => Set<McpKey>();
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<Client> Clients => Set<Client>();
     public DbSet<Address> Addresses => Set<Address>();
@@ -453,6 +457,12 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
                 .HasForeignKey(p => p.ClientAddressId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne(p => p.SiteAddress).WithMany()
                 .HasForeignKey(p => p.SiteAddressId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(p => p.Contact).WithMany()
+                .HasForeignKey(p => p.ContactId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(p => p.BillingContact).WithMany()
+                .HasForeignKey(p => p.BillingContactId).OnDelete(DeleteBehavior.SetNull);
+            // The recurrence pass reads by this date across every company.
+            e.HasIndex(p => p.RecurrenceNextDate);
             e.HasOne(p => p.PricePolicy).WithMany()
                 .HasForeignKey(p => p.PricePolicyId).OnDelete(DeleteBehavior.SetNull);
 
@@ -1316,7 +1326,7 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
 
             // Restrict on the client, like a project: a client with quotes on file is not
             // deleted out from under them.
-            e.HasOne(q => q.Client).WithMany().HasForeignKey(q => q.ClientId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(q => q.Client).WithMany(c => c.Quotes).HasForeignKey(q => q.ClientId).OnDelete(DeleteBehavior.Restrict);
 
             // SetNull everywhere else: tidying an address book, an asset list or the filing
             // categories must never take a quote with it.
@@ -1396,12 +1406,70 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
                 && (CurrentClientId == null || l.Quote!.ClientId == CurrentClientId));
         });
 
+        builder.Entity<Equipment>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.SerialNumber).HasMaxLength(100);
+            e.Property(x => x.Description).HasMaxLength(2000);
+            e.Property(x => x.Notes).HasMaxLength(2000);
+            e.Property(x => x.CostRate).HasPrecision(12, 2);
+            e.Property(x => x.SellingRate).HasPrecision(12, 2);
+            e.HasIndex(x => new { x.TenantId, x.Number }).IsUnique();
+            e.HasQueryFilter(x => x.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<ProjectEquipment>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.Notes).HasMaxLength(2000);
+            e.Property(x => x.Quantity).HasPrecision(12, 2);
+            e.Property(x => x.CostRate).HasPrecision(12, 2);
+            e.Property(x => x.SellingRate).HasPrecision(12, 2);
+            e.HasOne(x => x.Project).WithMany(p => p.EquipmentUsed)
+                .HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Equipment).WithMany()
+                .HasForeignKey(x => x.EquipmentId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(x => x.ProjectTask).WithMany()
+                .HasForeignKey(x => x.ProjectTaskId).OnDelete(DeleteBehavior.SetNull);
+            // Same scoping as the job it hangs off: a customer reading their project reads none
+            // of this, which the controller enforces by being staff only.
+            e.HasQueryFilter(x => x.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<WorkDay>(e =>
+        {
+            e.Property(x => x.Note).HasMaxLength(500);
+            e.HasOne(x => x.Employee).WithMany()
+                .HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Cascade);
+            // One day per person per date: starting twice is the same day.
+            e.HasIndex(x => new { x.EmployeeId, x.Date }).IsUnique();
+            e.HasIndex(x => new { x.TenantId, x.Date });
+            e.HasQueryFilter(x => x.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<McpKey>(e =>
+        {
+            e.Property(k => k.Name).HasMaxLength(100);
+            e.Property(k => k.Prefix).HasMaxLength(20);
+            e.Property(k => k.KeyHash).HasMaxLength(64);
+            // Looked up by hash on every call, from outside any company.
+            e.HasIndex(k => k.KeyHash).IsUnique();
+            e.HasIndex(k => k.TenantId);
+            e.HasQueryFilter(k => k.TenantId == CurrentTenantId);
+        });
+
         builder.Entity<WageClassificationStep>(e =>
         {
             e.Property(s => s.Name).HasMaxLength(100);
             e.Property(s => s.Wage).HasPrecision(10, 2);
             e.Property(s => s.Cost).HasPrecision(10, 2);
             e.Property(s => s.Selling).HasPrecision(10, 2);
+            e.Property(s => s.WageTimeAndHalf).HasPrecision(10, 2);
+            e.Property(s => s.CostTimeAndHalf).HasPrecision(10, 2);
+            e.Property(s => s.SellingTimeAndHalf).HasPrecision(10, 2);
+            e.Property(s => s.WageDouble).HasPrecision(10, 2);
+            e.Property(s => s.CostDouble).HasPrecision(10, 2);
+            e.Property(s => s.SellingDouble).HasPrecision(10, 2);
 
             // Cascade: a step is a row of its classification's table and nothing else.
             e.HasOne(s => s.Classification).WithMany(c => c.Steps)
@@ -1719,5 +1787,95 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.Property(a => a.ContentType).HasMaxLength(100);
             e.Property(a => a.ETag).HasMaxLength(64);
         });
+    }
+
+    /// <summary>
+    /// Saves, after moving to « Commencé » any project still « À faire » that work was just
+    /// recorded on: hours, an expense, a material, an extra charge, a file or note, or a person
+    /// assigned to one of its tasks.
+    ///
+    /// Done here rather than in each controller because the work arrives through many doors —
+    /// the timesheet, the phone, the receipt scanner, the assistant — and a rule kept in each of
+    /// them is a rule one of them forgets. A project being created in the same save is left
+    /// alone: copying a recurring job's tasks and crew is planning, not work.
+    /// </summary>
+    public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        await StartTouchedProjectsAsync(cancellationToken);
+        return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    private async Task StartTouchedProjectsAsync(CancellationToken ct)
+    {
+        var added = ChangeTracker.Entries().Where(e => e.State == EntityState.Added).ToList();
+        if (added.Count == 0) return;
+
+        var projectIds = new HashSet<Guid>();
+        var taskIds = new HashSet<Guid>();
+
+        foreach (var entry in added)
+        {
+            switch (entry.Entity)
+            {
+                case TimesheetEntry t: projectIds.Add(t.ProjectId); break;
+                case ProjectExpense x: projectIds.Add(x.ProjectId); break;
+                case ProjectMaterial m: projectIds.Add(m.ProjectId); break;
+                case ProjectExtraCharge c: projectIds.Add(c.ProjectId); break;
+                case ProjectEquipment q: projectIds.Add(q.ProjectId); break;
+                case ProjectDocument d: projectIds.Add(d.ProjectId); break;
+                case ProjectNote n: projectIds.Add(n.ProjectId); break;
+                case Dictionary<string, object> join
+                    when entry.Metadata.Name == "ProjectTaskAssignees"
+                        && join.TryGetValue("ProjectTaskId", out var task) && task is Guid taskId:
+                    taskIds.Add(taskId);
+                    break;
+            }
+        }
+
+        if (taskIds.Count > 0)
+        {
+            // A task added in this same save is known only to the tracker; an older one is read.
+            var tracked = ChangeTracker.Entries<ProjectTask>()
+                .Where(e => taskIds.Contains(e.Entity.Id))
+                .ToDictionary(e => e.Entity.Id, e => e);
+            // The task's project; when it is a project being created, the check below skips it.
+            foreach (var entry in tracked.Values) projectIds.Add(entry.Entity.ProjectId);
+
+            var missing = taskIds.Where(id => !tracked.ContainsKey(id)).ToList();
+            if (missing.Count > 0)
+            {
+                projectIds.UnionWith(await ProjectTasks.IgnoreQueryFilters().AsNoTracking()
+                    .Where(t => missing.Contains(t.Id))
+                    .Select(t => t.ProjectId)
+                    .ToListAsync(ct));
+            }
+        }
+
+        if (projectIds.Count == 0) return;
+
+        var trackedProjects = ChangeTracker.Entries<Project>()
+            .Where(e => projectIds.Contains(e.Entity.Id))
+            .ToList();
+        foreach (var entry in trackedProjects)
+        {
+            projectIds.Remove(entry.Entity.Id);
+            if (entry.State == EntityState.Added) continue;
+            if (entry.Entity.Status == ProjectStatus.AFaire)
+            {
+                entry.Entity.Status = ProjectStatus.Commence;
+                entry.Entity.UpdatedAt = DateTimeOffset.UtcNow;
+            }
+        }
+
+        if (projectIds.Count == 0) return;
+
+        var waiting = await Projects.IgnoreQueryFilters()
+            .Where(p => projectIds.Contains(p.Id) && p.Status == ProjectStatus.AFaire)
+            .ToListAsync(ct);
+        foreach (var project in waiting)
+        {
+            project.Status = ProjectStatus.Commence;
+            project.UpdatedAt = DateTimeOffset.UtcNow;
+        }
     }
 }

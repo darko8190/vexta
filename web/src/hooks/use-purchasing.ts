@@ -25,6 +25,7 @@ export function useAllExpensesQuery(page: number, filters: ExpenseFilters) {
           du: filters.du || undefined,
           au: filters.au || undefined,
           projet: filters.projet || undefined,
+          statut: filters.statut || undefined,
         })}`,
       ),
     placeholderData: (previous) => previous,

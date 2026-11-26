@@ -1,4 +1,5 @@
-﻿namespace Vexta.Api.Features.Projects;
+using Vexta.Api.Domain;
+namespace Vexta.Api.Features.Projects;
 
 // ---- Lecture d'un reçu ----
 
@@ -70,7 +71,12 @@ public record ProjectExpenseDto(
     Guid? ProjectTaskId,
     string? ProjectTaskTitle,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    ExpenseStatus Status = ExpenseStatus.AApprouver,
+    int ProjectNumber = 0,
+    string? ClientName = null);
+
+public record SetExpenseStatusRequest(ExpenseStatus Status);
 
 /// <summary>The expense plus its photographs, for the panel that shows or edits one.</summary>
 public record ProjectExpenseDetailDto(ProjectExpenseDto Expense, IReadOnlyList<ExpensePhotoDto> Photos);

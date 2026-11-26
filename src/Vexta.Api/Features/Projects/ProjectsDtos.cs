@@ -42,7 +42,18 @@ public record ProjectDto(
     string? SubCategoryName = null,
     /// <summary>The pay classification the hours on this job are counted under.</summary>
     Guid? WageClassificationId = null,
-    string? WageClassificationName = null);
+    string? WageClassificationName = null,
+    /// <summary>The client's person for this job, and who its invoices go to.</summary>
+    Guid? ContactId = null,
+    string? ContactName = null,
+    Guid? BillingContactId = null,
+    string? BillingContactName = null,
+    /// <summary>Null on a one-off job. See Project.RecurrenceEvery.</summary>
+    int? RecurrenceEvery = null,
+    RecurrenceUnit RecurrenceUnit = RecurrenceUnit.Mois,
+    DateOnly? RecurrenceNextDate = null,
+    DateOnly? RecurrenceEndDate = null,
+    Guid? RecurringFromId = null);
 
 public record UpsertProjectRequest(
     Guid ClientId,
@@ -65,7 +76,14 @@ public record UpsertProjectRequest(
     Guid? CategoryId = null,
     /// <summary>Has to sit under CategoryId; ignored without one.</summary>
     Guid? SubCategoryId = null,
-    Guid? WageClassificationId = null);
+    Guid? WageClassificationId = null,
+    /// <summary>Both have to be contacts of ClientId.</summary>
+    Guid? ContactId = null,
+    Guid? BillingContactId = null,
+    /// <summary>Null or 0 makes it a one-off job.</summary>
+    int? RecurrenceEvery = null,
+    RecurrenceUnit RecurrenceUnit = RecurrenceUnit.Mois,
+    DateOnly? RecurrenceEndDate = null);
 
 // ---- What the project's own page needs beyond the record itself ----
 

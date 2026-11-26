@@ -1,25 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Controller, useForm } from "react-hook-form";
-import * as z from "zod";
+import { useState } from "react";
 import { toast } from "sonner";
-import { BanknoteArrowDown, CircleCheck, Lock, Plus, Trash2 } from "lucide-react";
+import { BanknoteArrowDown, Check, CircleCheck, Lock, Plus, Trash2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-  Sheet,
-  SheetClose,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -38,7 +25,6 @@ import { paymentMethodLabels } from "@/lib/labels";
 import { formatAmount } from "@/lib/money";
 import type { InvoicePayment, PaymentMethod } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { ex } from "@/lib/placeholders";
 
 const methods: PaymentMethod[] = [
   "Comptant",
@@ -50,19 +36,6 @@ const methods: PaymentMethod[] = [
   "Autre",
 ];
 
-const formSchema = z.object({
-  amount: z
-    .string()
-    .trim()
-    .min(1, "Le montant est obligatoire.")
-    .refine((value) => Number(value.replace(",", ".")) > 0, "Le montant doit être supérieur à zéro."),
-  method: z.enum(["Comptant", "Interac", "Carte", "Cheque", "Virement", "PorteAuCompte", "Autre"]),
-  date: z.string().min(1, "La date est obligatoire."),
-  reference: z.string().trim().max(80, "80 caractères maximum."),
-  note: z.string().trim().max(300, "300 caractères maximum."),
-});
-
-type FormValues = z.infer<typeof formSchema>;
 
 /**
  * What has been paid on one invoice, and what is left.
@@ -79,7 +52,7 @@ export function InvoicePaymentsSection({ invoiceId }: { invoiceId: string }) {
 
   const remove = useDeleteInvoicePayment(invoiceId);
 
-  const [formOpen, setFormOpen] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<InvoicePayment | undefined>(undefined);
 
   const payments = data?.payments ?? [];
@@ -102,7 +75,7 @@ export function InvoicePaymentsSection({ invoiceId }: { invoiceId: string }) {
 
   const addButton =
     canManage && !settled ? (
-      <Button onClick={() => setFormOpen(true)}>
+      <Button onClick={() => setAdding(true)} disabled={adding}>
         <Plus />
         Inscrire un paiement
       </Button>
@@ -199,7 +172,7 @@ export function InvoicePaymentsSection({ invoiceId }: { invoiceId: string }) {
             </p>
           )}
 
-          {payments.length === 0 ? (
+          {payments.length === 0 && !adding ? (
             <EmptyState
               icon={BanknoteArrowDown}
               title="Aucun paiement"
@@ -215,10 +188,18 @@ export function InvoicePaymentsSection({ invoiceId }: { invoiceId: string }) {
                     <TableHead className="w-40">Méthode</TableHead>
                     <TableHead>Référence</TableHead>
                     <TableHead className="w-32 text-right">Montant</TableHead>
-                    {canManage && <TableHead className="w-10" />}
+                    {canManage && <TableHead className="w-20" />}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
+                  {adding && (
+                    <NewPaymentRow
+                      invoiceId={invoiceId}
+                      outstanding={outstanding}
+                      accountRefusal={data?.accountRefusal ?? null}
+                      onDone={() => setAdding(false)}
+                    />
+                  )}
                   {payments.map((payment) => (
                     <TableRow key={payment.id}>
                       <TableCell className="text-muted-foreground tabular-nums">
@@ -261,13 +242,6 @@ export function InvoicePaymentsSection({ invoiceId }: { invoiceId: string }) {
         </>
       )}
 
-      <PaymentSheet
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        invoiceId={invoiceId}
-        outstanding={outstanding}
-        accountRefusal={data?.accountRefusal ?? null}
-      />
 
       <ConfirmDeleteDialog
         open={Boolean(deleteTarget)}
@@ -285,188 +259,119 @@ export function InvoicePaymentsSection({ invoiceId }: { invoiceId: string }) {
   );
 }
 
-function PaymentSheet({
-  open,
-  onOpenChange,
+/**
+ * A payment typed straight into the table, where it will stay: date, method, reference, amount,
+ * prefilled with today and what is left to pay. Entrée saves, Échap drops the line — no panel
+ * hiding the invoice while the amount is being read off it.
+ */
+function NewPaymentRow({
   invoiceId,
   outstanding,
   accountRefusal,
+  onDone,
 }: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
   invoiceId: string;
   outstanding: number;
   accountRefusal: string | null;
+  onDone: () => void;
 }) {
   const create = useCreateInvoicePayment(invoiceId);
+  const [date, setDate] = useState(todayIso());
+  const [method, setMethod] = useState<PaymentMethod>("Comptant");
+  const [reference, setReference] = useState("");
+  const [note, setNote] = useState("");
+  // Prefilled with what is left, which is what gets entered nine times out of ten.
+  const [amount, setAmount] = useState(outstanding > 0 ? outstanding.toFixed(2).replace(".", ",") : "");
 
-  const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      amount: "",
-      method: "Comptant",
-      date: todayIso(),
-      reference: "",
-      note: "",
-    },
-  });
+  const parsed = Number(amount.replace(/\s/g, "").replace(",", "."));
+  const valid = amount.trim() !== "" && Number.isFinite(parsed) && parsed > 0 && date !== "";
 
-  useEffect(() => {
-    if (open) {
-      form.reset({
-        // Prefilled with what is left, which is what gets entered nine times out of ten. Typed
-        // with a comma because that is how an amount is written in fr-CA.
-        amount: outstanding > 0 ? outstanding.toFixed(2).replace(".", ",") : "",
-        method: "Comptant",
-        date: todayIso(),
-        reference: "",
-        note: "",
-      });
-    }
-  }, [open, outstanding, form]);
-
-  async function onSubmit(values: FormValues) {
+  async function save() {
+    if (!valid || create.isPending) return;
     try {
       await create.mutateAsync({
-        amount: Number(values.amount.replace(",", ".")),
-        method: values.method,
-        date: values.date,
-        reference: values.reference || null,
-        note: values.note || null,
+        amount: parsed,
+        method,
+        date,
+        reference: reference.trim() || null,
+        note: note.trim() || null,
       });
       toast.success("Paiement inscrit.");
-      onOpenChange(false);
+      onDone();
     } catch (error) {
       toast.error(error instanceof ApiError ? error.message : "Impossible d'inscrire ce paiement.");
     }
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-md">
-        <SheetHeader>
-          <SheetTitle>Inscrire un paiement</SheetTitle>
-          <SheetDescription>
-            Il reste {formatAmount(outstanding)} à encaisser sur cette facture.
-          </SheetDescription>
-        </SheetHeader>
-
-        <form
-          id="payment-form"
-          className="flex-1 overflow-y-auto px-4"
-          onSubmit={form.handleSubmit(onSubmit)}
-          noValidate
-        >
-          <FieldGroup>
-            <Controller
-              name="amount"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="payment-amount">Montant ($)</FieldLabel>
-                  <Input
-                    {...field}
-                    id="payment-amount"
-                    inputMode="decimal"
-                    aria-invalid={fieldState.invalid}
-                  />
-                  {fieldState.invalid ? (
-                    <FieldError errors={[fieldState.error]} />
-                  ) : (
-                    <FieldDescription>
-                      Un acompte se saisit en changeant ce montant.
-                    </FieldDescription>
-                  )}
-                </Field>
-              )}
-            />
-
-            <Controller
-              name="method"
-              control={form.control}
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel htmlFor="payment-method">Méthode</FieldLabel>
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger id="payment-method" className="w-full">
-                      <SelectValue>
-                        {(value: PaymentMethod) => paymentMethodLabels[value]}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {methods.map((method) => (
-                        <SelectItem
-                          key={method}
-                          value={method}
-                          // Offered but refused would cost a round trip to learn what the panel
-                          // already knows.
-                          disabled={method === "PorteAuCompte" && Boolean(accountRefusal)}
-                        >
-                          {paymentMethodLabels[method]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FieldDescription>
-                    {field.value === "PorteAuCompte"
-                      ? "La facture est réglée et le montant s'ajoute au compte du client."
-                      : "L'argent est entré."}
-                  </FieldDescription>
-                </Field>
-              )}
-            />
-
-            <Controller
-              name="date"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="payment-date">Date</FieldLabel>
-                  <Input {...field} id="payment-date" type="date" aria-invalid={fieldState.invalid} />
-                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                </Field>
-              )}
-            />
-
-            <Controller
-              name="reference"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="payment-reference">Référence</FieldLabel>
-                  <Input
-                    {...field}
-                    id="payment-reference"
-                    placeholder={ex("Numéro de chèque, code d'autorisation")}
-                    aria-invalid={fieldState.invalid}
-                  />
-                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                </Field>
-              )}
-            />
-
-            <Controller
-              name="note"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="payment-note">Note</FieldLabel>
-                  <Input {...field} id="payment-note" aria-invalid={fieldState.invalid} />
-                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                </Field>
-              )}
-            />
-          </FieldGroup>
-        </form>
-
-        <SheetFooter>
-          <Button type="submit" form="payment-form" disabled={create.isPending}>
-            {create.isPending && <Spinner />}
-            Inscrire le paiement
+    <TableRow
+      className="bg-muted/30"
+      onKeyDown={(event) => {
+        if (event.key === "Escape") onDone();
+        if (event.key === "Enter" && (event.target as HTMLElement).tagName === "INPUT") {
+          event.preventDefault();
+          void save();
+        }
+      }}
+    >
+      <TableCell className="py-1.5 align-top">
+        <Input type="date" aria-label="Date du paiement" value={date} onChange={(e) => setDate(e.target.value)} className="h-8" />
+      </TableCell>
+      <TableCell className="py-1.5 align-top">
+        <Select value={method} onValueChange={(value) => value && setMethod(value as PaymentMethod)}>
+          <SelectTrigger size="sm" aria-label="Méthode" className="w-full">
+            <SelectValue>{(value: PaymentMethod) => paymentMethodLabels[value]}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {methods.map((item) => (
+              <SelectItem key={item} value={item} disabled={item === "PorteAuCompte" && Boolean(accountRefusal)}>
+                {paymentMethodLabels[item]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </TableCell>
+      <TableCell className="py-1.5 align-top">
+        <div className="grid gap-1">
+        <Input
+          aria-label="Référence"
+          placeholder="Référence (no de chèque…)"
+          maxLength={80}
+          value={reference}
+          onChange={(e) => setReference(e.target.value)}
+          className="h-8"
+        />
+        <Input
+          aria-label="Note"
+          placeholder="Note"
+          maxLength={300}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          className="h-8"
+        />
+        </div>
+      </TableCell>
+      <TableCell className="py-1.5 align-top">
+        <Input
+          autoFocus
+          inputMode="decimal"
+          aria-label="Montant"
+          aria-invalid={amount.trim() !== "" && !valid}
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          className="h-8 min-w-24 text-right tabular-nums"
+        />
+      </TableCell>
+      <TableCell className="py-1.5 align-top">
+        <div className="flex gap-1">
+          <Button size="icon-sm" aria-label="Enregistrer le paiement" onClick={() => void save()} disabled={!valid || create.isPending}>
+            {create.isPending ? <Spinner /> : <Check />}
           </Button>
-          <SheetClose render={<Button type="button" variant="outline" />}>Annuler</SheetClose>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+          <Button size="icon-sm" variant="ghost" aria-label="Annuler" onClick={onDone}>
+            <X />
+          </Button>
+        </div>
+      </TableCell>
+    </TableRow>
   );
 }

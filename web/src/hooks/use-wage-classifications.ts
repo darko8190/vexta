@@ -6,8 +6,9 @@ import type { SaveWageClassificationValues, WageClassification } from "@/lib/typ
  * The company's pay classifications and their steps. Read by the settings card that manages
  * them and by the project form that picks one, which share this cache.
  */
-export function useWageClassificationsQuery() {
+export function useWageClassificationsQuery(enabled = true) {
   return useQuery({
+    enabled,
     queryKey: ["classements"],
     queryFn: () => api.get<WageClassification[]>("classements"),
   });

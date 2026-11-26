@@ -5,6 +5,7 @@ import type {
   ProjectRecord,
   ProjectStatus,
   ProjectSummary,
+  RecurrenceUnit,
 } from "@/lib/types";
 
 export interface ProjectFormValues {
@@ -29,6 +30,13 @@ export interface ProjectFormValues {
   /** Has to sit under categoryId; dropped by the server without one. */
   subCategoryId?: string | null;
   wageClassificationId?: string | null;
+  /** Both have to be contacts of clientId — the server checks. */
+  contactId?: string | null;
+  billingContactId?: string | null;
+  /** Null or 0 for a one-off job. */
+  recurrenceEvery?: number | null;
+  recurrenceUnit?: RecurrenceUnit;
+  recurrenceEndDate?: string | null;
 }
 
 export function useProjectsQuery(
@@ -37,12 +45,14 @@ export function useProjectsQuery(
   clientId?: string,
   status?: ProjectStatus,
   clientAssetId?: string,
+  /** Column filters, already as query parameters (see filtersToQuery). */
+  filters: Record<string, string> = {},
 ) {
   return useQuery({
-    queryKey: ["projects", page, search, clientId, status, clientAssetId],
+    queryKey: ["projects", page, search, clientId, status, clientAssetId, filters],
     queryFn: () =>
       api.get<PagedResult<ProjectRecord>>(
-        `projects${buildQuery({ page, search, clientId, status, clientAssetId })}`,
+        `projects${buildQuery({ page, search, clientId, status, clientAssetId, ...filters })}`,
       ),
     placeholderData: (previous) => previous,
   });

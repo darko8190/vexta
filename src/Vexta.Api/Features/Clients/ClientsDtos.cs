@@ -48,7 +48,9 @@ public record ClientDto(
     /// <summary>The contact responsible for billing, or null for the person on the record.</summary>
     Guid? BillingContactId = null,
     /// <summary>Who that is, worked out either way, so a screen never has to.</summary>
-    string? BillingContactName = null);
+    string? BillingContactName = null,
+    /// <summary>Current quotes only: a quote replaced by a revision is the same quote.</summary>
+    int QuoteCount = 0);
 
 /// <summary>
 /// The state of one person's access, in the three forms it can take: none, invited but never

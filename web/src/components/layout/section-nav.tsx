@@ -8,7 +8,25 @@ export interface NavSection {
   label: string;
   /** The badge. Omitted for a section that is one thing rather than a list of them. */
   count?: number;
+  /**
+   * Whether the section is set up, for screens of settings: a green dot when it is, an amber
+   * one when it still needs doing. Omitted where the question does not apply.
+   */
+  status?: "ok" | "todo";
   icon: React.ComponentType<{ className?: string }>;
+}
+
+/** The dot that says whether something is set up, with the words for a screen reader. */
+export function StatusDot({ status, className }: { status: "ok" | "todo"; className?: string }) {
+  return (
+    <span className={cn("inline-flex shrink-0 items-center", className)}>
+      <span
+        aria-hidden
+        className={cn("size-2 rounded-full", status === "ok" ? "bg-emerald-500" : "bg-amber-500")}
+      />
+      <span className="sr-only">{status === "ok" ? "configuré" : "à configurer"}</span>
+    </span>
+  );
 }
 
 /**
@@ -81,10 +99,17 @@ export function SectionNav({
             <span className="min-w-0 truncate" title={section.label}>
               {section.label}
             </span>
+            {section.status && (
+              <StatusDot
+                status={section.status}
+                // At the right edge, before the count when there is one.
+                className="ml-auto"
+              />
+            )}
             {section.count !== undefined && (
               <Badge
                 variant={current ? "default" : "secondary"}
-                className="ml-auto shrink-0 tabular-nums"
+                className={cn("shrink-0 tabular-nums", !section.status && "ml-auto")}
               >
                 {section.count}
               </Badge>

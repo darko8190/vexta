@@ -1,6 +1,7 @@
 ﻿"use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import * as z from "zod";
@@ -27,16 +28,24 @@ import { Spinner } from "@/components/ui/spinner";
 import { AddressPicker } from "@/components/addresses/address-picker";
 import { ClientAssetPicker } from "@/components/assets/client-asset-picker";
 import { ClientPicker } from "@/components/clients/client-picker";
+import { ContactPicker } from "@/components/clients/contact-picker";
 import { ProjectCategoryFields } from "@/components/projects/project-category-fields";
 import { useWageClassificationsQuery } from "@/hooks/use-wage-classifications";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FieldDescription } from "@/components/ui/field";
-import { useClientQuery } from "@/hooks/use-clients";
+import { useClientContactsQuery, useClientQuery } from "@/hooks/use-clients";
 import { useCreateProject, useUpdateProject, type ProjectFormValues } from "@/hooks/use-projects";
 import { projectStatusLabels } from "@/lib/labels";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { formatProjectNumber, type PricePolicy, type ProjectRecord, type ProjectStatus } from "@/lib/types";
+import {
+  formatProjectNumber,
+  type PricePolicy,
+  type ProjectRecord,
+  type ProjectStatus,
+  type RecurrenceUnit,
+} from "@/lib/types";
+import { formatDateOnly } from "@/lib/dates";
 import { ex } from "@/lib/placeholders";
 
 const statuses = Object.keys(projectStatusLabels) as ProjectStatus[];
@@ -45,8 +54,17 @@ const statuses = Object.keys(projectStatusLabels) as ProjectStatus[];
 const NO_POLICY = "aucune";
 const NO_CLASSIFICATION = "aucun";
 
-const formSchema = z.object({
+const RECURRENCE_UNITS: Record<RecurrenceUnit, string> = { Semaine: "semaine(s)", Mois: "mois", Annee: "année(s)" };
+
+const formSchema = z
+  .object({
   clientId: z.string().min(1, "Le client est requis."),
+  contactId: z.string(),
+  billingContactId: z.string(),
+  recurring: z.boolean(),
+  recurrenceEvery: z.string(),
+  recurrenceUnit: z.custom<RecurrenceUnit>((v) => typeof v === "string" && v in RECURRENCE_UNITS),
+  recurrenceEndDate: z.string(),
   poNumber: z.string().trim().max(60, "60 caractères maximum.").optional().or(z.literal("")),
   clientAddressId: z.string().optional().or(z.literal("")),
   sameAddressAsClient: z.boolean(),
@@ -62,7 +80,17 @@ const formSchema = z.object({
   categoryId: z.string(),
   subCategoryId: z.string(),
   wageClassificationId: z.string(),
-});
+})
+  // Work somewhere else than the billing address has to say where: a crew sent to "not
+  // there" is a phone call from the truck.
+  .refine((v) => v.sameAddressAsClient || Boolean(v.siteAddressId), {
+    message: "Indiquez l'adresse du projet, ou cochez que les travaux ont lieu à l'adresse du client.",
+    path: ["siteAddressId"],
+  })
+  .refine((v) => !v.recurring || /^\d+$/.test(v.recurrenceEvery.trim()) && Number(v.recurrenceEvery) >= 1 && Number(v.recurrenceEvery) <= 99, {
+    message: "Entre 1 et 99.",
+    path: ["recurrenceEvery"],
+  });
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -76,6 +104,12 @@ function toFormValues(
 ): FormValues {
   return {
     clientId: project?.clientId ?? defaultClientId ?? "",
+    contactId: project?.contactId ?? "",
+    billingContactId: project?.billingContactId ?? "",
+    recurring: project?.recurrenceEvery != null,
+    recurrenceEvery: String(project?.recurrenceEvery ?? 1),
+    recurrenceUnit: project?.recurrenceUnit ?? "Mois",
+    recurrenceEndDate: project?.recurrenceEndDate ?? "",
     poNumber: project?.poNumber ?? "",
     clientAddressId: project?.clientAddress?.id ?? "",
     // A new project bills and works at the same place until someone says otherwise, which is
@@ -124,6 +158,11 @@ export function storedValues(project: ProjectRecord): ProjectFormValues {
     categoryId: project.categoryId,
     subCategoryId: project.subCategoryId,
     wageClassificationId: project.wageClassificationId,
+    contactId: project.contactId,
+    billingContactId: project.billingContactId,
+    recurrenceEvery: project.recurrenceEvery,
+    recurrenceUnit: project.recurrenceUnit,
+    recurrenceEndDate: project.recurrenceEndDate,
   };
 }
 
@@ -142,6 +181,7 @@ export function ProjectFormSheet({
   defaultClientAssetId?: string;
 }) {
   const isEditing = Boolean(project);
+  const router = useRouter();
   const createProject = useCreateProject();
   const updateProject = useUpdateProject();
 
@@ -176,17 +216,26 @@ export function ProjectFormSheet({
       categoryId: values.categoryId || null,
       subCategoryId: values.categoryId ? values.subCategoryId || null : null,
       wageClassificationId: values.wageClassificationId || null,
+      contactId: values.contactId || null,
+      billingContactId: values.billingContactId || null,
+      recurrenceEvery: values.recurring ? Number(values.recurrenceEvery) : null,
+      recurrenceUnit: values.recurrenceUnit,
+      recurrenceEndDate: values.recurring ? values.recurrenceEndDate || null : null,
     };
 
     try {
       if (isEditing && project) {
         await updateProject.mutateAsync({ id: project.id, values: payload });
         toast.success("Projet mis à jour.");
+        onOpenChange(false);
       } else {
-        await createProject.mutateAsync(payload);
+        const created = await createProject.mutateAsync(payload);
         toast.success("Projet créé.");
+        onOpenChange(false);
+        // Straight to its page: a new job is created to be worked on, and the next thing
+        // anybody does is add its tasks, its hours or its materials.
+        router.push(`/projets/${created.id}`);
       }
-      onOpenChange(false);
     } catch (error) {
       toast.error(error instanceof ApiError ? error.message : "Impossible d'enregistrer le projet.");
     }
@@ -228,14 +277,42 @@ export function ProjectFormSheet({
     queryFn: () => api.get<PricePolicy[]>("price-policies"),
   });
 
+  const { data: clientRecord } = useClientQuery(clientId || undefined);
+  const { data: clientContacts } = useClientContactsQuery(clientId);
   // Only while creating: an existing project owns its own answer, and re-reading the client's
   // would quietly change the tax on a job that has already been invoiced.
-  const { data: pickedClient } = useClientQuery(isEditing ? undefined : clientId || undefined);
+  const pickedClient = isEditing ? undefined : clientRecord;
+  const recurring = useWatch({ control: form.control, name: "recurring" });
 
   useEffect(() => {
     if (isEditing || exemptTouched || !pickedClient) return;
     form.setValue("isTaxExempt", pickedClient.isTaxExempt);
   }, [isEditing, exemptTouched, pickedClient, form]);
+
+  // The client whose contacts and address were last filled in. An edited project starts as
+  // already filled: its blanks were left blank by somebody, and are not this form's to fill.
+  const filledFor = useRef<string | null>(project?.clientId ?? null);
+
+  /**
+   * Picking a client fills in who and where from their file: their first contact for the job,
+   * their billing contact (or that same person) for the invoices, their main address. Only
+   * into empty fields, and once per client, so nothing a person chose is overwritten.
+   */
+  useEffect(() => {
+    if (!open || !clientId || filledFor.current === clientId) return;
+    if (!clientRecord || clientRecord.id !== clientId || !clientContacts) return;
+    filledFor.current = clientId;
+
+    const first = clientContacts[0]?.id ?? "";
+    const billing = clientContacts.some((c) => c.id === clientRecord.billingContactId)
+      ? (clientRecord.billingContactId ?? "")
+      : first;
+    if (!form.getValues("contactId")) form.setValue("contactId", first);
+    if (!form.getValues("billingContactId")) form.setValue("billingContactId", billing);
+    if (!form.getValues("clientAddressId") && clientRecord.primaryAddress?.id) {
+      form.setValue("clientAddressId", clientRecord.primaryAddress.id);
+    }
+  }, [open, clientId, clientRecord, clientContacts, form]);
 
   return (
     <Sheet
@@ -243,7 +320,10 @@ export function ProjectFormSheet({
       // Cleared as the panel closes rather than as it opens: the same reset, but in an event
       // handler, where the React Compiler lint can see it is not a render-time cascade.
       onOpenChange={(next) => {
-        if (!next) setExemptTouched(false);
+        if (!next) {
+          setExemptTouched(false);
+          filledFor.current = project?.clientId ?? null;
+        }
         onOpenChange(next);
       }}
     >
@@ -306,6 +386,9 @@ export function ProjectFormSheet({
                       // did not, it would print the wrong street on the invoice.
                       form.setValue("clientAddressId", "");
                       form.setValue("siteAddressId", "");
+                      // The contacts too, for the same reason; the new client's are filled in.
+                      form.setValue("contactId", "");
+                      form.setValue("billingContactId", "");
                       // The asset belonged to the client being replaced. The server refuses
                       // another client's asset, and if it did not, this job would carry
                       // somebody else's truck on its paperwork.
@@ -319,6 +402,98 @@ export function ProjectFormSheet({
             />
             </fieldset>
 
+            <Controller
+              name="contactId"
+              control={form.control}
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel htmlFor="project-contact">Contact du projet</FieldLabel>
+                  <ContactPicker id="project-contact" clientId={clientId} value={field.value} onChange={field.onChange} />
+                  <FieldDescription>La personne à joindre pour les travaux.</FieldDescription>
+                </Field>
+              )}
+            />
+
+            <Controller
+              name="billingContactId"
+              control={form.control}
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel htmlFor="project-billing-contact">Contact de facturation</FieldLabel>
+                  <ContactPicker
+                    id="project-billing-contact"
+                    clientId={clientId}
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                  <FieldDescription>À qui vont les factures de ce projet.</FieldDescription>
+                </Field>
+              )}
+            />
+
+            <Controller
+              name="clientAddressId"
+              control={form.control}
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel htmlFor="project-client-address">Adresse du client</FieldLabel>
+                  <AddressPicker
+                    id="project-client-address"
+                    clientId={clientId}
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                  />
+                  <FieldDescription>Celle qui apparaît sur la facture.</FieldDescription>
+                </Field>
+              )}
+            />
+
+            <Controller
+              name="sameAddressAsClient"
+              control={form.control}
+              render={({ field }) => (
+                <Field orientation="horizontal">
+                  <Checkbox
+                    id="project-same-address"
+                    checked={field.value}
+                    onCheckedChange={(checked) => field.onChange(checked === true)}
+                  />
+                  <FieldLabel htmlFor="project-same-address" className="font-normal">
+                    Les travaux ont lieu à cette adresse
+                  </FieldLabel>
+                </Field>
+              )}
+            />
+
+            {/* Only asked for when it differs. Showing it always would invite the same address
+                to be entered twice, and a copy goes stale the moment the client moves. */}
+            {!sameAddress && (
+              <Controller
+                name="siteAddressId"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="project-site-address">
+                      Adresse du projet
+                      <RequiredMark />
+                    </FieldLabel>
+                    <AddressPicker
+                      id="project-site-address"
+                      clientId={clientId}
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                      invalid={fieldState.invalid}
+                      placeholder="Rechercher le lieu des travaux…"
+                    />
+                    {fieldState.invalid ? (
+                      <FieldError errors={[fieldState.error]} />
+                    ) : (
+                      <FieldDescription>Où le travail se fait, quand ce n&apos;est pas là où va la facture.</FieldDescription>
+                    )}
+                  </Field>
+                )}
+              />
+            )}
             <Controller
               name="description"
               control={form.control}
@@ -545,61 +720,89 @@ export function ProjectFormSheet({
             />
             </fieldset>
 
-            <Controller
-              name="clientAddressId"
-              control={form.control}
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel htmlFor="project-client-address">Adresse du client</FieldLabel>
-                  <AddressPicker
-                    id="project-client-address"
-                    clientId={clientId}
-                    value={field.value ?? ""}
-                    onChange={field.onChange}
-                  />
-                  <FieldDescription>Celle qui apparaît sur la facture.</FieldDescription>
-                </Field>
-              )}
-            />
-
-            <Controller
-              name="sameAddressAsClient"
-              control={form.control}
-              render={({ field }) => (
-                <Field orientation="horizontal">
-                  <Checkbox
-                    id="project-same-address"
-                    checked={field.value}
-                    onCheckedChange={(checked) => field.onChange(checked === true)}
-                  />
-                  <FieldLabel htmlFor="project-same-address" className="font-normal">
-                    Les travaux ont lieu à cette adresse
-                  </FieldLabel>
-                </Field>
-              )}
-            />
-
-            {/* Only asked for when it differs. Showing it always would invite the same address
-                to be entered twice, and a copy goes stale the moment the client moves. */}
-            {!sameAddress && (
+            <div className="space-y-3 rounded-lg border border-border p-3">
               <Controller
-                name="siteAddressId"
+                name="recurring"
                 control={form.control}
                 render={({ field }) => (
-                  <Field>
-                    <FieldLabel htmlFor="project-site-address">Adresse du projet</FieldLabel>
-                    <AddressPicker
-                      id="project-site-address"
-                      clientId={clientId}
-                      value={field.value ?? ""}
-                      onChange={field.onChange}
-                      placeholder="Rechercher le lieu des travaux…"
+                  <Field orientation="horizontal">
+                    <Checkbox
+                      id="project-recurring"
+                      checked={field.value}
+                      onCheckedChange={(checked) => field.onChange(checked === true)}
                     />
-                    <FieldDescription>Où le travail se fait, quand ce n&apos;est pas là où va la facture.</FieldDescription>
+                    <FieldLabel htmlFor="project-recurring" className="font-normal">
+                      Projet récurrent
+                    </FieldLabel>
                   </Field>
                 )}
               />
-            )}
+              {recurring && (
+                <>
+                  <div className="grid grid-cols-[5rem_1fr] items-end gap-2">
+                    <Controller
+                      name="recurrenceEvery"
+                      control={form.control}
+                      render={({ field, fieldState }) => (
+                        <Field data-invalid={fieldState.invalid}>
+                          <FieldLabel htmlFor="project-recurrence-every">Tous les</FieldLabel>
+                          <Input
+                            {...field}
+                            id="project-recurrence-every"
+                            type="number"
+                            inputMode="numeric"
+                            min={1}
+                            max={99}
+                            aria-invalid={fieldState.invalid}
+                          />
+                        </Field>
+                      )}
+                    />
+                    <Controller
+                      name="recurrenceUnit"
+                      control={form.control}
+                      render={({ field }) => (
+                        <Field>
+                          <Select value={field.value} onValueChange={(value) => value && field.onChange(value)}>
+                            <SelectTrigger aria-label="Unité de la récurrence" className="w-full">
+                              <SelectValue>{(unit: RecurrenceUnit) => RECURRENCE_UNITS[unit]}</SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(Object.keys(RECURRENCE_UNITS) as RecurrenceUnit[]).map((unit) => (
+                                <SelectItem key={unit} value={unit}>
+                                  {RECURRENCE_UNITS[unit]}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </Field>
+                      )}
+                    />
+                  </div>
+                  {form.formState.errors.recurrenceEvery && (
+                    <FieldError errors={[form.formState.errors.recurrenceEvery]} />
+                  )}
+                  <Controller
+                    name="recurrenceEndDate"
+                    control={form.control}
+                    render={({ field }) => (
+                      <Field>
+                        <FieldLabel htmlFor="project-recurrence-end">Jusqu&apos;au</FieldLabel>
+                        <Input {...field} id="project-recurrence-end" type="date" />
+                        <FieldDescription>
+                          Facultatif. À chaque date, une copie du projet et de ses tâches est créée,
+                          décalée d&apos;autant à partir du début de celui-ci.
+                          {project?.recurrenceEvery != null &&
+                            (project.recurrenceNextDate
+                              ? ` Prochaine copie : ${formatDateOnly(project.recurrenceNextDate)}.`
+                              : " La série est terminée.")}
+                        </FieldDescription>
+                      </Field>
+                    )}
+                  />
+                </>
+              )}
+            </div>
           </FieldGroup>
         </form>
 

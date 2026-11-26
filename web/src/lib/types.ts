@@ -107,6 +107,8 @@ export interface ClientRecord {
   billingContactId: string | null;
   /** Who that is, worked out either way. */
   billingContactName: string | null;
+  /** Current quotes only: a revision replaces, it does not add. */
+  quoteCount: number;
 }
 
 /**
@@ -332,6 +334,8 @@ export interface ProjectAddress {
   postalCode: string;
 }
 
+export type RecurrenceUnit = "Semaine" | "Mois" | "Annee";
+
 export interface ProjectRecord {
   id: string;
   /** Sequential within the company. Shown as P-0001. */
@@ -368,6 +372,19 @@ export interface ProjectRecord {
   /** The pay classification the hours on this job are counted under. */
   wageClassificationId: string | null;
   wageClassificationName: string | null;
+  /** The client's person for this job, and who its invoices go to. Both client contacts. */
+  contactId: string | null;
+  contactName: string | null;
+  billingContactId: string | null;
+  billingContactName: string | null;
+  /** Null on a one-off job. The project carrying it is the model its copies are made from. */
+  recurrenceEvery: number | null;
+  recurrenceUnit: RecurrenceUnit;
+  /** When the next copy starts; null once the series is over. */
+  recurrenceNextDate: string | null;
+  recurrenceEndDate: string | null;
+  /** On a copy: the model it came from. */
+  recurringFromId: string | null;
 }
 
 /** One of the company's own categories for its jobs, separate from the catalogue's. */
@@ -396,6 +413,13 @@ export interface WageClassificationStep {
   cost: number | null;
   /** What the client is billed for it. */
   selling: number | null;
+  /** The same three at time and a half, and at double time. */
+  wageTimeAndHalf: number | null;
+  costTimeAndHalf: number | null;
+  sellingTimeAndHalf: number | null;
+  wageDouble: number | null;
+  costDouble: number | null;
+  sellingDouble: number | null;
 }
 
 /** A pay classification: a title ("Commercial") and the steps a worker climbs under it. */
@@ -407,11 +431,23 @@ export interface WageClassification {
   steps: WageClassificationStep[];
 }
 
+/** Every hourly figure a step carries: three kinds, at three rates. */
+export type WageRateKey =
+  | "wage"
+  | "cost"
+  | "selling"
+  | "wageTimeAndHalf"
+  | "costTimeAndHalf"
+  | "sellingTimeAndHalf"
+  | "wageDouble"
+  | "costDouble"
+  | "sellingDouble";
+
 export interface SaveWageClassificationValues {
   name: string;
   sortOrder: number;
   /** The whole table in climbing order; it replaces the stored one. */
-  steps: { id: string | null; name: string; wage: number | null; cost: number | null; selling: number | null }[];
+  steps: ({ id: string | null; name: string } & Record<WageRateKey, number | null>)[];
 }
 
 /** P-0001. Padded so the column sorts and scans cleanly. */
@@ -1072,6 +1108,9 @@ export interface ExpensePhoto {
   sortOrder: number;
 }
 
+/** Where an expense stands with the office. */
+export type ExpenseStatus = "AApprouver" | "Approuvee" | "Remboursee" | "Refusee";
+
 export interface ProjectExpense {
   id: string;
   projectId: string;
@@ -1089,6 +1128,9 @@ export interface ProjectExpense {
   projectTaskTitle: string | null;
   createdAt: string;
   updatedAt: string;
+  status: ExpenseStatus;
+  projectNumber: number;
+  clientName: string | null;
 }
 
 export interface ProjectExpenseDetail {
@@ -2015,6 +2057,7 @@ export interface ExpenseListItem {
   spentOn: string | null;
   photoCount: number;
   createdAt: string;
+  status: ExpenseStatus;
 }
 
 /** Over everything the filters match, not only the page on screen. */
@@ -2035,6 +2078,7 @@ export interface ExpenseFilters {
   du?: string;
   au?: string;
   projet?: string;
+  statut?: ExpenseStatus | "";
 }
 
 // ---- Formulaires : what a company asks, and what the answers set off ----

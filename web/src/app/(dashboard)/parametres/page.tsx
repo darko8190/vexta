@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Building2, ClipboardPen, Clock, CreditCard, Mail, Percent, Receipt, Sparkles, Wallet } from "lucide-react";
+import { Building2, ClipboardPen, Clock, CreditCard, KeyRound, Mail, Percent, Receipt, Sparkles, Wallet } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,6 +28,13 @@ import {
   QuoteTermsCard,
 } from "@/components/settings/quote-settings-cards";
 import { WageClassificationsCard } from "@/components/settings/wage-classifications-card";
+import { SettingsTabs } from "@/components/settings/settings-tabs";
+import { McpKeysCard } from "@/components/settings/mcp-keys-card";
+import { useMcpKeysQuery } from "@/hooks/use-mcp-keys";
+import { useBillingSettingsQuery } from "@/hooks/use-billing-settings";
+import { useOnlinePaymentsQuery } from "@/hooks/use-online-payments";
+import { useAiSettingsQuery } from "@/hooks/use-assistant";
+import { useWageClassificationsQuery } from "@/hooks/use-wage-classifications";
 import { useBillingStateQuery, type BillingState } from "@/hooks/use-billing";
 import { usePublicPlansQuery } from "@/hooks/use-catalog";
 import { usePricePoliciesQuery } from "@/hooks/use-price-policies";
@@ -337,6 +344,32 @@ export default function SettingsPage() {
 
   // Asked for here for the badge, and skipped entirely for anyone who may not read it.
   const { data: policies } = usePricePoliciesQuery(canManage === true);
+  // Read here only to say, on each section, whether it is set up. The cards read the same
+  // queries, so this costs no request of its own.
+  const { data: billing } = useBillingSettingsQuery(canManage === true);
+  const { data: payments } = useOnlinePaymentsQuery(canManage === true);
+  const { data: ai } = useAiSettingsQuery(canManage === true);
+  const { data: classifications } = useWageClassificationsQuery(canManage === true);
+  const { data: mcpKeys } = useMcpKeysQuery(canManage === true);
+
+  const done = (configured: boolean | undefined): "ok" | "todo" | undefined =>
+    configured === undefined ? undefined : configured ? "ok" : "todo";
+
+  const billingStatus = done(billing?.configured);
+  const quoteTermsStatus = done(billing ? Boolean(billing.quoteTerms?.trim()) : undefined);
+  const quoteReminderStatus = done(billing ? billing.quoteReminderDays != null : undefined);
+  const invoiceReminderStatus = done(billing ? billing.invoiceReminderDays != null : undefined);
+  const invoiceEmailStatus = done(billing ? Boolean(billing.invoiceEmailBody || billing.invoiceEmailSubject) : undefined);
+  const quoteEmailStatus = done(billing ? Boolean(billing.quoteEmailBody || billing.quoteEmailSubject) : undefined);
+  const hourlyStatus = done(billing ? billing.defaultHourlyRate != null : undefined);
+  const classificationsStatus = done(classifications ? classifications.length > 0 : undefined);
+  const policiesStatus = done(policies ? policies.length > 0 : undefined);
+
+  /** A section is set up when everything in it is; one part left undone is still something to do. */
+  const all = (...parts: ("ok" | "todo" | undefined)[]): "ok" | "todo" | undefined =>
+    parts.some((p) => p === undefined) ? undefined : parts.every((p) => p === "ok") ? "ok" : "todo";
+  const any = (...parts: ("ok" | "todo" | undefined)[]): "ok" | "todo" | undefined =>
+    parts.some((p) => p === undefined) ? undefined : parts.some((p) => p === "ok") ? "ok" : "todo";
 
   const [section, setSection] = useState("abonnement");
 
@@ -344,17 +377,32 @@ export default function SettingsPage() {
     { key: "abonnement", label: "Abonnement", icon: CreditCard },
     ...(canManage
       ? [
-          { key: "facturation", label: "Facturation", icon: Receipt },
-          { key: "soumissions", label: "Soumissions", icon: ClipboardPen },
-          { key: "courriel", label: "Courriel", icon: Mail },
+          { key: "facturation", label: "Facturation", icon: Receipt, status: billingStatus },
+          { key: "soumissions", label: "Soumissions", icon: ClipboardPen, status: quoteTermsStatus },
+          // The built-in messages work; the section is "done" once either has been made the
+          // company's own.
+          { key: "courriel", label: "Courriel", icon: Mail, status: any(invoiceEmailStatus, quoteEmailStatus) },
           // Beside Facturation rather than beside Abonnement, which is the money going the
           // other way: this one is the company being paid, not the company paying Vexta.
-          { key: "paiements", label: "Paiements", icon: Wallet },
-          { key: "taux", label: "Taux", icon: Clock },
+          {
+            key: "paiements",
+            label: "Paiements",
+            icon: Wallet,
+            // No dot when the plan does not offer it: there is nothing to set up.
+            status: payments && payments.included ? done(payments.chargesEnabled) : undefined,
+          },
+          { key: "taux", label: "Taux", icon: Clock, status: all(hourlyStatus, classificationsStatus) },
           // The only count that means anything on this page; the others are one thing each.
-          { key: "marge", label: "Marge et prix", count: policies?.length ?? 0, icon: Percent },
+          { key: "marge", label: "Marge et prix", count: policies?.length ?? 0, icon: Percent, status: policiesStatus },
           // Last, because it is the one section that is set up once and then forgotten.
-          { key: "assistant", label: "Assistant IA", icon: Sparkles },
+          {
+            key: "assistant",
+            label: "Assistant IA",
+            icon: Sparkles,
+            status: ai && ai.featureIncluded ? done(ai.hasApiKey && ai.isEnabled) : undefined,
+          },
+          // Optional, so a count rather than an amber dot: no key is not something left undone.
+          { key: "integrations", label: "Intégrations", icon: KeyRound, count: mcpKeys?.length ?? 0 },
         ]
       : []),
   ];
@@ -396,37 +444,58 @@ export default function SettingsPage() {
                 <BusinessSubscription state={data} />
               ))}
             {active === "facturation" && (
-              <div className="space-y-6">
-                <BillingSettingsCard />
-                <InvoiceReminderCard />
-              </div>
+              <SettingsTabs
+                tabs={[
+                  { value: "facture", label: "Facture", status: billingStatus, content: <BillingSettingsCard /> },
+                  { value: "relances", label: "Relances", status: invoiceReminderStatus, content: <InvoiceReminderCard /> },
+                ]}
+              />
             )}
             {active === "soumissions" && (
-              <div className="space-y-6">
-                <QuoteTermsCard />
-                <QuoteReminderCard />
-                <QuoteTemplatesCard />
-              </div>
+              <SettingsTabs
+                tabs={[
+                  { value: "conditions", label: "Conditions", status: quoteTermsStatus, content: <QuoteTermsCard /> },
+                  { value: "relances", label: "Relances", status: quoteReminderStatus, content: <QuoteReminderCard /> },
+                  { value: "modeles", label: "Modèles", content: <QuoteTemplatesCard /> },
+                ]}
+              />
             )}
             {active === "courriel" && (
-              <div className="space-y-6">
-                <EmailTemplateCard kind="facture" />
-                <EmailTemplateCard kind="soumission" />
-              </div>
+              <SettingsTabs
+                tabs={[
+                  { value: "facture", label: "Factures", status: invoiceEmailStatus, content: <EmailTemplateCard kind="facture" /> },
+                  {
+                    value: "soumission",
+                    label: "Soumissions",
+                    status: quoteEmailStatus,
+                    content: <EmailTemplateCard kind="soumission" />,
+                  },
+                ]}
+              />
             )}
             {active === "paiements" && <OnlinePaymentsCard />}
             {active === "taux" && (
-              <div className="space-y-6">
-                <HourlyRateCard />
-                <WageClassificationsCard />
-              </div>
+              <SettingsTabs
+                tabs={[
+                  { value: "horaire", label: "Taux horaire", status: hourlyStatus, content: <HourlyRateCard /> },
+                  {
+                    value: "classements",
+                    label: "Classements",
+                    status: classificationsStatus,
+                    content: <WageClassificationsCard />,
+                  },
+                ]}
+              />
             )}
             {active === "assistant" && <AiAssistantCard />}
+            {active === "integrations" && <McpKeysCard />}
             {active === "marge" && (
-              <div className="space-y-6">
-                <MarginModeCard />
-                <PricePoliciesCard />
-              </div>
+              <SettingsTabs
+                tabs={[
+                  { value: "mode", label: "Calcul de la marge", content: <MarginModeCard /> },
+                  { value: "politiques", label: "Politiques de prix", status: policiesStatus, content: <PricePoliciesCard /> },
+                ]}
+              />
             )}
           </div>
         </div>

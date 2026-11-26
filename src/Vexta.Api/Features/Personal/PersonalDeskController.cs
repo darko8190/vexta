@@ -156,7 +156,24 @@ public class PersonalDeskController(VextaDbContext db, ICurrentUserService curre
             .Select(c => c.Id)
             .ToListAsync(ct);
 
-        var mine = clientIds.Concat(direct).ToHashSet();
+        // And a customer file carrying this person's address, once they have proved the address
+        // is theirs. A company that typed it on the file sent its invoices there; somebody who
+        // later signs up with it is that customer, but only the inbox can say so.
+        var byEmail = new List<Guid>();
+        var account = await db.Users.AsNoTracking()
+            .Where(u => u.Id == userId)
+            .Select(u => new { u.Email, u.EmailConfirmed })
+            .FirstOrDefaultAsync(ct);
+        if (account is { EmailConfirmed: true, Email: { Length: > 0 } email })
+        {
+            var normalized = email.Trim().ToLower();
+            byEmail = await db.Clients.IgnoreQueryFilters().AsNoTracking()
+                .Where(c => c.Email != null && c.Email.Trim().ToLower() == normalized)
+                .Select(c => c.Id)
+                .ToListAsync(ct);
+        }
+
+        var mine = clientIds.Concat(direct).Concat(byEmail).ToHashSet();
         if (mine.Count == 0) return Ok(new List<MyInvoiceDto>());
 
         var rows = await db.Invoices.IgnoreQueryFilters().AsNoTracking()

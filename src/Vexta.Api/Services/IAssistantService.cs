@@ -345,29 +345,7 @@ public class AssistantService(
     /// and back, which is three more things that can be down. An http address is preferred over
     /// an https one for the same reason a loopback call does not need a certificate.
     /// </summary>
-    private string SelfBaseAddress()
-    {
-        var addresses = server.Features.Get<IServerAddressesFeature>()?.Addresses ?? [];
-
-        var candidate =
-            addresses.FirstOrDefault(a => a.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
-            ?? addresses.FirstOrDefault();
-
-        if (candidate is not null)
-        {
-            // Kestrel reports the wildcard it bound, not somewhere you can connect to.
-            var usable = candidate
-                .Replace("://[::]", "://localhost", StringComparison.Ordinal)
-                .Replace("://0.0.0.0", "://localhost", StringComparison.Ordinal)
-                .Replace("://+", "://localhost", StringComparison.Ordinal)
-                .Replace("://*", "://localhost", StringComparison.Ordinal);
-
-            return usable.TrimEnd('/') + "/";
-        }
-
-        var request = accessor.HttpContext?.Request;
-        return request is null ? "http://localhost/" : $"{request.Scheme}://{request.Host}/";
-    }
+    private string SelfBaseAddress() => AssistantApiTool.SelfBaseAddress(server, accessor.HttpContext?.Request);
 
     private async Task<string> SystemPromptAsync(bool canWrite, CancellationToken ct)
     {

@@ -130,8 +130,8 @@ public class QuoteReminderService(
                 var to = quote.SentTo!;
                 var name = await QuoteMail.DisplayNameAsync(db, quote, to, ct);
                 var values = await QuoteMail.ValuesAsync(db, quote, settings, company, name, frontendUrl, ct);
-                var subject = QuoteEmailTemplate.Render(QuoteEmailTemplate.ReminderSubject, values, escapeHtml: false);
-                var body = QuoteEmailTemplate.Render(QuoteEmailTemplate.ReminderBody, values, escapeHtml: true);
+                var subject = QuoteEmailTemplate.Render(QuoteEmailTemplate.ReminderSubject, values, isBody: false);
+                var body = EmailText.ToHtml(QuoteEmailTemplate.Render(QuoteEmailTemplate.ReminderBody, values, isBody: true));
 
                 var rendered = await pdf.RenderQuoteAsync(quote.Id, ct);
                 if (rendered is not { } document) continue;

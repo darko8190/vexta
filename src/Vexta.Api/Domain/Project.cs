@@ -83,6 +83,34 @@ public class Project
     public Guid? WageClassificationId { get; set; }
     public WageClassification? WageClassification { get; set; }
 
+    /// <summary>
+    /// The client's person for this job — who the crew calls on site. One of the client's own
+    /// contacts; null for a client reached only through their main file.
+    /// </summary>
+    public Guid? ContactId { get; set; }
+    public ClientContact? Contact { get; set; }
+
+    /// <summary>Who this job's invoices are addressed to, among the client's contacts.</summary>
+    public Guid? BillingContactId { get; set; }
+    public ClientContact? BillingContact { get; set; }
+
+    /// <summary>
+    /// How often this job comes back: every <see cref="RecurrenceEvery"/> of
+    /// <see cref="RecurrenceUnit"/>. Null for a one-off job. The project carrying it is the
+    /// model; each occurrence is a new project copied from it (see ProjectRecurrenceService).
+    /// </summary>
+    public int? RecurrenceEvery { get; set; }
+    public RecurrenceUnit RecurrenceUnit { get; set; } = RecurrenceUnit.Mois;
+
+    /// <summary>The start date of the next copy. Stored to be queried.</summary>
+    public DateOnly? RecurrenceNextDate { get; set; }
+
+    /// <summary>No copy starts after this day; null for until stopped.</summary>
+    public DateOnly? RecurrenceEndDate { get; set; }
+
+    /// <summary>On a copy: the model it was made from, so the two can be found from each other.</summary>
+    public Guid? RecurringFromId { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 
@@ -90,6 +118,7 @@ public class Project
     public List<ProjectExpense> Expenses { get; set; } = [];
     public List<ProjectExtraCharge> ExtraCharges { get; set; } = [];
     public List<ProjectMaterial> Materials { get; set; } = [];
+    public List<ProjectEquipment> EquipmentUsed { get; set; } = [];
     public List<TimesheetEntry> Timesheets { get; set; } = [];
     public List<ProjectDocument> Documents { get; set; } = [];
     public List<ProjectNote> Notes { get; set; } = [];

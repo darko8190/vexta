@@ -181,7 +181,7 @@ export function TimesheetFormSheet({
         },
       });
 
-      toast.success(isEditing ? "Feuille de temps mise à jour." : "Heures ajoutées.");
+      toast.success(isEditing ? "Poinçon mis à jour." : "Heures ajoutées.");
       onOpenChange(false);
     } catch (error) {
       toast.error(error instanceof ApiError ? error.message : "Impossible d'enregistrer ces heures.");

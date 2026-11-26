@@ -83,7 +83,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
     { key: "contacts", label: "Contacts", count: client.contactCount, icon: UserRound },
     { key: "actifs", label: "Actifs", count: client.assetCount, icon: Car },
     { key: "adresses", label: "Adresses", count: client.addressCount, icon: MapPin },
-    { key: "soumissions", label: "Soumissions", icon: ClipboardPen },
+    { key: "soumissions", label: "Soumissions", count: client.quoteCount, icon: ClipboardPen },
     { key: "projets", label: "Projets", count: client.projectCount, icon: FolderKanban },
     { key: "factures", label: "Factures", count: client.invoiceCount, icon: FileText },
     { key: "formulaires", label: "Formulaires", icon: Send },

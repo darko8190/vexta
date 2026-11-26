@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { use, useState } from "react";
 import Link from "next/link";
@@ -24,8 +24,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/layout/empty-state";
 import { SectionNav, type NavSection } from "@/components/layout/section-nav";
 import { ProjectFormSheet } from "@/components/projects/project-form-sheet";
+import { ProjectStatusSelect } from "@/components/projects/project-status-select";
 import { ProjectCostTable } from "@/components/projects/detail/project-cost-table";
 import { ProjectDocumentsSection } from "@/components/projects/detail/project-documents-section";
+import { ProjectEquipmentSection } from "@/components/projects/detail/project-equipment-section";
 import { ProjectExpensesSection } from "@/components/projects/detail/project-expenses-section";
 import { ProjectExtraChargesSection } from "@/components/projects/detail/project-extra-charges-section";
 import { ProjectMaterialsSection } from "@/components/projects/detail/project-materials-section";
@@ -146,7 +148,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         { key: "materiaux", label: "Matériaux", count: counts?.materials ?? 0, icon: HardHat },
         { key: "equipements", label: "Équipements", count: counts?.equipment ?? 0, icon: Wrench },
         { key: "assemblages", label: "Assemblages", count: counts?.assemblies ?? 0, icon: Blocks },
-        { key: "feuilles-de-temps", label: "Feuilles de temps", count: counts?.timesheets ?? 0, icon: Clock },
+        { key: "feuilles-de-temps", label: "Poinçons", count: counts?.timesheets ?? 0, icon: Clock },
         { key: "depenses", label: "Dépenses", count: counts?.expenses ?? 0, icon: Receipt },
         { key: "frais", label: "Frais supplémentaires", count: counts?.extraCharges ?? 0, icon: Plus },
         {
@@ -175,9 +177,15 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               <span className="font-mono text-xs text-muted-foreground tabular-nums">
                 {formatProjectNumber(project.number)}
               </span>
-              <Badge variant={projectStatusBadgeVariant[project.status]}>
-                {projectStatusLabels[project.status]}
-              </Badge>
+              {/* Staff move the state from here; a customer only reads it. */}
+              {isClient ? (
+                <Badge variant={projectStatusBadgeVariant[project.status]}>
+                  {projectStatusLabels[project.status]}
+                </Badge>
+              ) : (
+                <ProjectStatusSelect project={project} />
+              )}
+              {project.recurrenceEvery != null && <Badge variant="outline">Récurrent</Badge>}
               {project.poNumber && <Badge variant="secondary">PO {project.poNumber}</Badge>}
               {project.isTaxExempt && <Badge variant="outline">Non taxable</Badge>}
             </div>
@@ -196,7 +204,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
-      {/* The rail sits beside the content from md up and becomes a scrollable row below it. */}
+      {/* The rail sits beside the content from md up and becomes a scrollable row below it.
+          From xl, the money joins them as a third column: the job's figures stay in view
+          whichever section is open, instead of living at the bottom of Détails. */}
       <div className="flex flex-col gap-4 md:flex-row md:gap-6">
         <SectionNav
           sections={sections}
@@ -219,7 +229,10 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               <InlineSheet>
                 <ProjectFormSheet open onOpenChange={() => {}} project={project} />
               </InlineSheet>
-              <ProjectCostTable costs={summary?.costs} isLoading={summaryLoading} />
+              {/* Below xl there is no third column, so the figures sit under the record. */}
+              <div className="xl:hidden">
+                <ProjectCostTable costs={summary?.costs} isLoading={summaryLoading} />
+              </div>
             </div>
           )}
 
@@ -276,6 +289,19 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                   </div>
                 )}
 
+                {project.contactName && (
+                  <div>
+                    <dt className="text-muted-foreground">Contact du projet</dt>
+                    <dd className="text-foreground">{project.contactName}</dd>
+                  </div>
+                )}
+                {project.billingContactName && (
+                  <div>
+                    <dt className="text-muted-foreground">Contact de facturation</dt>
+                    <dd className="text-foreground">{project.billingContactName}</dd>
+                  </div>
+                )}
+
                 <AddressBlock label="Adresse de facturation" lines={billing} />
                 <AddressBlock
                   label="Adresse des travaux"
@@ -293,13 +319,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
           {section === "materiaux" && <ProjectMaterialsSection projectId={project.id} locked={locked} />}
 
-          {section === "equipements" && (
-            <SectionPlaceholder
-              icon={Wrench}
-              title="Équipements"
-              description="Ce qui est loué ou sorti de l'inventaire pour ce projet."
-            />
-          )}
+          {section === "equipements" && <ProjectEquipmentSection projectId={project.id} locked={locked} />}
 
           {section === "assemblages" && (
             <SectionPlaceholder
@@ -325,8 +345,19 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             <ProjectInvoicesSection projectId={project.id} clientId={project.clientId} />
           )}
         </div>
-      </div>
 
+        {!isClient && (
+          <aside
+            aria-label="Montants du projet"
+            // Tighter cells than in the page body: five columns of money in a side column, where
+            // the default padding would push the margin out of view behind a scrollbar.
+            className="hidden w-96 shrink-0 self-start xl:sticky xl:top-0 xl:block 2xl:w-[28rem] [&_td]:px-1.5 [&_td]:text-xs [&_th]:px-1.5 [&_th]:text-xs"
+          >
+            <h2 className="mb-3 text-base font-semibold text-foreground">Montants</h2>
+            <ProjectCostTable costs={summary?.costs} isLoading={summaryLoading} />
+          </aside>
+        )}
+      </div>
     </div>
   );
 }

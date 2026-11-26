@@ -8,7 +8,11 @@ using Vexta.Api.Domain;
 
 namespace Vexta.Api.Features.BillingSettings;
 
-public record WageClassificationStepDto(Guid Id, string Name, int SortOrder, decimal? Wage, decimal? Cost, decimal? Selling);
+public record WageClassificationStepDto(
+    Guid Id, string Name, int SortOrder,
+    decimal? Wage, decimal? Cost, decimal? Selling,
+    decimal? WageTimeAndHalf, decimal? CostTimeAndHalf, decimal? SellingTimeAndHalf,
+    decimal? WageDouble, decimal? CostDouble, decimal? SellingDouble);
 
 public record WageClassificationDto(
     Guid Id,
@@ -19,7 +23,10 @@ public record WageClassificationDto(
     IReadOnlyList<WageClassificationStepDto> Steps);
 
 /// <param name="Id">Null for a step added in this save.</param>
-public record SaveWageClassificationStepRequest(Guid? Id, string Name, decimal? Wage, decimal? Cost, decimal? Selling);
+public record SaveWageClassificationStepRequest(
+    Guid? Id, string Name, decimal? Wage, decimal? Cost, decimal? Selling,
+    decimal? WageTimeAndHalf = null, decimal? CostTimeAndHalf = null, decimal? SellingTimeAndHalf = null,
+    decimal? WageDouble = null, decimal? CostDouble = null, decimal? SellingDouble = null);
 
 /// <param name="Steps">The whole table, in climbing order. It replaces the whole table.</param>
 public record SaveWageClassificationRequest(
@@ -57,7 +64,10 @@ public class WageClassificationsController(VextaDbContext db, ICurrentUserServic
                 c.Projects.Count,
                 c.Steps
                     .OrderBy(s => s.SortOrder)
-                    .Select(s => new WageClassificationStepDto(s.Id, s.Name, s.SortOrder, s.Wage, s.Cost, s.Selling))
+                    .Select(s => new WageClassificationStepDto(
+                        s.Id, s.Name, s.SortOrder, s.Wage, s.Cost, s.Selling,
+                        s.WageTimeAndHalf, s.CostTimeAndHalf, s.SellingTimeAndHalf,
+                        s.WageDouble, s.CostDouble, s.SellingDouble))
                     .ToList()))
             .ToListAsync(ct);
 
@@ -169,6 +179,12 @@ public class WageClassificationsController(VextaDbContext db, ICurrentUserServic
             target.Wage = source.Wage;
             target.Cost = source.Cost;
             target.Selling = source.Selling;
+            target.WageTimeAndHalf = source.WageTimeAndHalf;
+            target.CostTimeAndHalf = source.CostTimeAndHalf;
+            target.SellingTimeAndHalf = source.SellingTimeAndHalf;
+            target.WageDouble = source.WageDouble;
+            target.CostDouble = source.CostDouble;
+            target.SellingDouble = source.SellingDouble;
         }
     }
 
@@ -182,7 +198,10 @@ public class WageClassificationsController(VextaDbContext db, ICurrentUserServic
                 c.Projects.Count,
                 c.Steps
                     .OrderBy(s => s.SortOrder)
-                    .Select(s => new WageClassificationStepDto(s.Id, s.Name, s.SortOrder, s.Wage, s.Cost, s.Selling))
+                    .Select(s => new WageClassificationStepDto(
+                        s.Id, s.Name, s.SortOrder, s.Wage, s.Cost, s.Selling,
+                        s.WageTimeAndHalf, s.CostTimeAndHalf, s.SellingTimeAndHalf,
+                        s.WageDouble, s.CostDouble, s.SellingDouble))
                     .ToList()))
             .FirstOrDefaultAsync(ct);
 
@@ -204,7 +223,12 @@ public class WageClassificationsController(VextaDbContext db, ICurrentUserServic
             if (string.IsNullOrWhiteSpace(step.Name)) return "Chaque échelon a besoin d'un nom.";
             if (step.Name.Trim().Length > 100) return "Le nom d'un échelon est trop long.";
 
-            foreach (var amount in new[] { step.Wage, step.Cost, step.Selling })
+            foreach (var amount in new[]
+            {
+                step.Wage, step.Cost, step.Selling,
+                step.WageTimeAndHalf, step.CostTimeAndHalf, step.SellingTimeAndHalf,
+                step.WageDouble, step.CostDouble, step.SellingDouble
+            })
             {
                 if (amount is < 0) return "Un taux ne peut pas être négatif.";
                 if (amount is > 10_000m) return "Un taux horaire au-delà de 10 000 $, c'est sûrement une faute de frappe.";

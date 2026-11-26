@@ -129,6 +129,7 @@ public class Client : IInvitable
     public List<ClientContact> Contacts { get; set; } = [];
     public List<Project> Projects { get; set; } = [];
     public List<Invoice> Invoices { get; set; } = [];
+    public List<Quote> Quotes { get; set; } = [];
     public List<ClientAsset> Assets { get; set; } = [];
     public List<ClientAccountEntry> AccountEntries { get; set; } = [];
 }

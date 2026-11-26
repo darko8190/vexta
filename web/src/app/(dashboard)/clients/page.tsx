@@ -26,9 +26,10 @@ import { PaginationBar } from "@/components/layout/pagination-bar";
 import { SearchInput } from "@/components/layout/search-input";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { storedClientValues, useClientsQuery, useDeleteClient, useUpdateClient } from "@/hooks/use-clients";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { clientStatusBadge, clientStatusLabels } from "@/lib/labels";
 import { formatClientNumber, type ClientRecord, type ClientStatus } from "@/lib/types";
+import { filtersToQuery, type TableFilters } from "@/lib/table-filters";
+import { StatusPills, useStatusCountsQuery } from "@/components/layout/status-pills";
 
 /** The filter's own values: the three states, the lock, and everybody. */
 type StatusFilter = ClientStatus | "Bloques" | "Tous";
@@ -49,11 +50,14 @@ export default function ClientsPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("Tous");
   const debouncedSearch = useDebouncedValue(search);
 
+  const [filters, setFilters] = useState<TableFilters>({});
   const { data, isLoading } = useClientsQuery(
     page,
     debouncedSearch,
     statusFilter === "Tous" ? undefined : statusFilter,
+    filtersToQuery(filters),
   );
+  const { data: statusCounts } = useStatusCountsQuery("clients", "clients/statuts");
   const deleteClient = useDeleteClient();
   const updateClient = useUpdateClient();
 
@@ -85,6 +89,7 @@ export default function ClientsPage() {
   const columns: DataColumn<ClientRecord>[] = [
     {
       key: "numero",
+      filter: { type: "number" },
       label: "Numéro",
       locked: true,
       headClassName: "w-24",
@@ -93,6 +98,7 @@ export default function ClientsPage() {
     },
     {
       key: "nom",
+      filter: { type: "text" },
       label: "Nom",
       cell: (clientItem) => (
         <>
@@ -111,6 +117,7 @@ export default function ClientsPage() {
     },
     {
       key: "entreprise",
+      filter: { type: "text" },
       label: "Nom de l'entreprise",
       hiddenByDefault: true,
       cellClassName: "text-muted-foreground",
@@ -119,6 +126,7 @@ export default function ClientsPage() {
     },
     {
       key: "prenom",
+      filter: { type: "text" },
       label: "Prénom",
       hiddenByDefault: true,
       cellClassName: "text-muted-foreground",
@@ -127,6 +135,7 @@ export default function ClientsPage() {
     },
     {
       key: "nomFamille",
+      filter: { type: "text" },
       label: "Nom de famille",
       hiddenByDefault: true,
       cellClassName: "text-muted-foreground",
@@ -135,6 +144,7 @@ export default function ClientsPage() {
     },
     {
       key: "statut",
+      filter: { type: "select", options: (Object.keys(clientStatusLabels) as ClientStatus[]).map((status) => ({ value: status, label: clientStatusLabels[status] })) },
       label: "État",
       hiddenByDefault: true,
       cell: (clientItem) => clientStatusLabels[clientItem.status],
@@ -149,6 +159,7 @@ export default function ClientsPage() {
     },
     {
       key: "courriel",
+      filter: { type: "text" },
       label: "Courriel",
       cellClassName: "text-muted-foreground",
       cell: (clientItem) => clientItem.email ?? "—",
@@ -156,6 +167,7 @@ export default function ClientsPage() {
     },
     {
       key: "telephone",
+      filter: { type: "text" },
       label: "Téléphone",
       cellClassName: "text-muted-foreground",
       cell: (clientItem) => clientItem.phone ?? "—",
@@ -163,6 +175,7 @@ export default function ClientsPage() {
     },
     {
       key: "ville",
+      filter: { type: "text" },
       label: "Ville",
       hiddenByDefault: true,
       cellClassName: "text-muted-foreground",
@@ -170,6 +183,7 @@ export default function ClientsPage() {
     },
     {
       key: "projets",
+      filter: { type: "number" },
       label: "Projets",
       headClassName: "text-center",
       cellClassName: "text-center",
@@ -177,6 +191,7 @@ export default function ClientsPage() {
     },
     {
       key: "factures",
+      filter: { type: "number" },
       label: "Factures",
       headClassName: "text-center",
       cellClassName: "text-center",
@@ -215,28 +230,22 @@ export default function ClientsPage() {
         }
       />
 
+      <StatusPills
+        options={(Object.keys(statusFilterLabels) as StatusFilter[])
+          .filter((value) => value !== "Tous")
+          .map((value) => ({ value: value as Exclude<StatusFilter, "Tous">, label: statusFilterLabels[value] }))}
+        value={statusFilter === "Tous" ? "" : (statusFilter as Exclude<StatusFilter, "Tous">)}
+        onChange={(next) => {
+          setStatusFilter(next === "" ? "Tous" : next);
+          setPage(1);
+        }}
+        counts={statusCounts}
+      />
+
       <div className="mb-4 flex flex-col gap-2 sm:flex-row">
         <div className="min-w-0 flex-1">
           <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Rechercher un client…" />
         </div>
-        <Select
-          value={statusFilter}
-          onValueChange={(value) => {
-            setStatusFilter((value ?? "Tous") as StatusFilter);
-            setPage(1);
-          }}
-        >
-          <SelectTrigger className="sm:w-56" aria-label="Filtrer par état">
-            <SelectValue>{(value: StatusFilter) => statusFilterLabels[value]}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {(Object.keys(statusFilterLabels) as StatusFilter[]).map((value) => (
-              <SelectItem key={value} value={value}>
-                {statusFilterLabels[value]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
 
       {isLoading ? (
@@ -245,7 +254,7 @@ export default function ClientsPage() {
             <Skeleton key={i} className="h-12 w-full" />
           ))}
         </div>
-      ) : !data || data.items.length === 0 ? (
+      ) : !data || (data.items.length === 0 && Object.keys(filters).length === 0) ? (
         <EmptyState
           icon={Users}
           title={debouncedSearch ? "Aucun client trouvé" : "Aucun client pour l'instant"}
@@ -271,6 +280,11 @@ export default function ClientsPage() {
       ) : (
         <DataTable
           id="clients"
+          filters={filters}
+          onFiltersChange={(next) => {
+            setFilters(next);
+            setPage(1);
+          }}
           columns={columns}
           rows={data.items}
           getRowId={(clientItem) => clientItem.id}

@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/layout/empty-state";
 import { LoadErrorState } from "@/components/layout/load-error-state";
 import { PageHeader } from "@/components/layout/page-header";
+import { ConfirmEmailBanner } from "@/components/personal/confirm-email-banner";
 import { useMyInvoicesQuery } from "@/hooks/use-personal-profile";
 import { invoiceStatusBadgeVariant, invoiceStatusLabels } from "@/lib/labels";
 import { formatAmount } from "@/lib/money";
@@ -36,6 +37,8 @@ export default function MyInvoicesPage() {
         title="Mes factures"
         description="Ce que les entreprises de Vexta vous ont facturé."
       />
+
+      <ConfirmEmailBanner />
 
       {isLoading ? (
         <div className="space-y-2">

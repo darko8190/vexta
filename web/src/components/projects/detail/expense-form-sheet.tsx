@@ -31,6 +31,7 @@ import {
 import { useUploadMedia, MAX_UPLOAD_BYTES } from "@/hooks/use-media";
 import { useReceiptScanAvailabilityQuery, useScanReceipt } from "@/hooks/use-receipt-scan";
 import { ApiError } from "@/lib/api";
+import { todayIso } from "@/lib/dates";
 import type { ProjectExpense } from "@/lib/types";
 import { ex } from "@/lib/placeholders";
 
@@ -128,7 +129,8 @@ export function ExpenseFormSheet({
       expenseTypeId: expense?.expenseTypeId ?? "",
       cost: amountField(expense?.cost),
       sellingPrice: amountField(expense?.sellingPrice),
-      spentOn: expense?.spentOn ?? "",
+      // Today for a new one: most expenses are entered the day they are paid.
+      spentOn: expense?.spentOn ?? todayIso(),
       projectTaskId: expense ? (expense.projectTaskId ?? "") : (defaultTaskId ?? ""),
     });
 
@@ -203,7 +205,10 @@ export function ExpenseFormSheet({
 
       function fill(name: "name" | "cost" | "spentOn", value: string | null, label: string) {
         if (!value) return;
-        if (form.getValues(name).trim().length > 0) return;
+        // The date starts at today, which is a default and not something a person chose: the
+        // receipt's own date is better, until somebody has changed the field by hand.
+        const untouched = name === "spentOn" && !form.getFieldState(name).isDirty;
+        if (form.getValues(name).trim().length > 0 && !untouched) return;
         form.setValue(name, value, { shouldValidate: true });
         filled.push(label);
       }
@@ -410,6 +415,18 @@ export function ExpenseFormSheet({
             />
 
             <Controller
+              name="projectTaskId"
+              control={form.control}
+              render={({ field }) => (
+                <TaskPickerField
+                  id="expense-task"
+                  projectId={projectId}
+                  value={field.value || null}
+                  onChange={(taskId) => field.onChange(taskId ?? "")}
+                />
+              )}
+            />
+            <Controller
               name="description"
               control={form.control}
               render={({ field, fieldState }) => (
@@ -544,18 +561,6 @@ export function ExpenseFormSheet({
               </FieldDescription>
             </Field>
 
-            <Controller
-              name="projectTaskId"
-              control={form.control}
-              render={({ field }) => (
-                <TaskPickerField
-                  id="expense-task"
-                  projectId={projectId}
-                  value={field.value || null}
-                  onChange={(taskId) => field.onChange(taskId ?? "")}
-                />
-              )}
-            />
           </FieldGroup>
         </form>
 

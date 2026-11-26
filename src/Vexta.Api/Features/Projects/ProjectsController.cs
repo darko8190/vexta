@@ -48,6 +48,8 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
                 || (number != null && p.Number == number));
         }
 
+        projects = ApplyColumnFilters(projects, new ListFilter(Request.Query));
+
         var totalCount = await projects.CountAsync();
 
         var items = await projects
@@ -59,6 +61,13 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
 
         return Ok(new PagedResult<ProjectDto> { Items = items, Page = query.Page, PageSize = query.PageSize, TotalCount = totalCount });
     }
+
+    /// <summary>Projects per state, for the pills above the list. Same scoping as the list.</summary>
+    [HttpGet("statuts")]
+    public async Task<ActionResult<List<StatusCountDto>>> StatusCounts(CancellationToken ct) =>
+        Ok((await db.Projects.AsNoTracking().GroupBy(p => p.Status)
+                .Select(g => new { g.Key, Count = g.Count() }).ToListAsync(ct))
+            .OrderBy(g => g.Key).Select(g => new StatusCountDto(g.Key.ToString(), g.Count)).ToList());
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ProjectDto>> Get(Guid id)
@@ -87,6 +96,7 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
                 Invoices = p.Invoices.Count,
                 Expenses = p.Expenses.Count,
                 Materials = p.Materials.Count,
+                Equipment = p.EquipmentUsed.Count,
                 Timesheets = p.Timesheets.Count,
                 Documents = p.Documents.Count,
                 Notes = p.Notes.Count,
@@ -113,6 +123,11 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
             .Select(m => new { m.Quantity, m.PurchasePrice, m.UnitPrice })
             .ToListAsync();
 
+        var equipment = await db.ProjectEquipment.AsNoTracking()
+            .Where(x => x.ProjectId == id)
+            .Select(x => new { x.Quantity, x.CostRate, x.SellingRate })
+            .ToListAsync();
+
         var hours = await db.TimesheetEntries.AsNoTracking()
             .Where(t => t.ProjectId == id)
             .SumAsync(t => (decimal?)t.Hours) ?? 0m;
@@ -123,7 +138,7 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
         var counts = new ProjectSectionCountsDto(
             OpenTasks: project.OpenTasks,
             Materials: project.Materials,
-            Equipment: 0,
+            Equipment: project.Equipment,
             Assemblies: 0,
             Timesheets: project.Timesheets,
             Expenses: project.Expenses,
@@ -144,9 +159,11 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
             new("materiaux", "Matériaux",
                 materials.Sum(m => m.Quantity * (m.PurchasePrice ?? 0m)),
                 materials.Sum(m => m.Quantity * m.UnitPrice)),
-            new("equipements", "Équipements", 0m, 0m),
+            new("equipements", "Équipements",
+                equipment.Sum(x => x.Quantity * (x.CostRate ?? 0m)),
+                equipment.Sum(x => x.Quantity * (x.SellingRate ?? 0m))),
             new("assemblages", "Assemblages", 0m, 0m),
-            new("feuilles-de-temps", "Feuilles de temps", 0m, labourRevenue),
+            new("feuilles-de-temps", "Poinçons", 0m, labourRevenue),
             new("depenses", "Dépenses",
                 expenses.Sum(x => x.Cost ?? 0m),
                 expenses.Sum(x => x.SellingPrice ?? 0m)),
@@ -207,6 +224,8 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
         if (await InvalidAddressesAsync(request) is { } addressError) return BadRequest(new { message = addressError });
         if (await InvalidAssetAsync(request) is { } assetError) return BadRequest(new { message = assetError });
         if (await InvalidFilingAsync(request) is { } filingError) return BadRequest(new { message = filingError });
+        if (await InvalidContactsAsync(request) is { } contactError) return BadRequest(new { message = contactError });
+        if (ProjectRecurrence.Problem(request) is { } recurrenceError) return BadRequest(new { message = recurrenceError });
 
         var tenantId = currentUser.TenantId!.Value;
         var project = new Project
@@ -228,6 +247,8 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
         };
 
         ApplyFiling(project, request);
+        ApplyContacts(project, request);
+        ProjectRecurrence.Apply(project, request, BusinessDay.Today);
 
         ApplyAddresses(project, request);
         db.Projects.Add(project);
@@ -256,6 +277,8 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
         if (await InvalidAddressesAsync(request) is { } addressError) return BadRequest(new { message = addressError });
         if (await InvalidAssetAsync(request) is { } assetError) return BadRequest(new { message = assetError });
         if (await InvalidFilingAsync(request) is { } filingError) return BadRequest(new { message = filingError });
+        if (await InvalidContactsAsync(request) is { } contactError) return BadRequest(new { message = contactError });
+        if (ProjectRecurrence.Problem(request) is { } recurrenceError) return BadRequest(new { message = recurrenceError });
 
         project.ClientId = request.ClientId;
         project.ClientAssetId = request.ClientAssetId;
@@ -271,6 +294,8 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
 
         ApplyAddresses(project, request);
         ApplyFiling(project, request);
+        ApplyContacts(project, request);
+        ProjectRecurrence.Apply(project, request, BusinessDay.Today);
 
         await db.SaveChangesAsync();
         return Ok(await GetDtoAsync(id));
@@ -309,6 +334,29 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
         || project.Budget != request.Budget
         || project.IsTaxExempt != (request.IsTaxExempt ?? project.IsTaxExempt)
         || project.PricePolicyId != request.PricePolicyId;
+
+    /// <summary>The table's column filters, by the screen's column names.</summary>
+    private static IQueryable<Project> ApplyColumnFilters(IQueryable<Project> projects, ListFilter f)
+    {
+        if (f.Min("numero") is { } numberMin) projects = projects.Where(p => p.Number >= numberMin);
+        if (f.Max("numero") is { } numberMax) projects = projects.Where(p => p.Number <= numberMax);
+        if (f.Ids("client") is { Count: > 0 } clients) projects = projects.Where(p => clients.Contains(p.ClientId));
+        if (f.Contains("description") is { } description)
+            projects = projects.Where(p => p.Description != null && EF.Functions.ILike(p.Description, description));
+        if (f.Enums<ProjectStatus>("statut") is { Count: > 0 } statuses) projects = projects.Where(p => statuses.Contains(p.Status));
+        if (f.From("debut") is { } startFrom) projects = projects.Where(p => p.StartDate >= startFrom);
+        if (f.To("debut") is { } startTo) projects = projects.Where(p => p.StartDate <= startTo);
+        if (f.From("fin") is { } endFrom) projects = projects.Where(p => p.EndDate >= endFrom);
+        if (f.To("fin") is { } endTo) projects = projects.Where(p => p.EndDate <= endTo);
+        if (f.Min("budget") is { } budgetMin) projects = projects.Where(p => p.Budget >= budgetMin);
+        if (f.Max("budget") is { } budgetMax) projects = projects.Where(p => p.Budget <= budgetMax);
+        if (f.Contains("po") is { } po) projects = projects.Where(p => p.PoNumber != null && EF.Functions.ILike(p.PoNumber, po));
+        if (f.Ids("categorie") is { Count: > 0 } categories)
+            projects = projects.Where(p => p.CategoryId != null && categories.Contains(p.CategoryId.Value));
+        if (f.Contains("actif") is { } asset)
+            projects = projects.Where(p => p.ClientAsset != null && EF.Functions.ILike(p.ClientAsset.Label, asset));
+        return projects;
+    }
 
     /// <summary>
     /// Max + 1, not count + 1: deleting a project must not hand its number to the next one.
@@ -384,6 +432,30 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
         return null;
     }
 
+    /// <summary>
+    /// Both contacts have to be the client's own, checked rather than trusted: a contact of
+    /// another client would put a stranger on this job's paperwork.
+    /// </summary>
+    private async Task<string?> InvalidContactsAsync(UpsertProjectRequest request)
+    {
+        foreach (var contactId in new[] { request.ContactId, request.BillingContactId })
+        {
+            if (contactId is not { } id) continue;
+            if (!await db.ClientContacts.AnyAsync(c => c.Id == id && c.ClientId == request.ClientId))
+            {
+                return "Ce contact n'appartient pas à ce client.";
+            }
+        }
+
+        return null;
+    }
+
+    private static void ApplyContacts(Project project, UpsertProjectRequest request)
+    {
+        project.ContactId = request.ContactId;
+        project.BillingContactId = request.BillingContactId;
+    }
+
     /// <summary>A sub-category without its category is dropped rather than kept dangling.</summary>
     private static void ApplyFiling(Project project, UpsertProjectRequest request)
     {
@@ -442,5 +514,14 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
         p.SubCategoryId,
         p.SubCategory == null ? null : p.SubCategory.Name,
         p.WageClassificationId,
-        p.WageClassification == null ? null : p.WageClassification.Name);
+        p.WageClassification == null ? null : p.WageClassification.Name,
+        p.ContactId,
+        p.Contact == null ? null : (p.Contact.FirstName + " " + p.Contact.LastName).Trim(),
+        p.BillingContactId,
+        p.BillingContact == null ? null : (p.BillingContact.FirstName + " " + p.BillingContact.LastName).Trim(),
+        p.RecurrenceEvery,
+        p.RecurrenceUnit,
+        p.RecurrenceNextDate,
+        p.RecurrenceEndDate,
+        p.RecurringFromId);
 }

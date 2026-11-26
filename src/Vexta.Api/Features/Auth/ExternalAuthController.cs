@@ -100,6 +100,14 @@ public class ExternalAuthController(
                 await userManager.AddLoginAsync(user, new UserLoginInfo(info.LoginProvider, info.ProviderKey, info.ProviderDisplayName));
             }
 
+            // The provider vouches for the address. When it is the one on the account, that is
+            // the proof a confirmation link would have asked for.
+            if (!user.EmailConfirmed && string.Equals(user.Email, email, StringComparison.OrdinalIgnoreCase))
+            {
+                user.EmailConfirmed = true;
+                await userManager.UpdateAsync(user);
+            }
+
             var code = CodeProtector.Protect(user.Id.ToString(), CodeLifetime);
             return Redirect($"{FrontendUrl}/connexion/externe?code={Uri.EscapeDataString(code)}");
         }

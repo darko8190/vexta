@@ -123,3 +123,19 @@ export function useMyInvoicesQuery(enabled = true) {
     enabled,
   });
 }
+
+export type EmailStatus = { email: string; confirmed: boolean };
+
+/** Whether the person has proved their address, which decides which invoices can find them. */
+export function useEmailStatusQuery() {
+  return useQuery({
+    queryKey: ["auth", "courriel"],
+    queryFn: () => api.get<EmailStatus>("auth/courriel"),
+  });
+}
+
+export function useSendEmailConfirmation() {
+  return useMutation({
+    mutationFn: () => api.post<{ message: string }>("auth/courriel/verification"),
+  });
+}

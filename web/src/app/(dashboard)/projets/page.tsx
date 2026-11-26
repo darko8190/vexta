@@ -27,6 +27,10 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useDeleteProject, useProjectsQuery, useUpdateProject } from "@/hooks/use-projects";
 import { projectStatusBadgeVariant, projectStatusLabels } from "@/lib/labels";
 import { formatProjectNumber, type ProjectRecord, type ProjectStatus } from "@/lib/types";
+import { filtersToQuery, type TableFilters } from "@/lib/table-filters";
+import { useClientSummaryQuery } from "@/hooks/use-clients";
+import { useProjectCategoriesQuery } from "@/hooks/use-project-categories";
+import { StatusPills, useStatusCountsQuery } from "@/components/layout/status-pills";
 
 function formatCurrency(amount: number | null) {
   if (amount == null) return "—";
@@ -41,7 +45,21 @@ export default function ProjectsPage() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search);
 
-  const { data, isLoading } = useProjectsQuery(page, debouncedSearch);
+  const [filters, setFilters] = useState<TableFilters>({});
+  const [status, setStatus] = useState<ProjectStatus | "">("");
+  const { data, isLoading } = useProjectsQuery(
+    page,
+    debouncedSearch,
+    undefined,
+    status || undefined,
+    undefined,
+    filtersToQuery(filters),
+  );
+  const { data: statusCounts } = useStatusCountsQuery("projects", "projects/statuts");
+  // The options of the two reference columns. A customer sees only their own jobs, so the
+  // client column offers nothing to them.
+  const { data: clientOptions } = useClientSummaryQuery(!isClient);
+  const { data: categories } = useProjectCategoriesQuery();
   const deleteProject = useDeleteProject();
   const updateProject = useUpdateProject();
 
@@ -73,15 +91,17 @@ export default function ProjectsPage() {
   const columns: DataColumn<ProjectRecord>[] = [
     {
       key: "numero",
+      filter: { type: "number" },
       label: "Numéro",
       locked: true,
       headClassName: "w-24",
       cellClassName: "font-mono text-xs font-medium tabular-nums",
       cell: (projectItem) => formatProjectNumber(projectItem.number),
     },
-    { key: "client", label: "Client", cellClassName: "font-medium", cell: (projectItem) => projectItem.clientName },
+    { key: "client", filter: isClient ? undefined : { type: "select", options: (clientOptions ?? []).map((c) => ({ value: c.id, label: c.name })) }, label: "Client", cellClassName: "font-medium", cell: (projectItem) => projectItem.clientName },
     {
       key: "description",
+      filter: { type: "text" },
       label: "Description",
       cellClassName: "max-w-xs truncate text-muted-foreground",
       cell: (projectItem) => projectItem.description || "—",
@@ -89,6 +109,7 @@ export default function ProjectsPage() {
     },
     {
       key: "statut",
+      filter: { type: "select", options: (Object.keys(projectStatusLabels) as ProjectStatus[]).map((status) => ({ value: status, label: projectStatusLabels[status] })) },
       label: "Statut",
       cell: (projectItem) => (
         <Badge variant={projectStatusBadgeVariant[projectItem.status]}>
@@ -106,6 +127,7 @@ export default function ProjectsPage() {
     },
     {
       key: "debut",
+      filter: { type: "date" },
       label: "Début",
       cellClassName: "text-muted-foreground",
       cell: (projectItem) => projectItem.startDate ?? "—",
@@ -113,6 +135,7 @@ export default function ProjectsPage() {
     },
     {
       key: "fin",
+      filter: { type: "date" },
       label: "Fin",
       cellClassName: "text-muted-foreground",
       cell: (projectItem) => projectItem.endDate ?? "—",
@@ -120,6 +143,7 @@ export default function ProjectsPage() {
     },
     {
       key: "budget",
+      filter: { type: "number" },
       label: "Budget",
       cellClassName: "text-muted-foreground tabular-nums",
       cell: (projectItem) => formatCurrency(projectItem.budget),
@@ -127,6 +151,7 @@ export default function ProjectsPage() {
     },
     {
       key: "po",
+      filter: { type: "text" },
       label: "PO",
       hiddenByDefault: true,
       cellClassName: "text-muted-foreground",
@@ -135,6 +160,7 @@ export default function ProjectsPage() {
     },
     {
       key: "categorie",
+      filter: { type: "select", options: (categories ?? []).map((c) => ({ value: c.id, label: c.name })) },
       label: "Catégorie",
       hiddenByDefault: true,
       cellClassName: "text-muted-foreground",
@@ -145,6 +171,7 @@ export default function ProjectsPage() {
     },
     {
       key: "actif",
+      filter: { type: "text" },
       label: "Actif",
       hiddenByDefault: true,
       cellClassName: "text-muted-foreground",
@@ -184,13 +211,23 @@ export default function ProjectsPage() {
         <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Rechercher un projet…" />
       </div>
 
+      <StatusPills
+        options={(Object.keys(projectStatusLabels) as ProjectStatus[]).map((value) => ({ value, label: projectStatusLabels[value] }))}
+        value={status}
+        onChange={(next) => {
+          setStatus(next);
+          setPage(1);
+        }}
+        counts={statusCounts}
+      />
+
       {isLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 5 }).map((_, i) => (
             <Skeleton key={i} className="h-12 w-full" />
           ))}
         </div>
-      ) : !data || data.items.length === 0 ? (
+      ) : !data || (data.items.length === 0 && Object.keys(filters).length === 0 && !status) ? (
         <EmptyState
           icon={FolderKanban}
           title={debouncedSearch ? "Aucun projet trouvé" : "Aucun projet pour l'instant"}
@@ -218,6 +255,11 @@ export default function ProjectsPage() {
       ) : (
         <DataTable
           id="projets"
+          filters={filters}
+          onFiltersChange={(next) => {
+            setFilters(next);
+            setPage(1);
+          }}
           columns={columns}
           rows={data.items}
           getRowId={(projectItem) => projectItem.id}

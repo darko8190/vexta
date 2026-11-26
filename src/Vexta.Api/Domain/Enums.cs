@@ -85,6 +85,23 @@ public enum AddressType
 ///
 /// Facture is reached by invoicing the project rather than by remembering to come back here.
 /// </summary>
+/// <summary>Where an expense stands with the office.</summary>
+public enum ExpenseStatus
+{
+    AApprouver = 0,
+    Approuvee = 1,
+    Remboursee = 2,
+    Refusee = 3
+}
+
+/// <summary>The unit a recurring project counts its interval in.</summary>
+public enum RecurrenceUnit
+{
+    Semaine = 0,
+    Mois = 1,
+    Annee = 2
+}
+
 public enum ProjectStatus
 {
     AFaire = 0,

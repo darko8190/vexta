@@ -24,11 +24,18 @@ function useInvalidate() {
   return () => queryClient.invalidateQueries({ queryKey: ["quotes"] });
 }
 
-export function useQuotesQuery(page: number, search: string, status?: QuoteStatus, clientId?: string) {
+export function useQuotesQuery(
+  page: number,
+  search: string,
+  status?: QuoteStatus,
+  clientId?: string,
+  /** Column filters, already as query parameters (see filtersToQuery). */
+  filters: Record<string, string> = {},
+) {
   return useQuery({
-    queryKey: ["quotes", "list", page, search, status, clientId],
+    queryKey: ["quotes", "list", page, search, status, clientId, filters],
     queryFn: () =>
-      api.get<PagedResult<QuoteRecord>>(`soumissions${buildQuery({ page, search, status, clientId })}`),
+      api.get<PagedResult<QuoteRecord>>(`soumissions${buildQuery({ page, search, status, clientId, ...filters })}`),
     placeholderData: (previous) => previous,
   });
 }

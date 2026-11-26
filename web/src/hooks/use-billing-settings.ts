@@ -116,8 +116,9 @@ export function toSaveValues(settings?: BillingSettings): SaveBillingSettingsVal
   };
 }
 
-export function useBillingSettingsQuery() {
+export function useBillingSettingsQuery(enabled = true) {
   return useQuery({
+    enabled,
     queryKey: ["billing-settings"],
     queryFn: () => api.get<BillingSettings>("billing-settings"),
   });

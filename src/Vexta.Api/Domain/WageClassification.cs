@@ -54,4 +54,18 @@ public class WageClassificationStep
     public decimal? Wage { get; set; }
     public decimal? Cost { get; set; }
     public decimal? Selling { get; set; }
+
+    /// <summary>
+    /// The same three at time and a half, and at double time. Stored rather than computed: a
+    /// decree or a collective agreement does not always land on exactly 1.5 and 2 times the
+    /// regular figure, and the cost of an overtime hour carries different charges. The screen
+    /// offers 1.5× and 2× as the starting point and lets them be changed.
+    /// </summary>
+    public decimal? WageTimeAndHalf { get; set; }
+    public decimal? CostTimeAndHalf { get; set; }
+    public decimal? SellingTimeAndHalf { get; set; }
+
+    public decimal? WageDouble { get; set; }
+    public decimal? CostDouble { get; set; }
+    public decimal? SellingDouble { get; set; }
 }

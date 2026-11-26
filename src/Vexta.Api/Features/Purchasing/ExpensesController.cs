@@ -24,7 +24,8 @@ public record ExpenseListItemDto(
     decimal? SellingPrice,
     DateOnly? SpentOn,
     int PhotoCount,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    Domain.ExpenseStatus Status = Domain.ExpenseStatus.AApprouver);
 
 /// <summary>
 /// The page's totals, over everything the filters match and not only the page being shown.
@@ -52,6 +53,13 @@ public record ExpenseListDto(PagedResult<ExpenseListItemDto> Page, ExpenseTotals
 [RequireActiveSubscription]
 public class ExpensesController(VextaDbContext db) : ControllerBase
 {
+    /// <summary>Expenses per state, for the pills above the list.</summary>
+    [HttpGet("statuts")]
+    public async Task<ActionResult<List<StatusCountDto>>> StatusCounts(CancellationToken ct) =>
+        Ok((await db.ProjectExpenses.AsNoTracking().GroupBy(x => x.Status)
+                .Select(g => new { g.Key, Count = g.Count() }).ToListAsync(ct))
+            .OrderBy(g => g.Key).Select(g => new StatusCountDto(g.Key.ToString(), g.Count)).ToList());
+
     /// <param name="type">One of the company's expense categories.</param>
     /// <param name="du">On or after this day. Read against the day the money went out.</param>
     /// <param name="au">On or before this day.</param>
@@ -63,6 +71,7 @@ public class ExpensesController(VextaDbContext db) : ControllerBase
         [FromQuery] DateOnly? du,
         [FromQuery] DateOnly? au,
         [FromQuery] Guid? projet,
+        [FromQuery] Domain.ExpenseStatus? statut,
         CancellationToken ct)
     {
         var expenses = db.ProjectExpenses.AsNoTracking().AsQueryable();
@@ -80,6 +89,7 @@ public class ExpensesController(VextaDbContext db) : ControllerBase
 
         if (type is { } typeId) expenses = expenses.Where(x => x.ExpenseTypeId == typeId);
         if (projet is { } projectId) expenses = expenses.Where(x => x.ProjectId == projectId);
+        if (statut is { } status) expenses = expenses.Where(x => x.Status == status);
 
         // An expense with no date is left out of a dated search rather than swept in: it has
         // not been said when the money went out, so no range can honestly claim it.
@@ -117,7 +127,8 @@ public class ExpensesController(VextaDbContext db) : ControllerBase
                 x.SellingPrice,
                 x.SpentOn,
                 x.Photos.Count,
-                x.CreatedAt))
+                x.CreatedAt,
+                x.Status))
             .ToListAsync(ct);
 
         return Ok(new ExpenseListDto(

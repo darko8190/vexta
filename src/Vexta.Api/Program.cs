@@ -88,6 +88,7 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IWorkspaceService, WorkspaceService>();
 builder.Services.AddScoped<IInvoicePdfService, InvoicePdfService>();
 builder.Services.AddScoped<IPasswordResetService, PasswordResetService>();
+builder.Services.AddScoped<IEmailConfirmationService, EmailConfirmationService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IFormActionRunner, FormActionRunner>();
 
@@ -101,6 +102,7 @@ builder.Services.AddScoped<IAssistantService, AssistantService>();
 builder.Services.AddHostedService<Vexta.Api.Features.Quotes.QuoteReminderService>();
 builder.Services.AddHostedService<Vexta.Api.Features.Invoices.InvoiceReminderService>();
 builder.Services.AddHostedService<Vexta.Api.Features.Clients.AssetMaintenanceReminderService>();
+builder.Services.AddHostedService<Vexta.Api.Features.Projects.ProjectRecurrenceService>();
 builder.Services.AddHostedService<Vexta.Api.Features.Invoices.RecurringInvoiceService>();
 
 builder.Services

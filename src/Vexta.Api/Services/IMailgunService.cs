@@ -158,8 +158,8 @@ public class MailgunService(IHttpClientFactory httpClientFactory, IPlatformSetti
 
         var form = new MultipartFormDataContent
         {
-            { new StringContent($"{fromName} <{fromEmail}>"), "from" },
-            { new StringContent($"{toName} <{toEmail}>"), "to" },
+            { new StringContent(MailboxHeader(fromName, fromEmail)), "from" },
+            { new StringContent(CleanSenderName(toName) is { } recipient ? MailboxHeader(recipient, toEmail) : toEmail.Trim()), "to" },
             { new StringContent(subject), "subject" },
             { new StringContent(htmlBody), "html" }
         };
@@ -204,6 +204,27 @@ public class MailgunService(IHttpClientFactory httpClientFactory, IPlatformSetti
             """;
 
         await SendAsync(toEmail, "Test Vexta", "Test d'envoi Vexta", body, ct);
+    }
+
+    /// <summary>
+    /// The From header, with the name in quotes.
+    ///
+    /// Unquoted, a company name is read word by word under the mail grammar: a comma ends the
+    /// sender ("Rénovations X, inc." becomes two of them), and a period or parenthesis is not
+    /// allowed at all. Mail apps that hit either give up on the name and show the bare address,
+    /// which is how an invoice from a company arrived as no-reply@ with no name. Quoted, every
+    /// character is just text. The address setting is reduced to the address itself, in case it
+    /// was pasted as « Vexta &lt;no-reply@…&gt; ».
+    /// </summary>
+    private static string MailboxHeader(string name, string email)
+    {
+        var address = email.Trim();
+        var open = address.LastIndexOf('<');
+        var close = address.LastIndexOf('>');
+        if (open >= 0 && close > open) address = address[(open + 1)..close].Trim();
+
+        var quoted = name.Replace("\\", "\\\\");
+        return $"\"{quoted}\" <{address}>";
     }
 
     /// <summary>

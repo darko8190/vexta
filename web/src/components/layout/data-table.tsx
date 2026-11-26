@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { AlertCircle, ArrowDown, ArrowUp, Check, Columns3, Pencil } from "lucide-react";
+import { AlertCircle, ArrowDown, ArrowUp, Check, Columns3, ListFilter, Pencil, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -18,6 +18,8 @@ import { Spinner } from "@/components/ui/spinner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ClickableRow } from "@/components/layout/clickable-row";
+import { TableFiltersSheet, type FilterableColumn } from "@/components/layout/table-filters-sheet";
+import { isActive, type ColumnFilterType, type ColumnFilterValue, type TableFilters } from "@/lib/table-filters";
 import { useTableLayout } from "@/hooks/use-table-layout";
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -41,6 +43,25 @@ export interface DataColumn<T> {
   locked?: boolean;
   /** Editable in the table's edit mode. */
   edit?: DataColumnEdit<T>;
+  /** Filterable, with a field of this kind. The list sends it to the API under the column's key. */
+  filter?: { type: ColumnFilterType; options?: { value: string; label: string }[] };
+}
+
+/** What an active filter reads as, on its chip. */
+function describe(column: { label: string; filter?: DataColumn<unknown>["filter"] }, value: ColumnFilterValue): string {
+  const type = column.filter?.type;
+  if (type === "select") {
+    const labels = (value.values ?? []).map(
+      (v) => column.filter?.options?.find((option) => option.value === v)?.label ?? v,
+    );
+    return `${column.label} : ${labels.length > 2 ? `${labels.slice(0, 2).join(", ")} +${labels.length - 2}` : labels.join(", ")}`;
+  }
+  if (type === "text") return `${column.label} : « ${value.text} »`;
+  const low = type === "date" ? value.from : value.min;
+  const high = type === "date" ? value.to : value.max;
+  if (low && high) return `${column.label} : ${low} à ${high}`;
+  if (low) return `${column.label} ≥ ${low}`;
+  return `${column.label} ≤ ${high}`;
 }
 
 type RowState = "idle" | "saving" | "saved" | "error";
@@ -63,6 +84,8 @@ export function DataTable<T>({
   onSaveRow,
   actions,
   toolbarStart,
+  filters,
+  onFiltersChange,
 }: {
   /** Names the stored column layout. */
   id: string;
@@ -77,6 +100,9 @@ export function DataTable<T>({
   actions?: (row: T) => React.ReactNode;
   /** What sits at the left of the toolbar, usually the search. */
   toolbarStart?: React.ReactNode;
+  /** The column filters, held by the page because they go to the API with the page's query. */
+  filters?: TableFilters;
+  onFiltersChange?: (filters: TableFilters) => void;
 }) {
   const { layout, save } = useTableLayout(
     id,
@@ -85,12 +111,22 @@ export function DataTable<T>({
   );
   const [editing, setEditing] = useState(false);
   const [columnsOpen, setColumnsOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const byKey = new Map(columns.map((column) => [column.key, column]));
   const visible = layout.order
     .map((key) => byKey.get(key)!)
     .filter((column) => column && (column.locked || !layout.hidden.includes(column.key)));
   const canEdit = Boolean(onSaveRow) && columns.some((column) => column.edit);
+
+  // The columns of the view, as the person has arranged it: a filter on a column they have
+  // hidden would narrow the list by something they cannot see.
+  const filterable: FilterableColumn[] = onFiltersChange
+    ? visible
+        .filter((column) => column.filter)
+        .map((column) => ({ key: column.key, label: column.label, type: column.filter!.type, options: column.filter!.options }))
+    : [];
+  const active = Object.entries(filters ?? {}).filter(([key, value]) => isActive(value) && byKey.has(key));
 
   return (
     <div>
@@ -100,6 +136,17 @@ export function DataTable<T>({
           <Button variant={editing ? "default" : "outline"} onClick={() => setEditing((value) => !value)}>
             {editing ? <Check /> : <Pencil />}
             {editing ? "Terminer" : "Modifier"}
+          </Button>
+        )}
+        {filterable.length > 0 && (
+          <Button variant="outline" onClick={() => setFiltersOpen(true)}>
+            <ListFilter />
+            Filtres
+            {active.length > 0 && (
+              <span className="rounded-full bg-primary px-1.5 text-xs text-primary-foreground tabular-nums">
+                {active.length}
+              </span>
+            )}
           </Button>
         )}
         <Tooltip>
@@ -113,6 +160,34 @@ export function DataTable<T>({
           <TooltipContent>Colonnes</TooltipContent>
         </Tooltip>
       </div>
+
+      {active.length > 0 && onFiltersChange && (
+        <div className="mb-3 flex flex-wrap items-center gap-1.5">
+          {active.map(([key, value]) => (
+            <span
+              key={key}
+              className="inline-flex max-w-full items-center gap-1 rounded-full border border-border bg-muted/40 py-0.5 pr-1 pl-2.5 text-xs text-foreground"
+            >
+              <span className="truncate">{describe(byKey.get(key)! as DataColumn<unknown>, value)}</span>
+              <button
+                type="button"
+                aria-label={`Retirer le filtre ${byKey.get(key)!.label}`}
+                className="rounded-full p-0.5 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                onClick={() => {
+                  const next = { ...filters };
+                  delete next[key];
+                  onFiltersChange(next);
+                }}
+              >
+                <X className="size-3" />
+              </button>
+            </span>
+          ))}
+          <Button variant="ghost" size="sm" onClick={() => onFiltersChange({})}>
+            Tout effacer
+          </Button>
+        </div>
+      )}
 
       {editing && (
         <p className="mb-2 text-xs text-muted-foreground">
@@ -133,6 +208,13 @@ export function DataTable<T>({
             </TableRow>
           </TableHeader>
           <TableBody>
+            {rows.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={visible.length + 1} className="py-8 text-center text-sm text-muted-foreground">
+                  Aucune ligne ne correspond à ces filtres.
+                </TableCell>
+              </TableRow>
+            )}
             {rows.map((row) =>
               editing ? (
                 <EditableRow
@@ -164,6 +246,16 @@ export function DataTable<T>({
           </TableBody>
         </Table>
       </div>
+
+      {onFiltersChange && (
+        <TableFiltersSheet
+          open={filtersOpen}
+          onOpenChange={setFiltersOpen}
+          columns={filterable}
+          filters={filters ?? {}}
+          onApply={onFiltersChange}
+        />
+      )}
 
       <ColumnsDialog
         open={columnsOpen}

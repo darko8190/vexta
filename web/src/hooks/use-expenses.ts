@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { ExpenseType, ProjectExpense, ProjectExpenseDetail } from "@/lib/types";
+import type { ExpenseStatus, ExpenseType, ProjectExpense, ProjectExpenseDetail } from "@/lib/types";
 
 export interface ExpenseFormValues {
   name: string;
@@ -79,5 +79,18 @@ export function useCreateExpenseType() {
   return useMutation({
     mutationFn: (name: string) => api.post<ExpenseType>("expense-types", { name }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["expense-types"] }),
+  });
+}
+
+/** Approved, paid back, refused: the office's decision, without touching the figures. */
+export function useSetExpenseStatus(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: ExpenseStatus }) =>
+      api.patch<ProjectExpenseDetail>(`projects/${projectId}/expenses/${id}/statut`, { status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects", projectId, "expenses"] });
+      queryClient.invalidateQueries({ queryKey: ["depenses"] });
+    },
   });
 }

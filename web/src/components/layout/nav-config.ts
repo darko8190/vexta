@@ -23,6 +23,7 @@
   Truck,
   Users,
   UsersRound,
+  Wrench,
 } from "lucide-react";
 import type { UserRole } from "@/lib/types";
 
@@ -65,6 +66,9 @@ const tenantNav: NavItem[] = [
   // is money promised. They are read by different people on different days.
   { href: "/approvisionnement", label: "Fournisseurs & Commandes", icon: Truck },
   { href: "/inventaire", label: "Inventaire", icon: Boxes },
+  // Beside Inventaire: both are what the company has, one sold off the shelf, the other
+  // brought back after each job and billed for its time.
+  { href: "/equipements", label: "Équipements", icon: Wrench },
   // Right after Inventaire, because that is where what it sells comes from. "En ligne" is
   // doing real work in the label: Fournisseurs & Commandes above is the company buying, and
   // somebody who opened the wrong one would only find out from the names on the rows.
@@ -134,6 +138,7 @@ const clientNav: NavItem[] = [
 const superAdminNav: NavItem[] = [
   { href: "/tableau-de-bord", label: "Tableau de bord", icon: LayoutDashboard },
   { href: "/admin/tenants", label: "Locataires", icon: Building2 },
+  { href: "/admin/utilisateurs", label: "Utilisateurs", icon: Users },
   { href: "/admin/forfaits", label: "Forfaits", icon: Tag },
   { href: "/admin/modules", label: "Modules", icon: Blocks },
   // Beside Modules, because the two together are what a forfait is made of: the tabs and what
@@ -144,6 +149,18 @@ const superAdminNav: NavItem[] = [
   { href: "/admin/apparence", label: "Apparence", icon: Palette },
   { href: "/admin/parametres", label: "Intégrations", icon: Settings },
 ];
+
+/**
+ * The menu of « mode employé »: what someone working on the jobs opens, for an owner or a
+ * project manager who is, today, one of the crew.
+ */
+const EMPLOYEE_MODE_HREFS = ["/tableau-de-bord", "/mes-assignations", "/mes-feuilles-de-temps", "/projets", "/outils"];
+
+export function employeeModeNavItems(): NavItem[] {
+  return EMPLOYEE_MODE_HREFS.map((href) => tenantNav.find((item) => item.href === href)).filter(
+    (item): item is NavItem => Boolean(item),
+  );
+}
 
 export function getNavItems(
   role: UserRole | undefined,

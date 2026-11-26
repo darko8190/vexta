@@ -410,10 +410,9 @@ public class BillingSettingsController(VextaDbContext db, ICurrentUserService cu
         var body = Clean(request.Body) ?? InvoiceEmailTemplate.DefaultBody;
 
         return Ok(new InvoiceEmailPreviewDto(
-            // The subject is plain text and must not arrive with &amp; in it; the body is HTML
-            // and must, which is the one thing this flag decides.
-            InvoiceEmailTemplate.Render(subject, values, escapeHtml: false),
-            InvoiceEmailTemplate.Render(body, values, escapeHtml: true)));
+            // The body as the mail will carry it: the text filled in, then made into paragraphs.
+            InvoiceEmailTemplate.Render(subject, values, isBody: false),
+            EmailText.ToHtml(InvoiceEmailTemplate.Render(body, values, isBody: true))));
     }
 
     /// <summary>
@@ -454,13 +453,13 @@ public class BillingSettingsController(VextaDbContext db, ICurrentUserService cu
             ["date_validite"] = validUntil,
             ["validite"] = QuoteEmailTemplate.Validity(validUntil),
             ["devise"] = CurrencyCode(model.Currency),
-            // "#" rather than a real address: the preview is clicked by the company, not the client.
-            [QuoteEmailTemplate.AcceptField] = QuoteEmailTemplate.AcceptParagraph("#")
+            // A sample address: the preview is read by the company, and the real one is per client.
+            [QuoteEmailTemplate.AcceptField] = QuoteEmailTemplate.AcceptParagraph("https://vexta.ca/soumissions/exemple")
         };
 
         return Ok(new InvoiceEmailPreviewDto(
-            QuoteEmailTemplate.Render(Clean(request.Subject) ?? QuoteEmailTemplate.DefaultSubject, values, escapeHtml: false),
-            QuoteEmailTemplate.Render(Clean(request.Body) ?? QuoteEmailTemplate.DefaultBody, values, escapeHtml: true)));
+            QuoteEmailTemplate.Render(Clean(request.Subject) ?? QuoteEmailTemplate.DefaultSubject, values, isBody: false),
+            EmailText.ToHtml(QuoteEmailTemplate.Render(Clean(request.Body) ?? QuoteEmailTemplate.DefaultBody, values, isBody: true))));
     }
 
     /// <summary>
@@ -601,12 +600,14 @@ public class BillingSettingsController(VextaDbContext db, ICurrentUserService cu
             defaultPolicyId,
             InvoiceNumbering.Format(model.InvoicePrefix, model.NextInvoiceNumber),
             model.InvoiceEmailSubject,
-            model.InvoiceEmailBody,
+            // Read back as text: a template saved when they were written in HTML opens without
+            // its tags, and is saved that way the next time.
+            model.InvoiceEmailBody is { } invoiceBody ? EmailText.ToPlain(invoiceBody) : null,
             InvoiceEmailTemplate.DefaultSubject,
             InvoiceEmailTemplate.DefaultBody,
             [.. InvoiceEmailTemplate.Fields.Select(f => new InvoiceEmailFieldDto(f.Field, f.Description))],
             model.QuoteEmailSubject,
-            model.QuoteEmailBody,
+            model.QuoteEmailBody is { } quoteBody ? EmailText.ToPlain(quoteBody) : null,
             QuoteEmailTemplate.DefaultSubject,
             QuoteEmailTemplate.DefaultBody,
             [.. QuoteEmailTemplate.Fields.Select(f => new InvoiceEmailFieldDto(f.Field, f.Description))],

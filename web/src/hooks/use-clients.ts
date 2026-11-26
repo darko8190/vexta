@@ -73,14 +73,20 @@ export interface ClientContactFormValues {
  * <paramref name="statut"/> is one of the three states, or "Bloques" — which is not a state but
  * the lock, and is asked for separately because it can be closed on a client of any state.
  */
-export function useClientsQuery(page: number, search: string, statut?: ClientStatus | "Bloques") {
+export function useClientsQuery(
+  page: number,
+  search: string,
+  statut?: ClientStatus | "Bloques",
+  /** Column filters, already as query parameters (see filtersToQuery). */
+  filters: Record<string, string> = {},
+) {
   const filter =
     statut === "Bloques" ? { bloques: true } : statut ? { statut } : {};
 
   return useQuery({
-    queryKey: ["clients", page, search, statut ?? "tous"],
+    queryKey: ["clients", page, search, statut ?? "tous", filters],
     queryFn: () =>
-      api.get<PagedResult<ClientRecord>>(`clients${buildQuery({ page, search, ...filter })}`),
+      api.get<PagedResult<ClientRecord>>(`clients${buildQuery({ page, search, ...filter, ...filters })}`),
     placeholderData: (previous) => previous,
   });
 }
@@ -94,8 +100,9 @@ export function useClientQuery(id: string | undefined) {
   });
 }
 
-export function useClientSummaryQuery() {
+export function useClientSummaryQuery(enabled = true) {
   return useQuery({
+    enabled,
     queryKey: ["clients", "summary"],
     queryFn: () => api.get<ClientSummary[]>("clients/summary"),
     staleTime: 60_000,

@@ -58,7 +58,37 @@ public class AssistantApiTool(
         "api/public",      // the unauthenticated side of the house
         "api/catalog",
         "api/parametres-plateforme",
+        "api/mcp",         // the MCP door, and the keys that open it: a key never mints another
+        "api/cles-mcp",
     ];
+
+    /// <summary>
+    /// Where this server can call itself. Taken from the server's own listening addresses rather
+    /// than from the public hostname: inside a container the public name goes out to the
+    /// internet, through the reverse proxy, and back.
+    /// </summary>
+    public static string SelfBaseAddress(Microsoft.AspNetCore.Hosting.Server.IServer server, Microsoft.AspNetCore.Http.HttpRequest? request)
+    {
+        var addresses = server.Features.Get<Microsoft.AspNetCore.Hosting.Server.Features.IServerAddressesFeature>()?.Addresses ?? [];
+
+        var candidate =
+            addresses.FirstOrDefault(a => a.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+            ?? addresses.FirstOrDefault();
+
+        if (candidate is not null)
+        {
+            // Kestrel reports the wildcard it bound, not somewhere you can connect to.
+            var usable = candidate
+                .Replace("://[::]", "://localhost", StringComparison.Ordinal)
+                .Replace("://0.0.0.0", "://localhost", StringComparison.Ordinal)
+                .Replace("://+", "://localhost", StringComparison.Ordinal)
+                .Replace("://*", "://localhost", StringComparison.Ordinal);
+
+            return usable.TrimEnd('/') + "/";
+        }
+
+        return request is null ? "http://localhost/" : $"{request.Scheme}://{request.Host}/";
+    }
 
     private readonly List<AssistantAction> actions = [];
 

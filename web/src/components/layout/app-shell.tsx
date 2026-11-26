@@ -20,7 +20,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { AssistantButton } from "@/components/assistant/assistant-panel";
 import { VextaIcon, VextaLockup } from "@/components/brand/vexta-logo";
-import { dashboardNavItem, getNavItems, type NavItem } from "@/components/layout/nav-config";
+import { dashboardNavItem, employeeModeNavItems, getNavItems, type NavItem } from "@/components/layout/nav-config";
+import { ViewModeToggle } from "@/components/layout/view-mode-toggle";
+import { useViewMode } from "@/lib/view-mode";
 import { NavLinks } from "@/components/layout/nav-links";
 import { FeedbackButton } from "@/components/layout/feedback-button";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
@@ -53,6 +55,10 @@ function flatten(items: NavigationItem[], depth = 0): NavItem[] {
  */
 function useTenantNavItems(): { items: NavItem[]; pending: boolean } {
   const { user } = useAuth();
+  const viewMode = useViewMode();
+  const managesForReal =
+    user?.role === "TenantAdmin" || user?.role === "ProjectManager" || (user?.role === "SuperAdmin" && user.isImpersonating);
+  const employeeMode = managesForReal && user?.tenantKind !== "Personal" && viewMode === "employe";
 
   // Only a company's own menu comes from modules. A super admin outside a tenant, a customer and
   // a personal space each have a fixed one, and asking would be a refused request.
@@ -71,6 +77,9 @@ function useTenantNavItems(): { items: NavItem[]; pending: boolean } {
   const builtIn = getNavItems(user?.role, user?.isImpersonating, user?.tenantKind).filter(
     (item) => !isClient || item.href !== "/soumissions" || hasQuotes,
   );
+
+  // The crew's menu, whatever the plan's modules say: the point of the mode is a short one.
+  if (employeeMode) return { items: employeeModeNavItems(), pending: false };
 
   // A fixed menu has nothing in flight, so it draws at once.
   if (!fromModules) return { items: builtIn, pending: false };
@@ -249,6 +258,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               purpose rather than once a year. It draws nothing unless the company has an
               assistant switched on. */}
           <AssistantButton />
+          <ViewModeToggle />
           <FeedbackButton />
           <ThemeToggle />
           <UserAvatarMenu />
@@ -257,6 +267,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <WorkspaceSwitcher />
           <InstallPrompt />
           <AssistantButton />
+          <ViewModeToggle />
           <FeedbackButton />
           <ThemeToggle />
           <UserAvatarMenu />

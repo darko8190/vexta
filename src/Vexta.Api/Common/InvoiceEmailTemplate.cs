@@ -1,5 +1,3 @@
-using System.Net;
-
 namespace Vexta.Api.Common;
 
 /// <summary>
@@ -41,51 +39,52 @@ public static class InvoiceEmailTemplate
     /// </summary>
     public const string DefaultBody =
         """
-        <p>Bonjour,</p>
-        <p>Vous trouverez ci-jointe la facture <strong>{{numero}}</strong> de {{entreprise}}, datée du {{date_emission}} et payable au plus tard le {{date_echeance}}.</p>
-        <p>Montant à payer : {{total}} {{devise}}.</p>
-        <p>Merci de votre confiance.</p>
-        <p style="color:#666">{{entreprise}}</p>
+        Bonjour,
+
+        Vous trouverez ci-jointe la facture {{numero}} de {{entreprise}}, datée du {{date_emission}} et payable au plus tard le {{date_echeance}}.
+
+        Montant à payer : {{total}} {{devise}}.
+
+        Merci de votre confiance.
+
+        {{entreprise}}
         """;
 
     /// <summary>
-    /// Fills a template in.
+    /// Fills a template in, as plain text.
     ///
     /// Only the known fields are replaced, and anything else is left exactly as typed: a
     /// company that writes a brace in its signature must not watch the rest of its message
-    /// disappear. <paramref name="escapeHtml"/> is on for the body, which is sent as HTML — a
-    /// client called "Lavoie &amp; Fils" would otherwise arrive as broken markup.
+    /// disappear. Nothing is escaped here — the result is text, and <see cref="EmailText.ToHtml"/>
+    /// escapes all of it at once when the mail leaves. A template saved in the old HTML form is
+    /// read as text first.
     /// </summary>
     public static string Render(
-        string template, IReadOnlyDictionary<string, string> values, bool escapeHtml) =>
-        Render(template, Fields, values, escapeHtml, rawHtmlFields: null);
+        string template, IReadOnlyDictionary<string, string> values, bool isBody) =>
+        Render(template, Fields, values, isBody, bodyOnlyFields: null);
 
     /// <summary>
     /// The same filling for any template: the quote's runs through here too, so the two never
-    /// disagree about what a field or an escape is.
+    /// disagree about what a field is.
     ///
-    /// <paramref name="rawHtmlFields"/> names fields whose value is markup written by Vexta
-    /// itself, not data — they go into the body as is, and into a plain-text subject not at all.
+    /// <paramref name="bodyOnlyFields"/> names fields that are whole sentences meant for the
+    /// message, and that a one-line subject leaves out.
     /// </summary>
     public static string Render(
         string template,
         IReadOnlyList<(string Field, string Description)> fields,
         IReadOnlyDictionary<string, string> values,
-        bool escapeHtml,
-        IReadOnlySet<string>? rawHtmlFields)
+        bool isBody,
+        IReadOnlySet<string>? bodyOnlyFields)
     {
-        var rendered = template;
+        var rendered = isBody ? EmailText.ToPlain(template) : template;
 
         foreach (var (field, _) in fields)
         {
             var value = values.TryGetValue(field, out var found) ? found : string.Empty;
-            var raw = rawHtmlFields?.Contains(field) == true;
-            if (raw && !escapeHtml) value = string.Empty;
+            if (!isBody && bodyOnlyFields?.Contains(field) == true) value = string.Empty;
 
-            rendered = rendered.Replace(
-                $"{{{{{field}}}}}",
-                escapeHtml && !raw ? WebUtility.HtmlEncode(value) : value,
-                StringComparison.Ordinal);
+            rendered = rendered.Replace($"{{{{{field}}}}}", value, StringComparison.Ordinal);
         }
 
         return rendered;

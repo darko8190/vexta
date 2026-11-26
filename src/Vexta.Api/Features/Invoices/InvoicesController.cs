@@ -45,6 +45,13 @@ public class InvoicesController(
 
     private const int MaxSubjectLength = 300;
 
+    /// <summary>Invoices per state, for the pills above the list. Same scoping as the list.</summary>
+    [HttpGet("statuts")]
+    public async Task<ActionResult<List<StatusCountDto>>> StatusCounts(CancellationToken ct) =>
+        Ok((await db.Invoices.AsNoTracking().GroupBy(i => i.Status)
+                .Select(g => new { g.Key, Count = g.Count() }).ToListAsync(ct))
+            .OrderBy(g => g.Key).Select(g => new StatusCountDto(g.Key.ToString(), g.Count)).ToList());
+
     [HttpGet]
     public async Task<ActionResult<PagedResult<InvoiceDto>>> List(
         [FromQuery] PagingQuery query,
@@ -326,16 +333,16 @@ public class InvoicesController(
 
         return Ok(new InvoiceSendDefaultsDto(
             recipients.FirstOrDefault()?.Email,
-            // The subject is plain text and must not arrive carrying &amp;; the body is HTML and
-            // must. That flag is the whole difference between the two calls.
+            // Both as text: the person edits words, not markup. The body is made into HTML only
+            // when it is sent.
             InvoiceEmailTemplate.Render(
                 Template(settings?.InvoiceEmailSubject) ?? InvoiceEmailTemplate.DefaultSubject,
                 values,
-                escapeHtml: false),
+                isBody: false),
             InvoiceEmailTemplate.Render(
                 Template(settings?.InvoiceEmailBody) ?? InvoiceEmailTemplate.DefaultBody,
                 values,
-                escapeHtml: true),
+                isBody: true),
             recipients,
             employees,
             documents));
@@ -393,10 +400,9 @@ public class InvoicesController(
             });
         }
 
-        // The body is accepted as HTML and not scrubbed: it is written by a member of staff for
-        // their own client, and stripping their formatting would be answering a problem nobody
-        // has. What it must not do is grow without limit, and the values this message quotes are
-        // escaped where they are filled in, by InvoiceEmailTemplate.
+        // The body is plain text written by a member of staff for their own client. It is escaped
+        // as a whole when it is turned into the mail's HTML, below; here it must only not grow
+        // without limit.
         var body = request.Body?.Trim() ?? string.Empty;
         if (body.Length == 0)
         {
@@ -478,6 +484,8 @@ public class InvoicesController(
         // none of them gets two. The token is created here and saved with the rest below, so an
         // invoice only ever has one and every reminder carries the same link.
         var payment = await PaymentBlockAsync(invoice, ct);
+        // The text the person edited, made into the mail's paragraphs here and nowhere else.
+        body = EmailText.ToHtml(body);
         if (payment is not null) body += payment;
 
         try

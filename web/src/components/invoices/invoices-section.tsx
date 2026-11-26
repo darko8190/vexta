@@ -27,6 +27,8 @@ import { useDeleteInvoice, useInvoicesQuery } from "@/hooks/use-invoices";
 import { invoiceStatusBadgeVariant, invoiceStatusLabels } from "@/lib/labels";
 import type { InvoiceRecord } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { StatusPills, useStatusCountsQuery } from "@/components/layout/status-pills";
+import type { InvoiceStatus } from "@/lib/types";
 
 function formatCurrency(amount: number, currency: string) {
   return new Intl.NumberFormat("fr-CA", { style: "currency", currency }).format(amount);
@@ -40,7 +42,9 @@ export function InvoicesSection() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search);
 
-  const { data, isLoading } = useInvoicesQuery(page, debouncedSearch);
+  const [status, setStatus] = useState<InvoiceStatus | "">("");
+  const { data, isLoading } = useInvoicesQuery(page, debouncedSearch, undefined, status || undefined);
+  const { data: statusCounts } = useStatusCountsQuery("invoices", "invoices/statuts");
   const deleteInvoice = useDeleteInvoice();
   const [deleteTarget, setDeleteTarget] = useState<InvoiceRecord | undefined>(undefined);
 
@@ -74,6 +78,17 @@ export function InvoicesSection() {
         )}
       </div>
 
+      <StatusPills
+        options={(Object.keys(invoiceStatusLabels) as InvoiceStatus[]).map((value) => ({ value, label: invoiceStatusLabels[value] }))}
+        value={status}
+        onChange={(next) => {
+          setStatus(next);
+          setPage(1);
+        }}
+        counts={statusCounts}
+        allLabel="Toutes"
+      />
+
       <div className="mb-4">
         <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Rechercher une facture…" />
       </div>
@@ -84,7 +99,7 @@ export function InvoicesSection() {
             <Skeleton key={i} className="h-12 w-full" />
           ))}
         </div>
-      ) : !data || data.items.length === 0 ? (
+      ) : !data || (data.items.length === 0 && !status) ? (
         <EmptyState
           icon={FileText}
           title={debouncedSearch ? "Aucune facture trouvée" : "Aucune facture pour l'instant"}

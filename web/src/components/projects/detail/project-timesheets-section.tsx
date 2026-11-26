@@ -124,9 +124,9 @@ export function ProjectTimesheetsSection({
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold text-foreground">Feuilles de temps</h2>
+          <h2 className="text-base font-semibold text-foreground">Poinçons</h2>
           <p className="text-sm text-muted-foreground">
-            Les heures travaillées sur ce chantier, arrondies au quart d&apos;heure.
+            Les heures pointées sur ce projet et ses tâches, arrondies au quart d&apos;heure. Ce sont elles qui se facturent.
           </p>
         </div>
         {createButton}
@@ -143,7 +143,7 @@ export function ProjectTimesheetsSection({
       ) : isError && (!data || isPlaceholderData) ? (
         <LoadErrorState
           error={loadError}
-          title="Feuilles de temps indisponibles"
+          title="Poinçons indisponibles"
           fallback="Les heures de ce projet n'ont pas pu être chargées."
           onRetry={() => refetch()}
         />

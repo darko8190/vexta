@@ -27,7 +27,7 @@ public static class QuoteEmailTemplate
         (AcceptField, "Comment l'accepter : un lien vers le portail si le client y a accès, sinon une invitation à répondre au courriel. Dans le message seulement.")
     ];
 
-    public static readonly IReadOnlySet<string> RawHtmlFields = new HashSet<string> { AcceptField };
+    public static readonly IReadOnlySet<string> BodyOnlyFields = new HashSet<string> { AcceptField };
 
     public const string DefaultSubject = "Soumission {{numero}} — {{entreprise}}";
 
@@ -37,11 +37,15 @@ public static class QuoteEmailTemplate
     /// </summary>
     public const string DefaultBody =
         """
-        <p>Bonjour {{contact}},</p>
-        <p>Vous trouverez ci-jointe notre soumission <strong>{{numero}}</strong> au montant de {{total}} {{devise}}, taxes incluses. {{validite}}</p>
+        Bonjour {{contact}},
+
+        Vous trouverez ci-jointe notre soumission {{numero}} au montant de {{total}} {{devise}}, taxes incluses. {{validite}}
+
         {{acceptation}}
-        <p>Merci de votre confiance.</p>
-        <p style="color:#666">{{entreprise}}</p>
+
+        Merci de votre confiance.
+
+        {{entreprise}}
         """;
 
     /// <summary>
@@ -53,15 +57,19 @@ public static class QuoteEmailTemplate
 
     public const string ReminderBody =
         """
-        <p>Bonjour {{contact}},</p>
-        <p>Nous revenons vers vous au sujet de notre soumission <strong>{{numero}}</strong> au montant de {{total}} {{devise}}, taxes incluses, que vous trouverez de nouveau ci-jointe. {{validite}}</p>
+        Bonjour {{contact}},
+
+        Nous revenons vers vous au sujet de notre soumission {{numero}} au montant de {{total}} {{devise}}, taxes incluses, que vous trouverez de nouveau ci-jointe. {{validite}}
+
         {{acceptation}}
-        <p>Avez-vous des questions ou souhaitez-vous qu'on y apporte des changements ? Il nous fera plaisir d'en discuter.</p>
-        <p style="color:#666">{{entreprise}}</p>
+
+        Avez-vous des questions ou souhaitez-vous qu'on y apporte des changements ? Il nous fera plaisir d'en discuter.
+
+        {{entreprise}}
         """;
 
-    public static string Render(string template, IReadOnlyDictionary<string, string> values, bool escapeHtml) =>
-        InvoiceEmailTemplate.Render(template, Fields, values, escapeHtml, RawHtmlFields);
+    public static string Render(string template, IReadOnlyDictionary<string, string> values, bool isBody) =>
+        InvoiceEmailTemplate.Render(template, Fields, values, isBody, BodyOnlyFields);
 
     /// <summary>
     /// The <c>{{acceptation}}</c> paragraph. A customer who can sign in answers with one button,
@@ -70,11 +78,12 @@ public static class QuoteEmailTemplate
     /// </summary>
     public static string AcceptParagraph(string? portalUrl) =>
         portalUrl is null
-            ? "<p>Pour l'accepter, il suffit de nous la retourner signée ou de répondre à ce courriel. " +
-              "N'hésitez pas à nous écrire pour toute question.</p>"
-            : "<p>Vous pouvez la consulter et l'accepter en ligne depuis votre portail : " +
-              $"<a href=\"{System.Net.WebUtility.HtmlEncode(portalUrl)}\">voir la soumission</a>. " +
-              "Vous pouvez aussi nous la retourner signée ou répondre à ce courriel.</p>";
+            ? "Pour l'accepter, il suffit de nous la retourner signée ou de répondre à ce courriel. " +
+              "N'hésitez pas à nous écrire pour toute question."
+            // The address on a line of its own, so nothing after it is mistaken for part of it.
+            : "Vous pouvez la consulter et l'accepter en ligne depuis votre portail :\n" +
+              $"{portalUrl}\n" +
+              "Vous pouvez aussi nous la retourner signée ou répondre à ce courriel.";
 
     /// <summary>
     /// The typographic apostrophe on purpose: the body escapes what it fills in, and a straight

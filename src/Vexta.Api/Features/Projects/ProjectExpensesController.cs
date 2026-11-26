@@ -195,7 +195,25 @@ public class ProjectExpensesController(
         return await Get(id, ct);
     }
 
-    [HttpDelete("{id:guid}")]
+    /// <summary>
+    /// Moves the expense along — approved, paid back, refused — without touching its figures.
+    /// The office's decision, so managers only; and allowed on a billed job, since it changes
+    /// nothing the invoice was built from.
+    /// </summary>
+    [HttpPatch("{id:guid}/statut")]
+    [Authorize(Roles = Roles.Managers)]
+    public async Task<ActionResult<ProjectExpenseDetailDto>> SetStatus(Guid id, SetExpenseStatusRequest request, CancellationToken ct)
+    {
+        if (!Enum.IsDefined(request.Status)) return BadRequest(new { message = "État inconnu." });
+        var expense = await db.ProjectExpenses.FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (expense is null) return NotFound();
+        expense.Status = request.Status;
+        expense.UpdatedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(ct);
+        return await Get(id, ct);
+    }
+
+
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
         var expense = await db.ProjectExpenses.Include(x => x.Project)
@@ -320,7 +338,10 @@ public class ProjectExpensesController(
             x.ProjectTaskId,
             x.ProjectTask == null ? null : x.ProjectTask.Title,
             x.CreatedAt,
-            x.UpdatedAt);
+            x.UpdatedAt,
+            x.Status,
+            x.Project!.Number,
+            x.Project!.Client!.Name);
 }
 
 /// <summary>

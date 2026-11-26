@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Paperclip, Plus, Receipt } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +20,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/layout/empty-state";
+import { ClickableRow } from "@/components/layout/clickable-row";
+import { StatusPills, useStatusCountsQuery } from "@/components/layout/status-pills";
+import { expenseStatusBadgeVariant, expenseStatusLabels } from "@/lib/labels";
+import type { ExpenseStatus } from "@/lib/types";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { LoadErrorState } from "@/components/layout/load-error-state";
 import { PaginationBar } from "@/components/layout/pagination-bar";
@@ -65,16 +70,20 @@ export function ExpensesSection() {
   const [formProject, setFormProject] = useState<string | null>(null);
 
   const { data: types } = useExpenseTypesQuery();
+  const [status, setStatus] = useState<ExpenseStatus | "">("");
   const { data, isLoading, isError, error, refetch, isPlaceholderData } = useAllExpensesQuery(page, {
     search: debouncedSearch,
     type,
     du: from,
     au: to,
+    statut: status,
   });
+  const { data: statusCounts } = useStatusCountsQuery("depenses", "depenses/statuts");
+  const router = useRouter();
 
   const items = data?.page.items ?? [];
   const totals = data?.totals;
-  const filtered = Boolean(debouncedSearch || type || from || to);
+  const filtered = Boolean(debouncedSearch || type || from || to || status);
 
   /** Reset to the first page whenever the question changes: page 4 of a new filter is nowhere. */
   function change(apply: () => void) {
@@ -105,6 +114,17 @@ export function ExpensesSection() {
         </div>
         {createButton}
       </div>
+
+      <StatusPills
+        options={(Object.keys(expenseStatusLabels) as ExpenseStatus[]).map((value) => ({ value, label: expenseStatusLabels[value] }))}
+        value={status}
+        onChange={(next) => {
+          setStatus(next);
+          setPage(1);
+        }}
+        counts={statusCounts}
+        allLabel="Toutes"
+      />
 
       {/* Every filter carries a visible label, including the search: two labelled fields beside
           two unlabelled ones put the row on two different baselines, and the eye reads that as
@@ -228,13 +248,18 @@ export function ExpensesSection() {
                   <TableHead className="hidden md:table-cell">Projet</TableHead>
                   <TableHead className="hidden sm:table-cell">Type</TableHead>
                   <TableHead className="hidden lg:table-cell">Date</TableHead>
+                  <TableHead>État</TableHead>
                   <TableHead className="text-right">Coût</TableHead>
                   <TableHead className="hidden text-right sm:table-cell">Facturé</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {items.map((expense) => (
-                  <TableRow key={expense.id}>
+                  <ClickableRow
+                    key={expense.id}
+                    label={`Ouvrir la dépense ${expense.name}`}
+                    onOpen={() => router.push(`/achats/depenses/${expense.id}?projet=${expense.projectId}`)}
+                  >
                     <TableCell>
                       <div className="flex items-center gap-1.5">
                         <span className="font-medium text-foreground">{expense.name}</span>
@@ -269,13 +294,16 @@ export function ExpensesSection() {
                     <TableCell className="hidden text-muted-foreground tabular-nums lg:table-cell">
                       {formatDateOnly(expense.spentOn)}
                     </TableCell>
+                    <TableCell>
+                      <Badge variant={expenseStatusBadgeVariant[expense.status]}>{expenseStatusLabels[expense.status]}</Badge>
+                    </TableCell>
                     <TableCell className="text-right font-medium text-foreground tabular-nums">
                       {expense.cost == null ? "—" : formatAmount(expense.cost)}
                     </TableCell>
                     <TableCell className="hidden text-right text-muted-foreground tabular-nums sm:table-cell">
                       {expense.sellingPrice == null ? "—" : formatAmount(expense.sellingPrice)}
                     </TableCell>
-                  </TableRow>
+                  </ClickableRow>
                 ))}
               </TableBody>
             </Table>

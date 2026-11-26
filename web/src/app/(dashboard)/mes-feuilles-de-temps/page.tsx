@@ -11,6 +11,8 @@ import { EmptyState } from "@/components/layout/empty-state";
 import { LoadErrorState } from "@/components/layout/load-error-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { useMyWeekQuery } from "@/hooks/use-my-work";
+import { useMyWorkDaysQuery } from "@/hooks/use-work-days";
+import { WorkDaysTable } from "@/components/work/work-days-table";
 import { formatDateOnly, todayIso } from "@/lib/dates";
 import { formatProjectNumber } from "@/lib/types";
 
@@ -66,8 +68,12 @@ export default function MyTimesheetsPage() {
     <div>
       <PageHeader
         title="Mes feuilles de temps"
-        description="Les heures que vous avez inscrites, semaine par semaine, sur tous les chantiers."
+        description="Vos journées, et les heures pointées sur les projets, semaine par semaine."
       />
+
+      <MyWorkDays from={data?.weekStart} to={data?.weekEnd} />
+
+      <h2 className="mb-2 text-base font-semibold text-foreground">Mes poinçons</h2>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <Button
@@ -132,7 +138,7 @@ export default function MyTimesheetsPage() {
         <EmptyState
           icon={CalendarClock}
           title="Aucune heure cette semaine"
-          description="Les heures s'inscrivent depuis le projet sur lequel elles ont été travaillées, dans son onglet Feuilles de temps."
+          description="Les heures s'inscrivent depuis le projet sur lequel elles ont été travaillées, dans son onglet Poinçons."
         />
       ) : (
         <div className="overflow-hidden rounded-lg border border-border">
@@ -185,5 +191,24 @@ export default function MyTimesheetsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+/** My days in the week on screen: when I started and ended, beside what I pointed on projects. */
+function MyWorkDays({ from, to }: { from?: string; to?: string }) {
+  const { data } = useMyWorkDaysQuery(from ?? "", to ?? "");
+  if (!from || !to || !data) return null;
+
+  return (
+    <section className="mb-6">
+      <h2 className="mb-2 text-base font-semibold text-foreground">Mes journées</h2>
+      {data.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
+          Aucune journée cette semaine. Elles se commencent depuis « Mes assignations ».
+        </p>
+      ) : (
+        <WorkDaysTable days={data} />
+      )}
+    </section>
   );
 }

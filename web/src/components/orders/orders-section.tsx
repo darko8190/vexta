@@ -5,7 +5,6 @@ import Link from "next/link";
 import { CreditCard, FileText, Search, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ClickableCard } from "@/components/layout/clickable-card";
@@ -19,6 +18,7 @@ import { customerOrderStatusBadgeVariant, customerOrderStatusLabels } from "@/li
 import { formatAmount } from "@/lib/money";
 import { formatMoment } from "@/lib/dates";
 import type { CustomerOrderStatus } from "@/lib/types";
+import { StatusPills, useStatusCountsQuery } from "@/components/layout/status-pills";
 
 /** The states, in the order an order passes through them. */
 const STATES: CustomerOrderStatus[] = [
@@ -46,6 +46,7 @@ export function OrdersSection() {
   const debounced = useDebouncedValue(search, 300);
 
   const { data, isLoading, isError, error, refetch } = useOrdersQuery(status, debounced);
+  const { data: statusCounts } = useStatusCountsQuery("commandes", "commandes-en-ligne/statuts");
 
   const orders = data ?? [];
 
@@ -69,29 +70,15 @@ export function OrdersSection() {
             className="pl-9"
           />
         </div>
-
-        <div className="flex flex-wrap gap-2" role="group" aria-label="État">
-          <Button
-            type="button"
-            size="sm"
-            variant={status === "" ? "default" : "outline"}
-            onClick={() => setStatus("")}
-          >
-            Toutes
-          </Button>
-          {STATES.map((item) => (
-            <Button
-              key={item}
-              type="button"
-              size="sm"
-              variant={status === item ? "default" : "outline"}
-              onClick={() => setStatus(item)}
-            >
-              {customerOrderStatusLabels[item]}
-            </Button>
-          ))}
-        </div>
       </div>
+
+      <StatusPills
+        options={STATES.map((value) => ({ value, label: customerOrderStatusLabels[value] }))}
+        value={status}
+        onChange={setStatus}
+        counts={statusCounts}
+        allLabel="Toutes"
+      />
 
       {isLoading && !data ? (
         <div className="space-y-2">

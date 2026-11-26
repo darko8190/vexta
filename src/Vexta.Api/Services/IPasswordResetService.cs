@@ -95,6 +95,15 @@ public class PasswordResetService(
             // A reset is also how someone locked out gets back in, so the counter goes with it.
             // Leaving it would hand them a working password and a refused sign-in.
             await userManager.ResetAccessFailedCountAsync(user);
+
+            // The link reached this inbox and was opened, which is all a confirmation proves.
+            // Asking for a second one afterwards would be a click for nothing.
+            if (!user.EmailConfirmed)
+            {
+                user.EmailConfirmed = true;
+                await userManager.UpdateAsync(user);
+            }
+
             return PasswordResetOutcome.Ok;
         }
 
@@ -127,10 +136,10 @@ public class PasswordResetService(
     /// base64url blob keeps the link a single segment, the same shape as an invitation, and
     /// leaves no readable id in a URL that will sit in an inbox.
     /// </summary>
-    private static string Pack(Guid userId, string token) =>
+    internal static string Pack(Guid userId, string token) =>
         WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes($"{userId}|{token}"));
 
-    private static bool TryUnpack(string packed, out Guid userId, out string token)
+    internal static bool TryUnpack(string packed, out Guid userId, out string token)
     {
         userId = Guid.Empty;
         token = "";

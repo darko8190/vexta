@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import * as z from "zod";
@@ -41,7 +41,7 @@ import {
 import { ApiError } from "@/lib/api";
 import { formatAmount } from "@/lib/money";
 import { ex } from "@/lib/placeholders";
-import type { WageClassification } from "@/lib/types";
+import type { WageClassification, WageRateKey } from "@/lib/types";
 
 /** "32", "32,50" and "32.50" all, or nothing: a rate not worked out yet is left blank. */
 const RATE = /^\d+([.,]\d{1,2})?$/;
@@ -59,6 +59,12 @@ const formSchema = z.object({
       wage: rate,
       cost: rate,
       selling: rate,
+      wageTimeAndHalf: rate,
+      costTimeAndHalf: rate,
+      sellingTimeAndHalf: rate,
+      wageDouble: rate,
+      costDouble: rate,
+      sellingDouble: rate,
     }),
   ),
 });
@@ -73,6 +79,41 @@ function rateField(value: number | null): string {
 function parseRate(value: string): number | null {
   const typed = value.replace(/\s/g, "").replace(",", ".");
   return typed === "" ? null : Number(typed);
+}
+
+/** The three kinds of figure, as columns. */
+const KINDS = [
+  { key: "wage", label: "Salaire" },
+  { key: "cost", label: "Coûtant" },
+  { key: "selling", label: "Vendant" },
+] as const;
+
+/**
+ * The three rates, as rows, with the factor each one starts from. The factor is only where the
+ * field starts: a decree that sets overtime at something else is typed over it.
+ */
+const RATES = [
+  { suffix: "", label: "Régulier", factor: 1 },
+  { suffix: "TimeAndHalf", label: "Temps et demi", factor: 1.5 },
+  { suffix: "Double", label: "Temps double", factor: 2 },
+] as const;
+
+type Kind = (typeof KINDS)[number]["key"];
+type RateSuffix = (typeof RATES)[number]["suffix"];
+
+function rateKey(kind: Kind, suffix: RateSuffix): WageRateKey {
+  return `${kind}${suffix}` as WageRateKey;
+}
+
+const ALL_RATE_KEYS: WageRateKey[] = RATES.flatMap((r) => KINDS.map((k) => rateKey(k.key, r.suffix)));
+
+const EMPTY_RATES = Object.fromEntries(ALL_RATE_KEYS.map((key) => [key, ""])) as Record<WageRateKey, string>;
+
+/** Regular × factor, as the field shows it; empty when the regular figure is not a number yet. */
+function scaled(regular: string, factor: number): string {
+  const value = parseRate(regular);
+  if (value == null || Number.isNaN(value)) return "";
+  return rateField(Math.round(value * factor * 100) / 100);
 }
 
 function hourly(value: number | null): string {
@@ -206,20 +247,30 @@ export function WageClassificationsCard() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Échelon</TableHead>
+                          <TableHead>Taux</TableHead>
                           <TableHead className="w-28 text-right">Salaire</TableHead>
                           <TableHead className="w-28 text-right">Coûtant</TableHead>
                           <TableHead className="w-28 text-right">Vendant</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {classification.steps.map((step) => (
-                          <TableRow key={step.id}>
-                            <TableCell className="font-medium">{step.name}</TableCell>
-                            <TableCell className="text-right tabular-nums">{hourly(step.wage)}</TableCell>
-                            <TableCell className="text-right tabular-nums">{hourly(step.cost)}</TableCell>
-                            <TableCell className="text-right tabular-nums">{hourly(step.selling)}</TableCell>
-                          </TableRow>
-                        ))}
+                        {classification.steps.flatMap((step) =>
+                          RATES.map((rateRow, rowIndex) => (
+                            <TableRow key={`${step.id}-${rateRow.suffix}`} className={rowIndex < RATES.length - 1 ? "border-b-0" : undefined}>
+                              {rowIndex === 0 && (
+                                <TableCell rowSpan={RATES.length} className="align-top font-medium">
+                                  {step.name}
+                                </TableCell>
+                              )}
+                              <TableCell className="text-muted-foreground">{rateRow.label}</TableCell>
+                              {KINDS.map((kind) => (
+                                <TableCell key={kind.key} className="text-right tabular-nums">
+                                  {hourly(step[rateKey(kind.key, rateRow.suffix)])}
+                                </TableCell>
+                              ))}
+                            </TableRow>
+                          )),
+                        )}
                       </TableBody>
                     </Table>
                   </div>
@@ -263,7 +314,7 @@ function toFormValues(classification?: WageClassification): FormValues {
   if (!classification) {
     return {
       name: "",
-      steps: DEFAULT_STEPS.map((name) => ({ id: "", name, wage: "", cost: "", selling: "" })),
+      steps: DEFAULT_STEPS.map((name) => ({ id: "", name, ...EMPTY_RATES })),
     };
   }
 
@@ -272,9 +323,7 @@ function toFormValues(classification?: WageClassification): FormValues {
     steps: classification.steps.map((step) => ({
       id: step.id,
       name: step.name,
-      wage: rateField(step.wage),
-      cost: rateField(step.cost),
-      selling: rateField(step.selling),
+      ...(Object.fromEntries(ALL_RATE_KEYS.map((key) => [key, rateField(step[key])])) as Record<WageRateKey, string>),
     })),
   };
 }
@@ -300,6 +349,23 @@ function ClassificationSheet({
 
   const { fields, append, remove, move } = useFieldArray({ control: form.control, name: "steps" });
 
+  /**
+   * Typing a regular rate carries it to time and a half and double time — but only into a field
+   * that is empty or still holds what the previous regular figure gave. One somebody typed over
+   * is theirs and stays.
+   */
+  function fillOvertime(index: number, kind: Kind, next: string) {
+    const previous = form.getValues(`steps.${index}.${kind}`);
+    for (const rateRow of RATES) {
+      if (rateRow.factor === 1) continue;
+      const key = rateKey(kind, rateRow.suffix);
+      const current = form.getValues(`steps.${index}.${key}`);
+      if (current.trim() === "" || current === scaled(previous, rateRow.factor)) {
+        form.setValue(`steps.${index}.${key}`, scaled(next, rateRow.factor), { shouldValidate: true });
+      }
+    }
+  }
+
   useEffect(() => {
     if (open) form.reset(toFormValues(classification));
   }, [open, classification, form]);
@@ -314,9 +380,10 @@ function ClassificationSheet({
           steps: values.steps.map((step) => ({
             id: step.id || null,
             name: step.name.trim(),
-            wage: parseRate(step.wage),
-            cost: parseRate(step.cost),
-            selling: parseRate(step.selling),
+            ...(Object.fromEntries(ALL_RATE_KEYS.map((key) => [key, parseRate(step[key])])) as Record<
+              WageRateKey,
+              number | null
+            >),
           })),
         },
       });
@@ -369,72 +436,83 @@ function ClassificationSheet({
             />
 
             <div>
-              <div className="mb-2 hidden grid-cols-[1fr_6rem_6rem_6rem_6.5rem] gap-2 text-xs font-medium text-muted-foreground sm:grid">
-                <span>Échelon</span>
-                <span>Salaire</span>
-                <span>Coûtant</span>
-                <span>Vendant</span>
-                <span className="sr-only">Actions</span>
-              </div>
-
-              <div className="space-y-3 sm:space-y-2">
+              <div className="space-y-3">
                 {fields.map((row, index) => {
                   const errors = form.formState.errors.steps?.[index];
                   const message =
-                    errors?.name?.message ?? errors?.wage?.message ?? errors?.cost?.message ?? errors?.selling?.message;
+                    errors?.name?.message ?? ALL_RATE_KEYS.map((key) => errors?.[key]?.message).find(Boolean);
 
                   return (
-                    <div key={row.id} className="rounded-lg border border-border p-3 sm:rounded-none sm:border-0 sm:p-0">
-                      <div className="grid grid-cols-3 gap-2 sm:grid-cols-[1fr_6rem_6rem_6rem_6.5rem]">
+                    <div key={row.id} className="rounded-lg border border-border p-3">
+                      <div className="flex items-center gap-1">
                         <Input
                           {...form.register(`steps.${index}.name`)}
                           aria-label={`Nom de l'échelon ${index + 1}`}
                           placeholder={ex("Apprenti 1")}
                           aria-invalid={Boolean(errors?.name)}
-                          className="col-span-3 sm:col-span-1"
+                          className="flex-1"
                         />
-                        {(["wage", "cost", "selling"] as const).map((key) => (
-                          <Input
-                            key={key}
-                            {...form.register(`steps.${index}.${key}`)}
-                            inputMode="decimal"
-                            aria-label={`${key === "wage" ? "Salaire" : key === "cost" ? "Coûtant" : "Vendant"} de l'échelon ${index + 1}`}
-                            placeholder={key === "wage" ? "Salaire" : key === "cost" ? "Coûtant" : "Vendant"}
-                            aria-invalid={Boolean(errors?.[key])}
-                            className="tabular-nums"
-                          />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Monter l'échelon ${index + 1}`}
+                          disabled={index === 0}
+                          onClick={() => move(index, index - 1)}
+                        >
+                          <ArrowUp />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Descendre l'échelon ${index + 1}`}
+                          disabled={index === fields.length - 1}
+                          onClick={() => move(index, index + 1)}
+                        >
+                          <ArrowDown />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Retirer l'échelon ${index + 1}`}
+                          onClick={() => remove(index)}
+                        >
+                          <X />
+                        </Button>
+                      </div>
+
+                      <div className="mt-2 grid grid-cols-[5.5rem_repeat(3,minmax(0,1fr))] items-center gap-1.5">
+                        <span />
+                        {KINDS.map((kind) => (
+                          <span key={kind.key} className="text-xs font-medium text-muted-foreground">
+                            {kind.label}
+                          </span>
                         ))}
-                        <div className="col-span-3 flex justify-end gap-1 sm:col-span-1">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            aria-label={`Monter l'échelon ${index + 1}`}
-                            disabled={index === 0}
-                            onClick={() => move(index, index - 1)}
-                          >
-                            <ArrowUp />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            aria-label={`Descendre l'échelon ${index + 1}`}
-                            disabled={index === fields.length - 1}
-                            onClick={() => move(index, index + 1)}
-                          >
-                            <ArrowDown />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            aria-label={`Retirer l'échelon ${index + 1}`}
-                            onClick={() => remove(index)}
-                          >
-                            <X />
-                          </Button>
-                        </div>
+                        {RATES.map((rateRow) => (
+                          <Fragment key={rateRow.suffix || "regular"}>
+                            <span className="text-xs text-muted-foreground">{rateRow.label}</span>
+                            {KINDS.map((kind) => {
+                              const key = rateKey(kind.key, rateRow.suffix);
+                              const registered = form.register(`steps.${index}.${key}`);
+                              return (
+                                <Input
+                                  key={key}
+                                  {...registered}
+                                  onChange={(event) => {
+                                    if (rateRow.factor === 1) fillOvertime(index, kind.key, event.target.value);
+                                    return registered.onChange(event);
+                                  }}
+                                  inputMode="decimal"
+                                  aria-label={`${kind.label}, ${rateRow.label.toLowerCase()}, échelon ${index + 1}`}
+                                  aria-invalid={Boolean(errors?.[key])}
+                                  className="tabular-nums"
+                                />
+                              );
+                            })}
+                          </Fragment>
+                        ))}
                       </div>
                       {message && <p className="mt-1 text-xs text-destructive">{message}</p>}
                     </div>
@@ -446,14 +524,16 @@ function ClassificationSheet({
                 type="button"
                 variant="outline"
                 className="mt-3"
-                onClick={() => append({ id: "", name: "", wage: "", cost: "", selling: "" })}
+                onClick={() => append({ id: "", name: "", ...EMPTY_RATES })}
               >
                 <Plus />
                 Ajouter un échelon
               </Button>
               <FieldDescription className="mt-2">
                 Taux à l&apos;heure. Le salaire est ce que l&apos;employé touche, le coûtant ce que
-                l&apos;heure vous coûte avec les charges, le vendant ce que le client paie.
+                l&apos;heure vous coûte avec les charges, le vendant ce que le client paie. Le temps
+                et demi et le temps double se remplissent à 1,5 et 2 fois le régulier ; changez-les
+                si votre convention dit autre chose.
               </FieldDescription>
             </div>
           </FieldGroup>

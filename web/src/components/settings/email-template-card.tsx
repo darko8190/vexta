@@ -181,12 +181,12 @@ export function EmailTemplateCard({ kind }: { kind: EmailTemplateKind }) {
               onChange={(event) => setField("body", event.target.value)}
               onFocus={() => setTarget("body")}
               rows={12}
-              className="min-h-56 font-mono text-xs md:text-xs"
+              className="min-h-56"
             />
             <FieldDescription>
-              Facultatif : laissé vide, le message intégré est utilisé. Le courriel part en HTML,
-              donc un paragraphe s&apos;écrit <code>&lt;p&gt;…&lt;/p&gt;</code> ; un simple saut de
-              ligne suffit aussi, il est conservé tel quel.
+              Facultatif : laissé vide, le message intégré est utilisé. Écrivez comme dans un
+              courriel ordinaire : une ligne vide commence un nouveau paragraphe, et les adresses
+              web deviennent des liens.
             </FieldDescription>
           </Field>
 
@@ -232,9 +232,9 @@ export function EmailTemplateCard({ kind }: { kind: EmailTemplateKind }) {
             </div>
             {preview ? (
               /*
-               * The HTML comes from our own API, which renders the template and escapes every
-               * value it fills in — this is the one reason the string can be injected here. A
-               * body assembled in the browser, or coming from anywhere else, must not be.
+               * The HTML comes from our own API, which fills the template in as text and escapes
+               * all of it when making paragraphs — the one reason the string can be injected here.
+               * A body assembled in the browser, or coming from anywhere else, must not be.
                */
               <div
                 className="px-3 py-2 text-sm break-words text-foreground [&_a]:underline [&_p]:my-2 [&_strong]:font-medium"

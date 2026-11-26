@@ -148,3 +148,5 @@ public record PendingExternalSignupDto(
     string FirstName,
     string LastName,
     string Provider);
+
+public record ConfirmEmailRequest(string Token);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth } from "@/lib/auth-context";
+import { useViewMode } from "@/lib/view-mode";
 
 /**
  * Creating records is reserved for the people who run a business space — not a personal space,
@@ -34,7 +35,9 @@ export function useIsClientUser() {
  */
 export function useCanManage() {
   const { user } = useAuth();
-  if (!user) return false;
+  // « Mode employé »: the management buttons step aside; the API still knows who this is.
+  const viewMode = useViewMode();
+  if (!user || viewMode === "employe") return false;
 
   return (
     user.role === "TenantAdmin" ||
@@ -52,7 +55,8 @@ export function useCanManage() {
  */
 export function useIsOwner() {
   const { user } = useAuth();
-  if (!user) return false;
+  const viewMode = useViewMode();
+  if (!user || viewMode === "employe") return false;
 
   return user.role === "TenantAdmin" || (user.role === "SuperAdmin" && user.isImpersonating);
 }

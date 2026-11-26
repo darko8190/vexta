@@ -70,6 +70,14 @@ public class CustomerOrdersController(VextaDbContext db, ICurrentUserService cur
         return Ok(items);
     }
 
+    /// <summary>Orders per state, for the pills above the list. The till's unpaid ones are not orders.</summary>
+    [HttpGet("statuts")]
+    public async Task<ActionResult<List<StatusCountDto>>> StatusCounts(CancellationToken ct) =>
+        Ok((await db.CustomerOrders.AsNoTracking()
+                .Where(o => o.Status != CustomerOrderStatus.EnAttenteDePaiement)
+                .GroupBy(o => o.Status).Select(g => new { g.Key, Count = g.Count() }).ToListAsync(ct))
+            .OrderBy(g => g.Key).Select(g => new StatusCountDto(g.Key.ToString(), g.Count)).ToList());
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<OrderDetailDto>> Get(Guid id, CancellationToken ct)
     {

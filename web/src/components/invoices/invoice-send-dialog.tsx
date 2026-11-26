@@ -485,14 +485,13 @@ export function InvoiceSendDialog({
                 </FieldLabel>
                 <Textarea
                   id="send-body"
-                  rows={8}
-                  className="font-mono text-xs"
+                  rows={10}
                   value={bodyValue}
                   onChange={(event) => setBody(event.target.value)}
                 />
                 <FieldDescription>
-                  Le gabarit de votre entreprise, déjà rempli. Le message part en HTML : les
-                  balises simples comme &lt;p&gt; et &lt;strong&gt; fonctionnent.
+                  Le message de votre entreprise, déjà rempli. Une ligne vide commence un nouveau
+                  paragraphe.
                 </FieldDescription>
               </Field>
 
@@ -502,14 +501,11 @@ export function InvoiceSendDialog({
                   <p className="text-xs text-muted-foreground">Sujet</p>
                   <p className="text-sm font-medium text-foreground">{subjectValue || "—"}</p>
                   <Separator className="my-3" />
-                  {/* dangerouslySetInnerHTML on one condition, which holds here: this markup
-                      comes from our own API, which escapes every value it fills in, and is then
-                      edited only by the member of staff who is about to send it to their own
-                      client. It is never another tenant's text and never a client's. */}
-                  <div
-                    className="text-sm leading-relaxed text-foreground [&_a]:underline [&_p]:my-2"
-                    dangerouslySetInnerHTML={{ __html: bodyValue }}
-                  />
+                  {/* Plain text, shown as the client will read it: one blank line, one new
+                      paragraph. The mail's HTML is made by the API when it is sent. */}
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap break-words text-foreground">
+                    {bodyValue || "—"}
+                  </p>
                 </div>
               </Field>
 

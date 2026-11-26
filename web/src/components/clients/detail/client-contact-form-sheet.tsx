@@ -58,11 +58,14 @@ export function ClientContactFormSheet({
   open,
   onOpenChange,
   contact,
+  onSaved,
 }: {
   clientId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   contact?: ClientContact;
+  /** Told the saved contact, for a picker that opened this sheet to select it. */
+  onSaved?: (contact: ClientContact) => void;
 }) {
   const isEditing = Boolean(contact);
   const save = useSaveClientContact(clientId);
@@ -79,7 +82,7 @@ export function ClientContactFormSheet({
 
   async function onSubmit(values: FormValues) {
     try {
-      await save.mutateAsync({
+      const saved = await save.mutateAsync({
         id: contact?.id,
         values: {
           firstName: values.firstName,
@@ -91,6 +94,7 @@ export function ClientContactFormSheet({
         },
       });
       toast.success(isEditing ? "Contact mis à jour." : "Contact ajouté.");
+      onSaved?.(saved);
       onOpenChange(false);
     } catch (error) {
       toast.error(error instanceof ApiError ? error.message : "Impossible d'enregistrer ce contact.");
@@ -108,7 +112,12 @@ export function ClientContactFormSheet({
         <form
           id="client-contact-form"
           className="flex-1 overflow-y-auto px-4"
-          onSubmit={form.handleSubmit(onSubmit)}
+          onSubmit={(event) => {
+            // Opened from inside another form (a project's contact picker): the submit event
+            // still bubbles through the React tree, and must not submit that form too.
+            event.stopPropagation();
+            return form.handleSubmit(onSubmit)(event);
+          }}
           noValidate
         >
           <FieldGroup>

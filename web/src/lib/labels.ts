@@ -468,3 +468,20 @@ export const quoteStatusBadgeVariant: Record<QuoteStatus, "default" | "secondary
   Expiree: "outline",
   Remplacee: "outline",
 };
+
+export const expenseStatusLabels: Record<import("@/lib/types").ExpenseStatus, string> = {
+  AApprouver: "À approuver",
+  Approuvee: "Approuvée",
+  Remboursee: "Remboursée",
+  Refusee: "Refusée",
+};
+
+export const expenseStatusBadgeVariant: Record<
+  import("@/lib/types").ExpenseStatus,
+  "default" | "secondary" | "destructive" | "outline"
+> = {
+  AApprouver: "default",
+  Approuvee: "secondary",
+  Remboursee: "outline",
+  Refusee: "destructive",
+};

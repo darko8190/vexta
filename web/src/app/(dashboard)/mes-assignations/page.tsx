@@ -8,6 +8,9 @@ import { EmptyState } from "@/components/layout/empty-state";
 import { LoadErrorState } from "@/components/layout/load-error-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { useMyAssignmentsQuery } from "@/hooks/use-my-work";
+import { useMyDayQuery } from "@/hooks/use-work-days";
+import { MyDayCard } from "@/components/work/my-day-card";
+import { ChevronRight, Lock } from "lucide-react";
 import { formatDateOnly } from "@/lib/dates";
 import { taskPriorityLabels, taskStatusBadgeVariant, taskStatusLabels } from "@/lib/labels";
 import { formatProjectNumber } from "@/lib/types";
@@ -25,6 +28,9 @@ import { formatProjectNumber } from "@/lib/types";
 export default function MyAssignmentsPage() {
   const { data, isLoading, isError, error, refetch } = useMyAssignmentsQuery();
   const assignments = data?.assignments ?? [];
+  const { data: myDay } = useMyDayQuery();
+  // The assignments open once the day is under way: the poinçons on each job go inside the day.
+  const dayRunning = Boolean(myDay?.today && !myDay.today.endedAt);
 
   const open = assignments.filter((task) => task.status !== "Terminee");
   const late = open.filter((task) => task.isLate);
@@ -35,6 +41,8 @@ export default function MyAssignmentsPage() {
         title="Mes assignations"
         description="Les tâches qui vous ont été confiées, par votre nom ou par votre équipe."
       />
+
+      {myDay?.hasEmployee && <MyDayCard day={myDay} />}
 
       {!isLoading && !isError && assignments.length > 0 && (
         <div className="mb-4 flex flex-wrap gap-2 text-sm">
@@ -73,13 +81,24 @@ export default function MyAssignmentsPage() {
           {assignments.map((task) => (
             <div
               key={task.id}
-              className="rounded-lg border border-border bg-card p-3 opacity-100 data-[done=true]:opacity-60"
+              className="relative rounded-lg border border-border bg-card p-3 opacity-100 transition-colors data-[done=true]:opacity-60 data-[open=true]:hover:bg-muted/40"
               data-done={task.status === "Terminee"}
+              data-open={dayRunning}
             >
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-foreground">{task.title}</span>
+                    {dayRunning ? (
+                      // Stretched over the card: the whole card opens the task.
+                      <Link
+                        href={`/projets/${task.projectId}/taches/${task.id}`}
+                        className="font-medium text-foreground after:absolute after:inset-0 focus-visible:outline-none"
+                      >
+                        {task.title}
+                      </Link>
+                    ) : (
+                      <span className="font-medium text-foreground">{task.title}</span>
+                    )}
                     <Badge variant={taskStatusBadgeVariant[task.status]}>
                       {taskStatusLabels[task.status]}
                     </Badge>
@@ -94,7 +113,7 @@ export default function MyAssignmentsPage() {
                   <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                     <Link
                       href={`/projets/${task.projectId}`}
-                      className="font-medium underline-offset-4 hover:underline"
+                      className="relative z-10 font-medium underline-offset-4 hover:underline"
                     >
                       {formatProjectNumber(task.projectNumber)}
                     </Link>
@@ -118,6 +137,11 @@ export default function MyAssignmentsPage() {
                     </p>
                   )}
                 </div>
+                {dayRunning ? (
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                ) : (
+                  <Lock className="size-4 shrink-0 text-muted-foreground" aria-label="Commencez votre journée pour ouvrir" />
+                )}
               </div>
             </div>
           ))}

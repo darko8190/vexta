@@ -79,7 +79,7 @@ export function WorkTimesheetsSection() {
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold text-foreground">Feuilles de temps</h2>
+          <h2 className="text-base font-semibold text-foreground">Poinçons</h2>
           <p className="text-sm text-muted-foreground">
             {data
               ? `Du ${formatDateOnly(data.from)} au ${formatDateOnly(data.to)} · ${hours(data.totalHours)} au total`
@@ -124,7 +124,7 @@ export function WorkTimesheetsSection() {
       ) : isError ? (
         <LoadErrorState
           error={error}
-          title="Feuilles de temps indisponibles"
+          title="Poinçons indisponibles"
           fallback="Les heures n'ont pas pu être chargées."
           onRetry={() => refetch()}
         />

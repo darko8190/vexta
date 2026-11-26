@@ -12,7 +12,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { DataTable, type DataColumn } from "@/components/layout/data-table";
@@ -35,6 +34,9 @@ import { formatDateOnly } from "@/lib/dates";
 import { quoteStatusBadgeVariant, quoteStatusLabels } from "@/lib/labels";
 import { formatAmount } from "@/lib/money";
 import { formatProjectNumber, formatQuoteNumber, type QuoteRecord, type QuoteStatus } from "@/lib/types";
+import { filtersToQuery, type TableFilters } from "@/lib/table-filters";
+import { useClientSummaryQuery } from "@/hooks/use-clients";
+import { StatusPills } from "@/components/layout/status-pills";
 
 // Acceptée is listed so a converted quote reads right in edit mode; choosing it on one that is
 // not converted is refused by the API with the reason.
@@ -60,23 +62,21 @@ export default function QuotesPage() {
   const [statusFilter, setStatusFilter] = useState<QuoteStatus | "Toutes">("Toutes");
   const debouncedSearch = useDebouncedValue(search);
 
+  const [filters, setFilters] = useState<TableFilters>({});
   const { data, isLoading } = useQuotesQuery(
     page,
     debouncedSearch,
     statusFilter === "Toutes" ? undefined : statusFilter,
+    undefined,
+    filtersToQuery(filters),
   );
+  const { data: clientOptions } = useClientSummaryQuery(!isClient);
   const { data: counts } = useQuoteStatusCountsQuery();
-  const countOf = (status: QuoteStatus | "Toutes") =>
-    status === "Toutes"
-      ? (counts ?? []).reduce((sum, item) => sum + item.count, 0)
-      : (counts?.find((item) => item.status === status)?.count ?? 0);
   // A customer never sees a draft, so the filter does not offer one.
   const filterOptions: (QuoteStatus | "Toutes")[] = [
     "Toutes",
     ...(Object.keys(quoteStatusLabels) as QuoteStatus[]).filter((status) => !isClient || status !== "Brouillon"),
   ];
-  const filterLabel = (status: QuoteStatus | "Toutes") =>
-    `${status === "Toutes" ? "Tous les statuts" : quoteStatusLabels[status]}${counts ? ` (${countOf(status)})` : ""}`;
   const update = useUpdateQuote();
   const remove = useDeleteQuote();
 
@@ -97,15 +97,17 @@ export default function QuotesPage() {
   const columns: DataColumn<QuoteRecord>[] = [
     {
       key: "numero",
+      filter: { type: "number" },
       label: "Numéro",
       locked: true,
       headClassName: "w-24",
       cellClassName: "font-mono text-xs font-medium tabular-nums",
       cell: (quote) => formatQuoteNumber(quote.number, quote.revision),
     },
-    { key: "client", label: "Client", cellClassName: "font-medium", cell: (quote) => quote.clientName },
+    { key: "client", filter: isClient ? undefined : { type: "select", options: (clientOptions ?? []).map((c) => ({ value: c.id, label: c.name })) }, label: "Client", cellClassName: "font-medium", cell: (quote) => quote.clientName },
     {
       key: "description",
+      filter: { type: "text" },
       label: "Description",
       cellClassName: "max-w-xs truncate text-muted-foreground",
       cell: (quote) => quote.description || "—",
@@ -113,6 +115,7 @@ export default function QuotesPage() {
     },
     {
       key: "statut",
+      filter: { type: "select", options: (Object.keys(quoteStatusLabels) as QuoteStatus[]).map((status) => ({ value: status, label: quoteStatusLabels[status] })) },
       label: "Statut",
       cell: (quote) => (
         <Badge variant={quoteStatusBadgeVariant[quote.status]}>{quoteStatusLabels[quote.status]}</Badge>
@@ -125,6 +128,7 @@ export default function QuotesPage() {
     },
     {
       key: "date",
+      filter: { type: "date" },
       label: "Date",
       cellClassName: "text-muted-foreground",
       cell: (quote) => (quote.issuedOn ? formatDateOnly(quote.issuedOn) : "—"),
@@ -132,6 +136,7 @@ export default function QuotesPage() {
     },
     {
       key: "validite",
+      filter: { type: "date" },
       label: "Valide jusqu'au",
       cellClassName: "text-muted-foreground",
       cell: (quote) => (quote.validUntil ? formatDateOnly(quote.validUntil) : "—"),
@@ -139,6 +144,7 @@ export default function QuotesPage() {
     },
     {
       key: "po",
+      filter: { type: "text" },
       label: "PO",
       hiddenByDefault: true,
       cellClassName: "text-muted-foreground",
@@ -147,12 +153,14 @@ export default function QuotesPage() {
     },
     {
       key: "projet",
+      filter: { type: "number" },
       label: "Projet",
       cellClassName: "font-mono text-xs text-muted-foreground",
       cell: (quote) => (quote.projectNumber != null ? formatProjectNumber(quote.projectNumber) : "—"),
     },
     {
       key: "montant",
+      filter: { type: "number" },
       label: "Montant",
       headClassName: "text-right",
       cellClassName: "text-right tabular-nums",
@@ -191,25 +199,6 @@ export default function QuotesPage() {
           placeholder="Rechercher une soumission…"
         />
       </div>
-      {/* With the count in each choice, so the list says how many wait before it is opened. */}
-      <Select
-        value={statusFilter}
-        onValueChange={(value) => {
-          setStatusFilter((value ?? "Toutes") as QuoteStatus | "Toutes");
-          setPage(1);
-        }}
-      >
-        <SelectTrigger className="sm:w-52" aria-label="Filtrer par statut">
-          <SelectValue>{(value: QuoteStatus | "Toutes") => filterLabel(value)}</SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          {filterOptions.map((status) => (
-            <SelectItem key={status} value={status}>
-              {filterLabel(status)}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
     </div>
   );
 
@@ -225,13 +214,24 @@ export default function QuotesPage() {
         action={addButton}
       />
 
+      <StatusPills
+        options={filterOptions.filter((o) => o !== "Toutes").map((o) => ({ value: o as QuoteStatus, label: quoteStatusLabels[o as QuoteStatus] }))}
+        value={statusFilter === "Toutes" ? "" : statusFilter}
+        onChange={(next) => {
+          setStatusFilter(next === "" ? "Toutes" : next);
+          setPage(1);
+        }}
+        counts={counts}
+        allLabel="Toutes"
+      />
+
       {isLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 5 }).map((_, i) => (
             <Skeleton key={i} className="h-12 w-full" />
           ))}
         </div>
-      ) : !data || data.items.length === 0 ? (
+      ) : !data || (data.items.length === 0 && Object.keys(filters).length === 0) ? (
         <>
           <div className="mb-4">{searchBox}</div>
           <EmptyState
@@ -254,6 +254,11 @@ export default function QuotesPage() {
       ) : (
         <DataTable
           id="soumissions"
+          filters={filters}
+          onFiltersChange={(next) => {
+            setFilters(next);
+            setPage(1);
+          }}
           columns={columns}
           rows={data.items}
           getRowId={(quote) => quote.id}

@@ -2,20 +2,24 @@
 
 import { use, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Clock, HardHat, Info, ListChecks, Plus, Receipt } from "lucide-react";
+import { ArrowLeft, Blocks, Clock, FolderOpen, HardHat, Info, ListChecks, Plus, Receipt, Wrench } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { InlineSheet } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/layout/empty-state";
 import { SectionNav, type NavSection } from "@/components/layout/section-nav";
+import { ProjectDocumentsSection } from "@/components/projects/detail/project-documents-section";
+import { ProjectEquipmentSection } from "@/components/projects/detail/project-equipment-section";
 import { ProjectExpensesSection } from "@/components/projects/detail/project-expenses-section";
+import { SectionPlaceholder } from "@/components/projects/detail/section-placeholder";
 import { ProjectExtraChargesSection } from "@/components/projects/detail/project-extra-charges-section";
 import { ProjectMaterialsSection } from "@/components/projects/detail/project-materials-section";
 import { ProjectTimesheetsSection } from "@/components/projects/detail/project-timesheets-section";
 import { TaskFormSheet } from "@/components/projects/detail/task-form-sheet";
 import { useCanManage } from "@/hooks/use-can-create";
 import { useExpensesQuery } from "@/hooks/use-expenses";
+import { useProjectEquipmentQuery } from "@/hooks/use-equipment";
 import { useExtraChargesQuery } from "@/hooks/use-extra-charges";
 import { useProjectMaterialsQuery } from "@/hooks/use-project-materials";
 import { useProjectTasksQuery } from "@/hooks/use-project-tasks";
@@ -47,6 +51,7 @@ export default function ProjectTaskPage({
   const { data: charges } = useExtraChargesQuery(projectId);
   const { data: timesheets } = useTimesheetsQuery(projectId);
   const { data: expenses } = useExpensesQuery(projectId);
+  const { data: equipment } = useProjectEquipmentQuery(projectId);
 
   const task = tasks?.find((item) => item.id === taskId);
 
@@ -82,10 +87,15 @@ export default function ProjectTaskPage({
 
   const sections: NavSection[] = [
     { key: "details", label: "Détails", icon: Info },
+    // The hours first: on a task, what somebody opens it for is to point their time.
+    { key: "feuilles-de-temps", label: "Poinçons", count: count(timesheets), icon: Clock },
     { key: "materiaux", label: "Matériaux", count: count(materials), icon: HardHat },
-    { key: "frais", label: "Frais supplémentaires", count: count(charges), icon: Plus },
-    { key: "feuilles-de-temps", label: "Feuilles de temps", count: count(timesheets), icon: Clock },
+    { key: "equipements", label: "Équipements", count: count(equipment), icon: Wrench },
+    { key: "assemblages", label: "Assemblages", count: 0, icon: Blocks },
     { key: "depenses", label: "Dépenses", count: count(expenses), icon: Receipt },
+    { key: "frais", label: "Frais supplémentaires", count: count(charges), icon: Plus },
+    // The project's own files and thread: a note is about the job, not about one task of it.
+    { key: "documents", label: "Documents et notes", icon: FolderOpen },
   ];
 
   return (
@@ -150,6 +160,17 @@ export default function ProjectTaskPage({
           {section === "depenses" && (
             <ProjectExpensesSection projectId={projectId} locked={locked} taskId={taskId} />
           )}
+          {section === "equipements" && (
+            <ProjectEquipmentSection projectId={projectId} locked={locked} taskId={taskId} />
+          )}
+          {section === "assemblages" && (
+            <SectionPlaceholder
+              icon={Blocks}
+              title="Assemblages"
+              description="Les ensembles préparés d'avance et installés tels quels."
+            />
+          )}
+          {section === "documents" && <ProjectDocumentsSection projectId={projectId} />}
         </div>
       </div>
     </div>

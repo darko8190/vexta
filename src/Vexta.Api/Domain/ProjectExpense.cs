@@ -54,6 +54,12 @@ public class ProjectExpense
     /// <summary>The day the money went out, which is rarely the day the row is created.</summary>
     public DateOnly? SpentOn { get; set; }
 
+    /// <summary>
+    /// Where the expense stands with the office: filed and waiting, approved, paid back to
+    /// whoever advanced it, or refused. New ones wait for approval.
+    /// </summary>
+    public ExpenseStatus Status { get; set; } = ExpenseStatus.AApprouver;
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 

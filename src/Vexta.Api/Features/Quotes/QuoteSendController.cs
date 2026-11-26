@@ -85,8 +85,8 @@ public class QuoteSendController(
             ? QuoteEmailTemplate.ReminderBody
             : Template(settings?.QuoteEmailBody) ?? QuoteEmailTemplate.DefaultBody;
 
-        var subject = QuoteEmailTemplate.Render(subjectTemplate, values, escapeHtml: false);
-        var body = QuoteEmailTemplate.Render(bodyTemplate, values, escapeHtml: true);
+        var subject = QuoteEmailTemplate.Render(subjectTemplate, values, isBody: false);
+        var body = QuoteEmailTemplate.Render(bodyTemplate, values, isBody: true);
 
         return Ok(new InvoiceSendDefaultsDto(
             recipients.FirstOrDefault()?.Email, subject, body, recipients, employees, documents));
@@ -118,6 +118,9 @@ public class QuoteSendController(
         var body = request.Body?.Trim() ?? string.Empty;
         if (body.Length == 0) return BadRequest(new { message = "Le courriel a besoin d'un message." });
         if (body.Length > MaxBodyLength) return BadRequest(new { message = "Le message est trop long. Mettez le reste en pièce jointe." });
+
+        // The text the person edited, made into the mail's paragraphs here and nowhere else.
+        body = EmailText.ToHtml(body);
 
         // Copies by employee id, read back from their records: accepting addresses as given would
         // make this an open relay from the company's own sending domain.

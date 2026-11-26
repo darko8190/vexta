@@ -94,6 +94,8 @@ public class QuotesController(
                 || (number != null && q.Number == number));
         }
 
+        quotes = ApplyColumnFilters(quotes, new ListFilter(Request.Query));
+
         var totalCount = await quotes.CountAsync();
         var items = await quotes
             .OrderByDescending(q => q.Number)
@@ -103,6 +105,29 @@ public class QuotesController(
             .ToListAsync();
 
         return Ok(new PagedResult<QuoteDto> { Items = items, Page = query.Page, PageSize = query.PageSize, TotalCount = totalCount });
+    }
+
+    /// <summary>The table's column filters, by the screen's column names.</summary>
+    private static IQueryable<Quote> ApplyColumnFilters(IQueryable<Quote> quotes, ListFilter f)
+    {
+        if (f.Min("numero") is { } numberMin) quotes = quotes.Where(q => q.Number >= numberMin);
+        if (f.Max("numero") is { } numberMax) quotes = quotes.Where(q => q.Number <= numberMax);
+        if (f.Ids("client") is { Count: > 0 } clients) quotes = quotes.Where(q => clients.Contains(q.ClientId));
+        if (f.Contains("description") is { } description)
+            quotes = quotes.Where(q => q.Description != null && EF.Functions.ILike(q.Description, description));
+        if (f.Enums<QuoteStatus>("statut") is { Count: > 0 } statuses) quotes = quotes.Where(q => statuses.Contains(q.Status));
+        if (f.From("date") is { } issuedFrom) quotes = quotes.Where(q => q.IssuedOn >= issuedFrom);
+        if (f.To("date") is { } issuedTo) quotes = quotes.Where(q => q.IssuedOn <= issuedTo);
+        if (f.From("validite") is { } validFrom) quotes = quotes.Where(q => q.ValidUntil >= validFrom);
+        if (f.To("validite") is { } validTo) quotes = quotes.Where(q => q.ValidUntil <= validTo);
+        if (f.Contains("po") is { } po) quotes = quotes.Where(q => q.PoNumber != null && EF.Functions.ILike(q.PoNumber, po));
+        if (f.Min("projet") is { } projectMin) quotes = quotes.Where(q => q.Project != null && q.Project.Number >= projectMin);
+        if (f.Max("projet") is { } projectMax) quotes = quotes.Where(q => q.Project != null && q.Project.Number <= projectMax);
+        if (f.Min("montant") is { } amountMin)
+            quotes = quotes.Where(q => q.Lines.Where(l => !l.IsOptional || l.IsSelected).Sum(l => Math.Round(l.Quantity * l.UnitPrice, 2)) >= amountMin);
+        if (f.Max("montant") is { } amountMax)
+            quotes = quotes.Where(q => q.Lines.Where(l => !l.IsOptional || l.IsSelected).Sum(l => Math.Round(l.Quantity * l.UnitPrice, 2)) <= amountMax);
+        return quotes;
     }
 
     /// <summary>

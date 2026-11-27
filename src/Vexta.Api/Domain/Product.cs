@@ -144,6 +144,15 @@ public class ProductImage
     public Guid MediaAssetId { get; set; }
     public MediaAsset? MediaAsset { get; set; }
 
+    /// <summary>What the picture shows: « Vue de face », « Fini noir ». Null shows the file name.</summary>
+    public string? Name { get; set; }
+
+    /// <summary>
+    /// The picture that stands for the product wherever only one is shown. Exactly one per
+    /// product that has any, and always saved first, so every « first image » is this one.
+    /// </summary>
+    public bool IsPrimary { get; set; }
+
     public int SortOrder { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;

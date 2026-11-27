@@ -1634,6 +1634,7 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.HasOne(i => i.MediaAsset).WithMany()
                 .HasForeignKey(i => i.MediaAssetId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(i => new { i.ProductId, i.SortOrder });
+            e.Property(i => i.Name).HasMaxLength(200);
             e.HasQueryFilter(i => i.TenantId == CurrentTenantId);
         });
 

@@ -9,6 +9,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { formatAmount } from "@/lib/money";
 import { formatDateOnly } from "@/lib/dates";
 import type { PublicInvoice } from "@/lib/types";
+import { BrandTheme } from "@/components/layout/brand-theme";
 
 /** The one failure worth telling apart: this link leads nowhere. */
 class InvoiceNotFound extends Error {}
@@ -40,6 +41,8 @@ export default function InvoicePaymentPage() {
 function Shell({ children, accent }: { children: React.ReactNode; accent?: string | null }) {
   return (
     <main className="flex min-h-dvh items-center justify-center bg-muted/30 px-4 py-10">
+      {/* The company's colour on the buttons too, not only on the line at the top. */}
+      <BrandTheme color={accent} />
       <div className="w-full max-w-md">
         {/* The company's own colour, as a line at the top rather than as a background: it is
             somebody else's brand on a Vexta page, and a whole card in an unknown colour is a

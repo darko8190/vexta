@@ -219,7 +219,11 @@ public class ProductsController(
         };
         // The same pictures, pointed at again rather than copied.
         foreach (var image in source.Images.OrderBy(i => i.SortOrder))
-            copy.Images.Add(new ProductImage { TenantId = tenantId, MediaAssetId = image.MediaAssetId, SortOrder = image.SortOrder });
+            copy.Images.Add(new ProductImage
+            {
+                TenantId = tenantId, MediaAssetId = image.MediaAssetId, SortOrder = image.SortOrder,
+                Name = image.Name, IsPrimary = image.IsPrimary
+            });
 
         db.Products.Add(copy);
         if (copy.PurchasePrice is not null || copy.MarginPercent is not null || copy.SellingPrice is not null)
@@ -424,7 +428,23 @@ public class ProductsController(
         var product = await db.Products.Include(p => p.Images).FirstOrDefaultAsync(p => p.Id == id, ct);
         if (product is null) return NotFound();
 
-        var ids = (request.MediaAssetIds ?? []).Distinct().ToList();
+        // With names and a main picture, or the bare ids of an older screen, which keeps the
+        // names already given and the main picture it had.
+        var previous = product.Images.ToDictionary(i => i.MediaAssetId);
+        var inputs = (request.Images
+                ?? (request.MediaAssetIds ?? []).Select(assetId => new ProductImageInput(
+                    assetId,
+                    previous.GetValueOrDefault(assetId)?.Name,
+                    previous.GetValueOrDefault(assetId)?.IsPrimary ?? false)).ToList())
+            .DistinctBy(i => i.MediaAssetId)
+            .ToList();
+        if (inputs.Any(i => i.Name?.Trim().Length > 200))
+            return BadRequest(new { message = "Le nom d'une image ne peut pas dépasser 200 caractères." });
+
+        // One main picture, placed first: the one chosen, or the first one when none was.
+        var primary = inputs.FirstOrDefault(i => i.IsPrimary) ?? inputs.FirstOrDefault();
+        if (primary is not null) inputs = [primary, .. inputs.Where(i => i != primary)];
+        var ids = inputs.ConvertAll(i => i.MediaAssetId);
 
         // Checked against this tenant's own library — the query filter is what makes a foreign
         // id simply not exist here, rather than something that can be pinned to a product and
@@ -448,11 +468,13 @@ public class ProductsController(
         // Modified instead of Added, so the save issued an UPDATE for a line that had never
         // been inserted — nought rows affected, and the whole request failed with a
         // concurrency error. Add() states the intent and leaves nothing to infer.
-        db.ProductImages.AddRange(ids.Select((assetId, index) => new ProductImage
+        db.ProductImages.AddRange(inputs.Select((input, index) => new ProductImage
         {
             TenantId = tenantId,
             ProductId = product.Id,
-            MediaAssetId = assetId,
+            MediaAssetId = input.MediaAssetId,
+            Name = Clean(input.Name),
+            IsPrimary = index == 0,
             SortOrder = index
         }));
 
@@ -806,6 +828,8 @@ public class ProductsController(
                 i.Id,
                 i.MediaAssetId,
                 i.SortOrder,
+                i.Name,
+                i.IsPrimary,
                 i.MediaAsset!.FileName,
                 i.MediaAsset!.ContentType,
                 i.MediaAsset!.ObjectKey
@@ -828,7 +852,7 @@ public class ProductsController(
             }
 
             images.Add(new ProductImageDto(
-                row.Id, row.MediaAssetId, row.FileName, row.ContentType, url, row.SortOrder));
+                row.Id, row.MediaAssetId, row.FileName, row.ContentType, url, row.SortOrder, row.Name, row.IsPrimary));
         }
 
         return images;

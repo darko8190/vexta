@@ -166,8 +166,8 @@ export function useDeleteProduct() {
 export function useSaveProductImages(id: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (mediaAssetIds: string[]) =>
-      api.post<ProductImage[]>(`products/${id}/images`, { mediaAssetIds }),
+    mutationFn: (images: { mediaAssetId: string; name: string | null; isPrimary: boolean }[]) =>
+      api.post<ProductImage[]>(`products/${id}/images`, { images }),
     onSuccess: () => invalidate(queryClient, id),
   });
 }

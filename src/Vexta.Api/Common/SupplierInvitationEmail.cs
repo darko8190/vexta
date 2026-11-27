@@ -14,7 +14,7 @@ namespace Vexta.Api.Common;
 /// </summary>
 public static class SupplierInvitationEmail
 {
-    public static string Build(string companyName, string supplierName, string frontendUrl)
+    public static string Build(string companyName, string supplierName, string frontendUrl, string? brandColor = null)
     {
         var company = WebUtility.HtmlEncode(companyName);
         var supplier = WebUtility.HtmlEncode(supplierName);
@@ -37,7 +37,7 @@ public static class SupplierInvitationEmail
 
               <p>
                 <a href="{signupUrl}"
-                   style="display:inline-block;background:#1d4ed8;color:#ffffff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600">
+                   style="display:inline-block;background:{EmailButton.Colour(brandColor)};color:#ffffff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600">
                   Voir Vexta
                 </a>
               </p>

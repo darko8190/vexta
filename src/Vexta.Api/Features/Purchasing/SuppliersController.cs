@@ -267,10 +267,11 @@ public class SuppliersController(
             return BadRequest(new { message = "Une invitation a déjà été envoyée aujourd'hui." });
         }
 
-        var companyName = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
+        var company = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
             .Where(t => t.Id == tenantId)
-            .Select(t => t.Name)
+            .Select(t => new { t.Name, t.BrandColor })
             .FirstAsync(ct);
+        var companyName = company.Name;
 
         try
         {
@@ -278,7 +279,7 @@ public class SuppliersController(
                 supplier.Email!,
                 supplier.ContactName ?? supplier.Name,
                 $"{companyName} vous invite sur Vexta",
-                SupplierInvitationEmail.Build(companyName, supplier.Name, frontendUrl),
+                SupplierInvitationEmail.Build(companyName, supplier.Name, frontendUrl, company.BrandColor),
                 ct,
                 // From the company's own name, not ours: the supplier knows them and does not
                 // know us, and an invitation from a stranger is an invitation nobody opens.

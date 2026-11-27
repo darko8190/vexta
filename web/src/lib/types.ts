@@ -1406,6 +1406,10 @@ export interface ProductImage {
   contentType: string;
   url: string | null;
   sortOrder: number;
+  /** What the picture shows. Null shows the file name. */
+  name: string | null;
+  /** The picture that stands for the product; always first. */
+  isPrimary: boolean;
 }
 
 export interface ProductPriceEntry {

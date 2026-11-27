@@ -70,7 +70,9 @@ public record ProductImageDto(
     string FileName,
     string ContentType,
     string? Url,
-    int SortOrder);
+    int SortOrder,
+    string? Name = null,
+    bool IsPrimary = false);
 
 public record ProductPriceEntryDto(
     Guid Id,
@@ -159,7 +161,13 @@ public record SaveProductRequest(
 /// The photographs, in the order they should appear. It is the whole set every time: what is
 /// sent replaces what the product had, so removing one is saving the list without it.
 /// </param>
-public record SaveProductImagesRequest(IReadOnlyList<Guid>? MediaAssetIds);
+/// <param name="Images">
+/// The pictures with their name and which one is the main one, in order. When omitted, the
+/// bare ids in <paramref name="MediaAssetIds"/> are used and the names already given are kept.
+/// </param>
+public record SaveProductImagesRequest(IReadOnlyList<Guid>? MediaAssetIds, IReadOnlyList<ProductImageInput>? Images = null);
+
+public record ProductImageInput(Guid MediaAssetId, string? Name, bool IsPrimary);
 
 /// <param name="QuantityChange">Positive for what came in, negative for what left.</param>
 public record ProductStockMovementRequest(decimal QuantityChange, string? Reason);

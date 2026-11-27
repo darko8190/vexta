@@ -8,7 +8,7 @@ namespace Vexta.Api.Features.Forms;
 /// </summary>
 public static class FormLinkEmail
 {
-    public static string Build(string companyName, string formTitle, string? message, string url)
+    public static string Build(string companyName, string formTitle, string? message, string url, string? brandColor = null)
     {
         var company = WebUtility.HtmlEncode(companyName);
         var title = WebUtility.HtmlEncode(formTitle);
@@ -30,7 +30,7 @@ public static class FormLinkEmail
 
               <p>
                 <a href="{href}"
-                   style="display:inline-block;background:#1d4ed8;color:#ffffff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600">
+                   style="display:inline-block;background:{Vexta.Api.Common.EmailButton.Colour(brandColor)};color:#ffffff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600">
                   Remplir le formulaire
                 </a>
               </p>

@@ -204,8 +204,9 @@ public class FormsController(
     /// </summary>
     private async Task<ObjectResult?> MailShareAsync(FormShare share, string title, string name, CancellationToken ct)
     {
-        var companyName = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
-            .Where(t => t.Id == share.TenantId).Select(t => t.Name).FirstAsync(ct);
+        var company = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
+            .Where(t => t.Id == share.TenantId).Select(t => new { t.Name, t.BrandColor }).FirstAsync(ct);
+        var companyName = company.Name;
         var token = invitation.Seal(share.FormTemplateId, share.Email, share.Id);
         var url = $"{FrontendUrl}{LinkPath(share.FormTemplateId)}?jeton={Uri.EscapeDataString(token)}";
 
@@ -215,7 +216,7 @@ public class FormsController(
                 share.Email,
                 name,
                 $"{title} — {companyName}",
-                FormLinkEmail.Build(companyName, title, share.Message, url),
+                FormLinkEmail.Build(companyName, title, share.Message, url, company.BrandColor),
                 ct,
                 fromName: companyName);
             SendHistory.Add(db, share.TenantId, "formulaire", share.FormTemplateId, "Invitation",

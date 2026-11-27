@@ -11,6 +11,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { formatDateOnly } from "@/lib/dates";
 import { formatAmount } from "@/lib/money";
+import { BrandTheme } from "@/components/layout/brand-theme";
 
 interface PublicQuote {
   companyName: string;
@@ -50,6 +51,8 @@ export default function QuoteAnswerPage() {
 function Shell({ children, accent }: { children: React.ReactNode; accent?: string | null }) {
   return (
     <main className="flex min-h-dvh items-center justify-center bg-muted/30 px-4 py-10">
+      {/* The company's colour on the buttons too, not only on the line at the top. */}
+      <BrandTheme color={accent} />
       <div className="w-full max-w-md">
         <div className="h-1.5 rounded-t-xl" style={{ backgroundColor: accent ?? "var(--primary)" }} />
         <div className="rounded-b-xl border border-t-0 border-border bg-card p-6 shadow-sm">{children}</div>

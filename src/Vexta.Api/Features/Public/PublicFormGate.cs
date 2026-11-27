@@ -1,3 +1,4 @@
+using Vexta.Api.Common;
 using Microsoft.EntityFrameworkCore;
 using Vexta.Api.Data;
 using Vexta.Api.Domain;
@@ -105,10 +106,10 @@ public static class PublicFormGate
     {
         var tenant = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
             .Where(t => t.Slug == slug)
-            .Select(t => new { t.Id, t.SubscriptionStatus })
+            .Select(t => new { t.Id, t.SubscriptionStatus, t.TrialEndsAt })
             .FirstOrDefaultAsync(ct);
 
-        if (tenant is null || tenant.SubscriptionStatus != TenantSubscriptionStatus.Active) return null;
+        if (tenant is null || !TenantLive.IsLive(tenant.SubscriptionStatus, tenant.TrialEndsAt)) return null;
 
         var pageShowsForms = await db.PublicPages.IgnoreQueryFilters().AsNoTracking()
             .Where(p => p.TenantId == tenant.Id)

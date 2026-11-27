@@ -1,3 +1,4 @@
+using Vexta.Api.Common;
 using Microsoft.EntityFrameworkCore;
 using Vexta.Api.Data;
 using Vexta.Api.Domain;
@@ -36,11 +37,12 @@ public static class ShopGate
                 t.Id,
                 t.Name,
                 t.SubscriptionStatus,
+                t.TrialEndsAt,
                 CanCharge = t.StripeAccountId != null && t.StripeChargesEnabled
             })
             .FirstOrDefaultAsync(ct);
 
-        if (tenant is null || tenant.SubscriptionStatus != TenantSubscriptionStatus.Active) return null;
+        if (tenant is null || !TenantLive.IsLive(tenant.SubscriptionStatus, tenant.TrialEndsAt)) return null;
 
         var page = await db.PublicPages.IgnoreQueryFilters().AsNoTracking()
             .Where(p => p.TenantId == tenant.Id)

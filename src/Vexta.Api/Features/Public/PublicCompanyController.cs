@@ -1,3 +1,4 @@
+using Vexta.Api.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -39,6 +40,7 @@ public class PublicCompanyController(VextaDbContext db, IR2StorageService storag
                 t.Phone,
                 t.BrandColor,
                 t.SubscriptionStatus,
+                t.TrialEndsAt,
                 CanCharge = t.StripeAccountId != null && t.StripeChargesEnabled,
                 LogoETag = t.Logo!.ETag
             })
@@ -49,7 +51,7 @@ public class PublicCompanyController(VextaDbContext db, IR2StorageService storag
         // A lapsed subscription takes the page down with the rest of the product. It has to be
         // this way round: the editor is behind the same gate, so a company that stopped paying
         // could not take its own page off the internet if we kept serving it.
-        if (tenant.SubscriptionStatus != TenantSubscriptionStatus.Active) return NotFound();
+        if (!TenantLive.IsLive(tenant.SubscriptionStatus, tenant.TrialEndsAt)) return NotFound();
 
         var page = await db.PublicPages.AsNoTracking()
             .FirstOrDefaultAsync(p => p.TenantId == tenant.Id, ct);

@@ -49,7 +49,10 @@ public static class TenantEraser
                     await db.Database.ExecuteSqlRawAsync("RELEASE SAVEPOINT wipe_table", ct);
                     cleared.Add(table);
                 }
-                catch (Npgsql.PostgresException ex) when (ex.SqlState == Npgsql.PostgresErrorCodes.ForeignKeyViolation)
+                // A link declared ON DELETE RESTRICT refuses with its own code (23001), not the usual
+                // foreign-key one (23503); both mean "something still points here".
+                catch (Npgsql.PostgresException ex) when (ex.SqlState is Npgsql.PostgresErrorCodes.ForeignKeyViolation
+                                                              or Npgsql.PostgresErrorCodes.RestrictViolation)
                 {
                     await db.Database.ExecuteSqlRawAsync("ROLLBACK TO SAVEPOINT wipe_table", ct);
                 }

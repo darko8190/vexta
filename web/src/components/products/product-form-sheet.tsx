@@ -48,6 +48,7 @@ const formSchema = z.object({
   maximumQuantity: z.string(),
   tracksInventory: z.boolean(),
   isManufactured: z.boolean(),
+  isParent: z.boolean(),
   quantityOnHand: z.string(),
   purchasePrice: z.string(),
   marginPercent: z.string(),
@@ -73,6 +74,7 @@ function emptyValues(): FormValues {
     // Most of what a contractor stocks is counted, so the box starts ticked.
     tracksInventory: true,
     isManufactured: false,
+    isParent: false,
     quantityOnHand: "",
     purchasePrice: "",
     marginPercent: "",
@@ -138,6 +140,7 @@ export function ProductFormSheet({
             maximumQuantity: decimalField(product.maximumQuantity),
             tracksInventory: product.tracksInventory,
             isManufactured: product.isManufactured,
+            isParent: product.isParent,
             quantityOnHand: decimalField(product.quantityOnHand),
             purchasePrice: decimalField(product.purchasePrice),
             marginPercent: decimalField(product.marginPercent),
@@ -153,6 +156,7 @@ export function ProductFormSheet({
   // useWatch, not form.watch: the React Compiler lint rejects the latter inside render.
   const categoryId = useWatch({ control: form.control, name: "categoryId" });
   const tracksInventory = useWatch({ control: form.control, name: "tracksInventory" });
+  const isParent = useWatch({ control: form.control, name: "isParent" });
 
   // The second dropdown lists the chosen category's own sub-categories. Listing every
   // sub-category the company has ever made would offer "Cuivre" under Électricité.
@@ -248,6 +252,7 @@ export function ProductFormSheet({
           maximumQuantity: values.tracksInventory ? maximumQuantity : null,
           tracksInventory: values.tracksInventory,
           isManufactured: values.isManufactured,
+          isParent: isVariant ? false : values.isParent,
           quantityOnHand: values.tracksInventory ? (quantityOnHand ?? 0) : 0,
           purchasePrice,
           marginPercent,
@@ -544,6 +549,7 @@ export function ProductFormSheet({
                     <Checkbox
                       id="product-tracks"
                       checked={field.value}
+                      disabled={isParent}
                       onCheckedChange={(checked) => field.onChange(checked === true)}
                     />
                     <FieldLabel htmlFor="product-tracks" className="font-normal">
@@ -557,6 +563,36 @@ export function ProductFormSheet({
                 </Field>
               )}
             />
+
+            {!isVariant && (
+              <Controller
+                name="isParent"
+                control={form.control}
+                render={({ field }) => (
+                  <Field>
+                    <div className="flex items-center gap-3">
+                      <Checkbox
+                        id="product-parent"
+                        checked={field.value}
+                        onCheckedChange={(checked) => {
+                          field.onChange(checked === true);
+                          // A parent holds no stock: its variants do.
+                          if (checked === true) form.setValue("tracksInventory", false);
+                        }}
+                      />
+                      <FieldLabel htmlFor="product-parent" className="font-normal">
+                        Produit parent
+                      </FieldLabel>
+                    </div>
+                    <FieldDescription>
+                      Pour un produit qui existe en plusieurs versions (longueur, couleur, format). Le
+                      parent ne se vend pas : ce sont ses variantes, ajoutées dans l&apos;onglet
+                      Variantes, qui se vendent et se comptent en inventaire.
+                    </FieldDescription>
+                  </Field>
+                )}
+              />
+            )}
 
             <Controller
               name="isManufactured"

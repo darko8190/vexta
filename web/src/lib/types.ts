@@ -1382,6 +1382,8 @@ export interface ProductRecord {
   quantityOnOrder: number;
   /** Made by the company itself rather than bought. */
   isManufactured: boolean;
+  /** Not sold itself: its variants are. Only a parent has variants. */
+  isParent: boolean;
   purchasePrice: number | null;
   marginPercent: number | null;
   sellingPrice: number | null;

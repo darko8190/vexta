@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import Link from "next/link";
 import { Bug, Building2, Eye, LogOut, Settings, UserRound } from "lucide-react";
 import { toast } from "sonner";
@@ -142,6 +142,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // nothing until the session is known.
   const { items: navItems, pending: navPending } = useTenantNavItems();
 
+  // The bars above the page (super admin, free trial), measured into a CSS variable so a form
+  // opened as a full page starts below them instead of covering them.
+  const bannersRef = useCallback((node: HTMLDivElement | null) => {
+    if (!node) return;
+    const root = document.documentElement;
+    const observer = new ResizeObserver(() => root.style.setProperty("--app-banner-height", `${node.offsetHeight}px`));
+    observer.observe(node);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty("--app-banner-height");
+    };
+  }, []);
+
   if (!user) return null;
 
   return (
@@ -153,6 +166,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     // dvh rather than vh because of the phone: with vh the shell is as tall as the viewport
     // *without* the browser's own bars, so the last row of every page sat under them.
     <div className="flex h-dvh flex-col overflow-hidden bg-background">
+      <div ref={bannersRef} className="shrink-0">
       {user.isImpersonating && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-primary/30 bg-primary/10 px-4 py-2 md:px-6">
           <Eye className="size-4 shrink-0 text-primary" />
@@ -168,6 +182,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Under the impersonation bar and above everything else: it is about the whole space,
           not about the page, and it must not be something a scroll can hide. */}
       <TrialBanner />
+      </div>
 
       <div className="flex min-h-0 flex-1">
       {/* The rail keeps a fixed 64 px footprint in the layout. The panel inside it is absolute,
@@ -176,7 +191,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <aside className="relative hidden w-16 shrink-0 md:block">
         <div
           className={cn(
-            "group/sidebar absolute inset-y-0 left-0 z-30 flex w-16 flex-col overflow-hidden",
+            // Above a form opened as a full page (z-40), so the menu opens over it with its
+            // titles; below dialogs (z-50).
+            "group/sidebar absolute inset-y-0 left-0 z-[45] flex w-16 flex-col overflow-hidden",
             "border-r border-sidebar-border bg-sidebar",
             "transition-[width,box-shadow] duration-200 ease-out motion-reduce:transition-none",
             // The short delay stops the menu flapping open every time the pointer crosses the

@@ -28,6 +28,7 @@ export interface ProductFormValues {
   maximumQuantity: number | null;
   tracksInventory: boolean;
   isManufactured: boolean;
+  isParent: boolean;
   quantityOnHand: number;
   purchasePrice: number | null;
   marginPercent: number | null;

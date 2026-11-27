@@ -84,7 +84,7 @@ public class ProductsController(
     public async Task<ActionResult<List<ProductDto>>> ToReorder(CancellationToken ct)
     {
         var candidates = await db.Products.AsNoTracking()
-            .Where(p => p.TracksInventory && p.MinimumQuantity != null)
+            .Where(p => p.TracksInventory && !p.IsParent && p.MinimumQuantity != null)
             .OrderBy(p => p.Title)
             .Select(ToDto())
             .ToListAsync(ct);
@@ -106,7 +106,8 @@ public class ProductsController(
     {
         var limit = take is > 0 and <= 50 ? take : 20;
 
-        var items = await Matching(db.Products.AsNoTracking(), term)
+        // A parent is not sold: its variants are, so they are what a line can pick.
+        var items = await Matching(db.Products.AsNoTracking().Where(p => !p.IsParent), term)
             .OrderBy(p => p.Title)
             .Take(limit)
             .Select(p => new
@@ -149,7 +150,7 @@ public class ProductsController(
     public async Task<ActionResult<List<ProductBrowseDto>>> Browse(
         [FromQuery] string? term, [FromQuery] Guid? categoryId, [FromQuery] Guid? subCategoryId, CancellationToken ct)
     {
-        var products = Matching(db.Products.AsNoTracking(), term);
+        var products = Matching(db.Products.AsNoTracking().Where(p => !p.IsParent), term);
         if (categoryId is not null) products = products.Where(p => p.CategoryId == categoryId);
         if (subCategoryId is not null) products = products.Where(p => p.SubCategoryId == subCategoryId);
 
@@ -207,6 +208,7 @@ public class ProductsController(
             MaximumQuantity = source.MaximumQuantity,
             TracksInventory = source.TracksInventory,
             IsManufactured = source.IsManufactured,
+            IsParent = source.IsParent,
             PurchasePrice = source.PurchasePrice,
             MarginPercent = source.MarginPercent,
             SellingPrice = source.SellingPrice,
@@ -277,9 +279,10 @@ public class ProductsController(
             Barcode = Clean(request.Barcode),
             MinimumQuantity = request.MinimumQuantity,
             MaximumQuantity = request.MaximumQuantity,
-            TracksInventory = request.TracksInventory,
+            TracksInventory = request.TracksInventory && !request.IsParent,
             IsManufactured = request.IsManufactured,
-            QuantityOnHand = request.QuantityOnHand,
+            IsParent = request.IsParent,
+            QuantityOnHand = request.IsParent ? 0m : request.QuantityOnHand,
             PurchasePrice = purchasePrice,
             MarginPercent = marginPercent,
             SellingPrice = sellingPrice,
@@ -335,8 +338,9 @@ public class ProductsController(
         product.Barcode = Clean(request.Barcode);
         product.MinimumQuantity = request.MinimumQuantity;
         product.MaximumQuantity = request.MaximumQuantity;
-        product.TracksInventory = request.TracksInventory;
+        product.TracksInventory = request.TracksInventory && !request.IsParent;
         product.IsManufactured = request.IsManufactured;
+        product.IsParent = request.IsParent;
         product.PurchasePrice = purchasePrice;
         product.MarginPercent = marginPercent;
         product.SellingPrice = sellingPrice;
@@ -653,16 +657,24 @@ public class ProductsController(
             return "Choisissez une catégorie avant une sous-catégorie.";
         }
 
+        if (request.IsParent && request.ParentProductId is not null)
+            return "Une variante ne peut pas être elle-même un produit parent.";
+
+        // Its variants would be left hanging under a product that no longer has any.
+        if (!request.IsParent && id is { } self && await db.Products.AnyAsync(p => p.ParentProductId == self, ct))
+            return "Ce produit a des variantes : supprimez-les avant de décocher « Produit parent ».";
+
         if (request.ParentProductId is { } parentId)
         {
             if (parentId == id) return "Un produit ne peut pas être sa propre variante.";
 
             var parent = await db.Products.AsNoTracking()
                 .Where(p => p.Id == parentId)
-                .Select(p => new { p.ParentProductId })
+                .Select(p => new { p.ParentProductId, p.IsParent })
                 .FirstOrDefaultAsync(ct);
 
             if (parent is null) return "Le produit parent est introuvable.";
+            if (!parent.IsParent) return "Cochez « Produit parent » sur ce produit avant de lui ajouter des variantes.";
 
             // One level, deliberately: a variant of a variant is a tree nobody can read off a
             // shelf label, and every screen would have to decide how deep to walk it.
@@ -856,5 +868,6 @@ public class ProductsController(
         p.CreatedAt,
         p.UpdatedAt,
         0m,
-        p.IsManufactured);
+        p.IsManufactured,
+        p.IsParent);
 }

@@ -3263,6 +3263,9 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<bool>("IsManufactured")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsParent")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("IsPublic")
                         .HasColumnType("boolean");
 

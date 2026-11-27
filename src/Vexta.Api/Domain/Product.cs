@@ -86,6 +86,12 @@ public class Product : ISoftDeletable
     /// <summary>Made by the company itself, on its own production line, rather than bought.</summary>
     public bool IsManufactured { get; set; }
 
+    /// <summary>
+    /// A product that is not sold itself: its variants are. Holds what they share (the name,
+    /// the category, the pictures) and carries no stock of its own. Only a parent has variants.
+    /// </summary>
+    public bool IsParent { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 

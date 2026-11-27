@@ -72,7 +72,10 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const sections: NavSection[] = [
     { key: "details", label: "Détails", icon: Info },
     { key: "images", label: "Images", count: counts?.images ?? product.imageCount, icon: Images },
-    { key: "variantes", label: "Variantes", count: counts?.variants ?? product.variantCount, icon: GitBranch },
+    // Only a parent has variants.
+    ...(product.isParent || product.variantCount > 0
+      ? [{ key: "variantes", label: "Variantes", count: counts?.variants ?? product.variantCount, icon: GitBranch }]
+      : []),
     { key: "fournisseurs", label: "Fournisseurs du produit", count: counts?.suppliers ?? 0, icon: Truck },
     { key: "inventaire", label: "Historique d'inventaire", count: counts?.stockEntries ?? 0, icon: History },
     { key: "prix", label: "Historique de prix", count: counts?.priceEntries ?? 0, icon: TrendingUp },
@@ -100,6 +103,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               {product.subCategoryName && <Badge variant="outline">{product.subCategoryName}</Badge>}
               {!product.tracksInventory && <Badge variant="outline">Non suivi</Badge>}
               {product.isPublic && <Badge variant="outline">Page publique</Badge>}
+              {product.isParent && <Badge variant="outline">Produit parent</Badge>}
+              {product.isManufactured && <Badge variant="outline">Fabriqué</Badge>}
             </div>
 
             <h1 className="mt-1 text-xl font-semibold tracking-tight text-foreground sm:text-2xl">

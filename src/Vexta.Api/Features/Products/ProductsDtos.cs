@@ -55,7 +55,9 @@ public record ProductDto(
     /// </summary>
     decimal QuantityOnOrder = 0,
     /// <summary>Made by the company itself rather than bought.</summary>
-    bool IsManufactured = false);
+    bool IsManufactured = false,
+    /// <summary>Not sold itself: its variants are.</summary>
+    bool IsParent = false);
 
 /// <summary>
 /// A photograph of the product, with a link that works right now. The URL is signed on the way
@@ -150,7 +152,8 @@ public record SaveProductRequest(
     string? Note,
     Guid? ParentProductId,
     bool IsPublic,
-    bool IsManufactured = false);
+    bool IsManufactured = false,
+    bool IsParent = false);
 
 /// <param name="MediaAssetIds">
 /// The photographs, in the order they should appear. It is the whole set every time: what is

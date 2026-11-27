@@ -1,7 +1,7 @@
 "use client";
 
 import { Controller, useWatch, type FieldPath, type FieldValues, type UseFormReturn } from "react-hook-form";
-import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { CountrySelect, SubdivisionField } from "@/components/addresses/country-field";
 import { isKnownSubdivision, subdivisionLabel } from "@/lib/geo";
@@ -49,10 +49,6 @@ export function CompanyAddressFields<T extends FieldValues & CompanyAddressValue
           <Field>
             <FieldLabel htmlFor={`${idPrefix}-neq`}>Numéro d&apos;entreprise (optionnel)</FieldLabel>
             <Input {...field} value={field.value ?? ""} id={`${idPrefix}-neq`} placeholder={ex("1234567890")} />
-            <FieldDescription>
-              Le NEQ au Québec. Laissez vide si vous ne l&apos;avez pas encore — une entreprise
-              s&apos;enregistre avant de le recevoir.
-            </FieldDescription>
           </Field>
         )}
       />

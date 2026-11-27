@@ -18,7 +18,7 @@ import { CompanyAddressFields } from "@/components/addresses/company-address-fie
 import { usePublicPlansQuery } from "@/hooks/use-catalog";
 import { checkCompanyAddress, companyProfileFrom, emptyCompanyAddress } from "@/lib/company-signup";
 import { defaultCountryName } from "@/lib/geo";
-import { formatCents } from "@/lib/money";
+import { PlanPicker } from "@/components/auth/plan-picker";
 import { cn } from "@/lib/utils";
 import { ex } from "@/lib/placeholders";
 
@@ -81,6 +81,30 @@ function CompanyStep() {
   const accountType = useWatch({ control: form.control, name: "accountType" });
   const isPersonal = accountType === "personal";
   const { data: plans, isLoading: plansLoading } = usePublicPlansQuery();
+
+  // A business picks its plan on a second step, where each plan has room for its details.
+  const [step, setStep] = useState<"details" | "plan">("details");
+  const choosingPlan = step === "plan" && !isPersonal;
+  const planId = useWatch({ control: form.control, name: "planId" });
+  const freeTrial = !isPersonal && (plans?.find((plan) => plan.id === planId)?.trialDays ?? 0) > 0;
+
+  async function goToPlans() {
+    const valid = await form.trigger([
+      "companyName",
+      "line1",
+      "line2",
+      "city",
+      "province",
+      "postalCode",
+      "country",
+      "businessNumber",
+    ]);
+    if (valid) {
+      setServerError(null);
+      setStep("plan");
+      window.scrollTo({ top: 0 });
+    }
+  }
 
   useEffect(() => {
     if (!ticket) return;
@@ -153,15 +177,23 @@ function CompanyStep() {
   }
 
   return (
-    <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 shadow-sm">
+    <div
+      className={cn(
+        "w-full rounded-2xl border border-border bg-card p-8 shadow-sm",
+        choosingPlan ? "max-w-4xl" : "max-w-md",
+      )}
+    >
       <h1 className="text-center text-xl font-semibold text-card-foreground">
-        Encore une chose
+        {choosingPlan ? "Choisissez votre forfait" : "Encore une chose"}
       </h1>
-      <p className="mt-1 text-center text-sm text-muted-foreground">
-        {pending.provider} nous a confirmé <span className="font-medium text-foreground">{pending.email}</span>.
-        Il ne reste qu&apos;à nommer votre espace.
-      </p>
+      {!choosingPlan && (
+        <p className="mt-1 text-center text-sm text-muted-foreground">
+          {pending.provider} nous a confirmé <span className="font-medium text-foreground">{pending.email}</span>.
+          Il ne reste qu&apos;à nommer votre espace.
+        </p>
+      )}
 
+      {!choosingPlan && (
       <Controller
         name="accountType"
         control={form.control}
@@ -178,16 +210,61 @@ function CompanyStep() {
           </Tabs>
         )}
       />
+      )}
 
-      <form className="mt-6" onSubmit={form.handleSubmit(onSubmit)} noValidate>
+      <form
+        className="mt-6"
+        // Enter on the first step of a business signup goes on to the plans, not to the API.
+        onSubmit={(event) => {
+          if (!isPersonal && step === "details") {
+            event.preventDefault();
+            void goToPlans();
+            return;
+          }
+          void form.handleSubmit(onSubmit)(event);
+        }}
+        noValidate
+      >
+        {choosingPlan ? (
+          <FieldGroup>
+            <Controller
+              name="planId"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  {plansLoading ? (
+                    <FieldDescription>Chargement des forfaits…</FieldDescription>
+                  ) : !plans || plans.length === 0 ? (
+                    <FieldDescription>
+                      Aucun forfait n&apos;est offert pour le moment. Créez un espace personnel gratuit.
+                    </FieldDescription>
+                  ) : (
+                    <PlanPicker plans={plans} value={field.value} onChange={field.onChange} invalid={fieldState.invalid} />
+                  )}
+                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              )}
+            />
+
+            {serverError && (
+              <p className="text-sm font-medium text-destructive" role="alert">
+                {serverError}
+              </p>
+            )}
+
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+              <Button type="button" variant="outline" onClick={() => setStep("details")}>
+                Retour
+              </Button>
+              <Button type="submit" className="sm:min-w-56" disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting && <Spinner />}
+                {freeTrial ? "Créer mon espace" : "Continuer vers le paiement"}
+              </Button>
+            </div>
+          </FieldGroup>
+        ) : (
         <FieldGroup>
-          {isPersonal ? (
-            <FieldDescription>
-              Votre espace portera votre nom
-              {pending.firstName ? ` — ${pending.firstName} ${pending.lastName}`.trimEnd() : ""}, et il
-              est gratuit : mêmes fonctions que l&apos;offre entreprise, sans abonnement.
-            </FieldDescription>
-          ) : (
+          {!isPersonal && (
             <Controller
               name="companyName"
               control={form.control}
@@ -209,68 +286,29 @@ function CompanyStep() {
 
           {!isPersonal && <CompanyAddressFields form={form} idPrefix="fin" />}
 
-          {!isPersonal && (
-            <Controller
-              name="planId"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel>Forfait</FieldLabel>
-                  {plansLoading ? (
-                    <FieldDescription>Chargement des forfaits…</FieldDescription>
-                  ) : !plans || plans.length === 0 ? (
-                    <FieldDescription>
-                      Aucun forfait n&apos;est offert pour le moment. Créez un espace personnel gratuit.
-                    </FieldDescription>
-                  ) : (
-                    <div role="radiogroup" aria-label="Forfait" className="space-y-2">
-                      {plans.map((plan) => {
-                        const selected = field.value === plan.id;
-                        return (
-                          <button
-                            key={plan.id}
-                            type="button"
-                            role="radio"
-                            aria-checked={selected}
-                            onClick={() => field.onChange(plan.id)}
-                            className={cn(
-                              "flex w-full items-baseline justify-between gap-3 rounded-lg border px-3 py-2 text-left transition-colors",
-                              "focus-visible:ring-3 focus-visible:ring-ring/50 outline-none",
-                              selected ? "border-primary bg-primary/5" : "border-border hover:bg-muted/40",
-                            )}
-                          >
-                            <span className="text-sm font-medium text-foreground">{plan.name}</span>
-                            <span className="shrink-0 text-sm tabular-nums text-foreground">
-                              {formatCents(plan.amountCents, plan.currency)}
-                              <span className="text-muted-foreground"> /mois</span>
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                </Field>
-              )}
-            />
-          )}
-
           {serverError && (
             <p className="text-sm font-medium text-destructive" role="alert">
               {serverError}
             </p>
           )}
 
-          <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-            {form.formState.isSubmitting && <Spinner />}
-            {isPersonal ? "Créer mon espace" : "Continuer vers le paiement"}
-          </Button>
+          {isPersonal ? (
+            <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+              {form.formState.isSubmitting && <Spinner />}
+              Créer mon espace
+            </Button>
+          ) : (
+            <Button type="button" className="w-full" onClick={() => void goToPlans()}>
+              Continuer
+            </Button>
+          )}
         </FieldGroup>
+        )}
       </form>
 
       <p className="mt-6 text-center text-xs text-muted-foreground">
         {isPersonal
-          ? "Gratuit pour les travailleurs autonomes — aucune carte demandée."
+          ? "Gratuit pour les travailleurs autonomes."
           : "Abonnement mensuel — paiement sécurisé par Stripe."}
       </p>
     </div>

@@ -22,7 +22,7 @@ import { safeReturnPath } from "@/lib/api";
 import { usePublicPlansQuery } from "@/hooks/use-catalog";
 import { defaultCountryName } from "@/lib/geo";
 import { checkCompanyAddress, companyProfileFrom, emptyCompanyAddress } from "@/lib/company-signup";
-import { formatCents } from "@/lib/money";
+import { PlanPicker } from "@/components/auth/plan-picker";
 import { cn } from "@/lib/utils";
 import { ex } from "@/lib/placeholders";
 
@@ -128,6 +128,32 @@ function RegisterForm({
   const chosenPlan = plans?.find((plan) => plan.id === planId);
   const freeTrial = !isPersonal && (chosenPlan?.trialDays ?? 0) > 0;
 
+  // A business picks its plan on a second step, where each plan has room for its details.
+  const [step, setStep] = useState<"details" | "plan">("details");
+  const choosingPlan = step === "plan" && !isPersonal;
+
+  async function goToPlans() {
+    const valid = await form.trigger([
+      "companyName",
+      "firstName",
+      "lastName",
+      "email",
+      "password",
+      "line1",
+      "line2",
+      "city",
+      "province",
+      "postalCode",
+      "country",
+      "businessNumber",
+    ]);
+    if (valid) {
+      setServerError(null);
+      setStep("plan");
+      window.scrollTo({ top: 0 });
+    }
+  }
+
   async function onSubmit(values: FormValues) {
     setServerError(null);
     try {
@@ -165,16 +191,24 @@ function RegisterForm({
         </Link>
       </div>
 
-      <div className="vx-rise vx-rise-late w-full max-w-md rounded-2xl border border-border bg-card p-8 shadow-sm">
-        <h1 className="text-center text-xl font-semibold text-card-foreground">Créer votre espace Vexta</h1>
+      <div
+        className={cn(
+          "vx-rise vx-rise-late w-full rounded-2xl border border-border bg-card p-8 shadow-sm",
+          choosingPlan ? "max-w-4xl" : "max-w-md",
+        )}
+      >
+        <h1 className="text-center text-xl font-semibold text-card-foreground">
+          {choosingPlan ? "Choisissez votre forfait" : "Créer votre espace Vexta"}
+        </h1>
         <p className="mt-1 text-center text-sm text-muted-foreground">
           {isPersonal
-            ? "Gratuit pour les travailleurs autonomes — aucune carte demandée."
+            ? "Gratuit pour les travailleurs autonomes."
             : freeTrial
               ? `${chosenPlan!.trialDays} jours d'essai gratuit — aucune carte demandée maintenant.`
               : "Abonnement mensuel — paiement sécurisé par Stripe à l'étape suivante."}
         </p>
 
+        {!choosingPlan && (
         <Controller
           name="accountType"
           control={form.control}
@@ -196,11 +230,71 @@ function RegisterForm({
           )}
         />
 
-        <div className="mt-6">
-          <SocialButtons action="signup" />
-        </div>
+        )}
 
-        <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
+        {!choosingPlan && (
+          <div className="mt-6">
+            <SocialButtons action="signup" />
+          </div>
+        )}
+
+        <form
+          // Enter on the first step of a business signup goes on to the plans, not to the API.
+          onSubmit={(event) => {
+            if (!isPersonal && step === "details") {
+              event.preventDefault();
+              void goToPlans();
+              return;
+            }
+            void form.handleSubmit(onSubmit)(event);
+          }}
+          noValidate
+          className={cn(choosingPlan && "mt-6")}
+        >
+          {choosingPlan ? (
+            <FieldGroup>
+              <Controller
+                name="planId"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    {plansLoading ? (
+                      <FieldDescription>Chargement des forfaits…</FieldDescription>
+                    ) : !plans || plans.length === 0 ? (
+                      <FieldDescription>
+                        Aucun forfait n&apos;est offert pour le moment. Créez un espace personnel
+                        gratuit, ou écrivez-nous.
+                      </FieldDescription>
+                    ) : (
+                      <PlanPicker
+                        plans={plans}
+                        value={field.value}
+                        onChange={field.onChange}
+                        invalid={fieldState.invalid}
+                      />
+                    )}
+                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  </Field>
+                )}
+              />
+
+              {serverError && (
+                <p className="text-sm font-medium text-destructive" role="alert">
+                  {serverError}
+                </p>
+              )}
+
+              <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+                <Button type="button" variant="outline" onClick={() => setStep("details")}>
+                  Retour
+                </Button>
+                <Button type="submit" className="sm:min-w-56" disabled={form.formState.isSubmitting}>
+                  {form.formState.isSubmitting && <Spinner />}
+                  {freeTrial ? "Créer mon espace" : "Continuer vers le paiement"}
+                </Button>
+              </div>
+            </FieldGroup>
+          ) : (
           <FieldGroup>
             {!isPersonal && (
               <Controller
@@ -217,80 +311,6 @@ function RegisterForm({
             )}
 
             {!isPersonal && <CompanyAddressFields form={form} idPrefix="reg" />}
-
-            {!isPersonal && (
-              <Controller
-                name="planId"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel>Forfait</FieldLabel>
-
-                    {plansLoading ? (
-                      <FieldDescription>Chargement des forfaits…</FieldDescription>
-                    ) : !plans || plans.length === 0 ? (
-                      <FieldDescription>
-                        Aucun forfait n&apos;est offert pour le moment. Créez un espace personnel
-                        gratuit, ou écrivez-nous.
-                      </FieldDescription>
-                    ) : (
-                      <div role="radiogroup" aria-label="Forfait" className="space-y-2">
-                        {plans.map((plan) => {
-                          const selected = field.value === plan.id;
-                          return (
-                            <button
-                              key={plan.id}
-                              type="button"
-                              role="radio"
-                              aria-checked={selected}
-                              onClick={() => field.onChange(plan.id)}
-                              className={cn(
-                                "flex w-full items-baseline justify-between gap-3 rounded-lg border px-3 py-2 text-left transition-colors",
-                                "focus-visible:ring-3 focus-visible:ring-ring/50 outline-none",
-                                selected
-                                  ? "border-primary bg-primary/5"
-                                  : "border-border hover:bg-muted/40",
-                              )}
-                            >
-                              <span className="min-w-0">
-                                <span className="block text-sm font-medium text-foreground">{plan.name}</span>
-                                {plan.description && (
-                                  <span className="block truncate text-xs text-muted-foreground">
-                                    {plan.description}
-                                  </span>
-                                )}
-                                {/* Said where the choice is made. A trial the buyer is not told
-                                    about is a trial nobody takes, and "sans carte de crédit" is
-                                    the part that decides it. */}
-                                {plan.trialDays > 0 && (
-                                  <span className="mt-0.5 block text-xs font-medium text-primary">
-                                    {plan.trialDays} jours gratuits, sans carte de crédit
-                                  </span>
-                                )}
-                                {plan.discountPercent > 0 && plan.discountMonths > 0 && (
-                                  <span className="mt-0.5 block text-xs text-muted-foreground">
-                                    Puis {plan.discountPercent} % de rabais pendant{" "}
-                                    {plan.discountMonths === 1
-                                      ? "le premier mois"
-                                      : `les ${plan.discountMonths} premiers mois`}
-                                  </span>
-                                )}
-                              </span>
-                              <span className="shrink-0 text-sm tabular-nums text-foreground">
-                                {formatCents(plan.amountCents, plan.currency)}
-                                <span className="text-muted-foreground"> /mois</span>
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                  </Field>
-                )}
-              />
-            )}
 
             <div className="grid grid-cols-2 gap-3">
               <Controller
@@ -316,13 +336,6 @@ function RegisterForm({
                 )}
               />
             </div>
-
-            {isPersonal && (
-              <FieldDescription>
-                Votre espace portera votre nom, et il est gratuit — mêmes fonctions que
-                l&apos;offre entreprise, sans abonnement.
-              </FieldDescription>
-            )}
 
             <Controller
               name="email"
@@ -367,11 +380,18 @@ function RegisterForm({
               </p>
             )}
 
-            <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-              {form.formState.isSubmitting && <Spinner />}
-              {isPersonal || freeTrial ? "Créer mon espace" : "Continuer vers le paiement"}
-            </Button>
+            {isPersonal ? (
+              <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting && <Spinner />}
+                Créer mon espace
+              </Button>
+            ) : (
+              <Button type="button" className="w-full" onClick={() => void goToPlans()}>
+                Continuer
+              </Button>
+            )}
           </FieldGroup>
+          )}
         </form>
 
         <p className="mt-6 text-center text-sm text-muted-foreground">

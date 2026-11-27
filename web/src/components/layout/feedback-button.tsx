@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Bug, ImagePlus, Lightbulb, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -42,8 +44,9 @@ const kinds: { value: Kind; label: string; icon: typeof Bug; placeholder: string
 ];
 
 /**
- * The bug button in the app's top bar: a bug report or a suggestion, e-mailed to Vexta's team
- * with who sent it, from which space and which page. Only inside a company's or a person's own
+ * The bug button in the app's top bar: a bug report or a suggestion, kept for the sender to
+ * follow in « Mes demandes » and e-mailed to Vexta's team with who sent it, from which space and
+ * which page. Only inside a company's or a person's own
  * space — never for a client, and not for the super admin, who would be writing to themselves.
  */
 export function FeedbackButton() {
@@ -72,6 +75,7 @@ export function FeedbackButton() {
 }
 
 function FeedbackDialog({ onClose }: { onClose: () => void }) {
+  const queryClient = useQueryClient();
   const [kind, setKind] = useState<Kind>("bug");
   const [message, setMessage] = useState("");
   const [screenshot, setScreenshot] = useState<{ name: string; dataUrl: string } | null>(null);
@@ -104,6 +108,7 @@ function FeedbackDialog({ onClose }: { onClose: () => void }) {
         pageUrl: window.location.href,
         screenshot: screenshot?.dataUrl ?? null,
       });
+      void queryClient.invalidateQueries({ queryKey: ["feedback", "mine"] });
       toast.success(kind === "bug" ? "Merci, le bogue a été envoyé à l'équipe Vexta." : "Merci, votre suggestion a été envoyée à l'équipe Vexta.");
       onClose();
     } catch (error) {
@@ -119,8 +124,12 @@ function FeedbackDialog({ onClose }: { onClose: () => void }) {
         <DialogHeader>
           <DialogTitle>Écrire à l&apos;équipe Vexta</DialogTitle>
           <DialogDescription>
-            Votre message nous arrive par courriel avec votre nom, votre espace et la page où vous
-            êtes, pour qu&apos;on puisse vous répondre.
+            Votre message nous arrive avec votre nom, votre espace et la page où vous êtes. Suivez
+            son état et notre réponse dans{" "}
+            <Link href="/mes-demandes" onClick={onClose} className="text-primary underline-offset-4 hover:underline">
+              Mes demandes
+            </Link>
+            .
           </DialogDescription>
         </DialogHeader>
 

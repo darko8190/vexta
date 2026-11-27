@@ -2,6 +2,7 @@
   Blocks,
   Boxes,
   Briefcase,
+  Bug,
   Building2,
   CalendarClock,
   CalendarDays,
@@ -148,6 +149,7 @@ const superAdminNav: NavItem[] = [
   { href: "/admin/fonctionnalites", label: "Fonctionnalités", icon: Sparkles },
   // After Modules on purpose: a report is attached to one, so the module has to exist first.
   { href: "/admin/rapports", label: "Rapports", icon: ChartBar },
+  { href: "/admin/signalements", label: "Signalements", icon: Bug },
   { href: "/admin/apparence", label: "Apparence", icon: Palette },
   { href: "/admin/parametres", label: "Intégrations", icon: Settings },
 ];

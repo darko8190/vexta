@@ -10,12 +10,10 @@ using Vexta.Api.Services;
 namespace Vexta.Api.Features.Feedback;
 
 /// <summary>
-/// A bug report or a suggestion, sent from the bug button in the app's top bar to the platform's
-/// super admins by e-mail.
-///
-/// Nothing is stored: the mailbox is where these are read and answered, and a table nobody opens
-/// would only be a second copy. Who sent it and from where is read from the session, never from
-/// the request body, so the e-mail can be trusted to name the right person and company.
+/// A bug report or a suggestion, sent from the bug button in the app's top bar. It is kept, so the
+/// sender can follow it in « Mes demandes » and the super admin can move it along, and it is
+/// still e-mailed to the super admins so nothing waits for someone to open a table. Who sent it
+/// and from where is read from the session, never from the request body.
 ///
 /// Not behind the subscription gate on purpose: a company whose payment failed is exactly the
 /// one that may need to tell us something is wrong.
@@ -79,18 +77,35 @@ public class FeedbackController(
                 .FirstOrDefaultAsync(ct)
             : null;
 
+        var senderName = $"{sender.FirstName} {sender.LastName}".Trim();
+
+        // Kept first: the e-mail is a notice, the row is the request itself.
+        var report = new FeedbackReport
+        {
+            TenantId = tenant?.Id,
+            TenantName = tenant?.Name,
+            UserId = userId,
+            SenderName = senderName,
+            SenderEmail = sender.Email ?? "",
+            Kind = kind,
+            Message = message,
+            PageUrl = request.PageUrl is { Length: > 500 } url ? url[..500] : request.PageUrl,
+            Screenshot = screenshot?.Content,
+            ScreenshotType = screenshot?.ContentType,
+        };
+        db.FeedbackReports.Add(report);
+        await db.SaveChangesAsync(ct);
+
         var recipients = await db.Users.IgnoreQueryFilters().AsNoTracking()
             .Where(u => u.Role == UserRole.SuperAdmin && u.Email != null)
             .Select(u => new { u.Email, u.FirstName, u.LastName })
             .ToListAsync(ct);
         if (recipients.Count == 0 || !await mailgun.IsConfiguredAsync(ct))
         {
-            logger.LogWarning("Feedback from user {UserId} could not be sent: no super admin address or Mailgun unconfigured.", userId);
-            return StatusCode(StatusCodes.Status503ServiceUnavailable,
-                new { message = "L'envoi n'est pas possible pour le moment. Réessayez plus tard." });
+            logger.LogWarning("Feedback {ReportId} was saved but not e-mailed: no super admin address or Mailgun unconfigured.", report.Id);
+            return Ok(ToDto(report));
         }
 
-        var senderName = $"{sender.FirstName} {sender.LastName}".Trim();
         var label = kind == "bug" ? "Bogue" : "Suggestion";
         var subject = tenant is null
             ? $"[Vexta] {label} de {senderName}"
@@ -126,13 +141,58 @@ public class FeedbackController(
         }
         catch (InvalidOperationException ex)
         {
-            logger.LogError(ex, "Feedback from user {UserId} could not be sent.", userId);
-            return StatusCode(StatusCodes.Status502BadGateway,
-                new { message = "L'envoi a échoué. Réessayez dans quelques minutes." });
+            // Saved all the same, and visible in the super admin's table.
+            logger.LogError(ex, "Feedback {ReportId} was saved but the e-mail failed.", report.Id);
         }
 
+        return Ok(ToDto(report));
+    }
+
+    /// <summary>The sender's own requests, newest first, from every space they sent them from.</summary>
+    [HttpGet]
+    public async Task<ActionResult<IReadOnlyList<FeedbackDto>>> Mine(CancellationToken ct)
+    {
+        if (currentUser.UserId is not { } userId) return Unauthorized();
+
+        var rows = await db.FeedbackReports.AsNoTracking()
+            .Where(r => r.UserId == userId)
+            .OrderByDescending(r => r.CreatedAt)
+            .Select(r => new FeedbackDto(r.Id, r.Kind, r.Message, r.PageUrl, r.Screenshot != null,
+                r.Status, r.Response, r.RespondedAt, r.CreatedAt))
+            .ToListAsync(ct);
+        return Ok(rows);
+    }
+
+    /// <summary>Only while nobody has picked it up: once it is being handled, it stays.</summary>
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+    {
+        if (currentUser.UserId is not { } userId) return Unauthorized();
+
+        var report = await db.FeedbackReports.FirstOrDefaultAsync(r => r.Id == id && r.UserId == userId, ct);
+        if (report is null) return NotFound(new { message = "Cette demande n'existe plus." });
+        if (report.Status != FeedbackStatus.Sent)
+            return Conflict(new { message = "Cette demande est déjà prise en charge et ne peut plus être supprimée." });
+
+        db.FeedbackReports.Remove(report);
+        await db.SaveChangesAsync(ct);
         return NoContent();
     }
+
+    [HttpGet("{id:guid}/capture")]
+    public async Task<IActionResult> Screenshot(Guid id, CancellationToken ct)
+    {
+        if (currentUser.UserId is not { } userId) return Unauthorized();
+
+        var image = await db.FeedbackReports.AsNoTracking()
+            .Where(r => r.Id == id && r.UserId == userId && r.Screenshot != null)
+            .Select(r => new { r.Screenshot, r.ScreenshotType })
+            .FirstOrDefaultAsync(ct);
+        return image is null ? NotFound() : File(image.Screenshot!, image.ScreenshotType ?? "image/png");
+    }
+
+    private static FeedbackDto ToDto(FeedbackReport r) =>
+        new(r.Id, r.Kind, r.Message, r.PageUrl, r.Screenshot != null, r.Status, r.Response, r.RespondedAt, r.CreatedAt);
 
     /// <summary>
     /// A data URL from the browser ("data:image/png;base64,…"), checked for type and size before
@@ -168,6 +228,10 @@ public class FeedbackController(
 }
 
 public record SendFeedbackRequest(string? Kind, string? Message, string? PageUrl, string? Screenshot = null);
+
+public record FeedbackDto(
+    Guid Id, string Kind, string Message, string? PageUrl, bool HasScreenshot,
+    FeedbackStatus Status, string? Response, DateTimeOffset? RespondedAt, DateTimeOffset CreatedAt);
 
 /// <summary>The e-mail a super admin receives: who, from which space and page, then the message.</summary>
 public static class FeedbackEmail

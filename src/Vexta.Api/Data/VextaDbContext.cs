@@ -37,6 +37,8 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
     public DbSet<ProjectEquipment> ProjectEquipment => Set<ProjectEquipment>();
     public DbSet<McpKey> McpKeys => Set<McpKey>();
     public DbSet<SendLog> SendLogs => Set<SendLog>();
+    // No tenant filter: a sender reads their own by user id, the super admin reads them all.
+    public DbSet<FeedbackReport> FeedbackReports => Set<FeedbackReport>();
     public DbSet<Assembly> Assemblies => Set<Assembly>();
     public DbSet<AssemblyItem> AssemblyItems => Set<AssemblyItem>();
     public DbSet<ProjectAssembly> ProjectAssemblies => Set<ProjectAssembly>();
@@ -1533,6 +1535,20 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
                 .HasForeignKey(x => x.ProjectTaskId).OnDelete(DeleteBehavior.SetNull);
             e.HasIndex(x => x.ProjectId);
             e.HasQueryFilter(x => x.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<FeedbackReport>(e =>
+        {
+            e.Property(x => x.TenantName).HasMaxLength(200);
+            e.Property(x => x.SenderName).HasMaxLength(200);
+            e.Property(x => x.SenderEmail).HasMaxLength(256);
+            e.Property(x => x.Kind).HasMaxLength(20);
+            e.Property(x => x.Message).HasMaxLength(5000);
+            e.Property(x => x.PageUrl).HasMaxLength(500);
+            e.Property(x => x.ScreenshotType).HasMaxLength(40);
+            e.Property(x => x.Response).HasMaxLength(5000);
+            e.HasIndex(x => x.UserId);
+            e.HasIndex(x => new { x.Status, x.CreatedAt });
         });
 
         builder.Entity<SendLog>(e =>

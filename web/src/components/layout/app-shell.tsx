@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Building2, Eye, LogOut, Settings, UserRound } from "lucide-react";
+import { Bug, Building2, Eye, LogOut, Settings, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -332,6 +332,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <UserRound />
               Mon profil
             </DropdownMenuItem>
+            {/* The bugs and suggestions sent with the bug button: same people who see it. */}
+            {user!.role !== "Client" && user!.role !== "SuperAdmin" && (
+              <DropdownMenuItem render={<Link href="/mes-demandes" />}>
+                <Bug />
+                Mes demandes
+              </DropdownMenuItem>
+            )}
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
           {/* Settings live here rather than in the sidebar: they are about the account, not a

@@ -7,10 +7,11 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { RequiredMark } from "@/components/ui/required-mark";
-import { ProductPicker } from "@/components/invoices/product-picker";
+import { ReferenceSearchInput, type ReferencePick } from "@/components/catalog/reference-search";
+import { cn } from "@/lib/utils";
 import { TaskPickerField } from "@/components/projects/detail/task-picker-field";
 import { marginPercentFrom, sellingPriceFrom } from "@/lib/pricing";
-import type { MarginMode, ProductSearchResult, SaveProjectMaterialValues } from "@/lib/types";
+import type { MarginMode, SaveProjectMaterialValues } from "@/lib/types";
 
 /**
  * The nine columns, shared by the headings and every row so the two cannot drift apart.
@@ -19,6 +20,21 @@ import type { MarginMode, ProductSearchResult, SaveProjectMaterialValues } from 
  */
 export const MATERIAL_GRID =
   "lg:grid-cols-[170px_minmax(0,1fr)_70px_80px_100px_80px_100px_110px_76px]";
+
+/** The crew's columns: what went in and how much of it, never what it is worth. */
+export const CREW_MATERIAL_GRID = "lg:grid-cols-[170px_minmax(0,1fr)_70px_80px_76px]";
+
+/**
+ * Typed by hand rather than picked, and nobody priced it: the office has to look. A red dot on
+ * the row, and on the section.
+ */
+export function NeedsReviewDot({ label = "Ligne sans prix, ajoutée hors de la liste : à vérifier" }: { label?: string }) {
+  return (
+    <span className="inline-flex size-2 shrink-0 rounded-full bg-destructive" title={label}>
+      <span className="sr-only">{label}</span>
+    </span>
+  );
+}
 
 /** Once, so the row's total and the table's footer round and punctuate the same way. */
 export function formatMaterialAmount(amount: number): string {
@@ -83,14 +99,18 @@ function ReadCell({
 export function MaterialReadRow({
   values,
   taskTitle,
+  hidePrices = false,
+  assemblyName,
 }: {
   values: SaveProjectMaterialValues;
   /** The task it was filed under, when it was filed under one. */
   taskTitle?: string | null;
+  hidePrices?: boolean;
+  assemblyName?: string | null;
 }) {
   return (
     <div
-      className={`grid gap-2 rounded-lg border border-border p-3 ${MATERIAL_GRID} lg:items-center lg:gap-2`}
+      className={`grid gap-2 rounded-lg border border-border p-3 ${hidePrices ? CREW_MATERIAL_GRID : MATERIAL_GRID} lg:items-center lg:gap-2`}
     >
       <div className="min-w-0 space-y-1">
         <ReadCell label="Code" value={values.code ?? "—"} />
@@ -100,17 +120,24 @@ export function MaterialReadRow({
           </p>
         )}
       </div>
-      <ReadCell label="Description" value={values.description} />
+      <div className="min-w-0">
+        <ReadCell label="Description" value={values.description} />
+        {assemblyName && <p className="text-xs text-muted-foreground">Dans l&apos;assemblage {assemblyName}</p>}
+      </div>
       <ReadCell label="Unité" value={values.unit ?? "—"} />
       <ReadCell label="Qté" value={String(values.quantity)} numeric />
-      <ReadCell label="Prix d'achat" value={amountOrDash(values.purchasePrice)} numeric />
-      <ReadCell
-        label="Marge %"
-        value={values.marginPercent == null ? "—" : `${values.marginPercent} %`}
-        numeric
-      />
-      <ReadCell label="Prix vendant" value={formatMaterialAmount(values.unitPrice)} numeric />
-      <ReadCell label="Total" value={formatMaterialAmount(materialLineTotal(values))} numeric />
+      {!hidePrices && (
+        <>
+          <ReadCell label="Prix d'achat" value={amountOrDash(values.purchasePrice)} numeric />
+          <ReadCell
+            label="Marge %"
+            value={values.marginPercent == null ? "—" : `${values.marginPercent} %`}
+            numeric
+          />
+          <ReadCell label="Prix vendant" value={formatMaterialAmount(values.unitPrice)} numeric />
+          <ReadCell label="Total" value={formatMaterialAmount(materialLineTotal(values))} numeric />
+        </>
+      )}
       <div className="flex justify-end">
         <ProductLink productId={values.productId} />
       </div>
@@ -139,10 +166,19 @@ export function MaterialRow({
   onRemove,
   removeLabel,
   disabled,
+  hidePrices = false,
+  needsReview = false,
+  assemblyName,
 }: {
   values: SaveProjectMaterialValues;
   projectId: string;
   marginMode: MarginMode;
+  /** The crew: the line without its prices. */
+  hidePrices?: boolean;
+  /** Typed by hand with no price: flagged for the office. */
+  needsReview?: boolean;
+  /** The assembly this material came with: its money is the assembly's. */
+  assemblyName?: string | null;
   onChange: (next: SaveProjectMaterialValues) => void;
   /** Save this row now. Left to the caller to decide whether that is a POST or a PUT. */
   onCommit: (next: SaveProjectMaterialValues) => void;
@@ -180,7 +216,7 @@ export function MaterialRow({
    * The product's own margin is used as it stands. The project's price policy prices what is
    * invoiced; a material line is what the job consumed, and it is corrected by hand from here.
    */
-  function onPickProduct(product: ProductSearchResult) {
+  function onPickProduct(product: ReferencePick) {
     const margin = product.marginPercent ?? null;
     const selling =
       sellingPriceFrom(product.purchasePrice, margin, marginMode) ?? product.sellingPrice ?? 0;
@@ -204,11 +240,12 @@ export function MaterialRow({
 
   return (
     <div
-      className={`grid gap-2 rounded-lg border border-border p-3 ${MATERIAL_GRID} lg:items-start lg:gap-2`}
+      className={cn(
+        `grid gap-2 rounded-lg border p-3 ${hidePrices ? CREW_MATERIAL_GRID : MATERIAL_GRID} lg:items-start lg:gap-2`,
+        needsReview ? "border-destructive/50" : "border-border",
+      )}
     >
       <div className="space-y-2">
-        <ProductPicker onPick={onPickProduct} placeholder="Chercher un produit…" />
-
         <Field>
           <FieldLabel htmlFor={`${fieldId}-code`} className="lg:sr-only">
             Code
@@ -251,14 +288,24 @@ export function MaterialRow({
           Description
           <RequiredMark />
         </FieldLabel>
-        <Input
-          id={`${fieldId}-description`}
-          value={values.description}
-          placeholder="Description"
-          disabled={disabled}
-          onChange={(event) => patch({ description: event.target.value })}
-          onBlur={commit}
-        />
+        {/* The description is the search: pick a product or keep the words typed. */}
+        <div onBlur={(event) => !event.currentTarget.contains(event.relatedTarget as Node | null) && commit()}>
+          <ReferenceSearchInput
+            id={`${fieldId}-description`}
+            value={values.description}
+            source="produit"
+            placeholder="Description ou produit…"
+            hidePrices={hidePrices}
+            onChange={(description) => patch({ description })}
+            onPick={onPickProduct}
+          />
+        </div>
+        {(needsReview || assemblyName) && (
+          <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+            {needsReview && <NeedsReviewDot />}
+            {needsReview ? "Sans prix : à vérifier" : `Dans l'assemblage ${assemblyName}`}
+          </p>
+        )}
       </Field>
 
       <Field>
@@ -293,6 +340,8 @@ export function MaterialRow({
         />
       </Field>
 
+      {!hidePrices && (
+        <>
       <Field>
         <FieldLabel htmlFor={`${fieldId}-purchase`} className="lg:sr-only">
           Prix d&apos;achat
@@ -360,6 +409,9 @@ export function MaterialRow({
           {formatMaterialAmount(materialLineTotal(values))}
         </span>
       </div>
+
+        </>
+      )}
 
       <div className="flex items-center justify-end gap-1">
         <ProductLink productId={values.productId} />

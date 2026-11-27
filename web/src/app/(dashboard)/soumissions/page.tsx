@@ -17,6 +17,7 @@ import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { DataTable, type DataColumn } from "@/components/layout/data-table";
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
+import { TemplateLibraryButton } from "@/components/templates/template-library";
 import { PaginationBar } from "@/components/layout/pagination-bar";
 import { SearchInput } from "@/components/layout/search-input";
 import { UpgradeCta } from "@/components/layout/upgrade-cta";
@@ -220,7 +221,16 @@ export default function QuotesPage() {
             ? "Les prix que votre fournisseur vous a envoyés. Ouvrez-en une pour l'accepter ou la refuser."
             : "Les prix donnés aux clients, et ce qu'ils sont devenus."
         }
-        action={addButton}
+        action={
+          isClient ? (
+            addButton
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              <TemplateLibraryButton kind="soumission" />
+              {addButton}
+            </div>
+          )
+        }
       />
 
       <StatusPills

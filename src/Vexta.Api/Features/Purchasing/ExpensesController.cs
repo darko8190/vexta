@@ -51,7 +51,7 @@ public record ExpenseListDto(PagedResult<ExpenseListItemDto> Page, ExpenseTotals
 [StaffOnly]
 [Authorize(Roles = Roles.Staff)]
 [RequireActiveSubscription]
-public class ExpensesController(VextaDbContext db) : ControllerBase
+public class ExpensesController(VextaDbContext db, ICurrentUserService currentUser) : ControllerBase
 {
     /// <summary>Expenses per state, for the pills above the list.</summary>
     [HttpGet("statuts")]
@@ -72,9 +72,13 @@ public class ExpensesController(VextaDbContext db) : ControllerBase
         [FromQuery] DateOnly? au,
         [FromQuery] Guid? projet,
         [FromQuery] Domain.ExpenseStatus? statut,
-        CancellationToken ct)
+        CancellationToken ct,
+        [FromQuery] bool mes = false)
     {
         var expenses = db.ProjectExpenses.AsNoTracking().AsQueryable();
+        // « Mes dépenses »: what this person entered. An employee only ever gets their own.
+        if (mes || currentUser.Role == Domain.UserRole.TenantUser)
+            expenses = expenses.Where(x => x.CreatedByUserId == currentUser.UserId);
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {

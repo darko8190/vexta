@@ -47,6 +47,7 @@ public class ProjectTimesheetsController(VextaDbContext db, ICurrentUserService 
         if (currentUser.TenantId is not { } tenantId) return Forbid();
         if (!await db.Projects.AnyAsync(p => p.Id == projectId, ct)) return NotFound();
         if (await LockedAsync(projectId, ct) is { } locked) return BadRequest(new { message = locked });
+        request = await OwnHoursAsync(request, ct);
         if (await ProblemAsync(request, ct) is { } problem) return BadRequest(new { message = problem });
         if (await ProjectTaskLink.ProblemAsync(db, projectId, request.ProjectTaskId, ct) is { } wrongTask)
         {
@@ -84,6 +85,7 @@ public class ProjectTimesheetsController(VextaDbContext db, ICurrentUserService 
             .FirstOrDefaultAsync(x => x.Id == id && x.ProjectId == projectId, ct);
         if (entry is null) return NotFound();
         if (await LockedAsync(projectId, ct) is { } locked) return BadRequest(new { message = locked });
+        request = await OwnHoursAsync(request, ct);
         if (await ProblemAsync(request, ct) is { } problem) return BadRequest(new { message = problem });
         if (await ProjectTaskLink.ProblemAsync(db, projectId, request.ProjectTaskId, ct) is { } wrongTask)
         {
@@ -126,6 +128,21 @@ public class ProjectTimesheetsController(VextaDbContext db, ICurrentUserService 
             .FirstOrDefaultAsync(ct);
 
         return row is null ? NotFound() : Ok(ToDto(row));
+    }
+
+    /// <summary>
+    /// An employee punches their own hours: whoever the form named, the entry is theirs. The
+    /// office still files hours for anyone.
+    /// </summary>
+    private async Task<SaveTimesheetEntryRequest> OwnHoursAsync(SaveTimesheetEntryRequest request, CancellationToken ct)
+    {
+        // An employee always; anyone else when the form named nobody (the employee view).
+        if (currentUser.Role != UserRole.TenantUser && request.EmployeeId != Guid.Empty) return request;
+        var own = await db.Employees.AsNoTracking()
+            .Where(e => e.UserId == currentUser.UserId)
+            .Select(e => (Guid?)e.Id)
+            .FirstOrDefaultAsync(ct);
+        return own is { } id ? request with { EmployeeId = id } : request;
     }
 
     /// <summary>

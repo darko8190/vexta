@@ -17,7 +17,7 @@ import { ProjectExtraChargesSection } from "@/components/projects/detail/project
 import { ProjectMaterialsSection } from "@/components/projects/detail/project-materials-section";
 import { ProjectTimesheetsSection } from "@/components/projects/detail/project-timesheets-section";
 import { TaskFormSheet } from "@/components/projects/detail/task-form-sheet";
-import { useCanManage } from "@/hooks/use-can-create";
+import { useCanManage, useIsCrewView } from "@/hooks/use-can-create";
 import { useExpensesQuery } from "@/hooks/use-expenses";
 import { useProjectEquipmentQuery } from "@/hooks/use-equipment";
 import { useExtraChargesQuery } from "@/hooks/use-extra-charges";
@@ -44,6 +44,7 @@ export default function ProjectTaskPage({
   const { data: project } = useProjectQuery(projectId);
   const { data: tasks, isLoading, isError } = useProjectTasksQuery(projectId);
   const canManage = useCanManage();
+  const crew = useIsCrewView();
   const [section, setSection] = useState("details");
 
   // The project's own lists, shared with its tabs through the cache; counted here for the rail.
@@ -93,7 +94,8 @@ export default function ProjectTaskPage({
     { key: "equipements", label: "Équipements", count: count(equipment), icon: Wrench },
     { key: "assemblages", label: "Assemblages", count: 0, icon: Blocks },
     { key: "depenses", label: "Dépenses", count: count(expenses), icon: Receipt },
-    { key: "frais", label: "Frais supplémentaires", count: count(charges), icon: Plus },
+    // Extra charges are what the client is billed: the office's, not the crew's.
+    ...(crew ? [] : [{ key: "frais", label: "Frais supplémentaires", count: count(charges), icon: Plus }]),
     // The project's own files and thread: a note is about the job, not about one task of it.
     { key: "documents", label: "Documents et notes", icon: FolderOpen },
   ];

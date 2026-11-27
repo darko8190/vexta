@@ -20,8 +20,15 @@ export default function MyCvPage() {
         description="Écrit une fois, envoyé à chaque entreprise à qui vous répondez."
       />
 
-      <CvSection />
-      <CvDocumentSection />
+      {/* The fields on the left, the document they make on the right, side by side from xl. */}
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(26rem,42%)]">
+        <div className="min-w-0">
+          <CvSection />
+        </div>
+        <aside className="xl:sticky xl:top-0 xl:self-start">
+          <CvDocumentSection />
+        </aside>
+      </div>
       <MyApplicationsSection />
     </div>
   );

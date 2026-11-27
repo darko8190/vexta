@@ -24,6 +24,9 @@ import {
   type ProjectEquipmentLine,
 } from "@/hooks/use-equipment";
 import { ApiError } from "@/lib/api";
+import { useIsCrewView } from "@/hooks/use-can-create";
+import { NeedsReviewDot } from "@/components/projects/detail/material-row";
+import { cn } from "@/lib/utils";
 import { todayIso } from "@/lib/dates";
 import { formatAmount } from "@/lib/money";
 import { matchesSearch } from "@/lib/text-match";
@@ -33,6 +36,8 @@ const OTHER = "autre";
 
 /** The columns, shared by the headings and every row. Below lg each field carries its label. */
 const GRID = "lg:grid-cols-[minmax(0,1fr)_140px_90px_110px_110px_110px_76px]";
+/** The crew's columns: what was used, when, and how much — never the rates. */
+const CREW_GRID = "lg:grid-cols-[minmax(0,1fr)_140px_90px_76px]";
 
 type RowValues = ProjectEquipmentFormValues & { unit: EquipmentUnit };
 
@@ -88,6 +93,9 @@ export function ProjectEquipmentSection({
   /** Narrows the list to one task, and files new lines against it — the task's own page. */
   taskId?: string;
 }) {
+  const crew = useIsCrewView();
+  // The crew never sees the rates, so it never sends any: the API keeps the office's.
+  const outgoing = (values: RowValues): RowValues => (crew ? { ...values, costRate: null, sellingRate: null } : values);
   const { data, isLoading, isError, error, refetch } = useProjectEquipmentQuery(projectId);
   const { data: catalogue } = useEquipmentListQuery(1, "", 100);
   const save = useSaveProjectEquipment(projectId);
@@ -124,7 +132,7 @@ export function ProjectEquipmentSection({
     if (payload === baseline) return;
     sent.current[line.id] = payload;
     try {
-      await save.mutateAsync({ id: line.id, values });
+      await save.mutateAsync({ id: line.id, values: outgoing(values) });
     } catch (failure) {
       delete sent.current[line.id];
       toast.error(message(failure, "Impossible d'enregistrer la ligne."));
@@ -135,7 +143,7 @@ export function ProjectEquipmentSection({
     if (!isSavable(values) || posting.current.has(uid)) return;
     posting.current.add(uid);
     try {
-      await save.mutateAsync({ values });
+      await save.mutateAsync({ values: outgoing(values) });
       setDrafts((previous) => previous.filter((draft) => draft.uid !== uid));
     } catch (failure) {
       toast.error(message(failure, "Impossible d'ajouter l'équipement."));
@@ -207,13 +215,17 @@ export function ProjectEquipmentSection({
         />
       ) : (
         <div className="space-y-3">
-          <div className={`hidden items-end gap-2 px-3 text-xs font-medium text-muted-foreground lg:grid ${GRID}`}>
+          <div className={`hidden items-end gap-2 px-3 text-xs font-medium text-muted-foreground lg:grid ${crew ? CREW_GRID : GRID}`}>
             <span>Équipement</span>
             <span>Date</span>
             <span className="text-right">Qté</span>
-            <span className="text-right">Coûtant / unité</span>
-            <span className="text-right">Vendant / unité</span>
-            <span className="text-right">Total</span>
+            {!crew && (
+              <>
+                <span className="text-right">Coûtant / unité</span>
+                <span className="text-right">Vendant / unité</span>
+                <span className="text-right">Total</span>
+              </>
+            )}
             <span />
           </div>
 
@@ -224,6 +236,8 @@ export function ProjectEquipmentSection({
               equipment={equipment}
               disabled={locked}
               taskTitle={line.projectTaskTitle}
+              crew={crew}
+              needsReview={!crew && !line.equipmentId && !line.sellingRate}
               onChange={(next) => setEdits((previous) => ({ ...previous, [line.id]: next }))}
               onCommit={(next) => void commitExisting(line, next)}
               onRemove={() => setDeleteTarget(line)}
@@ -236,6 +250,7 @@ export function ProjectEquipmentSection({
                 key={draft.uid}
                 values={draft.values}
                 equipment={equipment}
+                crew={crew}
                 onChange={(next) =>
                   setDrafts((previous) => previous.map((row) => (row.uid === draft.uid ? { ...row, values: next } : row)))
                 }
@@ -244,10 +259,12 @@ export function ProjectEquipmentSection({
               />
             ))}
 
-          <div className="px-3 text-right text-sm text-muted-foreground">
-            Total des équipements{" "}
-            <span className="font-medium tabular-nums text-foreground">{formatAmount(total)}</span>
-          </div>
+          {!crew && (
+            <div className="px-3 text-right text-sm text-muted-foreground">
+              Total des équipements{" "}
+              <span className="font-medium tabular-nums text-foreground">{formatAmount(total)}</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -277,6 +294,8 @@ function EquipmentRow({
   equipment,
   disabled,
   taskTitle,
+  crew = false,
+  needsReview = false,
   onChange,
   onCommit,
   onRemove,
@@ -285,6 +304,8 @@ function EquipmentRow({
   equipment: Equipment[];
   disabled?: boolean;
   taskTitle?: string | null;
+  crew?: boolean;
+  needsReview?: boolean;
   onChange: (values: RowValues) => void;
   onCommit: (values: RowValues) => void;
   onRemove: () => void;
@@ -314,7 +335,12 @@ function EquipmentRow({
   }
 
   return (
-    <div className={`grid gap-2 rounded-lg border border-border p-3 ${GRID} lg:items-start`}>
+    <div
+      className={cn(
+        `grid gap-2 rounded-lg border p-3 ${crew ? CREW_GRID : GRID} lg:items-start`,
+        needsReview ? "border-destructive/50" : "border-border",
+      )}
+    >
       <div className="min-w-0 space-y-1.5">
         <span className="text-xs font-medium text-muted-foreground lg:sr-only">Équipement</span>
         <Select
@@ -353,6 +379,12 @@ function EquipmentRow({
           />
         )}
         {taskTitle && <p className="truncate text-xs text-muted-foreground">{taskTitle}</p>}
+        {needsReview && (
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <NeedsReviewDot />
+            Saisi à la main, sans prix : à vérifier
+          </p>
+        )}
       </div>
 
       <label className="space-y-1">
@@ -382,6 +414,8 @@ function EquipmentRow({
         />
       </label>
 
+      {!crew && (
+        <>
       <label className="space-y-1">
         <span className="text-xs font-medium text-muted-foreground lg:sr-only">Coûtant ($ / {unitLabel})</span>
         <Input
@@ -416,6 +450,9 @@ function EquipmentRow({
         <span className="text-sm font-medium text-muted-foreground lg:sr-only">Total</span>
         <span className="text-sm tabular-nums text-foreground">{formatAmount(lineSelling(values))}</span>
       </div>
+
+        </>
+      )}
 
       <div className="flex items-center justify-end gap-1">
         {values.equipmentId && (

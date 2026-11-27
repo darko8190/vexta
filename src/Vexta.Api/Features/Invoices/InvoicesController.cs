@@ -176,8 +176,9 @@ public class InvoicesController(
 
         var lines = new List<InvoiceDraftLineDto>();
 
+        // An assembly's materials are billed as the assembly, below.
         var materials = await db.ProjectMaterials.AsNoTracking()
-            .Where(m => m.ProjectId == projectId)
+            .Where(m => m.ProjectId == projectId && m.ProjectAssemblyId == null)
             .OrderBy(m => m.SortOrder).ThenBy(m => m.CreatedAt)
             .Select(m => new
             {
@@ -241,9 +242,9 @@ public class InvoicesController(
             .ToListAsync(ct);
 
         lines.AddRange(assemblies.Where(x => x.Quantity > 0).Select(x => new InvoiceDraftLineDto(
-            InvoiceLineKind.Materiaux,
+            InvoiceLineKind.Assemblage,
             null,
-            $"Assemblage : {x.Name.Trim()}",
+            x.Name.Trim(),
             x.Quantity,
             x.UnitCost,
             null,

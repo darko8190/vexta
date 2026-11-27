@@ -51,6 +51,22 @@ public static class QuoteMail
         var hasPortal = quote.Client?.UserId is not null
             || await db.ClientContacts.AnyAsync(c => c.ClientId == quote.ClientId && c.UserId != null, ct);
 
+        // The answer link: given a token the first time the message is prepared, written at once
+        // so the preview, the email sent and every reminder carry the same link.
+        string? responseUrl = null;
+        if ((settings?.QuoteEmailCanApprove ?? true) || (settings?.QuoteEmailCanRequestChange ?? true)
+            || (settings?.QuoteEmailCanRefuse ?? true))
+        {
+            if (string.IsNullOrWhiteSpace(quote.ResponseToken))
+            {
+                var token = NewToken();
+                await db.Quotes.IgnoreQueryFilters().Where(q => q.Id == quote.Id)
+                    .ExecuteUpdateAsync(set => set.SetProperty(q => q.ResponseToken, token), ct);
+                quote.ResponseToken = token;
+            }
+            responseUrl = ResponseUrl(frontendUrl, quote.ResponseToken);
+        }
+
         // Dates the way the PDF prints them, so the message and the attachment agree.
         var validUntil = quote.ValidUntil?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         return new Dictionary<string, string>
@@ -68,10 +84,22 @@ public static class QuoteMail
             ["date_validite"] = validUntil ?? "",
             ["validite"] = QuoteEmailTemplate.Validity(validUntil),
             ["devise"] = Currency(settings?.Currency),
-            [QuoteEmailTemplate.AcceptField] = QuoteEmailTemplate.AcceptParagraph(
+            [QuoteEmailTemplate.AcceptField] = QuoteEmailTemplate.ResponseParagraph(
+                responseUrl,
+                settings?.QuoteEmailCanApprove ?? true,
+                settings?.QuoteEmailCanRequestChange ?? true,
+                settings?.QuoteEmailCanRefuse ?? true,
                 hasPortal ? $"{frontendUrl}/soumissions/{quote.Id}" : null)
         };
     }
+
+    /// <summary>32 random bytes: the link is the whole credential, like an invoice's payment link.</summary>
+    public static string NewToken() =>
+        Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32))
+            .TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
+    public static string ResponseUrl(string frontendUrl, string token) =>
+        $"{frontendUrl.TrimEnd('/')}/reponse-soumission/{Uri.EscapeDataString(token)}";
 
     /// <summary>The client's own address, then its contacts — the billing contact first.</summary>
     public static async Task<List<InvoiceRecipientDto>> RecipientsAsync(VextaDbContext db, Quote quote, CancellationToken ct)

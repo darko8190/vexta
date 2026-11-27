@@ -135,7 +135,8 @@ public enum InvoiceLineKind
     MainDOeuvre = 1,
     Equipement = 2,
     FraisSupplementaires = 3,
-    Autre = 4
+    Autre = 4,
+    Assemblage = 5
 }
 
 /// <summary>

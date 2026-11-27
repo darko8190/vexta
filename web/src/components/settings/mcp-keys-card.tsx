@@ -1,5 +1,6 @@
 "use client";
 
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
 import { Check, Copy, KeyRound, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -96,13 +97,6 @@ export function McpKeysCard() {
     }
   }
 
-  const config = endpoint
-    ? JSON.stringify(
-        { mcpServers: { vexta: { type: "http", url: endpoint, headers: { Authorization: "Bearer VOTRE_CLE" } } } },
-        null,
-        2,
-      )
-    : "";
 
   return (
     <Card className="max-w-3xl">
@@ -176,13 +170,7 @@ export function McpKeysCard() {
           {secret ? (
             <div className="space-y-4">
               <CopyField id="mcp-secret" label="Clé" value={secret} />
-              {config && (
-                <Field>
-                  <FieldLabel>Exemple de configuration</FieldLabel>
-                  <pre className="overflow-x-auto rounded-lg border border-border bg-muted/40 p-3 text-xs">{config}</pre>
-                  <FieldDescription>Remplacez VOTRE_CLE par la clé ci-dessus.</FieldDescription>
-                </Field>
-              )}
+              {endpoint && <McpSetupGuide endpoint={endpoint} secret={secret} />}
             </div>
           ) : (
             <div className="space-y-4">
@@ -230,5 +218,91 @@ export function McpKeysCard() {
         pending={revoke.isPending}
       />
     </Card>
+  );
+}
+
+/**
+ * How to plug the key into each assistant. Most take the address and the key in a header;
+ * ChatGPT and the others that cannot send a header take the address with the key in it, set
+ * to no authentication — that address is then the secret.
+ */
+function McpSetupGuide({ endpoint, secret }: { endpoint: string; secret: string }) {
+  const header = `Bearer ${secret}`;
+  const keyedUrl = `${endpoint.replace(/\/$/, "")}/${secret}`;
+  const guides: { value: string; label: string; steps: string; code?: string; copy?: string }[] = [
+    {
+      value: "chatgpt",
+      label: "ChatGPT",
+      steps:
+        "Dans ChatGPT, ouvrez les réglages des connecteurs (mode développeur), créez un connecteur MCP, collez l'adresse ci-dessous et choisissez « Aucune authentification ». L'adresse contient la clé : gardez-la secrète.",
+      copy: keyedUrl,
+    },
+    {
+      value: "claude-code",
+      label: "Claude Code",
+      steps: "Dans un terminal :",
+      code: `claude mcp add --transport http vexta ${endpoint} --header "Authorization: ${header}"`,
+    },
+    {
+      value: "claude-desktop",
+      label: "Claude Desktop",
+      steps: "Dans le fichier de configuration de Claude Desktop (claude_desktop_config.json) :",
+      code: JSON.stringify(
+        { mcpServers: { vexta: { command: "npx", args: ["mcp-remote", endpoint, "--header", `Authorization:${header}`] } } },
+        null,
+        2,
+      ),
+    },
+    {
+      value: "cursor",
+      label: "Cursor / Windsurf",
+      steps: "Dans mcp.json :",
+      code: JSON.stringify({ mcpServers: { vexta: { url: endpoint, headers: { Authorization: header } } } }, null, 2),
+    },
+    {
+      value: "vscode",
+      label: "VS Code",
+      steps: "Dans .vscode/mcp.json :",
+      code: JSON.stringify({ servers: { vexta: { type: "http", url: endpoint, headers: { Authorization: header } } } }, null, 2),
+    },
+    {
+      value: "gemini",
+      label: "Gemini CLI",
+      steps: "Dans ~/.gemini/settings.json :",
+      code: JSON.stringify({ mcpServers: { vexta: { httpUrl: endpoint, headers: { Authorization: header } } } }, null, 2),
+    },
+    {
+      value: "autre",
+      label: "Autre",
+      steps:
+        "Tout client MCP « Streamable HTTP » : l'adresse du serveur avec l'en-tête Authorization: Bearer et la clé, ou, s'il ne permet pas d'en-tête, l'adresse avec la clé.",
+      copy: keyedUrl,
+    },
+  ];
+
+  return (
+    <Field>
+      <FieldLabel>Brancher la clé</FieldLabel>
+      <Tabs defaultValue="chatgpt">
+        <div className="-mx-1 overflow-x-auto px-1">
+          <TabsList>
+            {guides.map((guide) => (
+              <TabsTrigger key={guide.value} value={guide.value} className="px-2 text-xs">
+                {guide.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
+        {guides.map((guide) => (
+          <TabsContent key={guide.value} value={guide.value} className="space-y-2">
+            <FieldDescription>{guide.steps}</FieldDescription>
+            {guide.copy && <CopyField id={`mcp-${guide.value}`} label="Adresse avec la clé" value={guide.copy} />}
+            {guide.code && (
+              <pre className="max-h-48 overflow-auto rounded-lg border border-border bg-muted/40 p-3 text-xs">{guide.code}</pre>
+            )}
+          </TabsContent>
+        ))}
+      </Tabs>
+    </Field>
   );
 }

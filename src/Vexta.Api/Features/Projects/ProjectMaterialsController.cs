@@ -38,6 +38,10 @@ public class ProjectMaterialsController(VextaDbContext db, ICurrentUserService c
             .Select(ToDto())
             .ToListAsync(ct);
 
+        // The crew records what went in; what it cost and sells for is the office's.
+        if (currentUser.Role == UserRole.TenantUser)
+            items = items.ConvertAll(m => m with { PurchasePrice = null, MarginPercent = null, UnitPrice = 0m });
+
         return Ok(items);
     }
 
@@ -106,9 +110,26 @@ public class ProjectMaterialsController(VextaDbContext db, ICurrentUserService c
         material.Description = request.Description.Trim();
         material.Unit = Clean(request.Unit);
         material.Quantity = request.Quantity;
-        material.PurchasePrice = request.PurchasePrice;
-        material.MarginPercent = request.MarginPercent;
-        material.UnitPrice = request.UnitPrice;
+        // The crew never sees the prices, so what it sends back for them is not a price: the
+        // line keeps the one the office set, unless the crew picked another product.
+        var crew = currentUser.Role == UserRole.TenantUser;
+        if (!crew || material.ProductId != request.ProductId || material.UnitPrice == 0)
+        {
+            if (crew && request.ProductId is { } pid
+                && await db.Products.AsNoTracking().Where(p => p.Id == pid)
+                    .Select(p => new { p.PurchasePrice, p.MarginPercent, p.SellingPrice }).FirstOrDefaultAsync(ct) is { } product)
+            {
+                material.PurchasePrice = product.PurchasePrice;
+                material.MarginPercent = product.MarginPercent;
+                material.UnitPrice = product.SellingPrice ?? 0m;
+            }
+            else if (!crew)
+            {
+                material.PurchasePrice = request.PurchasePrice;
+                material.MarginPercent = request.MarginPercent;
+                material.UnitPrice = request.UnitPrice;
+            }
+        }
         material.ProjectTaskId = request.ProjectTaskId;
         material.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -196,7 +217,8 @@ public class ProjectMaterialsController(VextaDbContext db, ICurrentUserService c
         // through ToDto(), which does carry the title.
         null,
         m.CreatedAt,
-        m.UpdatedAt);
+        m.UpdatedAt,
+        m.ProjectAssemblyId);
 
     private static System.Linq.Expressions.Expression<Func<ProjectMaterial, ProjectMaterialDto>> ToDto() =>
         m => new ProjectMaterialDto(
@@ -213,5 +235,7 @@ public class ProjectMaterialsController(VextaDbContext db, ICurrentUserService c
             m.ProjectTaskId,
             m.ProjectTask == null ? null : m.ProjectTask.Title,
             m.CreatedAt,
-            m.UpdatedAt);
+            m.UpdatedAt,
+            m.ProjectAssemblyId,
+            m.ProjectAssembly == null ? null : m.ProjectAssembly.Name);
 }

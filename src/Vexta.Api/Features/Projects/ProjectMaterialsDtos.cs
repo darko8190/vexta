@@ -25,7 +25,10 @@ public record ProjectMaterialDto(
     Guid? ProjectTaskId,
     string? ProjectTaskTitle,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt)
+    DateTimeOffset UpdatedAt,
+    /// <summary>The assembly that brought it: its quantity follows the assembly, its money is the assembly's.</summary>
+    Guid? ProjectAssemblyId = null,
+    string? ProjectAssemblyName = null)
 {
     public decimal Total => Quantity * UnitPrice;
 }

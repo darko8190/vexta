@@ -37,6 +37,8 @@ export interface ProjectFormValues {
   recurrenceEvery?: number | null;
   recurrenceUnit?: RecurrenceUnit;
   recurrenceEndDate?: string | null;
+  /** On creation only: start from this project template's lines. */
+  templateId?: string | null;
 }
 
 export function useProjectsQuery(

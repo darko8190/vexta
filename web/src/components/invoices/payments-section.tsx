@@ -1,5 +1,7 @@
 "use client";
 
+import { BulkPaymentButton } from "@/components/invoices/bulk-payment-dialog";
+import { useCanManage } from "@/hooks/use-can-create";
 import { useState } from "react";
 import Link from "next/link";
 import { Wallet } from "lucide-react";
@@ -35,6 +37,7 @@ const methods = Object.keys(paymentMethodLabels) as PaymentMethod[];
  * only ever be a second way to do the same thing, drifting from the first.
  */
 export function PaymentsSection() {
+  const canManage = useCanManage();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [method, setMethod] = useState("");
@@ -65,11 +68,14 @@ export function PaymentsSection() {
 
   return (
     <div>
-      <div className="mb-4">
-        <h2 className="text-base font-semibold text-foreground">Paiements</h2>
-        <p className="text-sm text-muted-foreground">
-          Ce qui est rentré, toutes factures confondues.
-        </p>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold text-foreground">Paiements</h2>
+          <p className="text-sm text-muted-foreground">
+            Ce qui est rentré, toutes factures confondues.
+          </p>
+        </div>
+        {canManage && <BulkPaymentButton />}
       </div>
 
       {/* Every filter carries a visible label, including the search: two labelled fields beside

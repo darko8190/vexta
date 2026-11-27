@@ -76,7 +76,11 @@ public record BillingSettingsDto(
     int? InvoiceReminderDays,
     /// <summary>How many reminders each one gets per sending, spaced by its delay.</summary>
     int QuoteReminderCount,
-    int InvoiceReminderCount);
+    int InvoiceReminderCount,
+    /// <summary>What the client may answer straight from the quote's email.</summary>
+    bool QuoteEmailCanApprove = true,
+    bool QuoteEmailCanRequestChange = true,
+    bool QuoteEmailCanRefuse = true);
 
 /// <summary>One field a template may drop in, and what it stands for.</summary>
 public record InvoiceEmailFieldDto(string Field, string Description);
@@ -262,6 +266,30 @@ public class BillingSettingsController(VextaDbContext db, ICurrentUserService cu
         }
 
         settings.QuoteTerms = terms;
+        settings.UpdatedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(ct);
+        return Ok(ToDto(settings, settings.DefaultPricePolicyId));
+    }
+
+    /// <summary>What the client may answer from the quote's email. Its own endpoint, like the conditions.</summary>
+    [HttpPut("soumission-reponses")]
+    [Authorize(Roles = Roles.Owner)]
+    public async Task<ActionResult<BillingSettingsDto>> SaveQuoteResponses(SaveQuoteResponsesRequest request, CancellationToken ct)
+    {
+        if (currentUser.TenantId is not { } tenantId) return Forbid();
+        var settings = await db.BillingSettings.FirstOrDefaultAsync(b => b.TenantId == tenantId, ct);
+        if (settings is null)
+        {
+            settings = new Domain.BillingSettings
+            {
+                TenantId = tenantId,
+                DefaultPricePolicyId = await DefaultPolicyIdAsync(null, ct)
+            };
+            db.BillingSettings.Add(settings);
+        }
+        settings.QuoteEmailCanApprove = request.CanApprove;
+        settings.QuoteEmailCanRequestChange = request.CanRequestChange;
+        settings.QuoteEmailCanRefuse = request.CanRefuse;
         settings.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
         return Ok(ToDto(settings, settings.DefaultPricePolicyId));
@@ -615,9 +643,14 @@ public class BillingSettingsController(VextaDbContext db, ICurrentUserService cu
             model.QuoteReminderDays,
             model.InvoiceReminderDays,
             model.QuoteReminderCount,
-            model.InvoiceReminderCount);
+            model.InvoiceReminderCount,
+            model.QuoteEmailCanApprove,
+            model.QuoteEmailCanRequestChange,
+            model.QuoteEmailCanRefuse);
     }
 }
+
+public record SaveQuoteResponsesRequest(bool CanApprove, bool CanRequestChange, bool CanRefuse);
 
 /// <summary>
 /// What the Courriel card saves. Blank means null, and null means the built-in wording — never

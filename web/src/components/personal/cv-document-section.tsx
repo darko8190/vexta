@@ -46,11 +46,10 @@ export function CvDocumentSection() {
             error={pdf.error}
             title="Aperçu de votre CV"
             fileName={name ? `CV - ${name}.pdf` : "CV.pdf"}
-            className="max-w-2xl"
           />
         ) : (
           <p className="text-sm text-muted-foreground">
-            Remplissez au moins une section ci-dessus — un titre, un résumé, une expérience, une
+            Remplissez au moins une section — un titre, un résumé, une expérience, une
             formation ou une carte — et votre CV apparaîtra ici.
           </p>
         )}

@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/layout/empty-state";
 import { LoadErrorState } from "@/components/layout/load-error-state";
 import { SearchInput } from "@/components/layout/search-input";
 import { EmployeePicker } from "@/components/team/employee-picker";
+import { useIsCrewView } from "@/hooks/use-can-create";
 import { formatHours, quarterHoursBetween } from "@/components/projects/detail/timesheet-form-sheet";
 import { useDeleteTimesheet, useSaveTimesheet, useTimesheetsQuery } from "@/hooks/use-timesheets";
 import { ApiError } from "@/lib/api";
@@ -46,10 +47,10 @@ function toValues(entry: TimesheetEntry): SaveTimesheetValues {
   };
 }
 
-function blankValues(taskId?: string): SaveTimesheetValues {
+function blankValues(taskId?: string, self = false): SaveTimesheetValues {
   const today = todayIso();
   return {
-    employeeId: "",
+    employeeId: self ? SELF_EMPLOYEE : "",
     startDate: today,
     endDate: today,
     startTime: "07:00",
@@ -62,6 +63,9 @@ function blankValues(taskId?: string): SaveTimesheetValues {
 function hoursOf(values: SaveTimesheetValues): number {
   return quarterHoursBetween(values.startDate, values.startTime, values.endDate, values.endTime) ?? 0;
 }
+
+/** The crew punches its own hours: the API files them under whoever is signed in. */
+export const SELF_EMPLOYEE = "00000000-0000-0000-0000-000000000000";
 
 function isSavable(values: SaveTimesheetValues): boolean {
   return Boolean(values.employeeId && values.startDate && values.startTime && values.endTime) && hoursOf(values) > 0;
@@ -92,6 +96,8 @@ export function ProjectTimesheetsSection({
   const { data, isLoading, isError, isPlaceholderData, error: loadError, refetch } = useTimesheetsQuery(projectId);
   const save = useSaveTimesheet(projectId);
   const remove = useDeleteTimesheet(projectId);
+  // The crew punches its own hours: no one to choose.
+  const crew = useIsCrewView();
 
   const [edits, setEdits] = useState<Record<string, SaveTimesheetValues>>({});
   const [drafts, setDrafts] = useState<Draft[]>([]);
@@ -147,7 +153,7 @@ export function ProjectTimesheetsSection({
 
   function addDraft() {
     nextUid.current += 1;
-    setDrafts((previous) => [...previous, { uid: `draft-${nextUid.current}`, values: blankValues(taskId) }]);
+    setDrafts((previous) => [...previous, { uid: `draft-${nextUid.current}`, values: blankValues(taskId, crew) }]);
   }
 
   async function confirmDelete() {
@@ -234,7 +240,7 @@ export function ProjectTimesheetsSection({
               key={entry.id}
               values={valuesOf(entry)}
               disabled={locked}
-              removedEmployeeName={entry.employeeId ? null : "Employé retiré"}
+              removedEmployeeName={entry.employeeId ? (crew ? (entry.employeeName ?? "—") : null) : "Employé retiré"}
               taskTitle={entry.projectTaskTitle}
               onChange={(next) => setEdits((previous) => ({ ...previous, [entry.id]: next }))}
               onCommit={(next) => void commitExisting(entry, next)}
@@ -247,6 +253,7 @@ export function ProjectTimesheetsSection({
               <TimesheetRow
                 key={draft.uid}
                 values={draft.values}
+                removedEmployeeName={crew ? "Moi" : null}
                 onChange={(next) =>
                   setDrafts((previous) => previous.map((row) => (row.uid === draft.uid ? { ...row, values: next } : row)))
                 }

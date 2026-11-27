@@ -24,6 +24,17 @@ namespace Vexta.Api.Features.Hr;
 [RequireActiveSubscription]
 public class EmployeeFileController(VextaDbContext db, ICurrentUserService currentUser) : ControllerBase
 {
+    /// <summary>The employee file of the person signed in, for their own leave and schedule.</summary>
+    [HttpGet("moi")]
+    public async Task<ActionResult<MyEmployeeDto>> Me(CancellationToken ct)
+    {
+        var me = await db.Employees.AsNoTracking()
+            .Where(e => e.UserId == currentUser.UserId)
+            .Select(e => new MyEmployeeDto(e.Id, e.FirstName + " " + e.LastName))
+            .FirstOrDefaultAsync(ct);
+        return me is null ? NotFound(new { message = "Aucune fiche d'employé n'est liée à votre compte." }) : Ok(me);
+    }
+
     // ---- Adresses ----
 
     /// <param name="employe">One person's addresses. Omitted means every address in the company.</param>
@@ -669,3 +680,5 @@ public class EmployeeFileController(VextaDbContext db, ICurrentUserService curre
 
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
+
+public record MyEmployeeDto(Guid Id, string Name);

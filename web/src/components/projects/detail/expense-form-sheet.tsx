@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import { useIsCrewView } from "@/hooks/use-can-create";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
@@ -109,6 +110,7 @@ export function ExpenseFormSheet({
   const [newType, setNewType] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
 
+  const crew = useIsCrewView();
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -264,7 +266,8 @@ export function ExpenseFormSheet({
           description: values.description || null,
           expenseTypeId: values.expenseTypeId,
           cost,
-          sellingPrice,
+          // The crew never sees what the client is charged, so it leaves it as the office set it.
+          sellingPrice: crew ? (expense?.sellingPrice ?? null) : sellingPrice,
           spentOn: values.spentOn || null,
           projectTaskId: values.projectTaskId || null,
           isBillable: values.isBillable,
@@ -455,6 +458,7 @@ export function ExpenseFormSheet({
                   </Field>
                 )}
               />
+              {!crew && (
               <Controller
                 name="sellingPrice"
                 control={form.control}
@@ -466,6 +470,7 @@ export function ExpenseFormSheet({
                   </Field>
                 )}
               />
+              )}
             </div>
 
             <Controller

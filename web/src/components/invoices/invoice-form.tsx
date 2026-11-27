@@ -25,6 +25,7 @@ import { PdfViewer } from "@/components/layout/pdf-viewer";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { buttonVariants } from "@/components/ui/button";
 import { useBillingSettingsQuery } from "@/hooks/use-billing-settings";
+import { useInvoiceAutoFeesQuery, type InvoiceAutoFee } from "@/hooks/use-auto-fees";
 import { useClientQuery } from "@/hooks/use-clients";
 import { useProjectQuery } from "@/hooks/use-projects";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
@@ -49,7 +50,7 @@ const statuses = Object.keys(invoiceStatusLabels) as InvoiceStatus[];
 /** Base UI needs a value for every item, and "" is not one. */
 const NO_POLICY = "aucune";
 
-const lineKinds = ["Materiaux", "MainDOeuvre", "Equipement", "FraisSupplementaires", "Autre"] as const;
+const lineKinds = ["Materiaux", "MainDOeuvre", "Equipement", "Assemblage", "FraisSupplementaires", "Autre"] as const;
 
 const lineSchema = z.object({
   kind: z.enum(lineKinds),
@@ -95,10 +96,26 @@ function toFormValues(
   termsDays = 30,
   defaultProjectId?: string,
   draft?: InvoiceDraft,
+  autoFees?: InvoiceAutoFee[],
 ): FormValues {
   const exempt = invoice?.isTaxExempt ?? draft?.isTaxExempt ?? false;
   const saved = invoice?.lines?.length ? invoice.lines : undefined;
   const fromProject = draft?.lines?.length ? draft.lines : undefined;
+  // A new invoice starts with the company's automatic fees, which it can still remove.
+  const fees = !invoice
+    ? (autoFees ?? [])
+        .filter((fee) => fee.isActive)
+        .map((fee) => ({
+          kind: "FraisSupplementaires" as const,
+          productId: null,
+          description: fee.description,
+          quantity: fee.quantity,
+          purchasePrice: null,
+          marginPercent: null,
+          unitPrice: fee.unitPrice,
+          isTaxable: fee.isTaxable && !exempt,
+        }))
+    : [];
 
   return {
     clientId: invoice?.clientId ?? draft?.clientId ?? defaultClientId ?? "",
@@ -118,7 +135,7 @@ function toFormValues(
       marginPercent: l.marginPercent ?? null,
       unitPrice: l.unitPrice,
       isTaxable: l.isTaxable,
-    }))
+    })).concat(fees)
       // Taxable by default. Zero is not a neutral starting point on an invoice — it is a
       // claim that nothing on it is taxable, which is wrong on nearly every line.
       ?? [
@@ -132,6 +149,7 @@ function toFormValues(
           unitPrice: 0,
           isTaxable: !exempt,
         },
+        ...fees,
       ],
   };
 }
@@ -178,6 +196,8 @@ export function InvoiceForm({
     !isEditing ? defaultProjectId : undefined,
   );
 
+  const { data: autoFees, isLoading: feesLoading } = useInvoiceAutoFeesQuery(!isEditing);
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: toFormValues(invoice, defaultClientId, 30, defaultProjectId),
@@ -190,10 +210,10 @@ export function InvoiceForm({
     if (form.formState.isDirty) return;
 
     form.reset(
-      toFormValues(invoice, defaultClientId, settings?.paymentTermsDays, defaultProjectId, projectDraft),
+      toFormValues(invoice, defaultClientId, settings?.paymentTermsDays, defaultProjectId, projectDraft, autoFees),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [invoice?.id, settings?.paymentTermsDays, projectDraft]);
+  }, [invoice?.id, settings?.paymentTermsDays, projectDraft, autoFees]);
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "lines" });
   const clientId = useWatch({ control: form.control, name: "clientId" });
@@ -338,12 +358,17 @@ export function InvoiceForm({
       if (isEditing && invoice) {
         await updateInvoice.mutateAsync({ id: invoice.id, values: payload });
         toast.success("Facture mise à jour.");
+        // Started from a project: to the invoice, and from there back to the project.
+        router.push(defaultProjectId ? `/factures/${invoice.id}?retour=${encodeURIComponent(`/projets/${defaultProjectId}`)}` : `/factures/${invoice.id}`);
       } else {
-        await createInvoice.mutateAsync(payload);
+        const created = await createInvoice.mutateAsync(payload);
         toast.success("Facture créée.");
+        router.push(
+          defaultProjectId
+            ? `/factures/${created.id}?retour=${encodeURIComponent(`/projets/${defaultProjectId}`)}`
+            : `/factures/${created.id}`,
+        );
       }
-      // Started from a project: back to it, where the invoice was asked for.
-      router.push(defaultProjectId ? `/projets/${defaultProjectId}` : "/factures");
     } catch (error) {
       toast.error(error instanceof ApiError ? error.message : "Impossible d'enregistrer la facture.");
     }
@@ -351,7 +376,7 @@ export function InvoiceForm({
 
   // Also while the project is being read: saving the empty line that is about to be replaced
   // would create an invoice for a job whose own lines never made it onto it.
-  const pending = createInvoice.isPending || updateInvoice.isPending || draftLoading;
+  const pending = createInvoice.isPending || updateInvoice.isPending || draftLoading || (!isEditing && feesLoading);
 
   // Only on the way in. An invoice that already exists can still be corrected — locking someone
   // out of fixing a typo because a settings page is blank would be punishing the wrong thing.

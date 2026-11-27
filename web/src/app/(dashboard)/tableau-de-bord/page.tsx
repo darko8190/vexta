@@ -1,13 +1,13 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
-import { ClipboardPen, FileText, FolderKanban, UserRound } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ClipboardPen, FileText, FolderKanban } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AdminDashboardStats } from "@/components/dashboard/admin-dashboard-stats";
 import { DashboardStats } from "@/components/dashboard/dashboard-stats";
-import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
-import { UpgradeCta } from "@/components/layout/upgrade-cta";
 import { useProjectsQuery } from "@/hooks/use-projects";
 import { useInvoicesQuery } from "@/hooks/use-invoices";
 import { useQuoteStatusCountsQuery } from "@/hooks/use-quotes";
@@ -54,21 +54,6 @@ function TenantDashboard() {
   return <DashboardStats />;
 }
 
-/**
- * Nothing yet, and it says so. A personal space is free and holds none of the company modules,
- * so tiles linking to clients, projects and invoices would each lead to a screen whose only
- * content is an invitation to buy a business plan. What belongs here is still being decided.
- */
-function PersonalDashboard() {
-  return (
-    <EmptyState
-      icon={UserRound}
-      title="Votre espace personnel est vide"
-      description="Rien à gérer ici pour l'instant. Les clients, les projets et les factures appartiennent à un compte entreprise."
-      action={<UpgradeCta />}
-    />
-  );
-}
 
 /**
  * A customer's own numbers. The client directory is closed to them, so asking for its count
@@ -106,6 +91,12 @@ function SuperAdminDashboard() {
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const router = useRouter();
+  // A personal space has no dashboard: it opens on its CV.
+  const personal = user?.tenantKind === "Personal" && user.role !== "Client" && user.role !== "SuperAdmin";
+  useEffect(() => {
+    if (personal) router.replace("/mon-cv");
+  }, [personal, router]);
   const isSuperAdmin = user?.role === "SuperAdmin" && !user.isImpersonating;
 
   return (
@@ -130,9 +121,7 @@ export default function DashboardPage() {
         <SuperAdminDashboard />
       ) : user?.role === "Client" ? (
         <ClientDashboard />
-      ) : user?.tenantKind === "Personal" ? (
-        <PersonalDashboard />
-      ) : (
+      ) : personal ? null : (
         <TenantDashboard />
       )}
     </div>

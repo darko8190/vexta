@@ -152,3 +152,9 @@ public record SaveProductImagesRequest(IReadOnlyList<Guid>? MediaAssetIds);
 
 /// <param name="QuantityChange">Positive for what came in, negative for what left.</param>
 public record ProductStockMovementRequest(decimal QuantityChange, string? Reason);
+
+/// <summary>A product as the advanced search shows it: a picture, its filing and its prices.</summary>
+public record ProductBrowseDto(
+    Guid Id, int Number, string? Code, string Title, string? Unit, Guid? CategoryId, string? CategoryName,
+    string? SubCategoryName, decimal? PurchasePrice, decimal? MarginPercent, decimal? SellingPrice,
+    bool TracksInventory, decimal QuantityOnHand, string? ImageUrl);

@@ -22,7 +22,7 @@ import { AssistantButton } from "@/components/assistant/assistant-panel";
 import { VextaIcon, VextaLockup } from "@/components/brand/vexta-logo";
 import { isCrewHiddenRoute } from "@/hooks/use-can-create";
 import { GlobalSearch } from "@/components/layout/global-search";
-import { dashboardNavItem, employeeModeNavItems, getNavItems, type NavItem } from "@/components/layout/nav-config";
+import { crewOwnNav, dashboardNavItem, employeeModeNavItems, getNavItems, type NavItem } from "@/components/layout/nav-config";
 import { ViewModeToggle } from "@/components/layout/view-mode-toggle";
 import { useViewMode } from "@/lib/view-mode";
 import { NavLinks } from "@/components/layout/nav-links";
@@ -85,8 +85,13 @@ function useTenantNavItems(): { items: NavItem[]; pending: boolean } {
 
   // An employee never gets the dashboard, the project list or the tools, whichever menu applies.
   const isCrew = user?.role === "TenantUser" && user.tenantKind !== "Personal";
-  const crewFilter = (items: NavItem[]) =>
-    isCrew ? items.filter((item) => !isCrewHiddenRoute(item.href)) : items;
+  // ... and gets their own leave, week and expenses right after their assignments.
+  const crewFilter = (items: NavItem[]) => {
+    if (!isCrew) return items;
+    const kept = items.filter((item) => !isCrewHiddenRoute(item.href));
+    const at = kept.findIndex((item) => item.href === "/mes-assignations");
+    return at < 0 ? [...crewOwnNav, ...kept] : [...kept.slice(0, at + 1), ...crewOwnNav, ...kept.slice(at + 1)];
+  };
 
   // A fixed menu has nothing in flight, so it draws at once.
   if (!fromModules) return { items: crewFilter(builtIn), pending: false };
@@ -250,7 +255,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             onClick={() => setMobileOpen(true)}
             className="flex items-center rounded-lg transition-opacity hover:opacity-70"
           >
-            <VextaLockup iconClassName="size-7" />
+            {/* The mark alone: on a phone the bar needs the room for its controls. */}
+            <VextaIcon className="size-7" />
           </button>
           <div className="flex-1" />
           <GlobalSearch shortcut={false} />

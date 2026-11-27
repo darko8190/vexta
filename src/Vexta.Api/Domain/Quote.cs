@@ -25,7 +25,16 @@ public enum QuoteLineKind
     Materiel = 1,
 
     /// <summary>Becomes an extra charge on the project.</summary>
-    Frais = 2
+    Frais = 2,
+
+    /// <summary>Equipment priced for the job: becomes an equipment line on the project.</summary>
+    Equipement = 3,
+
+    /// <summary>
+    /// An assembly: carries the price. Its materials are added under it as lines of their own
+    /// (<see cref="QuoteLine.ParentLineId"/>), shown for what they are and left out of the total.
+    /// </summary>
+    Assemblage = 4
 }
 
 /// <summary>
@@ -139,6 +148,22 @@ public class Quote : ISoftDeletable
 
     public bool IsTaxExempt { get; set; }
 
+    /// <summary>Who the job is discussed with, and who the invoices go to. Carried to the project.</summary>
+    public Guid? ContactId { get; set; }
+    public ClientContact? Contact { get; set; }
+    public Guid? BillingContactId { get; set; }
+    public ClientContact? BillingContact { get; set; }
+
+    /// <summary>
+    /// The link sent in the email so the client can answer without an account: approve, ask for a
+    /// change, or refuse, as the company's settings allow. 32 random bytes, like an invoice's.
+    /// </summary>
+    public string? ResponseToken { get; set; }
+
+    /// <summary>What the client asked to change, from the email link. Cleared once a new version is sent.</summary>
+    public DateTimeOffset? ChangeRequestedAt { get; set; }
+    public string? ChangeRequestNote { get; set; }
+
     public Guid? ClientAssetId { get; set; }
     public ClientAsset? ClientAsset { get; set; }
 
@@ -189,6 +214,19 @@ public class QuoteLine
     public Guid? ProductId { get; set; }
     public Product? Product { get; set; }
 
+    /// <summary>The equipment an equipment line came from, and the assembly an assembly line did.</summary>
+    public Guid? EquipmentId { get; set; }
+    public Equipment? Equipment { get; set; }
+    public Guid? AssemblyId { get; set; }
+    public Assembly? Assembly { get; set; }
+
+    /// <summary>
+    /// The assembly line this material belongs to. Such a line says what goes into the assembly
+    /// and how much of it; the money is on the assembly, so it never counts in the total.
+    /// </summary>
+    public Guid? ParentLineId { get; set; }
+    public QuoteLine? ParentLine { get; set; }
+
     public string? Code { get; set; }
     public required string Description { get; set; }
     public string? Unit { get; set; }
@@ -206,7 +244,7 @@ public class QuoteLine
     public bool IsSelected { get; set; }
 
     /// <summary>In the price: every ordinary line, and the options that were chosen.</summary>
-    public bool Counts => !IsOptional || IsSelected;
+    public bool Counts => ParentLineId == null && (!IsOptional || IsSelected);
 
     public int SortOrder { get; set; }
 
@@ -290,6 +328,8 @@ public class QuoteTemplateLine
     public QuoteLineKind Kind { get; set; }
     public Guid? ProductId { get; set; }
     public Product? Product { get; set; }
+    public Guid? EquipmentId { get; set; }
+    public Guid? AssemblyId { get; set; }
     public string? Code { get; set; }
     public required string Description { get; set; }
     public string? Unit { get; set; }

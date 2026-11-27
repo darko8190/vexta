@@ -13,6 +13,8 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { PageHeader } from "@/components/layout/page-header";
+import { InvoiceAutoFeesCard } from "@/components/settings/invoice-auto-fees-card";
+import { QuoteResponsesCard } from "@/components/settings/quote-responses-card";
 import { SectionNav, type NavSection } from "@/components/layout/section-nav";
 import { AiAssistantCard } from "@/components/settings/ai-assistant-card";
 import { BillingSettingsCard } from "@/components/settings/billing-settings-card";
@@ -459,6 +461,7 @@ export default function SettingsPage() {
                 tabs={[
                   { value: "facture", label: "Facture", status: billingStatus, content: <BillingSettingsCard /> },
                   { value: "relances", label: "Relances", status: invoiceReminderStatus, content: <InvoiceReminderCard /> },
+                  { value: "frais-automatiques", label: "Frais automatiques", content: <InvoiceAutoFeesCard /> },
                 ]}
               />
             )}
@@ -467,6 +470,7 @@ export default function SettingsPage() {
                 tabs={[
                   { value: "conditions", label: "Conditions", status: quoteTermsStatus, content: <QuoteTermsCard /> },
                   { value: "relances", label: "Relances", status: quoteReminderStatus, content: <QuoteReminderCard /> },
+                  { value: "reponses", label: "Réponse par courriel", content: <QuoteResponsesCard /> },
                   { value: "modeles", label: "Modèles", content: <QuoteTemplatesCard /> },
                 ]}
               />

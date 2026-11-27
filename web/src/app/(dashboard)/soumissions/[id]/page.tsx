@@ -7,6 +7,10 @@ import {
   ArrowLeft,
   ArrowRightLeft,
   BellRing,
+  Blocks,
+  MessageSquareWarning,
+  UserRound,
+  Wrench,
   BookmarkPlus,
   ClipboardPen,
   Copy,
@@ -58,6 +62,7 @@ import { InvoiceSendDialog } from "@/components/invoices/invoice-send-dialog";
 import { PdfViewer } from "@/components/layout/pdf-viewer";
 import { SendHistoryCard } from "@/components/layout/send-history-card";
 import { ProjectCostTable } from "@/components/projects/detail/project-cost-table";
+import { ClientQuickView } from "@/components/clients/client-quick-view";
 import { useCanManage, useIsClientUser } from "@/hooks/use-can-create";
 import { usePdfDocument } from "@/hooks/use-pdf-document";
 import { ProjectDocumentsSection } from "@/components/projects/detail/project-documents-section";
@@ -119,6 +124,7 @@ function StaffQuoteDetail({ id }: { id: string }) {
   const [sending, setSending] = useState(false);
   const [reminding, setReminding] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
+  const [viewingClient, setViewingClient] = useState(false);
 
   if (isLoading) {
     return (
@@ -159,7 +165,9 @@ function StaffQuoteDetail({ id }: { id: string }) {
     !quote.depositInvoiceId &&
     (quote.depositPercent ?? 0) > 0 &&
     (quote.status === "Brouillon" || quote.status === "Envoyee");
-  const canConvert = !settled && quote.status !== "Refusee" && quote.status !== "Expiree" && quote.status !== "Remplacee";
+  // Approved first: by the client from the email or the portal, or marked « Acceptée » by the office.
+  const canConvert = !settled && quote.status === "Acceptee";
+  const waitingForApproval = !settled && (quote.status === "Brouillon" || quote.status === "Envoyee");
   // The automatic reminder of the latest sending, not one left from an earlier one.
   const remindedAt =
     quote.reminderSentAt && quote.sentAt && quote.reminderSentAt > quote.sentAt ? quote.reminderSentAt : null;
@@ -225,6 +233,8 @@ function StaffQuoteDetail({ id }: { id: string }) {
     ...(quote.replacesId ? [{ key: "changements", label: "Changements", icon: FileDiff }] : []),
     { key: "taches", label: "Tâches", count: summary?.tasks ?? 0, icon: ListChecks },
     { key: "materiaux", label: "Matériaux", count: summary?.materials ?? 0, icon: HardHat },
+    { key: "equipements", label: "Équipements", count: summary?.equipment ?? 0, icon: Wrench },
+    { key: "assemblages", label: "Assemblages", count: summary?.assemblies ?? 0, icon: Blocks },
     { key: "frais", label: "Frais supplémentaires", count: summary?.extraCharges ?? 0, icon: Plus },
     // The paper the client receives, drawn by the same code that attaches it to the email.
     { key: "apercu", label: "Aperçu PDF", icon: FileText },
@@ -297,9 +307,9 @@ function StaffQuoteDetail({ id }: { id: string }) {
               )}
             </div>
             <h1 className="mt-1 text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
-              <Link href={`/clients/${quote.clientId}`} className="underline-offset-4 hover:underline">
+              <button type="button" onClick={() => setViewingClient(true)} className="text-left underline-offset-4 hover:underline">
                 {quote.clientName}
-              </Link>
+              </button>
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Total avant taxes :{" "}
@@ -320,6 +330,10 @@ function StaffQuoteDetail({ id }: { id: string }) {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setViewingClient(true)}>
+              <UserRound />
+              Fiche du client
+            </Button>
             {awaiting ? (
               <Button variant="outline" size="sm" onClick={() => openSend(true)}>
                 <BellRing />
@@ -372,9 +386,19 @@ function StaffQuoteDetail({ id }: { id: string }) {
                 <FolderKanban />
                 Projet {formatProjectNumber(quote.projectNumber)}
               </Link>
+            ) : canConvert ? (
+              <Button size="sm" onClick={() => setConfirmConvert(true)}>
+                <ArrowRightLeft />
+                Convertir en projet
+              </Button>
             ) : (
-              canConvert && (
-                <Button size="sm" onClick={() => setConfirmConvert(true)}>
+              waitingForApproval && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled
+                  title="La soumission doit être approuvée par le client, ou marquée « Acceptée » dans ses détails, avant de devenir un projet."
+                >
                   <ArrowRightLeft />
                   Convertir en projet
                 </Button>
@@ -386,9 +410,21 @@ function StaffQuoteDetail({ id }: { id: string }) {
           </div>
         </div>
 
+        {quote.changeRequestedAt && (
+          <div className="mt-4 flex gap-2 border-t border-border pt-3 text-sm">
+            <MessageSquareWarning className="mt-0.5 size-4 shrink-0 text-amber-600" />
+            <p className="text-muted-foreground">
+              Le client a demandé une modification le {formatMoment(quote.changeRequestedAt)}
+              {quote.changeRequestNote && (
+                <span className="mt-1 block whitespace-pre-line text-foreground">« {quote.changeRequestNote} »</span>
+              )}
+            </p>
+          </div>
+        )}
+
         {quote.clientRespondedAt && (
           <p className="mt-4 border-t border-border pt-3 text-sm text-muted-foreground">
-            {quote.status === "Refusee" ? "Refusée" : "Acceptée"} par le client depuis son portail le{" "}
+            {quote.status === "Refusee" ? "Refusée" : "Acceptée"} par le client le{" "}
             {formatMoment(quote.clientRespondedAt)}
             {quote.clientRespondedBy ? ` (${quote.clientRespondedBy})` : ""}.
             {quote.clientSignature && (
@@ -438,6 +474,7 @@ function StaffQuoteDetail({ id }: { id: string }) {
         )}
       </div>
 
+      {/* Three columns from xl, like a project: the rail, the section, and the money. */}
       <div className="flex flex-col gap-4 md:flex-row md:gap-6">
         <SectionNav sections={sections} active={section} onSelect={setSection} label="Sections de la soumission" />
 
@@ -451,7 +488,9 @@ function StaffQuoteDetail({ id }: { id: string }) {
               <InlineSheet>
                 <QuoteFormSheet open onOpenChange={() => {}} quote={quote} />
               </InlineSheet>
-              <ProjectCostTable costs={summary?.costs} isLoading={summaryLoading} />
+              <div className="xl:hidden">
+                <ProjectCostTable costs={summary?.costs} isLoading={summaryLoading} />
+              </div>
               {summary && summary.linesWithoutCost > 0 && (
                 <p className="text-sm text-muted-foreground">
                   {summary.linesWithoutCost === 1
@@ -496,8 +535,36 @@ function StaffQuoteDetail({ id }: { id: string }) {
               wageClassificationId={quote.wageClassificationId}
             />
           )}
+          {section === "equipements" && (
+            <QuoteLinesSection
+              quoteId={quote.id}
+              kind="Equipement"
+              icon={Wrench}
+              locked={locked}
+              wageClassificationId={quote.wageClassificationId}
+            />
+          )}
+          {section === "assemblages" && (
+            <QuoteLinesSection
+              quoteId={quote.id}
+              kind="Assemblage"
+              icon={Blocks}
+              locked={locked}
+              wageClassificationId={quote.wageClassificationId}
+            />
+          )}
         </div>
+
+        <aside
+          aria-label="Montants de la soumission"
+          className="hidden w-[30rem] shrink-0 self-start xl:sticky xl:top-0 xl:block 2xl:w-[36rem] [&_td]:px-2 [&_th]:px-2"
+        >
+          <h2 className="mb-3 text-base font-semibold text-foreground">Montants</h2>
+          <ProjectCostTable costs={summary?.costs} isLoading={summaryLoading} />
+        </aside>
       </div>
+
+      <ClientQuickView clientId={quote.clientId} open={viewingClient} onOpenChange={setViewingClient} />
 
       <ConfirmDeleteDialog
         open={confirmDelete}
@@ -594,7 +661,9 @@ function QuotePdfPreview({ quote }: { quote: QuoteRecord }) {
         <h2 className="text-base font-semibold text-foreground">Aperçu PDF</h2>
         <p className="text-sm text-muted-foreground">Le document que le client recevra en pièce jointe.</p>
       </div>
+      {/* Held to a page's width rather than the column's: a sheet of paper, not a poster. */}
       <PdfViewer
+        className="max-w-xl"
         url={pdf.url}
         loading={pdf.loading}
         error={pdf.error}
@@ -622,9 +691,10 @@ function ConvertDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>Convertir en projet ?</AlertDialogTitle>
           <AlertDialogDescription>
-            Un projet est créé avec le même client, les mêmes adresses et le même actif. Les tâches,
-            les matériaux et les frais y sont repris aux prix soumis, et le total devient le budget.
-            La soumission passe à « Acceptée » et ses lignes ne changent plus.
+            Un projet est créé avec le même client, les mêmes contacts, les mêmes adresses et le même
+            actif. Les tâches, les matériaux, les équipements, les assemblages et les frais y sont
+            repris aux prix soumis, et le total devient le budget. Les lignes de la soumission ne
+            changent plus.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

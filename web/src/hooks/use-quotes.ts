@@ -73,11 +73,11 @@ export function useQuoteSummaryQuery(id: string | undefined) {
   });
 }
 
-export function useQuoteLinesQuery(id: string | undefined, kind: QuoteLineKind) {
+export function useQuoteLinesQuery(id: string | undefined, kind: QuoteLineKind | undefined) {
   return useQuery({
     queryKey: ["quotes", "lines", id, kind],
     queryFn: () => api.get<QuoteLine[]>(`soumissions/${id}/lignes${buildQuery({ kind })}`),
-    enabled: Boolean(id),
+    enabled: Boolean(id) && Boolean(kind),
   });
 }
 

@@ -37,10 +37,14 @@ public class ProjectEquipmentController(VextaDbContext db, ICurrentUserService c
     public async Task<ActionResult<List<ProjectEquipmentDto>>> List(Guid projectId, CancellationToken ct)
     {
         if (!await db.Projects.AnyAsync(p => p.Id == projectId, ct)) return NotFound();
-        return Ok(await db.ProjectEquipment.AsNoTracking()
+        var items = await db.ProjectEquipment.AsNoTracking()
             .Where(x => x.ProjectId == projectId)
             .OrderByDescending(x => x.UsedOn).ThenByDescending(x => x.CreatedAt)
-            .Select(ToDto()).ToListAsync(ct));
+            .Select(ToDto()).ToListAsync(ct);
+        // The crew records what was used; the rates are the office's.
+        if (currentUser.Role == UserRole.TenantUser)
+            items = items.ConvertAll(x => x with { CostRate = null, SellingRate = null });
+        return Ok(items);
     }
 
     [HttpPost]
@@ -71,7 +75,11 @@ public class ProjectEquipmentController(VextaDbContext db, ICurrentUserService c
         if (line.Project is { } owner && ProjectLock.Problem(owner.Status) is { } locked) return BadRequest(new { message = locked });
         if (await ProjectTaskLink.ProblemAsync(db, line.ProjectId, request.ProjectTaskId, ct) is { } wrongTask)
             return BadRequest(new { message = wrongTask });
+        var (costRate, sellingRate, previousEquipment) = (line.CostRate, line.SellingRate, line.EquipmentId);
         if (await ApplyAsync(line, request, ct) is { } problem) return BadRequest(new { message = problem });
+        // The crew never sees the rates: keep the office's unless another equipment was picked.
+        if (currentUser.Role == UserRole.TenantUser && previousEquipment == line.EquipmentId)
+            (line.CostRate, line.SellingRate) = (costRate, sellingRate);
 
         line.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);

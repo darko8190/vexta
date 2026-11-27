@@ -102,6 +102,15 @@ public class BillingSettings
     public string? QuoteTerms { get; set; }
 
     /// <summary>
+    /// What the client may do straight from the quote's email, without an account: approve it,
+    /// ask for a change, refuse it. Each one a button in the message; none, and the email only
+    /// carries the PDF.
+    /// </summary>
+    public bool QuoteEmailCanApprove { get; set; } = true;
+    public bool QuoteEmailCanRequestChange { get; set; } = true;
+    public bool QuoteEmailCanRefuse { get; set; } = true;
+
+    /// <summary>
     /// Days after a quote is emailed without an answer before Vexta sends the reminder on its
     /// own. Null for never: an email in the company's name only goes out by itself once the
     /// company has asked for it.

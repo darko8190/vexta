@@ -129,8 +129,9 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
             .Select(x => new { x.Cost, x.SellingPrice })
             .ToListAsync();
 
+        // An assembly's materials are on the job for what they are; their money is the assembly's.
         var materials = await db.ProjectMaterials.AsNoTracking()
-            .Where(m => m.ProjectId == id)
+            .Where(m => m.ProjectId == id && m.ProjectAssemblyId == null)
             .Select(m => new { m.Quantity, m.PurchasePrice, m.UnitPrice })
             .ToListAsync();
 
@@ -148,6 +149,22 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
             .Where(t => t.ProjectId == id)
             .SumAsync(t => (decimal?)t.Hours) ?? 0m;
 
+        var rateSettings = await db.BillingSettings.AsNoTracking()
+            .Where(b => b.TenantId == currentUser.TenantId)
+            .Select(b => b.DefaultHourlyRate)
+            .FirstOrDefaultAsync();
+        var noRate = rateSettings is null or 0m;
+        var materialsToReview = await db.ProjectMaterials.CountAsync(m =>
+            m.ProjectId == id && m.ProductId == null && m.ProjectAssemblyId == null && m.UnitPrice == 0);
+        var equipmentToReview = await db.ProjectEquipment.CountAsync(x =>
+            x.ProjectId == id && x.EquipmentId == null && (x.SellingRate == null || x.SellingRate == 0));
+        var timesheetsToReview = await db.TimesheetEntries.CountAsync(t => t.ProjectId == id && (noRate || t.Hours <= 0));
+
+        var quote = await db.Quotes.AsNoTracking()
+            .Where(q => q.ProjectId == id)
+            .Select(q => new { q.Id, q.Number, q.Revision })
+            .FirstOrDefaultAsync();
+
         // The sections that have no records of their own yet count zero rather than being left
         // out: the badge is what will show them filling up, and a section that appears only
         // once it has content is a section nobody discovers.
@@ -160,7 +177,11 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
             Expenses: project.Expenses,
             ExtraCharges: extraCharges.Count,
             DocumentsAndNotes: project.Documents + project.Notes,
-            Invoices: project.Invoices);
+            Invoices: project.Invoices,
+            Quotes: quote is null ? 0 : 1,
+            MaterialsToReview: materialsToReview,
+            EquipmentToReview: equipmentToReview,
+            TimesheetsToReview: timesheetsToReview);
 
         var settings = await db.BillingSettings.AsNoTracking()
             .FirstOrDefaultAsync(b => b.TenantId == currentUser.TenantId);
@@ -237,7 +258,12 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
             Round(paid),
             Math.Max(0m, Round(invoiced - credited - paid)));
 
-        return Ok(new ProjectSummaryDto(counts, costs));
+        // The crew sees how much there is of each thing, never what it is worth.
+        if (currentUser.Role == UserRole.TenantUser)
+            costs = new ProjectCostTableDto([], 0m, 0m, 0m, "", 0m, "", 0m, 0m, project.IsTaxExempt);
+
+        return Ok(new ProjectSummaryDto(counts, costs, quote?.Id,
+            quote is null ? null : quote.Revision > 1 ? $"S-{quote.Number:0000} rév. {quote.Revision}" : $"S-{quote.Number:0000}"));
     }
 
     private static string TaxLabel(string name, decimal rate) =>
@@ -293,6 +319,9 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
         ProjectRecurrence.Apply(project, request, BusinessDay.Today);
 
         ApplyAddresses(project, request);
+        if (request.TemplateId is { } templateId
+            && await ProjectTemplatesController.ApplyAsync(db, project, templateId, HttpContext.RequestAborted) is { } templateError)
+            return BadRequest(new { message = templateError });
         db.Projects.Add(project);
         await db.SaveChangesAsync();
 

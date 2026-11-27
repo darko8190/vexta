@@ -83,7 +83,9 @@ public record UpsertProjectRequest(
     /// <summary>Null or 0 makes it a one-off job.</summary>
     int? RecurrenceEvery = null,
     RecurrenceUnit RecurrenceUnit = RecurrenceUnit.Mois,
-    DateOnly? RecurrenceEndDate = null);
+    DateOnly? RecurrenceEndDate = null,
+    /// <summary>On creation only: the project template whose lines the new job starts with.</summary>
+    Guid? TemplateId = null);
 
 // ---- What the project's own page needs beyond the record itself ----
 
@@ -103,7 +105,17 @@ public record ProjectSectionCountsDto(
     int ExtraCharges,
     /// <summary>Files and written notes together: they share one section, so they share a badge.</summary>
     int DocumentsAndNotes,
-    int Invoices);
+    int Invoices,
+    /// <summary>1 when the job came from a quote.</summary>
+    int Quotes = 0,
+    /// <summary>
+    /// Lines an employee added by hand that carry no price: typed rather than picked from the
+    /// list, so nobody priced them. A red dot for the office until someone does.
+    /// </summary>
+    int MaterialsToReview = 0,
+    int EquipmentToReview = 0,
+    /// <summary>Punches that come to nothing: no hours, or no hourly rate to bill them at.</summary>
+    int TimesheetsToReview = 0);
 
 /// <summary>
 /// One line of the project's cost table: what the category cost the company, what the client is
@@ -138,4 +150,5 @@ public record ProjectCostTableDto(
     decimal? Paid = null,
     decimal? RemainingToPay = null);
 
-public record ProjectSummaryDto(ProjectSectionCountsDto Counts, ProjectCostTableDto Costs);
+public record ProjectSummaryDto(
+    ProjectSectionCountsDto Counts, ProjectCostTableDto Costs, Guid? QuoteId = null, string? QuoteLabel = null);

@@ -76,6 +76,21 @@ public static class QuoteEmailTemplate
     /// so the message offers it; one without access is not sent to a page that would only ask
     /// for a password. <paramref name="portalUrl"/> must be a URL Vexta built.
     /// </summary>
+    /// <summary>
+    /// The answer links, one per answer the company allows, each on a line of its own. Falls
+    /// back to the portal paragraph when the company allows none.
+    /// </summary>
+    public static string ResponseParagraph(string? responseUrl, bool approve, bool change, bool refuse, string? portalUrl)
+    {
+        if (responseUrl is null || !(approve || change || refuse)) return AcceptParagraph(portalUrl);
+        var lines = new List<string> { "Vous pouvez nous répondre en un clic :" };
+        if (approve) lines.Add($"Approuver la soumission :\n{responseUrl}?reponse=approuver");
+        if (change) lines.Add($"Demander une modification :\n{responseUrl}?reponse=modifier");
+        if (refuse) lines.Add($"Refuser la soumission :\n{responseUrl}?reponse=refuser");
+        lines.Add("Vous pouvez aussi répondre à ce courriel pour toute question.");
+        return string.Join("\n", lines);
+    }
+
     public static string AcceptParagraph(string? portalUrl) =>
         portalUrl is null
             ? "Pour l'accepter, il suffit de nous la retourner signée ou de répondre à ce courriel. " +

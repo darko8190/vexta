@@ -5,6 +5,8 @@ import Link from "next/link";
 import {
   ArrowLeft,
   Blocks,
+  BookmarkPlus,
+  ClipboardPen,
   Clock,
   FileText,
   FolderKanban,
@@ -20,7 +22,18 @@ import {
   Wrench,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Field, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
+import { toast } from "sonner";
+import { ClientQuickView } from "@/components/clients/client-quick-view";
+import { useProjectTasksQuery } from "@/hooks/use-project-tasks";
+import { useSaveProjectAsTemplate } from "@/hooks/use-project-templates";
+import { ApiError } from "@/lib/api";
+import { formatDateOnly } from "@/lib/dates";
+import { taskStatusBadgeVariant, taskStatusLabels } from "@/lib/labels";
 import { InlineSheet } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/layout/empty-state";
@@ -38,7 +51,7 @@ import { ProjectTasksSection } from "@/components/projects/detail/project-tasks-
 import { ProjectTimesheetsSection } from "@/components/projects/detail/project-timesheets-section";
 import { ProjectInvoicesSection } from "@/components/projects/detail/project-invoices-section";
 import { ProjectAssembliesSection } from "@/components/projects/detail/project-assemblies-section";
-import { useIsClientUser } from "@/hooks/use-can-create";
+import { useCanManage, useIsClientUser, useIsCrewView } from "@/hooks/use-can-create";
 import { useProjectQuery, useProjectSummaryQuery } from "@/hooks/use-projects";
 import { projectStatusBadgeVariant, projectStatusLabels } from "@/lib/labels";
 import { formatProjectNumber, type ProjectAddress } from "@/lib/types";
@@ -92,6 +105,11 @@ function AddressBlock({ label, lines, note }: { label: string; lines: string[]; 
 export default function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const isClient = useIsClientUser();
+  // The crew's own view of a job: what to do and where, never what it is worth.
+  const crew = useIsCrewView();
+  const canManage = useCanManage();
+  const [viewingClient, setViewingClient] = useState(false);
+  const [savingTemplate, setSavingTemplate] = useState(false);
   const { data: project, isLoading, isError } = useProjectQuery(id);
 
   // The summary carries what a job cost and what it makes, so it is staff only — asking for it
@@ -138,22 +156,59 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   // A customer reading their own project gets the two sections that are theirs. The rest are
   // the company's internal record of the job — what it cost, who worked on it — and listing
   // them would be offering six doors that all answer "réservé à l'équipe".
+  const review = (n: number | undefined) => (crew ? 0 : (n ?? 0));
   const sections: NavSection[] = isClient
     ? [
         { key: "details", label: "Détails", icon: Info },
         { key: "factures", label: "Factures", count: project.invoiceCount, icon: FileText },
       ]
-    : [
+    : crew
+    ? [
         { key: "details", label: "Détails", icon: Info },
-        // Second, right after the record: on a job in progress this is the list people open
-        // first, and the badge counts what is left rather than what exists.
         { key: "taches", label: "Tâches", count: counts?.openTasks ?? 0, icon: ListChecks },
         { key: "materiaux", label: "Matériaux", count: counts?.materials ?? 0, icon: HardHat },
         { key: "equipements", label: "Équipements", count: counts?.equipment ?? 0, icon: Wrench },
         { key: "assemblages", label: "Assemblages", count: counts?.assemblies ?? 0, icon: Blocks },
         { key: "feuilles-de-temps", label: "Poinçons", count: counts?.timesheets ?? 0, icon: Clock },
         { key: "depenses", label: "Dépenses", count: counts?.expenses ?? 0, icon: Receipt },
+        { key: "documents", label: "Documents et notes", count: counts?.documentsAndNotes ?? 0, icon: FolderOpen },
+      ]
+    : [
+        { key: "details", label: "Détails", icon: Info },
+        // Second, right after the record: on a job in progress this is the list people open
+        // first, and the badge counts what is left rather than what exists.
+        { key: "taches", label: "Tâches", count: counts?.openTasks ?? 0, icon: ListChecks },
+        {
+          key: "materiaux",
+          label: "Matériaux",
+          count: counts?.materials ?? 0,
+          icon: HardHat,
+          alert: review(counts?.materialsToReview),
+          alertLabel: "Des matériaux ajoutés à la main n'ont pas de prix",
+        },
+        {
+          key: "equipements",
+          label: "Équipements",
+          count: counts?.equipment ?? 0,
+          icon: Wrench,
+          alert: review(counts?.equipmentToReview),
+          alertLabel: "Des équipements saisis à la main n'ont pas de prix",
+        },
+        { key: "assemblages", label: "Assemblages", count: counts?.assemblies ?? 0, icon: Blocks },
+        {
+          key: "feuilles-de-temps",
+          label: "Poinçons",
+          count: counts?.timesheets ?? 0,
+          icon: Clock,
+          alert: review(counts?.timesheetsToReview),
+          alertLabel: "Des heures reviennent à 0 $ : aucun taux horaire",
+        },
+        { key: "depenses", label: "Dépenses", count: counts?.expenses ?? 0, icon: Receipt },
         { key: "frais", label: "Frais supplémentaires", count: counts?.extraCharges ?? 0, icon: Plus },
+        // The quote the job came from, when it came from one.
+        ...(summary?.quoteId
+          ? [{ key: "soumission", label: "Soumission", count: counts?.quotes ?? 1, icon: ClipboardPen }]
+          : []),
         {
           key: "documents",
           label: "Documents et notes",
@@ -193,9 +248,13 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               {project.isTaxExempt && <Badge variant="outline">Non taxable</Badge>}
             </div>
             <h1 className="mt-1 text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
-              <Link href={`/clients/${project.clientId}`} className="underline-offset-4 hover:underline">
-                {project.clientName}
-              </Link>
+              {isClient ? (
+                project.clientName
+              ) : (
+                <button type="button" onClick={() => setViewingClient(true)} className="text-left underline-offset-4 hover:underline">
+                  {project.clientName}
+                </button>
+              )}
             </h1>
             {project.description && (
               <p className="mt-2 max-w-prose whitespace-pre-line text-sm text-muted-foreground">
@@ -207,10 +266,22 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           {/* Straight to the records this job hangs off. */}
           {!isClient && (
             <div className="flex flex-wrap gap-2">
-              <Link href={`/clients/${project.clientId}`} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+              <Button variant="outline" size="sm" onClick={() => setViewingClient(true)}>
                 <UserRound />
                 Fiche du client
-              </Link>
+              </Button>
+              {summary?.quoteId && (
+                <Link href={`/soumissions/${summary.quoteId}`} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+                  <ClipboardPen />
+                  Soumission {summary.quoteLabel}
+                </Link>
+              )}
+              {canManage && (
+                <Button variant="outline" size="sm" onClick={() => setSavingTemplate(true)}>
+                  <BookmarkPlus />
+                  Enregistrer comme modèle
+                </Button>
+              )}
               {project.clientAssetId && (
                 <Link
                   href={`/clients/${project.clientId}/actifs/${project.clientAssetId}`}
@@ -225,7 +296,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
-      {locked && !isClient && <BilledNotice projectId={project.id} className="mb-6" />}
+      {locked && !isClient && !crew && <BilledNotice projectId={project.id} className="mb-6" />}
 
       {/* The rail sits beside the content from md up and becomes a scrollable row below it.
           From xl, the money joins them as a third column: the job's figures stay in view
@@ -241,7 +312,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         <div className="min-w-0 flex-1">
           {/* Staff edit the job where they read it: the form is the section, with one
               Enregistrer, instead of a summary and a Modifier that opened the same fields. */}
-          {section === "details" && !isClient && (
+          {section === "details" && crew && <CrewDetails project={project} billing={billing} site={site} />}
+
+          {section === "details" && !isClient && !crew && (
             <div className="space-y-6">
               <div>
                 <h2 className="text-base font-semibold text-foreground">Détails</h2>
@@ -358,12 +431,25 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
           {section === "documents" && <ProjectDocumentsSection projectId={project.id} />}
 
-          {section === "factures" && (
+          {section === "factures" && !crew && (
             <ProjectInvoicesSection projectId={project.id} clientId={project.clientId} />
+          )}
+
+          {section === "soumission" && summary?.quoteId && (
+            <div className="max-w-xl rounded-lg border border-border bg-card p-4">
+              <h2 className="text-base font-semibold text-foreground">Soumission {summary.quoteLabel}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Ce projet a été créé à partir de cette soumission : ses lignes, ses prix et la réponse du client y sont gardés.
+              </p>
+              <Link href={`/soumissions/${summary.quoteId}`} className={cn(buttonVariants(), "mt-3")}>
+                <ClipboardPen />
+                Ouvrir la soumission
+              </Link>
+            </div>
           )}
         </div>
 
-        {!isClient && (
+        {!isClient && !crew && (
           <aside
             aria-label="Montants du projet"
             // Wide enough for five columns of money at the body size: the sub-tab rail is now a
@@ -375,6 +461,139 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           </aside>
         )}
       </div>
+
+      {!isClient && (
+        <ClientQuickView clientId={project.clientId} open={viewingClient} onOpenChange={setViewingClient} />
+      )}
+      {savingTemplate && <SaveProjectTemplateDialog projectId={project.id} defaultName={project.description} onClose={() => setSavingTemplate(false)} />}
     </div>
+  );
+}
+
+/**
+ * What the crew needs on a job: who it is for and how to reach them, what is to be done and
+ * when, and on the right the list of tasks. No figure that says what anything is worth.
+ */
+function CrewDetails({
+  project,
+  billing,
+  site,
+}: {
+  project: NonNullable<ReturnType<typeof useProjectQuery>["data"]>;
+  billing: string[];
+  site: string[];
+}) {
+  const { data: tasks, isLoading } = useProjectTasksQuery(project.id);
+  return (
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-base font-semibold text-foreground">Détails</h2>
+          <p className="text-sm text-muted-foreground">Le client, le travail et les dates.</p>
+        </div>
+        <dl className="grid gap-4 rounded-lg border border-border bg-card p-4 text-sm sm:grid-cols-2">
+          <div>
+            <dt className="text-muted-foreground">Client</dt>
+            <dd className="font-medium text-foreground">{project.clientName}</dd>
+          </div>
+          {project.contactName && (
+            <div>
+              <dt className="text-muted-foreground">Contact</dt>
+              <dd className="text-foreground">{project.contactName}</dd>
+            </div>
+          )}
+          <div>
+            <dt className="text-muted-foreground">Début</dt>
+            <dd className="text-foreground">{project.startDate ? formatDateOnly(project.startDate) : "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Fin prévue</dt>
+            <dd className="text-foreground">{project.endDate ? formatDateOnly(project.endDate) : "—"}</dd>
+          </div>
+          <AddressBlock label="Adresse des travaux" lines={site} />
+          <AddressBlock label="Adresse du client" lines={billing} />
+          {project.description && (
+            <div className="sm:col-span-2">
+              <dt className="text-muted-foreground">Description</dt>
+              <dd className="whitespace-pre-line text-foreground">{project.description}</dd>
+            </div>
+          )}
+        </dl>
+      </div>
+
+      <aside aria-label="Tâches du projet">
+        <h2 className="mb-3 text-base font-semibold text-foreground">Tâches</h2>
+        {isLoading ? (
+          <Skeleton className="h-32 w-full" />
+        ) : (tasks ?? []).length === 0 ? (
+          <p className="text-sm text-muted-foreground">Aucune tâche sur ce projet.</p>
+        ) : (
+          <ul className="grid gap-2">
+            {(tasks ?? []).map((task) => (
+              <li key={task.id}>
+                <Link
+                  href={`/projets/${project.id}/taches/${task.id}`}
+                  className="flex items-center justify-between gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm hover:border-primary"
+                >
+                  <span className="min-w-0 truncate">{task.title}</span>
+                  <Badge variant={taskStatusBadgeVariant[task.status]}>{taskStatusLabels[task.status]}</Badge>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </aside>
+    </div>
+  );
+}
+
+/** Keeps the job as a template: its tasks, materials, equipment, assemblies and extra charges. */
+function SaveProjectTemplateDialog({
+  projectId,
+  defaultName,
+  onClose,
+}: {
+  projectId: string;
+  defaultName: string | null;
+  onClose: () => void;
+}) {
+  const save = useSaveProjectAsTemplate();
+  const [name, setName] = useState(defaultName?.split(/\r?\n/)[0]?.slice(0, 80) ?? "");
+
+  async function submit() {
+    try {
+      const template = await save.mutateAsync({ projectId, name: name.trim() });
+      toast.success(`Modèle « ${template.name} » enregistré.`, {
+        description: "Choisissez-le dans « Partir d'un modèle » en créant un projet.",
+      });
+      onClose();
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Impossible d'enregistrer le modèle.");
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(next) => !next && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Enregistrer comme modèle</DialogTitle>
+          <DialogDescription>
+            Les tâches, matériaux, équipements, assemblages et frais de ce projet sont gardés pour en
+            créer d&apos;autres. Un nom déjà utilisé remplace ce modèle.
+          </DialogDescription>
+        </DialogHeader>
+        <Field>
+          <FieldLabel htmlFor="project-template-name">Nom du modèle</FieldLabel>
+          <Input id="project-template-name" value={name} maxLength={200} onChange={(event) => setName(event.target.value)} />
+        </Field>
+        <DialogFooter>
+          <Button type="button" disabled={save.isPending || name.trim().length === 0} onClick={submit}>
+            {save.isPending && <Spinner />}
+            Enregistrer le modèle
+          </Button>
+          <DialogClose render={<Button type="button" variant="outline" />}>Annuler</DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

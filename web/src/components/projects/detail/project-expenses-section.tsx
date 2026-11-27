@@ -1,5 +1,6 @@
 "use client";
 
+import { useIsCrewView } from "@/hooks/use-can-create";
 import { useState } from "react";
 import { Image as ImageIcon, MoreHorizontal, Pencil, Plus, Receipt, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -57,6 +58,8 @@ export function ProjectExpensesSection({
    */
   taskId?: string;
 }) {
+  // The crew sees what it paid, never what the client is charged for it.
+  const crew = useIsCrewView();
   // A failed read is not a project without expenses: `data` is undefined either way, so asking
   // only `length === 0` would tell someone the receipts they filed are gone when the request
   // merely did not come back. The lock has nothing to do with it — a billed project's list can
@@ -156,7 +159,7 @@ export function ProjectExpensesSection({
                 <SortableHead label="Type" sortKey="type" sort={sort} onSort={setSort} />
                 <SortableHead label="Date" sortKey="date" sort={sort} onSort={setSort} className="w-28" />
                 <SortableHead label="Coût" sortKey="cout" sort={sort} onSort={setSort} className="w-28 text-right" />
-                <SortableHead label="Vendant" sortKey="vendant" sort={sort} onSort={setSort} className="w-28 text-right" />
+                {!crew && <SortableHead label="Vendant" sortKey="vendant" sort={sort} onSort={setSort} className="w-28 text-right" />}
                 <SortableHead label="Photos" sortKey="photos" sort={sort} onSort={setSort} className="w-20 text-center" />
                 {!locked && <TableHead className="w-10" />}
               </TableRow>
@@ -187,9 +190,11 @@ export function ProjectExpensesSection({
                     <TableCell className="text-right tabular-nums text-muted-foreground">
                       {money(expense.cost)}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">
-                      {money(expense.sellingPrice)}
-                    </TableCell>
+                    {!crew && (
+                      <TableCell className="text-right tabular-nums text-muted-foreground">
+                        {money(expense.sellingPrice)}
+                      </TableCell>
+                    )}
                     <TableCell className="text-center">
                       {expense.photoCount > 0 ? (
                         <span className="inline-flex items-center gap-1 text-sm text-muted-foreground tabular-nums">

@@ -2,7 +2,7 @@
 
 import { use, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, ArrowUpRight, FileText, FolderKanban, Pencil, Send, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -54,6 +54,9 @@ const quantityFormat = new Intl.NumberFormat("fr-CA", { maximumFractionDigits: 3
 export default function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
+  // Opened from a project: back goes there. Only a path inside the application.
+  const retour = useSearchParams().get("retour");
+  const back = retour && retour.startsWith("/") && !retour.startsWith("//") ? retour : null;
   const isClient = useIsClientUser();
   const { data: invoice, isLoading, isError } = useInvoiceQuery(id);
   const deleteInvoice = useDeleteInvoice();
@@ -100,11 +103,11 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   return (
     <div>
       <Link
-        href="/factures"
+        href={back ?? "/factures"}
         className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
         <ArrowLeft className="size-4" />
-        Factures
+        {back?.startsWith("/projets/") ? "Retour au projet" : "Factures"}
       </Link>
 
       {/* The document's identity card, above everything: its number, who it is for, where it

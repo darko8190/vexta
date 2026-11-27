@@ -39,6 +39,14 @@ public class ProjectMaterial
     public Guid? ProductId { get; set; }
     public Product? Product { get; set; }
 
+    /// <summary>
+    /// The assembly on this job this material was put in by. Its quantity follows the
+    /// assembly's; the money is on the assembly, so the line is left out of the totals.
+    /// Deleted with the assembly.
+    /// </summary>
+    public Guid? ProjectAssemblyId { get; set; }
+    public ProjectAssembly? ProjectAssembly { get; set; }
+
     /// <summary>The product's code as it stood, which is what the search column shows.</summary>
     public string? Code { get; set; }
 

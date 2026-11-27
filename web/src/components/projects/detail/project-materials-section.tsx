@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
+import { useIsCrewView } from "@/hooks/use-can-create";
 import {
+  CREW_MATERIAL_GRID,
   MATERIAL_GRID,
   MaterialReadRow,
   MaterialRow,
@@ -93,6 +95,10 @@ export function ProjectMaterialsSection({
 }) {
   const { data, isLoading } = useProjectMaterialsQuery(projectId);
   const { data: settings } = useBillingSettingsQuery();
+  // The crew records what went in, never what it is worth; the office sees what to price.
+  const crew = useIsCrewView();
+  const needsReview = (material: ProjectMaterial) =>
+    !crew && !material.productId && !material.projectAssemblyId && material.unitPrice === 0;
   const create = useCreateProjectMaterial(projectId);
   const update = useUpdateProjectMaterial(projectId);
   const remove = useDeleteProjectMaterial(projectId);
@@ -197,7 +203,7 @@ export function ProjectMaterialsSection({
   }
 
   const total =
-    materials.reduce((sum, material) => sum + materialLineTotal(valuesOf(material)), 0) +
+    materials.filter((material) => !material.projectAssemblyId).reduce((sum, material) => sum + materialLineTotal(valuesOf(material)), 0) +
     drafts.reduce((sum, draft) => sum + materialLineTotal(draft.values), 0);
 
   const addButton = locked ? undefined : (
@@ -244,16 +250,20 @@ export function ProjectMaterialsSection({
         <div className="space-y-3">
           {/* The headings, from lg up. Below that each field carries its own. */}
           <div
-            className={`hidden items-end gap-2 px-3 text-xs font-medium text-muted-foreground lg:grid ${MATERIAL_GRID}`}
+            className={`hidden items-end gap-2 px-3 text-xs font-medium text-muted-foreground lg:grid ${crew ? CREW_MATERIAL_GRID : MATERIAL_GRID}`}
           >
             <span>Code</span>
             <span>Description</span>
             <span>Unité</span>
             <span className="text-right">Qté</span>
-            <span className="text-right">Prix d&apos;achat</span>
-            <span className="text-right">Marge %</span>
-            <span className="text-right">Prix vendant</span>
-            <span className="text-right">Total</span>
+            {!crew && (
+              <>
+                <span className="text-right">Prix d&apos;achat</span>
+                <span className="text-right">Marge %</span>
+                <span className="text-right">Prix vendant</span>
+                <span className="text-right">Total</span>
+              </>
+            )}
             <span />
           </div>
 
@@ -263,6 +273,8 @@ export function ProjectMaterialsSection({
                 key={material.id}
                 values={valuesOf(material)}
                 taskTitle={material.projectTaskTitle}
+                hidePrices={crew}
+                assemblyName={material.projectAssemblyName}
               />
             ) : (
               <MaterialRow
@@ -274,6 +286,9 @@ export function ProjectMaterialsSection({
                 onCommit={(next) => void commitExisting(material, next)}
                 onRemove={() => setDeleteTarget(material)}
                 removeLabel={`Supprimer ${material.description || "le matériau"}`}
+                hidePrices={crew}
+                needsReview={needsReview(material)}
+                assemblyName={material.projectAssemblyName}
               />
             ),
           )}
@@ -298,18 +313,21 @@ export function ProjectMaterialsSection({
                   setDrafts((previous) => previous.filter((row) => row.uid !== draft.uid))
                 }
                 removeLabel="Retirer cette ligne"
+                hidePrices={crew}
               />
             ))}
 
           {/* The sum of what is on screen, including a draft that has not been saved yet: it
               is the figure someone is checking while they type, and the cost table beside the
               project has the saved one. */}
-          <div className="px-3 text-right text-sm text-muted-foreground">
-            Total des matériaux{" "}
-            <span className="font-medium tabular-nums text-foreground">
-              {formatMaterialAmount(total)}
-            </span>
-          </div>
+          {!crew && (
+            <div className="px-3 text-right text-sm text-muted-foreground">
+              Total des matériaux{" "}
+              <span className="font-medium tabular-nums text-foreground">
+                {formatMaterialAmount(total)}
+              </span>
+            </div>
+          )}
         </div>
       )}
 

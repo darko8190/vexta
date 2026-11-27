@@ -18,6 +18,8 @@ const kindLabels: Record<QuoteLineKind, string> = {
   Tache: "Tâche",
   Materiel: "Matériau",
   Frais: "Frais",
+  Equipement: "Équipement",
+  Assemblage: "Assemblage",
 };
 
 const changeLabels: Record<QuoteLineChange, string> = {

@@ -35,6 +35,16 @@ const headings: Record<QuoteLineKind, { title: string; description: string; empt
     description: "Déplacements, location, permis : ce qui s'ajoute au prix. Ils deviennent les frais du projet.",
     empty: "Ajoutez ce qui s'ajoute au prix en dehors des heures et des matériaux.",
   },
+  Equipement: {
+    title: "Équipements",
+    description: "La machinerie et les outils facturés au travail. Ils deviennent les équipements du projet.",
+    empty: "Ajoutez un équipement de votre liste ou décrivez-le à la main.",
+  },
+  Assemblage: {
+    title: "Assemblages",
+    description: "Des ensembles prêts à poser. Leurs matériaux s'ajoutent selon la quantité, et le prix reste sur l'assemblage.",
+    empty: "Ajoutez un assemblage : ses matériaux viennent avec lui.",
+  },
 };
 
 function quantity(value: number) {
@@ -59,6 +69,9 @@ export function QuoteLinesSection({
   wageClassificationId: string | null;
 }) {
   const { data, isLoading, isError, error, refetch } = useQuoteLinesQuery(quoteId, kind);
+  // The materials an assembly brought say which one; the assemblies say how many they brought.
+  const { data: related } = useQuoteLinesQuery(quoteId, kind === "Materiel" ? "Assemblage" : kind === "Assemblage" ? "Materiel" : undefined);
+  const parentName = (id: string | null | undefined) => related?.find((line) => line.id === id)?.description;
   const remove = useDeleteQuoteLine(quoteId);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<QuoteLine | undefined>(undefined);
@@ -67,8 +80,9 @@ export function QuoteLinesSection({
   const copy = quoteLineCopy[kind];
   const heading = headings[kind];
   const lines = data ?? [];
-  // Options not taken are outside the price, so outside these totals too.
-  const counted = lines.filter((line) => !line.isOptional || line.isSelected);
+  // Options not taken are outside the price, so outside these totals too — and an assembly's
+  // materials, whose money is the assembly's.
+  const counted = lines.filter((line) => !line.parentLineId && (!line.isOptional || line.isSelected));
   const total = counted.reduce((sum, line) => sum + line.total, 0);
   const cost = counted.reduce((sum, line) => sum + line.quantity * (line.unitCost ?? 0), 0);
 
@@ -122,7 +136,7 @@ export function QuoteLinesSection({
             <TableHeader>
               <TableRow>
                 <TableHead>Description</TableHead>
-                <TableHead className="text-right">{copy.quantity}</TableHead>
+                {kind !== "Frais" && <TableHead className="text-right">{copy.quantity}</TableHead>}
                 <TableHead className="text-right">Coûtant</TableHead>
                 <TableHead className="text-right">Vendant</TableHead>
                 <TableHead className="text-right">Total</TableHead>
@@ -141,12 +155,24 @@ export function QuoteLinesSection({
                           {line.isSelected ? "Option retenue" : "Option, hors total"}
                         </Badge>
                       )}
+                      {line.parentLineId && (
+                        <Badge variant="outline" className="mt-0.5 mr-1">
+                          Dans l&apos;assemblage {parentName(line.parentLineId) ?? ""} · hors total
+                        </Badge>
+                      )}
+                      {kind === "Assemblage" && related && (
+                        <span className="mr-1 text-xs text-muted-foreground">
+                          {related.filter((child) => child.parentLineId === line.id).length} matériau(x)
+                        </span>
+                      )}
                       {line.code && <span className="text-xs text-muted-foreground">{line.code}</span>}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {quantity(line.quantity)}
-                      {line.unit && <span className="text-muted-foreground"> {line.unit}</span>}
-                    </TableCell>
+                    {kind !== "Frais" && (
+                      <TableCell className="text-right tabular-nums">
+                        {quantity(line.quantity)}
+                        {line.unit && <span className="text-muted-foreground"> {line.unit}</span>}
+                      </TableCell>
+                    )}
                     <TableCell className="text-right tabular-nums">
                       {line.unitCost != null ? formatAmount(line.unitCost) : "—"}
                     </TableCell>
@@ -160,8 +186,23 @@ export function QuoteLinesSection({
                     </TableCell>
                   </>
                 );
-                return locked ? (
-                  <TableRow key={line.id}>{cells}</TableRow>
+                // An assembly's material follows its assembly: changed there, not here.
+                return locked || line.parentLineId ? (
+                  <TableRow key={line.id} className={line.parentLineId ? "text-muted-foreground" : undefined}>
+                    {cells}
+                    {!locked && (
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`Retirer ${line.description}`}
+                          onClick={() => setDeleting(line)}
+                        >
+                          <Trash2 />
+                        </Button>
+                      </TableCell>
+                    )}
+                  </TableRow>
                 ) : (
                   <ClickableRow
                     key={line.id}
@@ -189,7 +230,7 @@ export function QuoteLinesSection({
             <TableFooter>
               <TableRow>
                 <TableCell>Total</TableCell>
-                <TableCell />
+                {kind !== "Frais" && <TableCell />}
                 <TableCell className="text-right tabular-nums">{formatAmount(Math.round(cost * 100) / 100)}</TableCell>
                 <TableCell />
                 <TableCell className="text-right font-semibold tabular-nums">{formatAmount(total)}</TableCell>

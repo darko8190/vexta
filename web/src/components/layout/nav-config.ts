@@ -4,6 +4,8 @@
   Briefcase,
   Building2,
   CalendarClock,
+  CalendarDays,
+  CalendarRange,
   ChartBar,
   ClipboardPen,
   Clock,
@@ -13,6 +15,7 @@
   LayoutDashboard,
   ListChecks,
   Palette,
+  Receipt,
   Search,
   Settings,
   ShoppingBag,
@@ -111,7 +114,6 @@ const tenantAdminNav: NavItem[] = [
  * here would open screens whose only content is an invitation to buy a business plan.
  */
 const personalNav: NavItem[] = [
-  { href: "/tableau-de-bord", label: "Tableau de bord", icon: LayoutDashboard },
   { href: "/mon-cv", label: "Mon CV", icon: FileUser },
   { href: "/mes-emplois", label: "Mes emplois", icon: Briefcase },
   { href: "/mes-commandes", label: "Mes commandes", icon: ShoppingBag },
@@ -156,10 +158,20 @@ const superAdminNav: NavItem[] = [
  */
 const EMPLOYEE_MODE_HREFS = ["/mes-assignations", "/mes-feuilles-de-temps"];
 
+/** What is the employee's own besides their hours and assignments: their leave, their week, their expenses. */
+export const crewOwnNav: NavItem[] = [
+  { href: "/mes-conges", label: "Mes demandes de congés", icon: CalendarDays },
+  { href: "/mon-horaire", label: "Mon horaire", icon: CalendarRange },
+  { href: "/mes-depenses", label: "Mes dépenses", icon: Receipt },
+];
+
 export function employeeModeNavItems(): NavItem[] {
-  return EMPLOYEE_MODE_HREFS.map((href) => tenantNav.find((item) => item.href === href)).filter(
-    (item): item is NavItem => Boolean(item),
-  );
+  return [
+    ...EMPLOYEE_MODE_HREFS.map((href) => tenantNav.find((item) => item.href === href)).filter(
+      (item): item is NavItem => Boolean(item),
+    ),
+    ...crewOwnNav,
+  ];
 }
 
 export function getNavItems(

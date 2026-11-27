@@ -317,6 +317,7 @@ export const invoiceLineKindLabels: Record<InvoiceLineKind, string> = {
   Materiaux: "Matériaux",
   MainDOeuvre: "Main-d'œuvre",
   Equipement: "Équipement",
+  Assemblage: "Assemblage",
   FraisSupplementaires: "Frais supplémentaires",
   Autre: "Autre",
 };

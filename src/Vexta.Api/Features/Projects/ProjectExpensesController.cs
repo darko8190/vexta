@@ -128,6 +128,7 @@ public class ProjectExpensesController(
         {
             TenantId = tenantId,
             ProjectId = projectId,
+            CreatedByUserId = currentUser.UserId,
             Name = request.Name.Trim(),
             Description = Clean(request.Description),
             ExpenseTypeId = request.ExpenseTypeId,

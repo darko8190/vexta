@@ -8,15 +8,22 @@ import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { RequiredMark } from "@/components/ui/required-mark";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ProductPicker } from "@/components/invoices/product-picker";
+import { ReferenceSearchInput, type ReferencePick, type ReferenceSource } from "@/components/catalog/reference-search";
 import { invoiceLineKindLabels } from "@/lib/labels";
 import { marginPercentFrom, policyMarginFor, sellingPriceFrom } from "@/lib/pricing";
-import type { InvoiceLineKind, MarginMode, PricePolicy, ProductSearchResult } from "@/lib/types";
+import type { InvoiceLineKind, MarginMode, PricePolicy } from "@/lib/types";
 
 const KINDS = Object.keys(invoiceLineKindLabels) as InvoiceLineKind[];
 
-/** The two kinds that are bought rather than typed, and so can be found in the catalogue. */
-const CATALOGUE_KINDS: InvoiceLineKind[] = ["Materiaux", "Equipement"];
+/** The kinds that are looked up rather than typed, and where. */
+const SOURCES: Partial<Record<InvoiceLineKind, ReferenceSource>> = {
+  Materiaux: "produit",
+  Equipement: "equipement",
+  Assemblage: "assemblage",
+};
+
+/** Only a material is a catalogue product; the line keeps its id. */
+const CATALOGUE_KINDS: InvoiceLineKind[] = ["Materiaux"];
 
 /**
  * The columns, written once and shared by the headings and every row — two copies of a nine
@@ -158,7 +165,7 @@ export function InvoiceLineRows({
     setLine(index, { unitPrice, ...(margin != null ? { marginPercent: margin } : {}) });
   }
 
-  function onPickProduct(index: number, product: ProductSearchResult) {
+  function onPickProduct(index: number, product: ReferencePick) {
     // The policy wins over the product's own margin: it is what this customer was promised.
     // Resolved against this product's cost, because a policy can charge a different percentage
     // by price band — 60 % on a 3 $ fitting, 20 % on a 900 $ door.
@@ -167,7 +174,7 @@ export function InvoiceLineRows({
       sellingPriceFrom(product.purchasePrice, margin, marginMode) ?? product.sellingPrice ?? 0;
 
     setLine(index, {
-      productId: product.id,
+      productId: product.source === "produit" ? product.id : null,
       description: product.title,
       purchasePrice: product.purchasePrice,
       marginPercent: margin,
@@ -215,7 +222,6 @@ export function InvoiceLineRows({
 
       {fields.map((lineField, index) => {
         const kind = (lines[index]?.kind ?? "Autre") as InvoiceLineKind;
-        const fromCatalogue = CATALOGUE_KINDS.includes(kind);
 
         // Labour is sold by the hour, so the quantity is hours and the unit price is the rate.
         // Naming them so is the difference between a row that reads itself and one that has to
@@ -260,29 +266,34 @@ export function InvoiceLineRows({
               )}
             />
 
-            <div className="space-y-2">
-              {fromCatalogue && (
-                <ProductPicker
-                  onPick={(product) => onPickProduct(index, product)}
-                  placeholder={kind === "Materiaux" ? "Chercher un matériau…" : "Chercher un équipement…"}
-                />
+            {/* One field: the description is where the reference is searched. */}
+            <Controller
+              name={`lines.${index}.description`}
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel className="lg:sr-only">
+                    Description
+                    <RequiredMark />
+                  </FieldLabel>
+                  <ReferenceSearchInput
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    onPick={(pick) => onPickProduct(index, pick)}
+                    source={SOURCES[kind] ?? null}
+                    placeholder={
+                      kind === "Materiaux"
+                        ? "Description ou matériau…"
+                        : kind === "Equipement"
+                          ? "Description ou équipement…"
+                          : "Description ou assemblage…"
+                    }
+                    invalid={fieldState.invalid}
+                  />
+                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
               )}
-
-              <Controller
-                name={`lines.${index}.description`}
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel className="lg:sr-only">
-                      Description
-                      <RequiredMark />
-                    </FieldLabel>
-                    <Input {...field} placeholder="Description" aria-invalid={fieldState.invalid} />
-                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                  </Field>
-                )}
-              />
-            </div>
+            />
 
             <Controller
               name={`lines.${index}.quantity`}

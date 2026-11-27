@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
+import { UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm, useWatch } from "react-hook-form";
@@ -29,6 +30,8 @@ import { AddressPicker } from "@/components/addresses/address-picker";
 import { ClientAssetPicker } from "@/components/assets/client-asset-picker";
 import { ClientPicker } from "@/components/clients/client-picker";
 import { ContactPicker } from "@/components/clients/contact-picker";
+import { ClientQuickView } from "@/components/clients/client-quick-view";
+import { useProjectTemplatesQuery } from "@/hooks/use-project-templates";
 import { ProjectCategoryFields } from "@/components/projects/project-category-fields";
 import { useWageClassificationsQuery } from "@/hooks/use-wage-classifications";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -65,6 +68,7 @@ const formSchema = z
   recurrenceEvery: z.string(),
   recurrenceUnit: z.custom<RecurrenceUnit>((v) => typeof v === "string" && v in RECURRENCE_UNITS),
   recurrenceEndDate: z.string(),
+  templateId: z.string(),
   poNumber: z.string().trim().max(60, "60 caractères maximum.").optional().or(z.literal("")),
   clientAddressId: z.string().optional().or(z.literal("")),
   sameAddressAsClient: z.boolean(),
@@ -110,6 +114,7 @@ function toFormValues(
     recurrenceEvery: String(project?.recurrenceEvery ?? 1),
     recurrenceUnit: project?.recurrenceUnit ?? "Mois",
     recurrenceEndDate: project?.recurrenceEndDate ?? "",
+    templateId: "",
     poNumber: project?.poNumber ?? "",
     clientAddressId: project?.clientAddress?.id ?? "",
     // A new project bills and works at the same place until someone says otherwise, which is
@@ -188,6 +193,9 @@ export function ProjectFormSheet({
   // Set as soon as the box is touched, which is what stops the client's answer below from
   // overwriting a decision someone has just made about this job.
   const [exemptTouched, setExemptTouched] = useState(false);
+  const [viewingClient, setViewingClient] = useState(false);
+  // Only when creating: an existing project already has its lines.
+  const { data: templates } = useProjectTemplatesQuery(open && !isEditing);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -221,6 +229,7 @@ export function ProjectFormSheet({
       recurrenceEvery: values.recurring ? Number(values.recurrenceEvery) : null,
       recurrenceUnit: values.recurrenceUnit,
       recurrenceEndDate: values.recurring ? values.recurrenceEndDate || null : null,
+      templateId: isEditing ? null : values.templateId || null,
     };
 
     try {
@@ -372,10 +381,18 @@ export function ProjectFormSheet({
               control={form.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="project-client">
-                    Client
-                    <RequiredMark />
-                  </FieldLabel>
+                  <div className="flex items-center justify-between gap-2">
+                    <FieldLabel htmlFor="project-client">
+                      Client
+                      <RequiredMark />
+                    </FieldLabel>
+                    {field.value && (
+                      <Button type="button" variant="ghost" size="xs" onClick={() => setViewingClient(true)}>
+                        <UserRound />
+                        Fiche du client
+                      </Button>
+                    )}
+                  </div>
                   <ClientPicker
                     id="project-client"
                     value={field.value}
@@ -401,6 +418,41 @@ export function ProjectFormSheet({
               )}
             />
             </fieldset>
+
+            {!isEditing && templates && templates.length > 0 && (
+              <Controller
+                name="templateId"
+                control={form.control}
+                render={({ field }) => (
+                  <Field>
+                    <FieldLabel htmlFor="project-template">Partir d&apos;un modèle</FieldLabel>
+                    <Select
+                      value={field.value || "aucun"}
+                      onValueChange={(value) => field.onChange(value === "aucun" ? "" : (value ?? ""))}
+                    >
+                      <SelectTrigger id="project-template" className="w-full">
+                        <SelectValue>
+                          {(value: string) =>
+                            value === "aucun" ? "Aucun, un projet vide" : (templates.find((t) => t.id === value)?.name ?? "")
+                          }
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="aucun">Aucun, un projet vide</SelectItem>
+                        {templates.map((template) => (
+                          <SelectItem key={template.id} value={template.id}>
+                            {template.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FieldDescription>
+                      Ses tâches, matériaux, équipements, assemblages et frais sont copiés dans le nouveau projet.
+                    </FieldDescription>
+                  </Field>
+                )}
+              />
+            )}
 
             <Controller
               name="contactId"
@@ -805,6 +857,8 @@ export function ProjectFormSheet({
             </div>
           </FieldGroup>
         </form>
+
+        <ClientQuickView clientId={clientId} open={viewingClient} onOpenChange={setViewingClient} />
 
         <SheetFooter>
           {/* Enabled even on a billed job: the money fields are frozen, the rest is not, and

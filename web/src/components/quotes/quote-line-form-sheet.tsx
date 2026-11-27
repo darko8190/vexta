@@ -20,7 +20,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
-import { ProductPicker } from "@/components/invoices/product-picker";
+import { ReferenceSearchInput, type ReferenceSource } from "@/components/catalog/reference-search";
 import { useBillingSettingsQuery } from "@/hooks/use-billing-settings";
 import { useMarginMode } from "@/hooks/use-products";
 import { useSaveQuoteLine } from "@/hooks/use-quotes";
@@ -54,6 +54,27 @@ export const quoteLineCopy: Record<
     cost: "Coût ($)",
     price: "Vendant ($)",
   },
+  Equipement: {
+    one: "ligne d'équipement",
+    create: "Nouvel équipement",
+    quantity: "Quantité (heures, jours…)",
+    cost: "Taux coûtant ($)",
+    price: "Taux vendant ($)",
+  },
+  Assemblage: {
+    one: "ligne d'assemblage",
+    create: "Nouvel assemblage",
+    quantity: "Nombre d'assemblages",
+    cost: "Coûtant ($)",
+    price: "Vendant ($)",
+  },
+};
+
+/** Where each kind's description searches. Labour and extra charges are typed. */
+const SOURCES: Partial<Record<QuoteLineKind, ReferenceSource>> = {
+  Materiel: "produit",
+  Equipement: "equipement",
+  Assemblage: "assemblage",
 };
 
 interface Draft {
@@ -65,6 +86,8 @@ interface Draft {
   margin: string;
   unitPrice: string;
   productId: string | null;
+  equipmentId: string | null;
+  assemblyId: string | null;
   isOptional: boolean;
   isSelected: boolean;
 }
@@ -80,6 +103,8 @@ function toDraft(line: QuoteLine | undefined, kind: QuoteLineKind, defaultRate: 
     // A new labour line starts at the company's hourly rate: it is what most hours sell for.
     unitPrice: line ? String(line.unitPrice) : kind === "Tache" && defaultRate != null ? String(defaultRate) : "",
     productId: line?.productId ?? null,
+    equipmentId: line?.equipmentId ?? null,
+    assemblyId: line?.assemblyId ?? null,
     isOptional: line?.isOptional ?? false,
     isSelected: line?.isSelected ?? false,
   };
@@ -173,7 +198,8 @@ function LineForm({
     set({ unitPrice: value, margin: formatMargin(numberOrNull(draft.unitCost), numberOrNull(value)) });
   }
 
-  const quantity = numberOrNull(draft.quantity) ?? 0;
+  // Extra charges are one of each: the field is gone, the amount is the charge.
+  const quantity = kind === "Frais" ? (line?.quantity ?? 1) : (numberOrNull(draft.quantity) ?? 0);
   const price = numberOrNull(draft.unitPrice) ?? 0;
   const total = Math.round(quantity * price * 100) / 100;
 
@@ -199,7 +225,9 @@ function LineForm({
           quantity,
           unitCost: numberOrNull(draft.unitCost),
           unitPrice: price,
-          productId: draft.productId,
+          productId: kind === "Materiel" ? draft.productId : null,
+          equipmentId: kind === "Equipement" ? draft.equipmentId : null,
+          assemblyId: kind === "Assemblage" ? draft.assemblyId : null,
           code: draft.code.trim() || null,
           unit: draft.unit.trim() || null,
           isOptional: draft.isOptional,
@@ -222,30 +250,6 @@ function LineForm({
 
         <form id="quote-line-form" className="flex-1 overflow-y-auto px-4" onSubmit={onSubmit} noValidate>
           <FieldGroup>
-            {kind === "Materiel" && (
-              <Field>
-                <FieldLabel htmlFor="quote-line-product">Produit du catalogue</FieldLabel>
-                <ProductPicker
-                  id="quote-line-product"
-                  onPick={(product) => {
-                    const cost = product.purchasePrice;
-                    const selling = product.sellingPrice ?? 0;
-                    setDraft((current) => ({
-                      ...current,
-                      productId: product.id,
-                      code: product.code ?? "",
-                      description: product.title,
-                      unit: product.unit ?? "",
-                      unitCost: cost != null ? String(cost) : "",
-                      unitPrice: String(selling),
-                      margin: formatMargin(cost, selling),
-                    }));
-                  }}
-                />
-                <FieldDescription>Facultatif : un matériau peut aussi être décrit à la main.</FieldDescription>
-              </Field>
-            )}
-
             {kind === "Tache" && steps.length > 0 && (
               <Field>
                 <FieldLabel htmlFor="quote-line-step">Échelon</FieldLabel>
@@ -291,12 +295,40 @@ function LineForm({
                 Description
                 <RequiredMark />
               </FieldLabel>
-              <Textarea
-                id="quote-line-description"
-                rows={2}
-                value={draft.description}
-                onChange={(event) => set({ description: event.target.value })}
-              />
+              {SOURCES[kind] ? (
+                <ReferenceSearchInput
+                  id="quote-line-description"
+                  value={draft.description}
+                  source={SOURCES[kind] ?? null}
+                  onChange={(value) => set({ description: value })}
+                  onPick={(pick) => {
+                    const cost = pick.purchasePrice;
+                    const selling = pick.sellingPrice ?? 0;
+                    setDraft((current) => ({
+                      ...current,
+                      productId: pick.source === "produit" ? pick.id : current.productId,
+                      equipmentId: pick.source === "equipement" ? pick.id : current.equipmentId,
+                      assemblyId: pick.source === "assemblage" ? pick.id : current.assemblyId,
+                      code: pick.code ?? current.code,
+                      description: pick.title,
+                      unit: pick.unit ?? current.unit,
+                      unitCost: cost != null ? String(cost) : "",
+                      unitPrice: String(selling),
+                      margin: formatMargin(cost, selling),
+                    }));
+                  }}
+                />
+              ) : (
+                <Textarea
+                  id="quote-line-description"
+                  rows={2}
+                  value={draft.description}
+                  onChange={(event) => set({ description: event.target.value })}
+                />
+              )}
+              {kind === "Assemblage" && (
+                <FieldDescription>Ses matériaux s&apos;ajoutent à la soumission selon le nombre d&apos;assemblages.</FieldDescription>
+              )}
             </Field>
 
             {kind === "Materiel" && (
@@ -312,20 +344,22 @@ function LineForm({
               </div>
             )}
 
-            <Field>
-              <FieldLabel htmlFor="quote-line-quantity">
-                {copy.quantity}
-                <RequiredMark />
-              </FieldLabel>
-              <Input
-                id="quote-line-quantity"
-                type="number"
-                step="0.25"
-                min="0"
-                value={draft.quantity}
-                onChange={(event) => set({ quantity: event.target.value })}
-              />
-            </Field>
+            {kind !== "Frais" && (
+              <Field>
+                <FieldLabel htmlFor="quote-line-quantity">
+                  {copy.quantity}
+                  <RequiredMark />
+                </FieldLabel>
+                <Input
+                  id="quote-line-quantity"
+                  type="number"
+                  step="0.25"
+                  min="0"
+                  value={draft.quantity}
+                  onChange={(event) => set({ quantity: event.target.value })}
+                />
+              </Field>
+            )}
 
             <div className="grid grid-cols-3 gap-3">
               <Field>

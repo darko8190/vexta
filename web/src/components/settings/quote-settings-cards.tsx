@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { BellRing, ClipboardPen, FileText, Trash2 } from "lucide-react";
+import { BellRing, ClipboardPen, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -11,18 +11,15 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
-import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
+import { TemplateLibrary } from "@/components/templates/template-library";
 import {
   useBillingSettingsQuery,
   useSaveInvoiceReminder,
   useSaveQuoteReminder,
   useSaveQuoteTerms,
 } from "@/hooks/use-billing-settings";
-import { useDeleteQuoteTemplate, useQuoteTemplatesQuery } from "@/hooks/use-quotes";
 import { ApiError } from "@/lib/api";
-import { formatAmount } from "@/lib/money";
 import { ex } from "@/lib/placeholders";
-import type { QuoteTemplate } from "@/lib/types";
 
 /**
  * The conditions printed on every quote, above the signature: what the client agrees to along
@@ -230,21 +227,6 @@ function ReminderCard({ kind }: { kind: keyof typeof reminderCopy }) {
  * when creating one (« Partir d'un modèle »), so this card only lists them and removes them.
  */
 export function QuoteTemplatesCard() {
-  const { data: templates, isLoading } = useQuoteTemplatesQuery();
-  const remove = useDeleteQuoteTemplate();
-  const [target, setTarget] = useState<QuoteTemplate | undefined>(undefined);
-
-  async function confirmDelete() {
-    if (!target) return;
-    try {
-      await remove.mutateAsync(target.id);
-      toast.success("Modèle supprimé.");
-      setTarget(undefined);
-    } catch (error) {
-      toast.error(error instanceof ApiError ? error.message : "Impossible de supprimer le modèle.");
-    }
-  }
-
   return (
     <Card className="max-w-3xl">
       <CardHeader>
@@ -258,47 +240,8 @@ export function QuoteTemplatesCard() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
-          <Skeleton className="h-16 w-full" />
-        ) : !templates || templates.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Aucun modèle pour l&apos;instant. Ouvrez une soumission bien montée et cliquez
-            « Enregistrer comme modèle ».
-          </p>
-        ) : (
-          <ul className="divide-y divide-border rounded-lg border border-border">
-            {templates.map((template) => (
-              <li key={template.id} className="flex items-center gap-3 px-3 py-2.5">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-foreground">{template.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {template.lineCount === 1 ? "1 ligne" : `${template.lineCount} lignes`} ·{" "}
-                    {formatAmount(template.subtotal)} avant taxes
-                    {template.depositPercent != null ? ` · acompte de ${template.depositPercent} %` : ""}
-                  </p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label={`Supprimer le modèle ${template.name}`}
-                  onClick={() => setTarget(template)}
-                >
-                  <Trash2 />
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
+        <TemplateLibrary kind="soumission" />
       </CardContent>
-
-      <ConfirmDeleteDialog
-        open={Boolean(target)}
-        onOpenChange={(open) => !open && setTarget(undefined)}
-        title="Supprimer ce modèle ?"
-        description={`Le modèle « ${target?.name ?? ""} » sera supprimé. Les soumissions déjà créées à partir de lui ne changent pas.`}
-        onConfirm={confirmDelete}
-        pending={remove.isPending}
-      />
     </Card>
   );
 }

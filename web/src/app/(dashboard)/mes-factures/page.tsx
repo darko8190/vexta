@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { CreditCard, FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -26,6 +27,7 @@ import { cn } from "@/lib/utils";
  * company, and paying one goes through the link the company's own Stripe account issued.
  */
 export default function MyInvoicesPage() {
+  const router = useRouter();
   const { data, isLoading, isError, error, refetch } = useMyInvoicesQuery();
 
   const invoices = data ?? [];
@@ -69,7 +71,12 @@ export default function MyInvoicesPage() {
             {invoices.map((invoice) => (
               <li
                 key={invoice.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-3"
+                // The whole row opens the invoice; the links and buttons on it keep their own job.
+                onClick={(event) => {
+                  if ((event.target as HTMLElement).closest("a,button")) return;
+                  router.push(`/mes-factures/${invoice.id}`);
+                }}
+                className="flex cursor-pointer flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-3 transition-colors hover:border-primary/50 hover:bg-muted/30"
               >
                 <div className="min-w-0">
                   <p className="font-medium text-foreground">

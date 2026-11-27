@@ -26,8 +26,16 @@ public class ScheduleController(VextaDbContext db, ICurrentUserService currentUs
     /// <param name="employe">One person's week. Omitted means the whole crew's.</param>
     [HttpGet]
     public async Task<ActionResult<ScheduleWeekDto>> Week(
-        [FromQuery] DateOnly? semaine, [FromQuery] Guid? employe, CancellationToken ct)
+        [FromQuery] DateOnly? semaine, [FromQuery] Guid? employe, CancellationToken ct, [FromQuery] bool moi = false)
     {
+        // « Mon horaire »: the week of the person signed in.
+        if (moi)
+        {
+            employe = await db.Employees.AsNoTracking()
+                .Where(e => e.UserId == currentUser.UserId)
+                .Select(e => (Guid?)e.Id)
+                .FirstOrDefaultAsync(ct) ?? Guid.Empty;
+        }
         var start = MondayOf(semaine ?? BusinessDay.Today);
         var end = start.AddDays(6);
 

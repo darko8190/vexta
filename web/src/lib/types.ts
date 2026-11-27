@@ -471,7 +471,8 @@ export type InvoiceLineKind =
   | "MainDOeuvre"
   | "Equipement"
   | "FraisSupplementaires"
-  | "Autre";
+  | "Autre"
+  | "Assemblage";
 
 export interface InvoiceLine {
   id?: string;
@@ -910,6 +911,13 @@ export interface ProjectSectionCounts {
   /** Files and written notes together: one section, one badge. */
   documentsAndNotes: number;
   invoices: number;
+  /** 1 when the job came from a quote. */
+  quotes?: number;
+  /** Lines an employee typed by hand that nobody priced yet: a red dot for the office. */
+  materialsToReview?: number;
+  equipmentToReview?: number;
+  /** Punches that come to nothing: no hours, or no hourly rate to bill them at. */
+  timesheetsToReview?: number;
 }
 
 export interface ProjectCostLine {
@@ -941,6 +949,9 @@ export interface ProjectCostTable {
 export interface ProjectSummary {
   counts: ProjectSectionCounts;
   costs: ProjectCostTable;
+  /** The quote this job came from, if it came from one. */
+  quoteId?: string | null;
+  quoteLabel?: string | null;
 }
 
 /**
@@ -968,6 +979,9 @@ export interface ProjectMaterial {
   projectTaskTitle: string | null;
   createdAt: string;
   updatedAt: string;
+  /** The assembly that brought it: its quantity follows the assembly, its money is the assembly's. */
+  projectAssemblyId?: string | null;
+  projectAssemblyName?: string | null;
 }
 
 // ---- Tasks ----
@@ -3097,7 +3111,7 @@ export interface DirectorySummary {
 export type QuoteStatus = "Brouillon" | "Envoyee" | "Acceptee" | "Refusee" | "Expiree" | "Remplacee";
 
 /** Which project section the line becomes on acceptance: a task, a material, an extra charge. */
-export type QuoteLineKind = "Tache" | "Materiel" | "Frais";
+export type QuoteLineKind = "Tache" | "Materiel" | "Frais" | "Equipement" | "Assemblage";
 
 /** « S-0012 », or « S-0012 rév. 2 » from a quote's second version on. */
 export function formatQuoteNumber(n: number, revision = 1): string {
@@ -3165,6 +3179,13 @@ export interface QuoteRecord {
   reminderSentAt: string | null;
   /** Automatic reminders since the last sending. */
   reminderCount: number;
+  contactId?: string | null;
+  contactName?: string | null;
+  billingContactId?: string | null;
+  billingContactName?: string | null;
+  /** The client asked for a change from the email link. */
+  changeRequestedAt?: string | null;
+  changeRequestNote?: string | null;
 }
 
 export interface QuoteOption {
@@ -3195,6 +3216,8 @@ export interface QuoteFormValues {
   depositPercent?: number | null;
   /** On creation only: start from this template's lines. */
   templateId?: string | null;
+  contactId?: string | null;
+  billingContactId?: string | null;
 }
 
 /** A quote kept to start others from. */
@@ -3224,6 +3247,10 @@ export interface QuoteLine {
   /** An extra the client may take; counted in the total only once selected. */
   isOptional: boolean;
   isSelected: boolean;
+  equipmentId?: string | null;
+  assemblyId?: string | null;
+  /** The assembly line this material belongs to: shown for what it is, not in the total. */
+  parentLineId?: string | null;
 }
 
 export interface SaveQuoteLineValues {
@@ -3237,6 +3264,8 @@ export interface SaveQuoteLineValues {
   unit?: string | null;
   isOptional?: boolean;
   isSelected?: boolean;
+  equipmentId?: string | null;
+  assemblyId?: string | null;
 }
 
 export interface QuoteSummary {
@@ -3247,6 +3276,8 @@ export interface QuoteSummary {
   costs: ProjectCostTable;
   /** Lines in the price with no cost entered: the margin counts them as free. */
   linesWithoutCost: number;
+  equipment?: number;
+  assemblies?: number;
 }
 
 export type QuoteLineChange = "Inchangee" | "Ajoutee" | "Retiree" | "Modifiee";

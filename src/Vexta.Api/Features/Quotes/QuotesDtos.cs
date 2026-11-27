@@ -67,7 +67,14 @@ public record QuoteDto(
     /// <summary>When the last automatic reminder went out, if one did.</summary>
     DateTimeOffset? ReminderSentAt,
     /// <summary>Automatic reminders since the last sending.</summary>
-    int ReminderCount);
+    int ReminderCount,
+    Guid? ContactId = null,
+    string? ContactName = null,
+    Guid? BillingContactId = null,
+    string? BillingContactName = null,
+    /// <summary>The client asked for a change from the email link: when, and what.</summary>
+    DateTimeOffset? ChangeRequestedAt = null,
+    string? ChangeRequestNote = null);
 
 public record QuoteOptionDto(Guid Id, string Description, decimal Total, bool IsSelected);
 
@@ -133,7 +140,9 @@ public record UpsertQuoteRequest(
     /// <summary>Percent asked up front, from 0 to 100. Null or 0 for none.</summary>
     decimal? DepositPercent = null,
     /// <summary>On creation only: the template whose lines the new quote starts with.</summary>
-    Guid? TemplateId = null);
+    Guid? TemplateId = null,
+    Guid? ContactId = null,
+    Guid? BillingContactId = null);
 
 public record QuoteLineDto(
     Guid Id,
@@ -150,7 +159,11 @@ public record QuoteLineDto(
     int SortOrder,
     /// <summary>An extra the client may take; in the total only once <c>IsSelected</c>.</summary>
     bool IsOptional,
-    bool IsSelected);
+    bool IsSelected,
+    Guid? EquipmentId = null,
+    Guid? AssemblyId = null,
+    /// <summary>The assembly line this material belongs to; such a line is not in the total.</summary>
+    Guid? ParentLineId = null);
 
 public record SaveQuoteLineRequest(
     QuoteLineKind Kind,
@@ -163,12 +176,15 @@ public record SaveQuoteLineRequest(
     string? Unit = null,
     bool IsOptional = false,
     /// <summary>The office marking an option as taken (the client said so by phone).</summary>
-    bool IsSelected = false);
+    bool IsSelected = false,
+    Guid? EquipmentId = null,
+    Guid? AssemblyId = null);
 
 /// <summary>The rows behind each section, and the money, in the project's cost-table shape.</summary>
 /// <param name="LinesWithoutCost">Lines in the price with no cost entered: the margin counts them as free.</param>
 public record QuoteSummaryDto(
-    int Tasks, int Materials, int ExtraCharges, int DocumentsAndNotes, ProjectCostTableDto Costs, int LinesWithoutCost);
+    int Tasks, int Materials, int ExtraCharges, int DocumentsAndNotes, ProjectCostTableDto Costs, int LinesWithoutCost,
+    int Equipment = 0, int Assemblies = 0);
 
 public enum QuoteLineChange
 {

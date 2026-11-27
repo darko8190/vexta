@@ -22,12 +22,14 @@ import {
   type ProjectAssemblyValues,
 } from "@/hooks/use-assemblies";
 import { ApiError } from "@/lib/api";
+import { useIsCrewView } from "@/hooks/use-can-create";
 import { todayIso } from "@/lib/dates";
 import { formatAmount } from "@/lib/money";
 import { matchesSearch } from "@/lib/text-match";
 
 const OTHER = "autre";
 const GRID = "lg:grid-cols-[minmax(0,1fr)_140px_90px_110px_110px_110px_76px]";
+const CREW_GRID = "lg:grid-cols-[minmax(0,1fr)_140px_90px_76px]";
 
 function toValues(line: ProjectAssemblyLine): ProjectAssemblyValues {
   return {
@@ -80,6 +82,10 @@ export function ProjectAssembliesSection({
   locked?: boolean;
   taskId?: string;
 }) {
+  const crew = useIsCrewView();
+  // The crew never sees the prices, so it never sends any: the API keeps the office's.
+  const outgoing = (values: ProjectAssemblyValues): ProjectAssemblyValues =>
+    crew ? { ...values, unitCost: null, unitPrice: null } : values;
   const { data, isLoading } = useProjectAssembliesQuery(projectId);
   const { data: catalogue } = useAssembliesQuery();
   const save = useSaveProjectAssembly(projectId);
@@ -109,7 +115,7 @@ export function ProjectAssembliesSection({
     if (payload === baseline) return;
     sent.current[line.id] = payload;
     try {
-      await save.mutateAsync({ id: line.id, values });
+      await save.mutateAsync({ id: line.id, values: outgoing(values) });
     } catch (error) {
       delete sent.current[line.id];
       toast.error(message(error, "Impossible d'enregistrer la ligne."));
@@ -120,7 +126,7 @@ export function ProjectAssembliesSection({
     if (!isSavable(values) || posting.current.has(uid)) return;
     posting.current.add(uid);
     try {
-      await save.mutateAsync({ values });
+      await save.mutateAsync({ values: outgoing(values) });
       setDrafts((previous) => previous.filter((draft) => draft.uid !== uid));
     } catch (error) {
       toast.error(message(error, "Impossible d'ajouter l'assemblage."));
@@ -190,13 +196,17 @@ export function ProjectAssembliesSection({
         />
       ) : (
         <div className="space-y-3">
-          <div className={`hidden items-end gap-2 px-3 text-xs font-medium text-muted-foreground lg:grid ${GRID}`}>
+          <div className={`hidden items-end gap-2 px-3 text-xs font-medium text-muted-foreground lg:grid ${crew ? CREW_GRID : GRID}`}>
             <span>Assemblage</span>
             <span>Date</span>
             <span className="text-right">Qté</span>
-            <span className="text-right">Coûtant / unité</span>
-            <span className="text-right">Vendant / unité</span>
-            <span className="text-right">Total</span>
+            {!crew && (
+              <>
+                <span className="text-right">Coûtant / unité</span>
+                <span className="text-right">Vendant / unité</span>
+                <span className="text-right">Total</span>
+              </>
+            )}
             <span />
           </div>
 
@@ -205,6 +215,7 @@ export function ProjectAssembliesSection({
               key={line.id}
               values={valuesOf(line)}
               assemblies={assemblies}
+              crew={crew}
               disabled={locked}
               taskTitle={line.projectTaskTitle}
               onChange={(next) => setEdits((previous) => ({ ...previous, [line.id]: next }))}
@@ -219,6 +230,7 @@ export function ProjectAssembliesSection({
                 key={draft.uid}
                 values={draft.values}
                 assemblies={assemblies}
+                crew={crew}
                 onChange={(next) =>
                   setDrafts((previous) => previous.map((row) => (row.uid === draft.uid ? { ...row, values: next } : row)))
                 }
@@ -227,10 +239,12 @@ export function ProjectAssembliesSection({
               />
             ))}
 
-          <div className="px-3 text-right text-sm text-muted-foreground">
-            Total des assemblages{" "}
-            <span className="font-medium tabular-nums text-foreground">{formatAmount(total)}</span>
-          </div>
+          {!crew && (
+            <div className="px-3 text-right text-sm text-muted-foreground">
+              Total des assemblages{" "}
+              <span className="font-medium tabular-nums text-foreground">{formatAmount(total)}</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -255,12 +269,14 @@ function AssemblyRow({
   assemblies,
   disabled,
   taskTitle,
+  crew = false,
   onChange,
   onCommit,
   onRemove,
 }: {
   values: ProjectAssemblyValues;
   assemblies: Assembly[];
+  crew?: boolean;
   disabled?: boolean;
   taskTitle?: string | null;
   onChange: (values: ProjectAssemblyValues) => void;
@@ -281,7 +297,7 @@ function AssemblyRow({
   }
 
   return (
-    <div className={`grid gap-2 rounded-lg border border-border p-3 ${GRID} lg:items-start`}>
+    <div className={`grid gap-2 rounded-lg border border-border p-3 ${crew ? CREW_GRID : GRID} lg:items-start`}>
       <div className="min-w-0 space-y-1.5">
         <span className="text-xs font-medium text-muted-foreground lg:sr-only">Assemblage</span>
         <Select value={values.assemblyId ?? OTHER} onValueChange={(value) => value && pick(value)} disabled={disabled}>
@@ -343,6 +359,8 @@ function AssemblyRow({
         />
       </label>
 
+      {!crew && (
+        <>
       <label className="space-y-1">
         <span className="text-xs font-medium text-muted-foreground lg:sr-only">Coûtant / unité</span>
         <Input
@@ -377,6 +395,9 @@ function AssemblyRow({
         <span className="text-sm font-medium text-muted-foreground lg:sr-only">Total</span>
         <span className="text-sm tabular-nums text-foreground">{formatAmount(lineTotal(values))}</span>
       </div>
+
+        </>
+      )}
 
       <div className="flex items-center justify-end gap-1">
         {values.assemblyId && (

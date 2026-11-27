@@ -39,12 +39,23 @@ public class McpController(
 
     /// <summary>No stream to open: said in the way the transport expects.</summary>
     [HttpGet]
+    [HttpGet("{secret}")]
     public IActionResult Stream() => StatusCode(StatusCodes.Status405MethodNotAllowed);
 
     [HttpPost]
-    public async Task<IActionResult> Post(CancellationToken ct)
+    public Task<IActionResult> Post(CancellationToken ct) => HandleRequestAsync(null, ct);
+
+    /// <summary>
+    /// The same server with the key in the address, for the assistants that cannot send an
+    /// Authorization header — ChatGPT's connectors among them, set to « Aucune authentification ».
+    /// The address is then the secret, and is shown and revoked like the key it carries.
+    /// </summary>
+    [HttpPost("{secret}")]
+    public Task<IActionResult> PostWithKeyInPath(string secret, CancellationToken ct) => HandleRequestAsync(secret, ct);
+
+    private async Task<IActionResult> HandleRequestAsync(string? pathSecret, CancellationToken ct)
     {
-        var key = await AuthenticateAsync(ct);
+        var key = await AuthenticateAsync(pathSecret, ct);
         if (key is null)
         {
             Response.Headers.WWWAuthenticate = "Bearer";
@@ -161,10 +172,10 @@ public class McpController(
         return await tool.ExecuteAsync(arguments, ct);
     }
 
-    private async Task<McpKey?> AuthenticateAsync(CancellationToken ct)
+    private async Task<McpKey?> AuthenticateAsync(string? pathSecret, CancellationToken ct)
     {
         var header = Request.Headers.Authorization.ToString();
-        var secret = header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) ? header[7..].Trim() : null;
+        var secret = header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) ? header[7..].Trim() : pathSecret?.Trim();
         if (secret is null || !secret.StartsWith(McpKeysController.KeyStart, StringComparison.Ordinal)) return null;
 
         var hash = McpKeysController.Hash(secret);

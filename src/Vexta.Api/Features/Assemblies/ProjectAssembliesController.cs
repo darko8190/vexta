@@ -32,10 +32,13 @@ public class ProjectAssembliesController(VextaDbContext db, ICurrentUserService 
     public async Task<ActionResult<List<ProjectAssemblyDto>>> List(Guid projectId, CancellationToken ct)
     {
         if (!await db.Projects.AnyAsync(p => p.Id == projectId, ct)) return NotFound();
-        return Ok(await db.ProjectAssemblies.AsNoTracking()
+        var items = await db.ProjectAssemblies.AsNoTracking()
             .Where(x => x.ProjectId == projectId)
             .OrderBy(x => x.CreatedAt)
-            .Select(ToDto()).ToListAsync(ct));
+            .Select(ToDto()).ToListAsync(ct);
+        if (currentUser.Role == UserRole.TenantUser)
+            items = items.ConvertAll(x => x with { UnitCost = 0m, UnitPrice = 0m });
+        return Ok(items);
     }
 
     [HttpPost]
@@ -53,6 +56,7 @@ public class ProjectAssembliesController(VextaDbContext db, ICurrentUserService 
         if (await ApplyAsync(line, request, ct) is { } problem) return BadRequest(new { message = problem });
 
         db.ProjectAssemblies.Add(line);
+        await AddMaterialsAsync(line, ct);
         await db.SaveChangesAsync(ct);
         return Ok(await db.ProjectAssemblies.AsNoTracking().Where(x => x.Id == line.Id).Select(ToDto()).FirstAsync(ct));
     }
@@ -66,7 +70,22 @@ public class ProjectAssembliesController(VextaDbContext db, ICurrentUserService 
         if (line.Project is { } owner && ProjectLock.Problem(owner.Status) is { } locked) return BadRequest(new { message = locked });
         if (await ProjectTaskLink.ProblemAsync(db, line.ProjectId, request.ProjectTaskId, ct) is { } wrongTask)
             return BadRequest(new { message = wrongTask });
+        var previousQuantity = line.Quantity;
+        var previousAssembly = line.AssemblyId;
         if (await ApplyAsync(line, request, ct) is { } problem) return BadRequest(new { message = problem });
+
+        // The materials follow: another assembly brings its own, another quantity scales them.
+        var materials = await db.ProjectMaterials.Where(m => m.ProjectAssemblyId == line.Id).ToListAsync(ct);
+        if (previousAssembly != line.AssemblyId)
+        {
+            db.ProjectMaterials.RemoveRange(materials);
+            await AddMaterialsAsync(line, ct);
+        }
+        else if (previousQuantity != line.Quantity && previousQuantity > 0)
+        {
+            foreach (var material in materials)
+                material.Quantity = Math.Round(material.Quantity / previousQuantity * line.Quantity, 3);
+        }
 
         line.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
@@ -82,6 +101,37 @@ public class ProjectAssembliesController(VextaDbContext db, ICurrentUserService 
         db.ProjectAssemblies.Remove(line);
         await db.SaveChangesAsync(ct);
         return NoContent();
+    }
+
+    /// <summary>
+    /// Puts on the job the materials the assembly is made of, so many of each as there are
+    /// assemblies, tied to the line. The money stays on the assembly. Does not save.
+    /// </summary>
+    private async Task AddMaterialsAsync(ProjectAssembly line, CancellationToken ct)
+    {
+        if (line.AssemblyId is not { } assemblyId) return;
+        var assembly = await db.Assemblies.AsNoTracking().Include(a => a.Items).ThenInclude(i => i.Product)
+            .FirstOrDefaultAsync(a => a.Id == assemblyId, ct);
+        if (assembly is null) return;
+        var next = await db.ProjectMaterials.Where(m => m.ProjectId == line.ProjectId).MaxAsync(m => (int?)m.SortOrder, ct) ?? -1;
+        foreach (var item in assembly.Items.OrderBy(i => i.SortOrder))
+        {
+            db.ProjectMaterials.Add(new ProjectMaterial
+            {
+                TenantId = line.TenantId,
+                ProjectId = line.ProjectId,
+                ProjectAssemblyId = line.Id,
+                ProjectTaskId = line.ProjectTaskId,
+                ProductId = item.ProductId,
+                Code = item.Product?.Code,
+                Description = item.Description,
+                Unit = item.Unit,
+                Quantity = Math.Round(item.Quantity * line.Quantity, 3),
+                PurchasePrice = item.PurchasePrice,
+                UnitPrice = item.UnitPrice,
+                SortOrder = ++next,
+            });
+        }
     }
 
     private async Task<string?> ApplyAsync(ProjectAssembly line, SaveProjectAssemblyRequest r, CancellationToken ct)

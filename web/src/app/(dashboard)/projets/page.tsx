@@ -18,6 +18,7 @@ import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
 import { DataTable, type DataColumn } from "@/components/layout/data-table";
 import { PageHeader } from "@/components/layout/page-header";
+import { TemplateLibraryButton } from "@/components/templates/template-library";
 import { UpgradeCta } from "@/components/layout/upgrade-cta";
 import { useCanCreate, useIsClientUser } from "@/hooks/use-can-create";
 import { PaginationBar } from "@/components/layout/pagination-bar";
@@ -207,10 +208,13 @@ export default function ProjectsPage() {
         description={isClient ? "Les mandats que votre fournisseur suit pour vous." : "Suivez l'avancement des mandats pour vos clients."}
         action={
           canCreate ? (
-            <Button onClick={openCreate}>
-              <Plus />
-              Nouveau projet
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <TemplateLibraryButton kind="projet" />
+              <Button onClick={openCreate}>
+                <Plus />
+                Nouveau projet
+              </Button>
+            </div>
           ) : isClient ? null : (
             <UpgradeCta />
           )

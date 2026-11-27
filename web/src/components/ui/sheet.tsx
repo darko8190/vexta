@@ -5,7 +5,7 @@ import { Dialog as SheetPrimitive } from "@base-ui/react/dialog"
 import { cn } from "cn"
 
 import { Button } from "@/components/ui/button"
-import { XIcon } from "lucide-react"
+import { ArrowLeft, XIcon } from "lucide-react"
 
 /**
  * Inline mode: the same form, drawn in the page instead of over it.
@@ -44,8 +44,11 @@ function InlineSheet({ children }: { children: React.ReactNode }) {
 
 function Sheet({ ...props }: SheetPrimitive.Root.Props) {
   const inline = React.useContext(InlineRoot)
+  const depth = React.useContext(SheetDepth)
   if (inline) return <>{props.children as React.ReactNode}</>
-  return <SheetPrimitive.Root data-slot="sheet" {...props} />
+  // A form on its own page leaves the main menu usable beside it, so the person can still go
+  // to another view: not modal at the first level. A form opened from a form stays modal.
+  return <SheetPrimitive.Root data-slot="sheet" modal={props.modal ?? (depth === 0 ? false : true)} {...props} />
 }
 
 function SheetTrigger({ ...props }: SheetPrimitive.Trigger.Props) {
@@ -171,7 +174,7 @@ function SheetContent({
     // column in the middle. The buttons sit in a row at the bottom right, as on a page form.
     // The scrolling body spans the full width and pads itself into the column instead, so its
     // scrollbar sits at the edge of the window rather than in the middle of the screen.
-    page: "fixed inset-0 z-50 flex flex-col gap-0 bg-background text-sm text-foreground transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 [&>[data-slot=sheet-header]]:mx-auto [&>[data-slot=sheet-header]]:w-full [&>[data-slot=sheet-header]]:max-w-3xl [&>[data-slot=sheet-footer]]:mx-auto [&>[data-slot=sheet-footer]]:w-full [&>[data-slot=sheet-footer]]:max-w-3xl [&>*:not([data-slot])]:w-full [&>*:not([data-slot])]:px-[max(1rem,calc((100%-48rem)/2+1rem))] [&>[data-slot=sheet-header]]:pt-6 [&>[data-slot=sheet-header]]:pb-4 sm:[&>[data-slot=sheet-footer]]:flex-row-reverse sm:[&>[data-slot=sheet-footer]]:justify-start [&>[data-slot=sheet-footer]]:pb-6",
+    page: "fixed inset-0 z-50 md:left-16 md:border-l md:border-border flex flex-col gap-0 bg-background text-sm text-foreground transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 [&>[data-slot=sheet-header]]:mx-auto [&>[data-slot=sheet-header]]:w-full [&>[data-slot=sheet-header]]:max-w-3xl [&>[data-slot=sheet-footer]]:mx-auto [&>[data-slot=sheet-footer]]:w-full [&>[data-slot=sheet-footer]]:max-w-3xl [&>*:not([data-slot])]:w-full [&>*:not([data-slot])]:px-[max(1rem,calc((100%-48rem)/2+1rem))] [&>[data-slot=sheet-header]]:pt-6 [&>[data-slot=sheet-header]]:pb-4 sm:[&>[data-slot=sheet-footer]]:flex-row-reverse sm:[&>[data-slot=sheet-footer]]:justify-start [&>[data-slot=sheet-footer]]:pb-6",
     // Centred, over the form it came from. Capped in height so a long one scrolls inside.
     dialog: "fixed top-1/2 left-1/2 z-50 flex max-h-[90dvh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col gap-2 rounded-xl border border-border bg-popover text-sm text-popover-foreground shadow-lg transition duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0 sm:[&>[data-slot=sheet-footer]]:flex-row-reverse sm:[&>[data-slot=sheet-footer]]:justify-start",
     panel: "fixed z-50 flex flex-col gap-4 bg-popover bg-clip-padding text-sm text-popover-foreground shadow-lg transition duration-200 ease-in-out data-ending-style:opacity-0 data-starting-style:opacity-0 data-[side=bottom]:inset-x-0 data-[side=bottom]:bottom-0 data-[side=bottom]:h-auto data-[side=bottom]:border-t data-[side=bottom]:data-ending-style:translate-y-[2.5rem] data-[side=bottom]:data-starting-style:translate-y-[2.5rem] data-[side=left]:inset-y-0 data-[side=left]:left-0 data-[side=left]:h-full data-[side=left]:w-3/4 data-[side=left]:border-r data-[side=left]:data-ending-style:translate-x-[-2.5rem] data-[side=left]:data-starting-style:translate-x-[-2.5rem] data-[side=right]:inset-y-0 data-[side=right]:right-0 data-[side=right]:h-full data-[side=right]:w-3/4 data-[side=right]:border-l data-[side=right]:data-ending-style:translate-x-[2.5rem] data-[side=right]:data-starting-style:translate-x-[2.5rem] data-[side=top]:inset-x-0 data-[side=top]:top-0 data-[side=top]:h-auto data-[side=top]:border-b data-[side=top]:data-ending-style:translate-y-[-2.5rem] data-[side=top]:data-starting-style:translate-y-[-2.5rem] data-[side=left]:sm:max-w-sm data-[side=right]:sm:max-w-sm",
@@ -188,6 +191,22 @@ function SheetContent({
         className={cn(layoutClasses, callerClasses)}
         {...props}
       >
+        {/* A form on its own page reads like a page: a way back, at the top. */}
+        {resolved === "page" && (
+          <div className="mx-auto w-full max-w-3xl px-4 pt-4">
+            <SheetPrimitive.Close
+              render={
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+                />
+              }
+            >
+              <ArrowLeft className="size-4" />
+              Retour
+            </SheetPrimitive.Close>
+          </div>
+        )}
         <InlineContent.Provider value={false}>
           <SheetDepth.Provider value={depth + 1}>{children}</SheetDepth.Provider>
         </InlineContent.Provider>

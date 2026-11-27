@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { UserRound } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import * as z from "zod";
@@ -27,8 +28,10 @@ import { Spinner } from "@/components/ui/spinner";
 import { AddressPicker } from "@/components/addresses/address-picker";
 import { ClientAssetPicker } from "@/components/assets/client-asset-picker";
 import { ClientPicker } from "@/components/clients/client-picker";
+import { ClientQuickView } from "@/components/clients/client-quick-view";
+import { ContactPicker } from "@/components/clients/contact-picker";
 import { ProjectCategoryFields } from "@/components/projects/project-category-fields";
-import { useClientQuery } from "@/hooks/use-clients";
+import { useClientContactsQuery, useClientQuery } from "@/hooks/use-clients";
 import { useCreateQuote, useQuoteTemplatesQuery, useUpdateQuote } from "@/hooks/use-quotes";
 import { useWageClassificationsQuery } from "@/hooks/use-wage-classifications";
 import { quoteStatusLabels } from "@/lib/labels";
@@ -42,8 +45,9 @@ import {
 
 const allStatuses = Object.keys(quoteStatusLabels) as QuoteStatus[];
 /** Accepted is reached by converting to a project, never from the dropdown. */
-// Accepted comes from converting or billing, and Replaced from revising: neither is picked by hand.
-const pickableStatuses = allStatuses.filter((status) => status !== "Acceptee" && status !== "Remplacee");
+// Replaced comes from revising and is never picked by hand. Accepted is: the client said yes
+// by phone, and the quote has to be approved before it becomes a project.
+const pickableStatuses = allStatuses.filter((status) => status !== "Remplacee");
 
 const NO_CLASSIFICATION = "aucun";
 
@@ -72,6 +76,8 @@ const formSchema = z
       .string()
       .refine((v) => v.trim() === "" || (Number(v) >= 0 && Number(v) <= 100), "Un pourcentage entre 0 et 100."),
     templateId: z.string(),
+    contactId: z.string(),
+    billingContactId: z.string(),
   })
   .refine((v) => !v.issuedOn || !v.validUntil || v.validUntil >= v.issuedOn, {
     path: ["validUntil"],
@@ -102,6 +108,8 @@ function toFormValues(quote?: QuoteRecord, defaultClientId?: string): FormValues
     wageClassificationId: quote?.wageClassificationId ?? "",
     depositPercent: quote?.depositPercent != null ? String(quote.depositPercent) : "",
     templateId: "",
+    contactId: quote?.contactId ?? "",
+    billingContactId: quote?.billingContactId ?? "",
   };
 }
 
@@ -132,6 +140,7 @@ export function QuoteFormSheet({
   // Once it is a project, the price belongs to the project: client, tax and status stay put.
   const converted = Boolean(quote?.projectId);
   const [exemptTouched, setExemptTouched] = useState(false);
+  const [viewingClient, setViewingClient] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -148,11 +157,36 @@ export function QuoteFormSheet({
   const subCategoryId = useWatch({ control: form.control, name: "subCategoryId" });
   const { data: classifications, isLoading: classificationsLoading } = useWageClassificationsQuery();
 
-  const { data: pickedClient } = useClientQuery(isEditing ? undefined : clientId || undefined);
+  const { data: clientRecord } = useClientQuery(clientId || undefined);
+  const { data: clientContacts } = useClientContactsQuery(clientId);
+  const pickedClient = isEditing ? undefined : clientRecord;
   useEffect(() => {
     if (isEditing || exemptTouched || !pickedClient) return;
     form.setValue("isTaxExempt", pickedClient.isTaxExempt);
   }, [isEditing, exemptTouched, pickedClient, form]);
+
+  // The client whose contacts and address were last filled in; an existing quote starts filled.
+  const filledFor = useRef<string | null>(quote?.clientId ?? null);
+
+  /**
+   * Picking a client fills in who and where from their file: their first contact, their billing
+   * contact, their main address. Only empty fields, once per client.
+   */
+  useEffect(() => {
+    if (!open || !clientId || filledFor.current === clientId) return;
+    if (!clientRecord || clientRecord.id !== clientId || !clientContacts) return;
+    filledFor.current = clientId;
+
+    const first = clientContacts[0]?.id ?? "";
+    const billing = clientContacts.some((c) => c.id === clientRecord.billingContactId)
+      ? (clientRecord.billingContactId ?? "")
+      : first;
+    if (!form.getValues("contactId")) form.setValue("contactId", first);
+    if (!form.getValues("billingContactId")) form.setValue("billingContactId", billing);
+    if (!form.getValues("clientAddressId") && clientRecord.primaryAddress?.id) {
+      form.setValue("clientAddressId", clientRecord.primaryAddress.id);
+    }
+  }, [open, clientId, clientRecord, clientContacts, form]);
 
   async function onSubmit(values: FormValues) {
     const payload: QuoteFormValues = {
@@ -174,6 +208,8 @@ export function QuoteFormSheet({
       wageClassificationId: values.wageClassificationId || null,
       depositPercent: values.depositPercent.trim() ? Number(values.depositPercent) : null,
       templateId: isEditing ? null : values.templateId || null,
+      contactId: values.contactId || null,
+      billingContactId: values.billingContactId || null,
     };
 
     try {
@@ -191,13 +227,19 @@ export function QuoteFormSheet({
     }
   }
 
-  const statuses = converted ? allStatuses : pickableStatuses;
+  // Accepted is offered once the quote can have been answered: never on a draft nobody received.
+  const statuses = converted
+    ? allStatuses
+    : pickableStatuses.filter((status) => status !== "Acceptee" || quote?.status !== "Brouillon");
 
   return (
     <Sheet
       open={open}
       onOpenChange={(next) => {
-        if (!next) setExemptTouched(false);
+        if (!next) {
+          setExemptTouched(false);
+          filledFor.current = quote?.clientId ?? null;
+        }
         onOpenChange(next);
       }}
     >
@@ -228,10 +270,18 @@ export function QuoteFormSheet({
                 control={form.control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="quote-client">
-                      Client
-                      <RequiredMark />
-                    </FieldLabel>
+                    <div className="flex items-center justify-between gap-2">
+                      <FieldLabel htmlFor="quote-client">
+                        Client
+                        <RequiredMark />
+                      </FieldLabel>
+                      {field.value && (
+                        <Button type="button" variant="ghost" size="xs" onClick={() => setViewingClient(true)}>
+                          <UserRound />
+                          Fiche du client
+                        </Button>
+                      )}
+                    </div>
                     <ClientPicker
                       id="quote-client"
                       value={field.value}
@@ -241,6 +291,8 @@ export function QuoteFormSheet({
                         form.setValue("clientAddressId", "");
                         form.setValue("siteAddressId", "");
                         form.setValue("clientAssetId", "");
+                        form.setValue("contactId", "");
+                        form.setValue("billingContactId", "");
                       }}
                       invalid={fieldState.invalid}
                     />
@@ -249,6 +301,85 @@ export function QuoteFormSheet({
                 )}
               />
             </fieldset>
+
+            <Controller
+              name="contactId"
+              control={form.control}
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel htmlFor="quote-contact">Contact principal</FieldLabel>
+                  <ContactPicker id="quote-contact" clientId={clientId} value={field.value} onChange={field.onChange} />
+                </Field>
+              )}
+            />
+
+            <Controller
+              name="billingContactId"
+              control={form.control}
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel htmlFor="quote-billing-contact">Contact de facturation</FieldLabel>
+                  <ContactPicker
+                    id="quote-billing-contact"
+                    clientId={clientId}
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                </Field>
+              )}
+            />
+
+            <Controller
+              name="clientAddressId"
+              control={form.control}
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel htmlFor="quote-client-address">Adresse du client</FieldLabel>
+                  <AddressPicker
+                    id="quote-client-address"
+                    clientId={clientId}
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                </Field>
+              )}
+            />
+
+            <Controller
+              name="sameAddressAsClient"
+              control={form.control}
+              render={({ field }) => (
+                <Field orientation="horizontal">
+                  <Checkbox
+                    id="quote-same-address"
+                    checked={field.value}
+                    onCheckedChange={(checked) => field.onChange(checked === true)}
+                  />
+                  <FieldLabel htmlFor="quote-same-address" className="font-normal">
+                    Les travaux ont lieu à cette adresse
+                  </FieldLabel>
+                </Field>
+              )}
+            />
+
+            {!sameAddress && (
+              <Controller
+                name="siteAddressId"
+                control={form.control}
+                render={({ field }) => (
+                  <Field>
+                    <FieldLabel htmlFor="quote-site-address">Adresse des travaux</FieldLabel>
+                    <AddressPicker
+                      id="quote-site-address"
+                      clientId={clientId}
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder="Rechercher le lieu des travaux…"
+                    />
+                  </Field>
+                )}
+              />
+            )}
 
             {!isEditing && templates && templates.length > 0 && (
               <Controller
@@ -297,6 +428,8 @@ export function QuoteFormSheet({
               )}
             />
 
+            {/* A new quote is a draft: the status is set by sending it, or by the client's answer. */}
+            {isEditing && (
             <Controller
               name="status"
               control={form.control}
@@ -318,11 +451,12 @@ export function QuoteFormSheet({
                   <FieldDescription>
                     {converted
                       ? "Acceptée : elle est devenue un projet."
-                      : "Elle devient « Acceptée » en la convertissant en projet."}
+                      : "« Acceptée » quand le client a dit oui : elle peut alors devenir un projet."}
                   </FieldDescription>
                 </Field>
               )}
             />
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <Controller
@@ -495,59 +629,10 @@ export function QuoteFormSheet({
               )}
             />
 
-            <Controller
-              name="clientAddressId"
-              control={form.control}
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel htmlFor="quote-client-address">Adresse du client</FieldLabel>
-                  <AddressPicker
-                    id="quote-client-address"
-                    clientId={clientId}
-                    value={field.value}
-                    onChange={field.onChange}
-                  />
-                </Field>
-              )}
-            />
-
-            <Controller
-              name="sameAddressAsClient"
-              control={form.control}
-              render={({ field }) => (
-                <Field orientation="horizontal">
-                  <Checkbox
-                    id="quote-same-address"
-                    checked={field.value}
-                    onCheckedChange={(checked) => field.onChange(checked === true)}
-                  />
-                  <FieldLabel htmlFor="quote-same-address" className="font-normal">
-                    Les travaux ont lieu à cette adresse
-                  </FieldLabel>
-                </Field>
-              )}
-            />
-
-            {!sameAddress && (
-              <Controller
-                name="siteAddressId"
-                control={form.control}
-                render={({ field }) => (
-                  <Field>
-                    <FieldLabel htmlFor="quote-site-address">Adresse des travaux</FieldLabel>
-                    <AddressPicker
-                      id="quote-site-address"
-                      clientId={clientId}
-                      value={field.value}
-                      onChange={field.onChange}
-                      placeholder="Rechercher le lieu des travaux…"
-                    />
-                  </Field>
-                )}
-              />
-            )}
           </FieldGroup>
         </form>
+
+        <ClientQuickView clientId={clientId} open={viewingClient} onOpenChange={setViewingClient} />
 
         <SheetFooter>
           <Button type="submit" form="quote-form" disabled={pending}>

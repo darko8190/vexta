@@ -53,6 +53,10 @@ export interface BillingSettings {
   /** How many reminders each gets per sending, spaced by its delay. */
   quoteReminderCount: number;
   invoiceReminderCount: number;
+  /** What the client may answer straight from the quote's email. */
+  quoteEmailCanApprove?: boolean;
+  quoteEmailCanRequestChange?: boolean;
+  quoteEmailCanRefuse?: boolean;
 }
 
 /** Which document's email a template card edits. */
@@ -87,6 +91,9 @@ export type SaveBillingSettingsValues = Omit<
   | "invoiceReminderDays"
   | "quoteReminderCount"
   | "invoiceReminderCount"
+  | "quoteEmailCanApprove"
+  | "quoteEmailCanRequestChange"
+  | "quoteEmailCanRefuse"
 >;
 
 /**
@@ -226,6 +233,15 @@ function useSaveReminder(endpoint: string) {
 }
 
 /** The conditions printed on every quote. Blank clears them. Its own endpoint, like the email. */
+export function useSaveQuoteResponses() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (values: { canApprove: boolean; canRequestChange: boolean; canRefuse: boolean }) =>
+      api.put<BillingSettings>("billing-settings/soumission-reponses", values),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["billing-settings"] }),
+  });
+}
+
 export function useSaveQuoteTerms() {
   const queryClient = useQueryClient();
   return useMutation({

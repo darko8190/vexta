@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/layout/empty-state";
 import { SectionNav, type NavSection } from "@/components/layout/section-nav";
 import { ProductBarcode } from "@/components/products/product-barcode";
+import { DuplicateProductButton } from "@/components/products/duplicate-product-button";
 import { ProductDetailsSection } from "@/components/products/product-details-section";
 import { formatProductNumber } from "@/components/products/product-format";
 import { ProductImagesSection } from "@/components/products/product-images-section";
@@ -121,6 +122,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
             {product.barcode && <ProductBarcode value={product.barcode} className="mt-2" />}
           </div>
+          <DuplicateProductButton productId={product.id} />
         </div>
       </div>
 

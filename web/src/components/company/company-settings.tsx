@@ -37,10 +37,19 @@ export function CompanySettings({ canEdit }: { canEdit: boolean }) {
         { value: "informations", label: "Informations", content: <CompanyInfoSection profile={profile} canEdit={canEdit} /> },
         { value: "lieux", label: "Lieux", content: <LocationsSection /> },
         {
+          // One tab for everything the public sees: the page itself, its galleries and the
+          // builder that lays it out.
           value: "page-publique",
           label: "Page publique",
           content: canEdit ? (
-            <PublicPageSection />
+            <SettingsTabs
+              nested
+              tabs={[
+                { value: "page", label: "Page publique", content: <PublicPageSection /> },
+                { value: "galeries", label: "Galeries", content: <GalleriesSection canEdit={canEdit} /> },
+                { value: "constructeur", label: "Constructeur de page", content: <PageBuilderSection canEdit={canEdit} /> },
+              ]}
+            />
           ) : (
             <Alert>
               <AlertTitle>Réservé au propriétaire</AlertTitle>
@@ -50,8 +59,6 @@ export function CompanySettings({ canEdit }: { canEdit: boolean }) {
             </Alert>
           ),
         },
-        { value: "galeries", label: "Galeries", content: <GalleriesSection canEdit={canEdit} /> },
-        { value: "constructeur", label: "Constructeur de page", content: <PageBuilderSection canEdit={canEdit} /> },
       ]}
     />
   );

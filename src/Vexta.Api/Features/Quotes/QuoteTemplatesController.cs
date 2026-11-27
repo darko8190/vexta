@@ -27,6 +27,20 @@ public class QuoteTemplatesController(VextaDbContext db) : ControllerBase
             .Select(ToDto())
             .ToListAsync(ct));
 
+    /// <summary>A template with its lines, to read what it holds before using it.</summary>
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<QuoteTemplateDetailDto>> Get(Guid id, CancellationToken ct)
+    {
+        var template = await db.QuoteTemplates.AsNoTracking().Where(t => t.Id == id).Select(ToDto()).FirstOrDefaultAsync(ct);
+        if (template is null) return NotFound();
+        var lines = await db.QuoteTemplateLines.AsNoTracking()
+            .Where(l => l.TemplateId == id)
+            .OrderBy(l => l.Kind).ThenBy(l => l.SortOrder)
+            .Select(l => new QuoteTemplateLineDto(l.Id, l.Kind, l.Description, l.Unit, l.Quantity, l.UnitCost, l.UnitPrice, l.IsOptional))
+            .ToListAsync(ct);
+        return Ok(new QuoteTemplateDetailDto(template, lines));
+    }
+
     [HttpDelete("{id:guid}")]
     [Authorize(Roles = Roles.Managers)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
@@ -50,3 +64,8 @@ public class QuoteTemplatesController(VextaDbContext db) : ControllerBase
             t.DepositPercent,
             t.UpdatedAt);
 }
+
+public record QuoteTemplateLineDto(
+    Guid Id, QuoteLineKind Kind, string Description, string? Unit, decimal Quantity, decimal? UnitCost, decimal UnitPrice, bool IsOptional);
+
+public record QuoteTemplateDetailDto(QuoteTemplateDto Template, List<QuoteTemplateLineDto> Lines);

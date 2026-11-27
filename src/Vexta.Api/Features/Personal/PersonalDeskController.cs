@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -303,6 +304,50 @@ public class PersonalDeskController(VextaDbContext db, ICurrentUserService curre
         }
 
         return clientIds.Concat(direct).Concat(byEmail).ToHashSet();
+    }
+
+    /// <summary>
+    /// The invoice as a document, the same PDF the company sends. Rendered as the company: the
+    /// document is built from the company's own settings and client file, which only open to it,
+    /// so the renderer runs in a scope signed as that company, for this one invoice.
+    /// </summary>
+    [HttpGet("factures/{id:guid}/pdf")]
+    public async Task<IActionResult> InvoicePdf(
+        Guid id, [FromServices] IServiceScopeFactory scopes, [FromServices] IHttpContextAccessor accessor, CancellationToken ct)
+    {
+        if (currentUser.UserId is not { } userId) return Forbid();
+        var mine = await MyClientIdsAsync(userId, ct);
+        var found = await db.Invoices.IgnoreQueryFilters().AsNoTracking()
+            .Where(i => i.Id == id && mine.Contains(i.ClientId) && i.Status != InvoiceStatus.Brouillon && i.DeletedAt == null)
+            .Select(i => new { i.TenantId, i.Number })
+            .FirstOrDefaultAsync(ct);
+        if (found is null) return NotFound();
+
+        var original = accessor.HttpContext;
+        byte[]? bytes;
+        using (var scope = scopes.CreateScope())
+        {
+            try
+            {
+                accessor.HttpContext = new DefaultHttpContext
+                {
+                    RequestServices = scope.ServiceProvider,
+                    User = new ClaimsPrincipal(new ClaimsIdentity(
+                    [
+                        new Claim(VextaClaimTypes.TenantId, found.TenantId.ToString()),
+                        new Claim(ClaimTypes.Role, nameof(UserRole.TenantUser))
+                    ], "PersonalInvoicePdf"))
+                };
+                bytes = await scope.ServiceProvider.GetRequiredService<IInvoicePdfService>().RenderAsync(id, ct);
+            }
+            finally
+            {
+                accessor.HttpContext = original;
+            }
+        }
+        if (bytes is null) return NotFound();
+        Response.Headers.ContentDisposition = $"inline; filename=\"Facture-{found.Number}.pdf\"";
+        return File(bytes, "application/pdf");
     }
 
     /// <summary>

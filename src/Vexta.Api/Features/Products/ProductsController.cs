@@ -122,6 +122,90 @@ public class ProductsController(
             i.QuantityOnHand - reserved.GetValueOrDefault(i.Id))));
     }
 
+    /// <summary>
+    /// The catalogue as the advanced search shows it: by category, with each product's first
+    /// picture, so a part is found by looking rather than by remembering its name.
+    /// </summary>
+    [HttpGet("parcourir")]
+    public async Task<ActionResult<List<ProductBrowseDto>>> Browse(
+        [FromQuery] string? term, [FromQuery] Guid? categoryId, [FromQuery] Guid? subCategoryId, CancellationToken ct)
+    {
+        var products = Matching(db.Products.AsNoTracking(), term);
+        if (categoryId is not null) products = products.Where(p => p.CategoryId == categoryId);
+        if (subCategoryId is not null) products = products.Where(p => p.SubCategoryId == subCategoryId);
+
+        var rows = await products.OrderBy(p => p.Title).Take(60)
+            .Select(p => new
+            {
+                p.Id, p.Number, p.Code, p.Title, p.Unit, p.CategoryId,
+                CategoryName = p.Category == null ? null : p.Category.Name,
+                SubCategoryName = p.SubCategory == null ? null : p.SubCategory.Name,
+                p.PurchasePrice, p.MarginPercent, p.SellingPrice, p.TracksInventory, p.QuantityOnHand,
+                Image = p.Images.OrderBy(i => i.SortOrder)
+                    .Select(i => new { i.MediaAsset!.ObjectKey, i.MediaAsset!.FileName }).FirstOrDefault()
+            })
+            .ToListAsync(ct);
+
+        var result = new List<ProductBrowseDto>(rows.Count);
+        foreach (var r in rows)
+        {
+            string? url = null;
+            if (r.Image is { } image)
+            {
+                try { url = await storage.CreateDownloadUrlAsync(image.ObjectKey, image.FileName, ct); }
+                catch (InvalidOperationException) { url = null; }
+            }
+            result.Add(new ProductBrowseDto(r.Id, r.Number, r.Code, r.Title, r.Unit, r.CategoryId, r.CategoryName,
+                r.SubCategoryName, r.PurchasePrice, r.MarginPercent, r.SellingPrice, r.TracksInventory, r.QuantityOnHand, url));
+        }
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// A copy of a product to start the next one from: the same filing, prices, unit and
+    /// pictures, under the next number. No stock: what is on the shelf belongs to the original.
+    /// </summary>
+    [Authorize(Roles = Roles.Managers)]
+    [HttpPost("{id:guid}/dupliquer")]
+    [RequireBusinessTenant]
+    public async Task<ActionResult<ProductDto>> Duplicate(Guid id, CancellationToken ct)
+    {
+        if (currentUser.TenantId is not { } tenantId) return Forbid();
+        var source = await db.Products.AsNoTracking().Include(p => p.Images).FirstOrDefaultAsync(p => p.Id == id, ct);
+        if (source is null) return NotFound();
+
+        var copy = new Product
+        {
+            TenantId = tenantId,
+            Number = await NextNumberAsync(tenantId, ct),
+            Code = null,
+            Title = source.Title.Length > 190 ? source.Title : $"{source.Title} (copie)",
+            Description = source.Description,
+            Unit = source.Unit,
+            CategoryId = source.CategoryId,
+            SubCategoryId = source.SubCategoryId,
+            MinimumQuantity = source.MinimumQuantity,
+            MaximumQuantity = source.MaximumQuantity,
+            TracksInventory = source.TracksInventory,
+            PurchasePrice = source.PurchasePrice,
+            MarginPercent = source.MarginPercent,
+            SellingPrice = source.SellingPrice,
+            InstallationMinutes = source.InstallationMinutes,
+            Note = source.Note,
+            ParentProductId = source.ParentProductId,
+            IsPublic = false
+        };
+        // The same pictures, pointed at again rather than copied.
+        foreach (var image in source.Images.OrderBy(i => i.SortOrder))
+            copy.Images.Add(new ProductImage { TenantId = tenantId, MediaAssetId = image.MediaAssetId, SortOrder = image.SortOrder });
+
+        db.Products.Add(copy);
+        if (copy.PurchasePrice is not null || copy.MarginPercent is not null || copy.SellingPrice is not null)
+            AddPriceEntry(copy, tenantId);
+        await db.SaveChangesAsync(ct);
+        return CreatedAtAction(nameof(Get), new { id = copy.Id }, await GetDtoAsync(copy.Id, ct));
+    }
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ProductDto>> Get(Guid id, CancellationToken ct)
     {

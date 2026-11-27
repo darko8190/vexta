@@ -133,9 +133,9 @@ public class QuotesController(
         if (f.Min("projet") is { } projectMin) quotes = quotes.Where(q => q.Project != null && q.Project.Number >= projectMin);
         if (f.Max("projet") is { } projectMax) quotes = quotes.Where(q => q.Project != null && q.Project.Number <= projectMax);
         if (f.Min("montant") is { } amountMin)
-            quotes = quotes.Where(q => q.Lines.Where(l => !l.IsOptional || l.IsSelected).Sum(l => Math.Round(l.Quantity * l.UnitPrice, 2)) >= amountMin);
+            quotes = quotes.Where(q => q.Lines.Where(l => l.ParentLineId == null && (!l.IsOptional || l.IsSelected)).Sum(l => Math.Round(l.Quantity * l.UnitPrice, 2)) >= amountMin);
         if (f.Max("montant") is { } amountMax)
-            quotes = quotes.Where(q => q.Lines.Where(l => !l.IsOptional || l.IsSelected).Sum(l => Math.Round(l.Quantity * l.UnitPrice, 2)) <= amountMax);
+            quotes = quotes.Where(q => q.Lines.Where(l => l.ParentLineId == null && (!l.IsOptional || l.IsSelected)).Sum(l => Math.Round(l.Quantity * l.UnitPrice, 2)) <= amountMax);
         return quotes;
     }
 
@@ -176,7 +176,7 @@ public class QuotesController(
                 // A quote made a project counts as accepted whatever its status says.
                 Accepted = q.ProjectId != null || q.InvoiceId != null || q.Status == QuoteStatus.Acceptee,
                 q.Status,
-                Amount = q.Lines.Where(l => !l.IsOptional || l.IsSelected).Sum(l => (decimal?)(l.Quantity * l.UnitPrice)) ?? 0m
+                Amount = q.Lines.Where(l => l.ParentLineId == null && (!l.IsOptional || l.IsSelected)).Sum(l => (decimal?)(l.Quantity * l.UnitPrice)) ?? 0m
             })
             .ToListAsync(ct);
 
@@ -252,6 +252,8 @@ public class QuotesController(
         {
             Line(QuoteLineKind.Tache, "main-oeuvre", "Main-d'œuvre"),
             Line(QuoteLineKind.Materiel, "materiaux", "Matériaux"),
+            Line(QuoteLineKind.Equipement, "equipements", "Équipements"),
+            Line(QuoteLineKind.Assemblage, "assemblages", "Assemblages"),
             Line(QuoteLineKind.Frais, "frais-supplementaires", "Frais supplémentaires"),
         };
 
@@ -277,7 +279,9 @@ public class QuotesController(
             quote.Lines.Count(l => l.Kind == QuoteLineKind.Frais),
             documentsAndNotes,
             costs,
-            withoutCost));
+            withoutCost,
+            quote.Lines.Count(l => l.Kind == QuoteLineKind.Equipement),
+            quote.Lines.Count(l => l.Kind == QuoteLineKind.Assemblage)));
     }
 
     [HttpPost]
@@ -291,7 +295,7 @@ public class QuotesController(
         if (client.WorkRefusal() is { } refusal) return BadRequest(new { message = refusal });
         if (await InvalidAsync(request) is { } problem) return BadRequest(new { message = problem });
         if (request.Status == QuoteStatus.Acceptee)
-            return BadRequest(new { message = "Une soumission est acceptée en la convertissant en projet." });
+            return BadRequest(new { message = "Une soumission est approuvée une fois donnée au client, pas à sa création." });
 
         var tenantId = currentUser.TenantId!.Value;
         var quote = new Quote
@@ -318,6 +322,8 @@ public class QuotesController(
                 TenantId = tenantId,
                 Kind = l.Kind,
                 ProductId = l.ProductId,
+                EquipmentId = l.EquipmentId,
+                AssemblyId = l.AssemblyId,
                 Code = l.Code,
                 Description = l.Description,
                 Unit = l.Unit,
@@ -328,6 +334,9 @@ public class QuotesController(
                 SortOrder = l.SortOrder
             })];
         }
+
+        // The template keeps only the assemblies; their materials come from the assembly as it is now.
+        await AddAssemblyMaterialsAsync(quote, [.. quote.Lines]);
 
         db.Quotes.Add(quote);
         await db.SaveChangesAsync();
@@ -352,8 +361,11 @@ public class QuotesController(
             return BadRequest(new { message = Locked });
         }
 
-        if (!IsLocked(quote) && request.Status == QuoteStatus.Acceptee)
-            return BadRequest(new { message = "Une soumission est acceptée en la convertissant en projet." });
+        // Approved by hand: the client said yes by phone or in person. A draft has not been
+        // given to anybody yet, so it cannot have been approved.
+        if (!IsLocked(quote) && request.Status == QuoteStatus.Acceptee && quote.Status != QuoteStatus.Acceptee
+            && quote.Status is not (QuoteStatus.Envoyee or QuoteStatus.Brouillon))
+            return BadRequest(new { message = "Seule une soumission en attente de réponse peut être approuvée." });
 
         if (await InvalidAsync(request) is { } problem) return BadRequest(new { message = problem });
 
@@ -483,21 +495,10 @@ public class QuotesController(
             WageClassificationId = source.WageClassificationId,
             DepositPercent = source.DepositPercent,
             // Dates of the work are not copied: they belong to the job that was planned.
-            Lines = [.. source.Lines.OrderBy(l => l.SortOrder).Select(l => new QuoteLine
-            {
-                TenantId = tenantId,
-                Kind = l.Kind,
-                ProductId = l.ProductId,
-                Code = l.Code,
-                Description = l.Description,
-                Unit = l.Unit,
-                Quantity = l.Quantity,
-                UnitCost = l.UnitCost,
-                UnitPrice = l.UnitPrice,
-                // An option stays an option; whether it was taken belongs to the original.
-                IsOptional = l.IsOptional,
-                SortOrder = l.SortOrder
-            })]
+            ContactId = source.ContactId,
+            BillingContactId = source.BillingContactId,
+            // An option stays an option; whether it was taken belongs to the original.
+            Lines = CopyLines(source.Lines, tenantId)
         };
 
         db.Quotes.Add(copy);
@@ -568,6 +569,8 @@ public class QuotesController(
         quote.UpdatedAt = DateTimeOffset.UtcNow;
 
         db.QuoteLines.Add(line);
+        // An assembly brings its materials, so many of each as there are assemblies.
+        await AddAssemblyMaterialsAsync(quote, [line]);
         await db.SaveChangesAsync();
         return Ok(MapLine(line));
     }
@@ -582,9 +585,25 @@ public class QuotesController(
         if (IsLocked(line.Quote!)) return BadRequest(new { message = Locked });
         if (await InvalidLineAsync(request) is { } problem) return BadRequest(new { message = problem });
 
+        var previousQuantity = line.Quantity;
+        var previousAssembly = line.AssemblyId;
         ApplyLine(line, request);
         line.UpdatedAt = DateTimeOffset.UtcNow;
         line.Quote.UpdatedAt = DateTimeOffset.UtcNow;
+
+        // The materials follow their assembly: another assembly brings its own, another
+        // quantity scales them.
+        var children = await db.QuoteLines.Where(c => c.ParentLineId == line.Id).ToListAsync();
+        if (line.Kind != QuoteLineKind.Assemblage || previousAssembly != line.AssemblyId)
+        {
+            db.QuoteLines.RemoveRange(children);
+            if (line.Kind == QuoteLineKind.Assemblage) await AddAssemblyMaterialsAsync(line.Quote, [line]);
+        }
+        else if (previousQuantity != line.Quantity && previousQuantity > 0)
+        {
+            foreach (var child in children)
+                child.Quantity = Math.Round(child.Quantity / previousQuantity * line.Quantity, 3);
+        }
 
         await db.SaveChangesAsync();
         return Ok(MapLine(line));
@@ -643,6 +662,10 @@ public class QuotesController(
             return BadRequest(new { message = "Cette version a été remplacée par une révision. Convertissez la révision." });
         if (quote.Status is QuoteStatus.Refusee or QuoteStatus.Expiree)
             return BadRequest(new { message = "Une soumission refusée ou expirée ne devient pas un projet. Remettez-la en brouillon d'abord." });
+        // Approved first, by the client or marked so by the office: a job nobody agreed to is
+        // not a job yet.
+        if (quote.Status != QuoteStatus.Acceptee)
+            return BadRequest(new { message = "La soumission doit être approuvée avant de devenir un projet. Marquez-la « Acceptée » une fois que le client a dit oui." });
         if (quote.Client!.WorkRefusal() is { } refusal) return BadRequest(new { message = refusal });
 
         var converted = await CreateProjectAsync(quote);
@@ -860,20 +883,9 @@ public class QuotesController(
             SubCategoryId = source.SubCategoryId,
             WageClassificationId = source.WageClassificationId,
             DepositPercent = source.DepositPercent,
-            Lines = [.. source.Lines.OrderBy(l => l.Kind).ThenBy(l => l.SortOrder).Select(l => new QuoteLine
-            {
-                TenantId = source.TenantId,
-                Kind = l.Kind,
-                ProductId = l.ProductId,
-                Code = l.Code,
-                Description = l.Description,
-                Unit = l.Unit,
-                Quantity = l.Quantity,
-                UnitCost = l.UnitCost,
-                UnitPrice = l.UnitPrice,
-                IsOptional = l.IsOptional,
-                SortOrder = l.SortOrder
-            })],
+            ContactId = source.ContactId,
+            BillingContactId = source.BillingContactId,
+            Lines = CopyLines(source.Lines, source.TenantId),
             // Dated as filed, so the thread still reads in the order things were said.
             Documents = [.. source.Documents.Select(d => new QuoteDocument
             {
@@ -958,6 +970,8 @@ public class QuotesController(
                 {
                     QuoteLineKind.Tache => InvoiceLineKind.MainDOeuvre,
                     QuoteLineKind.Materiel => InvoiceLineKind.Materiaux,
+                    QuoteLineKind.Equipement => InvoiceLineKind.Equipement,
+                    QuoteLineKind.Assemblage => InvoiceLineKind.Assemblage,
                     _ => InvoiceLineKind.FraisSupplementaires
                 },
                 ProductId = l.ProductId,
@@ -982,6 +996,7 @@ public class QuotesController(
             });
         }
 
+        await InvoiceAutoFees.AppendAsync(db, invoice, ct);
         settings.NextInvoiceNumber++;
         db.Invoices.Add(invoice);
         quote.InvoiceId = invoice.Id;
@@ -1154,7 +1169,6 @@ public class QuotesController(
 
         var quote = await db.Quotes.AsNoTracking().Include(q => q.Lines).FirstOrDefaultAsync(q => q.Id == id, ct);
         if (quote is null) return NotFound();
-        if (quote.Lines.Count == 0) return BadRequest(new { message = "Ajoutez des lignes avant d'en faire un modèle." });
 
         var tenantId = currentUser.TenantId!.Value;
         var existing = await db.QuoteTemplates.Include(t => t.Lines)
@@ -1170,7 +1184,8 @@ public class QuotesController(
         template.Description = quote.Description;
         template.DepositPercent = quote.DepositPercent;
         template.UpdatedAt = DateTimeOffset.UtcNow;
-        foreach (var l in quote.Lines.OrderBy(l => l.Kind).ThenBy(l => l.SortOrder))
+        // An assembly's materials are not kept: they come from the assembly when the template is used.
+        foreach (var l in quote.Lines.Where(l => l.ParentLineId == null).OrderBy(l => l.Kind).ThenBy(l => l.SortOrder))
         {
             var line = new QuoteTemplateLine
             {
@@ -1178,6 +1193,8 @@ public class QuotesController(
                 TemplateId = template.Id,
                 Kind = l.Kind,
                 ProductId = l.ProductId,
+                EquipmentId = l.EquipmentId,
+                AssemblyId = l.AssemblyId,
                 Code = l.Code,
                 Description = l.Description,
                 Unit = l.Unit,
@@ -1228,6 +1245,8 @@ public class QuotesController(
             CategoryId = quote.CategoryId,
             SubCategoryId = quote.SubCategoryId,
             WageClassificationId = quote.WageClassificationId,
+            ContactId = quote.ContactId,
+            BillingContactId = quote.BillingContactId,
         };
 
         var order = 0;
@@ -1257,6 +1276,56 @@ public class QuotesController(
                 UnitPrice = line.UnitPrice,
                 SortOrder = order++,
             });
+        }
+
+        var equipmentIds = ordered.Where(l => l.Kind == QuoteLineKind.Equipement && l.EquipmentId != null)
+            .Select(l => l.EquipmentId!.Value).Distinct().ToList();
+        var units = await db.Equipment.AsNoTracking().Where(e => equipmentIds.Contains(e.Id))
+            .ToDictionaryAsync(e => e.Id, e => e.Unit);
+        foreach (var line in ordered.Where(l => l.Kind == QuoteLineKind.Equipement))
+        {
+            project.EquipmentUsed.Add(new ProjectEquipment
+            {
+                TenantId = tenantId,
+                EquipmentId = line.EquipmentId,
+                Name = Truncate(line.Description, 200),
+                Unit = line.EquipmentId is { } eid && units.TryGetValue(eid, out var unit) ? unit : EquipmentUnit.Unite,
+                Quantity = line.Quantity,
+                CostRate = line.UnitCost,
+                SellingRate = line.UnitPrice,
+            });
+        }
+
+        // Each assembly with the materials it brought, still tied to it.
+        foreach (var line in ordered.Where(l => l.Kind == QuoteLineKind.Assemblage))
+        {
+            var assembly = new ProjectAssembly
+            {
+                TenantId = tenantId,
+                ProjectId = project.Id,
+                AssemblyId = line.AssemblyId,
+                Name = Truncate(line.Description, 200),
+                Quantity = line.Quantity,
+                UnitCost = line.UnitCost ?? 0m,
+                UnitPrice = line.UnitPrice,
+            };
+            db.ProjectAssemblies.Add(assembly);
+            foreach (var child in quote.Lines.Where(c => c.ParentLineId == line.Id).OrderBy(c => c.SortOrder))
+            {
+                project.Materials.Add(new ProjectMaterial
+                {
+                    TenantId = tenantId,
+                    ProjectAssemblyId = assembly.Id,
+                    ProductId = child.ProductId,
+                    Code = child.Code,
+                    Description = child.Description,
+                    Unit = child.Unit,
+                    Quantity = child.Quantity,
+                    PurchasePrice = child.UnitCost,
+                    UnitPrice = child.UnitPrice,
+                    SortOrder = order++,
+                });
+            }
         }
 
         foreach (var line in ordered.Where(l => l.Kind == QuoteLineKind.Frais))
@@ -1331,6 +1400,74 @@ public class QuotesController(
         quote.SubCategoryId = request.CategoryId is null ? null : request.SubCategoryId;
         quote.WageClassificationId = request.WageClassificationId;
         quote.DepositPercent = request.DepositPercent is > 0 ? Math.Round(request.DepositPercent.Value, 2) : null;
+        quote.ContactId = request.ContactId;
+        quote.BillingContactId = request.BillingContactId;
+    }
+
+    /// <summary>
+    /// Copies a quote's lines for a new version or a copy, each assembly's materials still under
+    /// the assembly. Whether an option was taken belongs to the original and is not copied.
+    /// </summary>
+    private static List<QuoteLine> CopyLines(IEnumerable<QuoteLine> source, Guid tenantId)
+    {
+        var ids = new Dictionary<Guid, Guid>();
+        var lines = source.OrderBy(l => l.Kind).ThenBy(l => l.SortOrder).ToList();
+        foreach (var l in lines) ids[l.Id] = Guid.NewGuid();
+        return [.. lines.Select(l => new QuoteLine
+        {
+            Id = ids[l.Id],
+            TenantId = tenantId,
+            Kind = l.Kind,
+            ProductId = l.ProductId,
+            EquipmentId = l.EquipmentId,
+            AssemblyId = l.AssemblyId,
+            ParentLineId = l.ParentLineId is { } parent && ids.TryGetValue(parent, out var mapped) ? mapped : null,
+            Code = l.Code,
+            Description = l.Description,
+            Unit = l.Unit,
+            Quantity = l.Quantity,
+            UnitCost = l.UnitCost,
+            UnitPrice = l.UnitPrice,
+            IsOptional = l.IsOptional,
+            SortOrder = l.SortOrder
+        })];
+    }
+
+    /// <summary>
+    /// Adds under each assembly line the materials its assembly is made of, so many of each as
+    /// there are assemblies. Shown for what they are; the money stays on the assembly. Does not save.
+    /// </summary>
+    private async Task AddAssemblyMaterialsAsync(Quote quote, List<QuoteLine> parents)
+    {
+        var assemblyLines = parents.Where(p => p.Kind == QuoteLineKind.Assemblage && p.AssemblyId != null).ToList();
+        if (assemblyLines.Count == 0) return;
+        var ids = assemblyLines.Select(p => p.AssemblyId!.Value).Distinct().ToList();
+        var assemblies = await db.Assemblies.AsNoTracking().Include(a => a.Items).ThenInclude(i => i.Product)
+            .Where(a => ids.Contains(a.Id)).ToDictionaryAsync(a => a.Id);
+        var next = await db.QuoteLines.Where(l => l.QuoteId == quote.Id && l.Kind == QuoteLineKind.Materiel)
+            .MaxAsync(l => (int?)l.SortOrder) ?? -1;
+        foreach (var parent in assemblyLines)
+        {
+            if (!assemblies.TryGetValue(parent.AssemblyId!.Value, out var assembly)) continue;
+            foreach (var item in assembly.Items.OrderBy(i => i.SortOrder))
+            {
+                db.QuoteLines.Add(new QuoteLine
+                {
+                    TenantId = quote.TenantId,
+                    QuoteId = quote.Id,
+                    Kind = QuoteLineKind.Materiel,
+                    ParentLineId = parent.Id,
+                    ProductId = item.ProductId,
+                    Code = item.Product?.Code,
+                    Description = item.Description,
+                    Unit = item.Unit,
+                    Quantity = Math.Round(item.Quantity * parent.Quantity, 3),
+                    UnitCost = item.PurchasePrice,
+                    UnitPrice = item.UnitPrice,
+                    SortOrder = ++next,
+                });
+            }
+        }
     }
 
     private static void ApplyLine(QuoteLine line, SaveQuoteLineRequest request)
@@ -1341,6 +1478,8 @@ public class QuotesController(
         line.UnitCost = request.UnitCost;
         line.UnitPrice = request.UnitPrice;
         line.ProductId = request.ProductId;
+        line.EquipmentId = request.Kind == QuoteLineKind.Equipement ? request.EquipmentId : null;
+        line.AssemblyId = request.Kind == QuoteLineKind.Assemblage ? request.AssemblyId : null;
         line.Code = Clean(request.Code);
         line.Unit = Clean(request.Unit);
         line.IsOptional = request.IsOptional;
@@ -1369,6 +1508,13 @@ public class QuotesController(
             && !await db.ClientAssets.AnyAsync(a => a.Id == assetId && a.ClientId == request.ClientId))
             return "Cet actif n'appartient pas à ce client.";
 
+        foreach (var contactId in new[] { request.ContactId, request.BillingContactId })
+        {
+            if (contactId is not { } cid) continue;
+            if (!await db.ClientContacts.AnyAsync(c => c.Id == cid && c.ClientId == request.ClientId))
+                return "Ce contact n'appartient pas à ce client.";
+        }
+
         if (request.CategoryId is { } categoryId && !await db.ProjectCategories.AnyAsync(c => c.Id == categoryId))
             return "Cette catégorie n'existe plus.";
 
@@ -1391,6 +1537,10 @@ public class QuotesController(
         if (request.UnitPrice < 0 || request.UnitCost < 0) return "Un prix ne peut pas être négatif.";
         if (request.ProductId is { } productId && !await db.Products.AnyAsync(p => p.Id == productId))
             return "Ce produit n'existe plus.";
+        if (request.EquipmentId is { } equipmentId && !await db.Equipment.AnyAsync(e => e.Id == equipmentId))
+            return "Cet équipement n'existe plus.";
+        if (request.AssemblyId is { } assemblyId && !await db.Assemblies.AnyAsync(a => a.Id == assemblyId))
+            return "Cet assemblage n'existe plus.";
         return null;
     }
 
@@ -1406,7 +1556,7 @@ public class QuotesController(
 
     private static QuoteLineDto MapLine(QuoteLine l) =>
         new(l.Id, l.Kind, l.ProductId, l.Code, l.Description, l.Unit, l.Quantity, l.UnitCost, l.UnitPrice,
-            LineTotal(l), l.SortOrder, l.IsOptional, l.IsSelected);
+            LineTotal(l), l.SortOrder, l.IsOptional, l.IsSelected, l.EquipmentId, l.AssemblyId, l.ParentLineId);
 
     private Task<QuoteDto?> GetDtoAsync(Guid id) =>
         Visible().AsNoTracking().Where(q => q.Id == id).Select(ToDto()).FirstOrDefaultAsync();
@@ -1443,7 +1593,7 @@ public class QuotesController(
         q.WageClassification == null ? null : q.WageClassification.Name,
         q.ProjectId,
         q.Project == null ? null : q.Project.Number,
-        q.Lines.Where(l => !l.IsOptional || l.IsSelected).Sum(l => Math.Round(l.Quantity * l.UnitPrice, 2)),
+        q.Lines.Where(l => l.ParentLineId == null && (!l.IsOptional || l.IsSelected)).Sum(l => Math.Round(l.Quantity * l.UnitPrice, 2)),
         q.CreatedAt,
         q.UpdatedAt,
         q.SentAt,
@@ -1455,7 +1605,7 @@ public class QuotesController(
         q.DepositPercent,
         q.DepositInvoiceId,
         q.DepositInvoice == null ? null : q.DepositInvoice.Number,
-        q.Lines.Where(l => l.IsOptional && !l.IsSelected).Sum(l => Math.Round(l.Quantity * l.UnitPrice, 2)),
+        q.Lines.Where(l => l.ParentLineId == null && l.IsOptional && !l.IsSelected).Sum(l => Math.Round(l.Quantity * l.UnitPrice, 2)),
         q.Lines.Where(l => l.IsOptional)
             .OrderBy(l => l.Kind).ThenBy(l => l.SortOrder)
             .Select(l => new QuoteOptionDto(l.Id, l.Description, Math.Round(l.Quantity * l.UnitPrice, 2), l.IsSelected))
@@ -1466,5 +1616,11 @@ public class QuotesController(
         q.InvoiceId,
         q.Invoice == null ? null : q.Invoice.Number,
         q.ReminderSentAt,
-        q.ReminderCount);
+        q.ReminderCount,
+        q.ContactId,
+        q.Contact == null ? null : (q.Contact.FirstName + " " + q.Contact.LastName).Trim(),
+        q.BillingContactId,
+        q.BillingContact == null ? null : (q.BillingContact.FirstName + " " + q.BillingContact.LastName).Trim(),
+        q.ChangeRequestedAt,
+        q.ChangeRequestNote);
 }

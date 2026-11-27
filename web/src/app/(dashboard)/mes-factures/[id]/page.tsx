@@ -8,6 +8,8 @@ import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/layout/empty-state";
+import { PdfViewer } from "@/components/layout/pdf-viewer";
+import { usePdfDocument } from "@/hooks/use-pdf-document";
 import { useMyInvoiceQuery } from "@/hooks/use-personal-profile";
 import { invoiceStatusBadgeVariant, invoiceStatusLabels } from "@/lib/labels";
 import { formatAmount } from "@/lib/money";
@@ -23,6 +25,8 @@ import { cn } from "@/lib/utils";
 export default function MyInvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { data: invoice, isLoading, isError } = useMyInvoiceQuery(id);
+  // The document itself, as the company sent it.
+  const pdf = usePdfDocument(invoice ? `mon-espace/factures/${id}/pdf` : null);
 
   const back = (
     <Link
@@ -55,8 +59,11 @@ export default function MyInvoicePage({ params }: { params: Promise<{ id: string
   const money = (value: number) => formatAmount(value, invoice.currency);
 
   return (
-    <div className="max-w-4xl">
+    <div>
       {back}
+      {/* The figures on the left, the document on the right from xl. */}
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(28rem,40%)]">
+      <div className="min-w-0">
 
       <div className="mb-6 rounded-lg border border-border bg-card p-4 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -145,6 +152,18 @@ export default function MyInvoicePage({ params }: { params: Promise<{ id: string
           {invoice.notes}
         </p>
       )}
+      </div>
+
+      <aside className="xl:sticky xl:top-0 xl:self-start">
+        <PdfViewer
+          url={pdf.url}
+          loading={pdf.loading}
+          error={pdf.error}
+          title={`Facture ${invoice.number}`}
+          fileName={`Facture-${invoice.number}.pdf`}
+        />
+      </aside>
+      </div>
     </div>
   );
 }

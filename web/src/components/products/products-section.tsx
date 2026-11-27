@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ExternalLink, MoreHorizontal, Package, Pencil, Plus, Trash2 } from "lucide-react";
+import { Copy, ExternalLink, MoreHorizontal, Package, Pencil, Plus, Trash2 } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,7 +27,7 @@ import { ProductFormSheet } from "@/components/products/product-form-sheet";
 import { formatProductNumber, money, quantity } from "@/components/products/product-format";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useDeleteProduct, useProductsQuery } from "@/hooks/use-products";
-import { ApiError } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import type { ProductRecord } from "@/lib/types";
 import { SortableHead } from "@/components/layout/sortable-head";
 import { byKeys, sortRows, type SortState } from "@/lib/table-sort";
@@ -60,6 +61,17 @@ export function AvailableQuantity({ product }: { product: ProductRecord }) {
 /** The catalogue, as Inventaire lists it. Pressing a row opens the product's own page. */
 export function ProductsSection() {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  // A copy to start the next product from, opened at once to be renamed.
+  const duplicate = useMutation({
+    mutationFn: (id: string) => api.post<{ id: string }>(`products/${id}/dupliquer`),
+    onSuccess: (copy) => {
+      void queryClient.invalidateQueries({ queryKey: ["products"] });
+      toast.success("Produit dupliqué.", { description: "Changez son nom et son code, puis enregistrez." });
+      router.push(`/inventaire/produits/${copy.id}`);
+    },
+    onError: (error) => toast.error(error instanceof ApiError ? error.message : "Impossible de dupliquer le produit."),
+  });
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortState | null>({ key: "numero", dir: "desc" });
@@ -236,6 +248,10 @@ export function ProductsSection() {
                         <DropdownMenuItem onClick={() => openEdit(product)}>
                           <Pencil />
                           Modifier
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => duplicate.mutate(product.id)}>
+                          <Copy />
+                          Dupliquer
                         </DropdownMenuItem>
                         <DropdownMenuItem variant="destructive" onClick={() => setDeleteTarget(product)}>
                           <Trash2 />

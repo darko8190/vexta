@@ -57,6 +57,9 @@ public class ProjectExpense
     /// </summary>
     public bool IsBillable { get; set; } = true;
 
+    /// <summary>Who entered it: an employee's « Mes dépenses » lists their own.</summary>
+    public Guid? CreatedByUserId { get; set; }
+
     /// <summary>The day the money went out, which is rarely the day the row is created.</summary>
     public DateOnly? SpentOn { get; set; }
 

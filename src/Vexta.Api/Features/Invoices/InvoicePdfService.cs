@@ -152,7 +152,8 @@ public class InvoicePdfService(VextaDbContext db, ICurrentUserService currentUse
         }
 
         var items = ordered.Select(Print).ToList();
-        var options = all.Where(l => !l.Counts).Select(Print).ToList();
+        // An assembly's materials are what it is made of, not something to choose.
+        var options = all.Where(l => !l.Counts && l.ParentLineId == null).Select(Print).ToList();
 
         var totals = InvoiceTotals.For(
             ordered.Select(l => new InvoiceTotals.Line(l.Quantity, l.UnitPrice, true)),

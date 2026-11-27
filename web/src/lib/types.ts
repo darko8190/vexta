@@ -1378,6 +1378,8 @@ export interface ProductRecord {
   quantityReserved: number;
   /** On hand minus reserved. */
   quantityAvailable: number;
+  /** Left to receive on purchase orders already sent. */
+  quantityOnOrder: number;
   purchasePrice: number | null;
   marginPercent: number | null;
   sellingPrice: number | null;
@@ -2155,7 +2157,12 @@ export type FormFieldTarget =
   | "ActifNumeroSerie"
   | "ActifReference"
   | "ActifUsage"
-  | "ActifNotes";
+  | "ActifNotes"
+  | "AdresseRue"
+  | "AdresseComplement"
+  | "AdresseVille"
+  | "AdresseProvince"
+  | "AdresseCodePostal";
 
 export type FormActionKind = "EnvoyerCourriel" | "CreerClient" | "CreerActifClient";
 
@@ -3163,7 +3170,8 @@ export interface DirectorySummary {
 
 // ---- Soumissions ----
 
-export type QuoteStatus = "Brouillon" | "Envoyee" | "Acceptee" | "Refusee" | "Expiree" | "Remplacee";
+/** EnProjet is never stored: the API shows it for a quote that became a project. */
+export type QuoteStatus = "Brouillon" | "Envoyee" | "Acceptee" | "Refusee" | "Expiree" | "Remplacee" | "EnProjet";
 
 /** Which project section the line becomes on acceptance: a task, a material, an extra charge. */
 export type QuoteLineKind = "Tache" | "Materiel" | "Frais" | "Equipement" | "Assemblage";

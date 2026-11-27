@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ExternalLink, FolderKanban, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { Ban, CircleDollarSign, ExternalLink, FolderKanban, MoreHorizontal, Pencil, Play, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
+import type { BulkAction } from "@/components/layout/bulk-actions";
 import { DataTable, type DataColumn } from "@/components/layout/data-table";
 import { PageHeader } from "@/components/layout/page-header";
 import { TemplateLibraryButton } from "@/components/templates/template-library";
@@ -90,6 +91,37 @@ export default function ProjectsPage() {
     if ("po" in changes) values.poNumber = changes.po.trim() || null;
     await updateProject.mutateAsync({ id: projectItem.id, values });
   }
+
+  const setProjectStatus = (projectItem: ProjectRecord, next: ProjectStatus) =>
+    updateProject.mutateAsync({ id: projectItem.id, values: { ...storedValues(projectItem), status: next } });
+
+  // A billed project is locked: the API refuses it, and the bar names the refusals.
+  const statusAction = (key: string, next: ProjectStatus, label: string, icon: BulkAction<ProjectRecord>["icon"]): BulkAction<ProjectRecord> => ({
+    key,
+    label,
+    icon,
+    applies: (projectItem) => projectItem.status !== next && projectItem.status !== "Facture",
+    run: (projectItem) => setProjectStatus(projectItem, next),
+    done: (count) => `${count} projet(s) : ${projectStatusLabels[next].toLowerCase()}.`,
+  });
+
+  const bulkActions: BulkAction<ProjectRecord>[] = [
+    statusAction("commence", "Commence", "Marquer commencé", Play),
+    statusAction("afacturer", "AFacturer", "Marquer à facturer", CircleDollarSign),
+    statusAction("annule", "Annule", "Annuler", Ban),
+    {
+      key: "supprimer",
+      label: "Supprimer",
+      icon: Trash2,
+      destructive: true,
+      confirm: {
+        title: "Supprimer les projets sélectionnés ?",
+        description: (count) => `${count} projet(s) iront à la corbeille (Paramètres). Vous pourrez les restaurer.`,
+      },
+      run: (projectItem) => deleteProject.mutateAsync(projectItem.id),
+      done: (count) => (count > 1 ? `${count} projets supprimés.` : "Projet supprimé."),
+    },
+  ];
 
   const columns: DataColumn<ProjectRecord>[] = [
     {
@@ -285,6 +317,7 @@ export default function ProjectsPage() {
           rowLabel={(projectItem) => `Ouvrir le projet ${formatProjectNumber(projectItem.number)}`}
           onOpen={(projectItem) => router.push(`/projets/${projectItem.id}`)}
           onSaveRow={canCreate && !isClient ? saveRow : undefined}
+          bulkActions={canCreate && !isClient ? bulkActions : undefined}
           actions={
             isClient
               ? undefined

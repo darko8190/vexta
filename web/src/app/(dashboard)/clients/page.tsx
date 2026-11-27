@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ExternalLink, MoreHorizontal, Pencil, Plus, Trash2, Users } from "lucide-react";
+import { Archive, ExternalLink, MoreHorizontal, Pencil, Plus, Trash2, UserCheck, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import { ClientFormSheet } from "@/components/clients/client-form-sheet";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
 import { DataTable, type DataColumn } from "@/components/layout/data-table";
+import type { BulkAction } from "@/components/layout/bulk-actions";
 import { PageHeader } from "@/components/layout/page-header";
 import { WorkbookMenu } from "@/components/import-export/workbook-menu";
 import { UpgradeCta } from "@/components/layout/upgrade-cta";
@@ -211,6 +212,42 @@ export default function ClientsPage() {
     },
   ];
 
+  // Through the same full save as the sheet, with only the status changed.
+  const setStatus = (clientItem: ClientRecord, status: ClientStatus) =>
+    updateClient.mutateAsync({ id: clientItem.id, values: { ...storedClientValues(clientItem), status } });
+
+  const bulkActions: BulkAction<ClientRecord>[] = [
+    {
+      key: "client",
+      label: "Passer en client",
+      icon: UserCheck,
+      applies: (clientItem) => clientItem.status !== "Client",
+      run: (clientItem) => setStatus(clientItem, "Client"),
+      done: (count) => (count > 1 ? `${count} fiches passées en client.` : "Fiche passée en client."),
+    },
+    {
+      key: "ancien",
+      label: "Marquer ancien client",
+      icon: Archive,
+      applies: (clientItem) => clientItem.status !== "Ancien",
+      run: (clientItem) => setStatus(clientItem, "Ancien"),
+      done: (count) => (count > 1 ? `${count} fiches marquées ancien client.` : "Fiche marquée ancien client."),
+    },
+    {
+      key: "supprimer",
+      label: "Supprimer",
+      icon: Trash2,
+      destructive: true,
+      confirm: {
+        title: "Supprimer les clients sélectionnés ?",
+        description: (count) =>
+          `${count} client(s) iront à la corbeille (Paramètres), avec leurs projets et factures. Vous pourrez les restaurer.`,
+      },
+      run: (clientItem) => deleteClient.mutateAsync(clientItem.id),
+      done: (count) => (count > 1 ? `${count} clients supprimés.` : "Client supprimé."),
+    },
+  ];
+
   async function confirmDelete() {
     if (!deleteTarget) return;
     try {
@@ -308,6 +345,7 @@ export default function ClientsPage() {
           rowLabel={(clientItem) => `Ouvrir la fiche de ${clientItem.name}`}
           onOpen={(clientItem) => router.push(`/clients/${clientItem.id}`)}
           onSaveRow={canCreate ? saveRow : undefined}
+          bulkActions={canCreate ? bulkActions : undefined}
           actions={(clientItem) => (
             <DropdownMenu>
               <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label="Actions" />}>

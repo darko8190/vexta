@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ClipboardPen, MoreHorizontal, Plus, Trash2 } from "lucide-react";
+import { CircleCheck, CircleX, ClipboardPen, MoreHorizontal, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDeleteDialog } from "@/components/layout/confirm-delete-dialog";
+import type { BulkAction } from "@/components/layout/bulk-actions";
 import { DataTable, type DataColumn } from "@/components/layout/data-table";
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
@@ -178,6 +179,40 @@ export default function QuotesPage() {
     },
   ];
 
+  const setQuoteStatus = (quote: QuoteRecord, next: QuoteStatus) =>
+    update.mutateAsync({ id: quote.id, values: { ...storedQuoteValues(quote), status: next } });
+
+  const bulkActions: BulkAction<QuoteRecord>[] = [
+    {
+      key: "acceptee",
+      label: "Marquer acceptée",
+      icon: CircleCheck,
+      applies: (quote) => quote.status !== "Acceptee" && quote.status !== "Remplacee" && quote.status !== "EnProjet",
+      run: (quote) => setQuoteStatus(quote, "Acceptee"),
+      done: (count) => `${count} soumission(s) marquée(s) acceptée(s).`,
+    },
+    {
+      key: "refusee",
+      label: "Marquer refusée",
+      icon: CircleX,
+      applies: (quote) => quote.status !== "Refusee" && quote.status !== "Remplacee" && quote.status !== "EnProjet",
+      run: (quote) => setQuoteStatus(quote, "Refusee"),
+      done: (count) => `${count} soumission(s) marquée(s) refusée(s).`,
+    },
+    {
+      key: "supprimer",
+      label: "Supprimer",
+      icon: Trash2,
+      destructive: true,
+      confirm: {
+        title: "Supprimer les soumissions sélectionnées ?",
+        description: (count) => `${count} soumission(s) iront à la corbeille (Paramètres). Vous pourrez les restaurer.`,
+      },
+      run: (quote) => remove.mutateAsync(quote.id),
+      done: (count) => (count > 1 ? `${count} soumissions supprimées.` : "Soumission supprimée."),
+    },
+  ];
+
   async function saveRow(quote: QuoteRecord, changes: Record<string, string>) {
     const values = storedQuoteValues(quote);
     if ("description" in changes) values.description = changes.description || null;
@@ -289,6 +324,7 @@ export default function QuotesPage() {
           rowLabel={(quote) => `Ouvrir la soumission ${formatQuoteNumber(quote.number, quote.revision)}`}
           onOpen={(quote) => router.push(`/soumissions/${quote.id}`)}
           onSaveRow={canCreate ? saveRow : undefined}
+          bulkActions={canCreate ? bulkActions : undefined}
           toolbarStart={searchBox}
           actions={isClient ? undefined : (quote) => (
             <DropdownMenu>

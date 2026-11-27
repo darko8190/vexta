@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ListChecks, Users } from "lucide-react";
+import { CircleCheck, ListChecks, Play, Users } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Field, FieldLabel } from "@/components/ui/field";
@@ -15,6 +17,7 @@ import { formatDateOnly } from "@/lib/dates";
 import { taskPriorityLabels, taskStatusBadgeVariant, taskStatusLabels } from "@/lib/labels";
 import { formatProjectNumber } from "@/lib/types";
 import type { ProjectTaskStatus } from "@/lib/types";
+import { BulkActionBar, SelectAllHead, SelectRowCell, useRowSelection, type BulkAction } from "@/components/layout/bulk-actions";
 
 /** The value the "everything open" row carries: a Select cannot hold undefined as an item. */
 const OPEN = "ouvertes";
@@ -39,6 +42,23 @@ export function WorkTasksSection() {
 
   const tasks = data ?? [];
   const late = tasks.filter((task) => task.isLate).length;
+  const queryClient = useQueryClient();
+  const selection = useRowSelection(tasks, (task) => task.id);
+  const selectable = true;
+  type TaskRow = (typeof tasks)[number];
+  const statusAction = (key: string, next: ProjectTaskStatus, label: string, icon: BulkAction<TaskRow>["icon"]): BulkAction<TaskRow> => ({
+    key,
+    label,
+    icon,
+    applies: (task) => task.status !== next,
+    run: (task) => api.patch(`projects/${task.projectId}/taches/${task.id}/statut`, { status: next }),
+    done: (count) => `${count} tâche(s) : ${taskStatusLabels[next].toLowerCase()}.`,
+    finish: () => queryClient.invalidateQueries(),
+  });
+  const bulkActions: BulkAction<TaskRow>[] = [
+    statusAction("encours", "EnCours", "Marquer en cours", Play),
+    statusAction("terminee", "Terminee", "Marquer terminée", CircleCheck),
+  ];
 
   return (
     <div>
@@ -94,9 +114,13 @@ export function WorkTasksSection() {
         />
       ) : (
         <div className="overflow-x-auto rounded-lg border border-border bg-card">
+          {selectable && (
+            <BulkActionBar selection={selection} actions={bulkActions} className="mb-0 rounded-none border-0 border-b" />
+          )}
           <Table>
             <TableHeader>
               <TableRow>
+                {selectable && <SelectAllHead selection={selection} />}
                 <TableHead>Tâche</TableHead>
                 <TableHead>Projet</TableHead>
                 <TableHead>Assignée à</TableHead>
@@ -107,6 +131,7 @@ export function WorkTasksSection() {
             <TableBody>
               {tasks.map((task) => (
                 <TableRow key={task.id}>
+                  {selectable && <SelectRowCell selection={selection} row={task} label={`la tâche ${task.title}`} />}
                   <TableCell>
                     <p className="font-medium text-foreground">{task.title}</p>
                     {/* Only when it is not the middle. Normale on every row would be a column

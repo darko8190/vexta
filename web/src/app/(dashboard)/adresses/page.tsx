@@ -25,6 +25,7 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useAddressesQuery, useDeleteAddress } from "@/hooks/use-addresses";
 import { addressTypeLabels } from "@/lib/labels";
 import type { AddressRecord } from "@/lib/types";
+import { BulkActionBar, SelectAllHead, SelectRowCell, useRowSelection, type BulkAction } from "@/components/layout/bulk-actions";
 
 export default function AddressesPage() {
   const canCreate = useCanCreate();
@@ -34,6 +35,22 @@ export default function AddressesPage() {
 
   const { data, isLoading } = useAddressesQuery(page, debouncedSearch);
   const deleteAddress = useDeleteAddress();
+  const selection = useRowSelection(data?.items ?? [], (addressItem) => addressItem.id);
+  const selectable = canCreate;
+  const bulkActions: BulkAction<AddressRecord>[] = [
+    {
+      key: "supprimer",
+      label: "Supprimer",
+      icon: Trash2,
+      destructive: true,
+      confirm: {
+        title: "Supprimer la sélection ?",
+        description: (count) => `${count} adresse(s) seront supprimé(e)s définitivement.`,
+      },
+      run: (addressItem) => deleteAddress.mutateAsync(addressItem.id),
+      done: (count) => (count > 1 ? `${count} adresses supprimées.` : "Adresse supprimée."),
+    },
+  ];
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingAddress, setEditingAddress] = useState<AddressRecord | undefined>(undefined);
@@ -112,9 +129,13 @@ export default function AddressesPage() {
         />
       ) : (
         <div className="overflow-hidden rounded-lg border border-border">
+          {selectable && (
+            <BulkActionBar selection={selection} actions={bulkActions} className="mb-0 rounded-none border-0 border-b" />
+          )}
           <Table>
             <TableHeader>
               <TableRow>
+                {selectable && <SelectAllHead selection={selection} />}
                 <TableHead>Client</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Adresse</TableHead>
@@ -126,6 +147,7 @@ export default function AddressesPage() {
             <TableBody>
               {data.items.map((addressItem) => (
                 <TableRow key={addressItem.id}>
+                  {selectable && <SelectRowCell selection={selection} row={addressItem} label={`l'adresse de ${addressItem.clientName}`} />}
                   <TableCell className="font-medium">{addressItem.clientName}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">

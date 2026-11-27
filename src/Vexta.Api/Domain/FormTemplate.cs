@@ -95,7 +95,15 @@ public enum FormFieldTarget
     ActifNumeroSerie = 11,
     ActifReference = 12,
     ActifUsage = 13,
-    ActifNotes = 14
+    ActifNotes = 14,
+
+    // The client's address, filed as its primary billing address. Five targets for the same
+    // reason as the asset's: a postal code mixed into one line is one nobody can route a truck by.
+    AdresseRue = 15,
+    AdresseComplement = 16,
+    AdresseVille = 17,
+    AdresseProvince = 18,
+    AdresseCodePostal = 19
 }
 
 /// <summary>What happens once a form comes back.</summary>

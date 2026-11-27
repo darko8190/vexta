@@ -18,7 +18,8 @@ public record SectionCountsDto(
     int PurchaseOrders,
     int GoodsReceipts,
     int Timesheets,
-    int WorkDays = 0);
+    int WorkDays = 0,
+    int RecurringInvoices = 0);
 
 /// <summary>
 /// The badges on the rails of Facturation, Achats, Fournisseurs &amp; Commandes and Feuilles de
@@ -45,5 +46,6 @@ public class SectionCountsController(VextaDbContext db) : ControllerBase
             await db.PurchaseOrders.CountAsync(ct),
             await db.GoodsReceipts.CountAsync(ct),
             await db.TimesheetEntries.CountAsync(ct),
-            await db.WorkDays.CountAsync(ct)));
+            await db.WorkDays.CountAsync(ct),
+            await db.RecurringInvoices.CountAsync(ct)));
 }

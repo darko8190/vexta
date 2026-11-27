@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Paperclip, Plus, Receipt } from "lucide-react";
+import { Ban, CircleCheck, HandCoins, Paperclip, Plus, Receipt } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,6 +40,7 @@ import { formatDateOnly } from "@/lib/dates";
 import { formatAmount } from "@/lib/money";
 import { SortableHead } from "@/components/layout/sortable-head";
 import { byKeys, sortRows, type SortState } from "@/lib/table-sort";
+import { BulkActionBar, SelectAllHead, SelectRowCell, useRowSelection, type BulkAction } from "@/components/layout/bulk-actions";
 
 /** Base UI needs a value for every item, and "" is not one. */
 const ALL_TYPES = "tous";
@@ -87,6 +90,32 @@ export function ExpensesSection() {
   const [sort, setSort] = useState<SortState | null>(null);
   const totals = data?.totals;
   const filtered = Boolean(debouncedSearch || type || from || to || status);
+  const queryClient = useQueryClient();
+  const selection = useRowSelection(items, (expense) => expense.id);
+  const selectable = canCreate;
+  type ExpenseRow = (typeof items)[number];
+  const statusAction = (
+    key: string,
+    next: ExpenseStatus,
+    label: string,
+    icon: BulkAction<ExpenseRow>["icon"],
+  ): BulkAction<ExpenseRow> => ({
+    key,
+    label,
+    icon,
+    applies: (expense) => expense.status !== next,
+    run: (expense) => api.patch(`projects/${expense.projectId}/expenses/${expense.id}/statut`, { status: next }),
+    done: (count) => `${count} dépense(s) : ${expenseStatusLabels[next].toLowerCase()}.`,
+    finish: () => Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["depenses"] }),
+      queryClient.invalidateQueries({ queryKey: ["projects"] }),
+    ]),
+  });
+  const bulkActions: BulkAction<ExpenseRow>[] = [
+    statusAction("approuvee", "Approuvee", "Approuver", CircleCheck),
+    statusAction("remboursee", "Remboursee", "Marquer remboursée", HandCoins),
+    statusAction("refusee", "Refusee", "Refuser", Ban),
+  ];
 
   /** Reset to the first page whenever the question changes: page 4 of a new filter is nowhere. */
   function change(apply: () => void) {
@@ -242,9 +271,13 @@ export function ExpensesSection() {
       ) : (
         <>
           <div className="overflow-hidden rounded-lg border border-border">
+            {selectable && (
+              <BulkActionBar selection={selection} actions={bulkActions} className="mb-0 rounded-none border-0 border-b" />
+            )}
             <Table>
               <TableHeader>
                 <TableRow>
+                  {selectable && <SelectAllHead selection={selection} />}
                   <SortableHead label="Dépense" sortKey="name" sort={sort} onSort={setSort} />
                   {/* Hidden on narrow screens: what it was and what it cost are what the list
                       is read for, and the rest is one tap away on the project. */}
@@ -263,6 +296,7 @@ export function ExpensesSection() {
                     label={`Ouvrir la dépense ${expense.name}`}
                     onOpen={() => router.push(`/achats/depenses/${expense.id}?projet=${expense.projectId}`)}
                   >
+                    {selectable && <SelectRowCell selection={selection} row={expense} label={`la dépense ${expense.name}`} />}
                     <TableCell>
                       <div className="flex items-center gap-1.5">
                         <span className="font-medium text-foreground">{expense.name}</span>

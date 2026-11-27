@@ -47,7 +47,8 @@ const allStatuses = Object.keys(quoteStatusLabels) as QuoteStatus[];
 /** Accepted is reached by converting to a project, never from the dropdown. */
 // Replaced comes from revising and is never picked by hand. Accepted is: the client said yes
 // by phone, and the quote has to be approved before it becomes a project.
-const pickableStatuses = allStatuses.filter((status) => status !== "Remplacee");
+// En projet is what a converted quote shows, never something to pick.
+const pickableStatuses = allStatuses.filter((status) => status !== "Remplacee" && status !== "EnProjet");
 
 const NO_CLASSIFICATION = "aucun";
 

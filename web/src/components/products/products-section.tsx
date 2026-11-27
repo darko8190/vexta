@@ -31,6 +31,7 @@ import { api, ApiError } from "@/lib/api";
 import type { ProductRecord } from "@/lib/types";
 import { SortableHead } from "@/components/layout/sortable-head";
 import { byKeys, sortRows, type SortState } from "@/lib/table-sort";
+import { BulkActionBar, SelectAllHead, SelectRowCell, useRowSelection, type BulkAction } from "@/components/layout/bulk-actions";
 
 /**
  * What the shelf can still promise, with the two figures it comes from underneath.
@@ -46,7 +47,7 @@ export function AvailableQuantity({ product }: { product: ProductRecord }) {
   return (
     <span
       className="inline-block"
-      title={`${quantity(product.quantityOnHand, product.unit)} en main, ${quantity(product.quantityReserved, product.unit)} réservé`}
+      title={`${quantity(product.quantityOnHand, product.unit)} en main, ${quantity(product.quantityReserved, product.unit)} réservé, ${quantity(product.quantityOnOrder, product.unit)} en commande`}
     >
       {/* The unit rides on the figure that is read first, and only on that one: repeating "pi"
           on the two figures underneath would triple it in a column 28 units wide. */}
@@ -54,6 +55,11 @@ export function AvailableQuantity({ product }: { product: ProductRecord }) {
       <span className="block text-xs text-muted-foreground tabular-nums">
         {quantity(product.quantityOnHand)} en main · {quantity(product.quantityReserved)} réservé
       </span>
+      {product.quantityOnOrder > 0 && (
+        <span className="block text-xs text-muted-foreground tabular-nums">
+          {quantity(product.quantityOnOrder)} en commande
+        </span>
+      )}
     </span>
   );
 }
@@ -86,6 +92,22 @@ export function ProductsSection() {
     refetch,
   } = useProductsQuery({ page, search: debouncedSearch });
   const remove = useDeleteProduct();
+  const selection = useRowSelection(data?.items ?? [], (product) => product.id);
+  const selectable = true;
+  const bulkActions: BulkAction<ProductRecord>[] = [
+    {
+      key: "supprimer",
+      label: "Supprimer",
+      icon: Trash2,
+      destructive: true,
+      confirm: {
+        title: "Supprimer la sélection ?",
+        description: (count) => `${count} produit(s) iront à la corbeille (Paramètres). Vous pourrez les restaurer.`,
+      },
+      run: (product) => remove.mutateAsync(product.id),
+      done: (count) => (count > 1 ? `${count} produits supprimés.` : "Produit supprimé."),
+    },
+  ];
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<ProductRecord | undefined>(undefined);
@@ -176,9 +198,13 @@ export function ProductsSection() {
         />
       ) : (
         <div className="overflow-hidden rounded-lg border border-border">
+          {selectable && (
+            <BulkActionBar selection={selection} actions={bulkActions} className="mb-0 rounded-none border-0 border-b" />
+          )}
           <Table>
             <TableHeader>
               <TableRow>
+                {selectable && <SelectAllHead selection={selection} />}
                 <SortableHead label="Numéro" sortKey="numero" sort={sort} onSort={setSort} className="w-24" />
                 <SortableHead label="Code" sortKey="code" sort={sort} onSort={setSort} className="hidden w-32 md:table-cell" />
                 <SortableHead label="Titre" sortKey="titre" sort={sort} onSort={setSort} />
@@ -195,6 +221,7 @@ export function ProductsSection() {
                   label={`Ouvrir le produit ${formatProductNumber(product.number)}`}
                   onOpen={() => router.push(`/inventaire/produits/${product.id}`)}
                 >
+                  {selectable && <SelectRowCell selection={selection} row={product} label={`le produit ${product.title}`} />}
                   <TableCell className="font-mono text-xs tabular-nums">
                     <Link
                       href={`/inventaire/produits/${product.id}`}

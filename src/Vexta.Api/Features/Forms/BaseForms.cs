@@ -59,6 +59,7 @@ public static class BaseForms
                     "Seulement si vous faites affaire au nom d'une entreprise."),
                 Field("Courriel", FormFieldType.Courriel, true, FormFieldTarget.Courriel),
                 Field("Téléphone", FormFieldType.Telephone, true, FormFieldTarget.Telephone),
+                .. AddressFields(),
                 Field("Comment nous avez-vous connus ?", FormFieldType.TexteLong, false, FormFieldTarget.Notes)
             ],
             actions: [new FormAction { TenantId = tenantId, Kind = FormActionKind.CreerClient, NewClientStatus = ClientStatus.Prospect }]);
@@ -145,13 +146,37 @@ public static class BaseForms
         return form;
     }
 
+    /// <summary>The Canadian provinces and territories, by the names the address sheets store.</summary>
+    public static readonly string[] Provinces =
+    [
+        "Alberta", "Colombie-Britannique", "Île-du-Prince-Édouard", "Manitoba", "Nouveau-Brunswick",
+        "Nouvelle-Écosse", "Nunavut", "Ontario", "Québec", "Saskatchewan", "Terre-Neuve-et-Labrador",
+        "Territoires du Nord-Ouest", "Yukon"
+    ];
+
+    /// <summary>
+    /// The address questions of the account form, each pointed at the client's address so the
+    /// answers land in the client's list of addresses. Kept in step with the migration
+    /// AddressOnClientAccountForm, which added the same questions to the forms made before.
+    /// </summary>
+    private static FormField[] AddressFields() =>
+    [
+        Field("Adresse", FormFieldType.Texte, true, FormFieldTarget.AdresseRue, "Le numéro et la rue."),
+        Field("Appartement ou bureau", FormFieldType.Texte, false, FormFieldTarget.AdresseComplement),
+        Field("Ville", FormFieldType.Texte, true, FormFieldTarget.AdresseVille),
+        Field("Province", FormFieldType.Choix, true, FormFieldTarget.AdresseProvince, options: string.Join('\n', Provinces)),
+        Field("Code postal", FormFieldType.Texte, true, FormFieldTarget.AdresseCodePostal)
+    ];
+
     private static FormField Field(
-        string label, FormFieldType type, bool required, FormFieldTarget target, string? help = null) => new()
+        string label, FormFieldType type, bool required, FormFieldTarget target, string? help = null,
+        string? options = null) => new()
     {
         Label = label,
         Type = type,
         IsRequired = required,
         Target = target,
-        HelpText = help
+        HelpText = help,
+        Options = options
     };
 }

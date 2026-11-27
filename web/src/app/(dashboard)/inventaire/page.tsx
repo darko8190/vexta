@@ -1,14 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Blocks, ClipboardList, Package, PackageCheck, ShoppingCart, Warehouse, Wrench } from "lucide-react";
+import { Blocks, ClipboardList, Package, PackageCheck, PackagePlus, ShoppingCart, Warehouse, Wrench } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { SectionNav, type NavSection } from "@/components/layout/section-nav";
 import { ProductsSection } from "@/components/products/products-section";
 import { AssembliesSection } from "@/components/assemblies/assemblies-section";
 import { useAssembliesQuery } from "@/hooks/use-assemblies";
 import { SectionPlaceholder } from "@/components/projects/detail/section-placeholder";
-import { useProductCountQuery } from "@/hooks/use-products";
+import { useProductCountQuery, useProductsToReorderQuery } from "@/hooks/use-products";
+import { ReorderSection } from "@/components/products/reorder-section";
 
 /**
  * Pattern 1 — List / Index, with the record type chosen from the rail.
@@ -27,9 +28,11 @@ export default function InventoryPage() {
   );
   const { data: assemblies } = useAssembliesQuery();
   const { data: productCount } = useProductCountQuery();
+  const { data: toReorder } = useProductsToReorderQuery();
 
   const sections: NavSection[] = [
     { key: "produits", label: "Produits", count: productCount ?? 0, icon: Package },
+    { key: "a-commander", label: "Produits à commander", count: toReorder?.length ?? 0, icon: PackagePlus },
     { key: "equipements", label: "Équipements", count: 0, icon: Wrench },
     { key: "entrepot", label: "Entrepôt", count: 0, icon: Warehouse },
     { key: "assemblages", label: "Assemblages", count: assemblies?.length ?? 0, icon: Blocks },
@@ -57,6 +60,7 @@ export default function InventoryPage() {
 
         <div className="min-w-0 flex-1">
           {section === "produits" && <ProductsSection />}
+          {section === "a-commander" && <ReorderSection />}
           {section === "equipements" && (
             <SectionPlaceholder
               icon={Wrench}

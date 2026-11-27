@@ -148,6 +148,11 @@ export const formFieldTargetLabels: Record<FormFieldTarget, string> = {
   ActifReference: "Actif — plaque ou référence",
   ActifUsage: "Actif — usage (km, heures)",
   ActifNotes: "Actif — notes",
+  AdresseRue: "Client — adresse (numéro et rue)",
+  AdresseComplement: "Client — adresse (app., bureau)",
+  AdresseVille: "Client — ville",
+  AdresseProvince: "Client — province",
+  AdresseCodePostal: "Client — code postal",
 };
 
 /**
@@ -463,6 +468,7 @@ export const quoteStatusLabels: Record<QuoteStatus, string> = {
   Refusee: "Refusée",
   Expiree: "Expirée",
   Remplacee: "Remplacée",
+  EnProjet: "En projet",
 };
 
 export const quoteStatusBadgeVariant: Record<QuoteStatus, "default" | "secondary" | "destructive" | "outline"> = {
@@ -473,6 +479,7 @@ export const quoteStatusBadgeVariant: Record<QuoteStatus, "default" | "secondary
   Refusee: "destructive",
   Expiree: "outline",
   Remplacee: "outline",
+  EnProjet: "secondary",
 };
 
 export const expenseStatusLabels: Record<import("@/lib/types").ExpenseStatus, string> = {

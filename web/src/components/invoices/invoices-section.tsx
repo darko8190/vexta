@@ -31,6 +31,7 @@ import { StatusPills, useStatusCountsQuery } from "@/components/layout/status-pi
 import type { InvoiceStatus } from "@/lib/types";
 import { SortableHead } from "@/components/layout/sortable-head";
 import { NUMBER_DESC, sortToQuery, type SortState } from "@/lib/table-sort";
+import { BulkActionBar, SelectAllHead, SelectRowCell, useRowSelection, type BulkAction } from "@/components/layout/bulk-actions";
 
 function formatCurrency(amount: number, currency: string) {
   return new Intl.NumberFormat("fr-CA", { style: "currency", currency }).format(amount);
@@ -53,6 +54,22 @@ export function InvoicesSection() {
   };
   const { data: statusCounts } = useStatusCountsQuery("invoices", "invoices/statuts");
   const deleteInvoice = useDeleteInvoice();
+  const selection = useRowSelection(data?.items ?? [], (invoiceItem) => invoiceItem.id);
+  const selectable = canCreate && !isClient;
+  const bulkActions: BulkAction<InvoiceRecord>[] = [
+    {
+      key: "supprimer",
+      label: "Supprimer",
+      icon: Trash2,
+      destructive: true,
+      confirm: {
+        title: "Supprimer la sélection ?",
+        description: (count) => `${count} facture(s) iront à la corbeille (Paramètres). Vous pourrez les restaurer.`,
+      },
+      run: (invoiceItem) => deleteInvoice.mutateAsync(invoiceItem.id),
+      done: (count) => (count > 1 ? `${count} factures supprimées.` : "Facture supprimée."),
+    },
+  ];
   const [deleteTarget, setDeleteTarget] = useState<InvoiceRecord | undefined>(undefined);
 
   async function confirmDelete() {
@@ -133,9 +150,13 @@ export function InvoicesSection() {
         />
       ) : (
         <div className="overflow-hidden rounded-lg border border-border">
+          {selectable && (
+            <BulkActionBar selection={selection} actions={bulkActions} className="mb-0 rounded-none border-0 border-b" />
+          )}
           <Table>
             <TableHeader>
               <TableRow>
+                {selectable && <SelectAllHead selection={selection} />}
                 <SortableHead label="Numéro" sortKey="numero" sort={sort} onSort={sortBy} />
                 <SortableHead label="Client" sortKey="client" sort={sort} onSort={sortBy} />
                 <SortableHead label="Statut" sortKey="statut" sort={sort} onSort={sortBy} />
@@ -152,6 +173,7 @@ export function InvoicesSection() {
                   label={`Ouvrir la facture ${invoiceItem.number}`}
                   onOpen={() => router.push(`/factures/${invoiceItem.id}`)}
                 >
+                  {selectable && <SelectRowCell selection={selection} row={invoiceItem} label={`la facture ${invoiceItem.number}`} />}
                   <TableCell className="font-medium">
                     <Link href={`/factures/${invoiceItem.id}`} className="hover:underline">
                       {invoiceItem.number}

@@ -56,7 +56,7 @@ export function ProductDetailsSection({ product }: { product: ProductRecord }) {
       </div>
 
       {product.tracksInventory ? (
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {/* The unit is on all three: each tile is read on its own, across a counter, and a
               figure that borrows its unit from the tile beside it is a figure read wrong. */}
           <Quantity
@@ -74,6 +74,12 @@ export function ProductDetailsSection({ product }: { product: ProductRecord }) {
             label="Disponible"
             value={quantity(product.quantityAvailable, product.unit)}
             note="Ce qui peut encore être vendu."
+          />
+          <Quantity
+            label="Qté en commande"
+            value={quantity(product.quantityOnOrder, product.unit)}
+            note="Commandée à un fournisseur, envoyée et pas encore reçue."
+            muted
           />
         </div>
       ) : (

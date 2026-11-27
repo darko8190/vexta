@@ -76,7 +76,8 @@ public class QuotesController(
         await ExpireLapsedAsync();
         var quotes = Visible().AsNoTracking();
         if (clientId is not null) quotes = quotes.Where(q => q.ClientId == clientId);
-        if (status is not null) quotes = quotes.Where(q => q.Status == status);
+        if (status == QuoteStatus.EnProjet) quotes = quotes.Where(q => q.ProjectId != null);
+        else if (status is not null) quotes = quotes.Where(q => q.Status == status && q.ProjectId == null);
         if (clientAssetId is not null) quotes = quotes.Where(q => q.ClientAssetId == clientAssetId);
 
         if (!string.IsNullOrWhiteSpace(query.Search))
@@ -124,7 +125,11 @@ public class QuotesController(
         if (f.Ids("client") is { Count: > 0 } clients) quotes = quotes.Where(q => clients.Contains(q.ClientId));
         if (f.Contains("description") is { } description)
             quotes = quotes.Where(q => q.Description != null && EF.Functions.ILike(q.Description, description));
-        if (f.Enums<QuoteStatus>("statut") is { Count: > 0 } statuses) quotes = quotes.Where(q => statuses.Contains(q.Status));
+        if (f.Enums<QuoteStatus>("statut") is { Count: > 0 } statuses)
+        {
+            var inProject = statuses.Contains(QuoteStatus.EnProjet);
+            quotes = quotes.Where(q => q.ProjectId != null ? inProject : statuses.Contains(q.Status));
+        }
         if (f.From("date") is { } issuedFrom) quotes = quotes.Where(q => q.IssuedOn >= issuedFrom);
         if (f.To("date") is { } issuedTo) quotes = quotes.Where(q => q.IssuedOn <= issuedTo);
         if (f.From("validite") is { } validFrom) quotes = quotes.Where(q => q.ValidUntil >= validFrom);
@@ -149,7 +154,7 @@ public class QuotesController(
     {
         await ExpireLapsedAsync(ct);
         var counts = await Visible().AsNoTracking()
-            .GroupBy(q => q.Status)
+            .GroupBy(q => q.ProjectId != null ? QuoteStatus.EnProjet : q.Status)
             .Select(g => new QuoteStatusCountDto(g.Key, g.Count()))
             .ToListAsync(ct);
         return Ok(counts.OrderBy(c => c.Status).ToList());
@@ -296,6 +301,8 @@ public class QuotesController(
         if (await InvalidAsync(request) is { } problem) return BadRequest(new { message = problem });
         if (request.Status == QuoteStatus.Acceptee)
             return BadRequest(new { message = "Une soumission est approuvée une fois donnée au client, pas à sa création." });
+        if (request.Status == QuoteStatus.EnProjet)
+            return BadRequest(new { message = "Une soumission devient un projet depuis sa fiche, une fois approuvée." });
 
         var tenantId = currentUser.TenantId!.Value;
         var quote = new Quote
@@ -350,6 +357,15 @@ public class QuotesController(
     {
         var quote = await db.Quotes.FirstOrDefaultAsync(q => q.Id == id);
         if (quote is null) return NotFound();
+
+        // « En projet » is what the screen was shown, never a status to store: sent back
+        // unchanged it means « leave the status alone ».
+        if (request.Status == QuoteStatus.EnProjet)
+        {
+            if (quote.ProjectId is null)
+                return BadRequest(new { message = "Une soumission devient un projet depuis sa fiche, une fois approuvée." });
+            request = request with { Status = quote.Status };
+        }
 
         // Once it is a project, the price is the project's. The words can still be corrected;
         // the client, the tax answer and the status cannot.
@@ -1568,7 +1584,7 @@ public class QuotesController(
         q.Client!.Name,
         q.PoNumber,
         q.Description,
-        q.Status,
+        q.ProjectId != null ? QuoteStatus.EnProjet : q.Status,
         q.IssuedOn,
         q.ValidUntil,
         q.StartDate,

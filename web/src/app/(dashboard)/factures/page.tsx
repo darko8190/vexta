@@ -33,7 +33,7 @@ export default function BillingPage() {
     { key: "paiements", label: "Paiements", count: counts?.payments ?? 0, icon: Wallet },
     { key: "credits", label: "Crédits", count: counts?.credits ?? 0, icon: ReceiptText },
     { key: "remboursements", label: "Remboursements", count: counts?.refunds ?? 0, icon: Undo2 },
-    { key: "recurrentes", label: "Récurrentes", icon: Repeat },
+    { key: "recurrentes", label: "Récurrentes", count: counts?.recurringInvoices ?? 0, icon: Repeat },
   ];
 
   if (isClient) {

@@ -95,7 +95,10 @@ public class PublicFormsController(
         var shared = await PublicFormGate.ResolveSharedAsync(db, formId, ct);
         if (shared is null) return NotFound();
 
-        var result = await FileAsync(shared.Form, request, ct, await InvitedClientAsync(shared.Form, request.Invitation, ct));
+        // A genuine e-mailed link, whatever the form asks for: the company wrote to this person.
+        var emailed = invitation.Open(request.Invitation, formId) is not null;
+        var result = await FileAsync(
+            shared.Form, request, ct, await InvitedClientAsync(shared.Form, request.Invitation, ct), emailed);
 
         // Filed through an e-mailed link: that send is answered. After the reply is down, and
         // only when it is — a refused reply leaves the office still waiting, which it is.
@@ -128,7 +131,8 @@ public class PublicFormsController(
 
     /// <summary>Files a reply once a gate has said which form it is for. Shared by both ways in.</summary>
     private async Task<ActionResult<PublicFormResultDto>> FileAsync(
-        PublicFormContext context, SubmitPublicFormRequest request, CancellationToken ct, Client? invited = null)
+        PublicFormContext context, SubmitPublicFormRequest request, CancellationToken ct, Client? invited = null,
+        bool fromEmailedLink = false)
     {
         var address = HttpContext.Connection.RemoteIpAddress?.ToString();
 
@@ -234,7 +238,7 @@ public class PublicFormsController(
 
         // After the answers are safely down, never before: an action that fails must not cost
         // somebody the form they just filled in.
-        var log = await actions.RunAsync(submission, ct);
+        var log = await actions.RunAsync(submission, ct, fromEmailedLink);
         if (log is not null)
         {
             var tracked = await db.FormSubmissions.IgnoreQueryFilters()

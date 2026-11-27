@@ -246,7 +246,10 @@ export function FormActionsSection({
                       </Select>
                       <FieldDescription>
                         Le client se construit avec les questions dont la colonne « Remplit »
-                        pointe vers un de ses champs. Il faut au moins un nom.
+                        pointe vers un de ses champs. Il faut au moins un nom. Les questions
+                        d&apos;adresse lui ajoutent son adresse, et la personne devient son
+                        premier contact. Rempli à partir d&apos;un lien envoyé par courriel, le
+                        client est toujours créé à l&apos;état Client.
                       </FieldDescription>
                     </Field>
                   )}

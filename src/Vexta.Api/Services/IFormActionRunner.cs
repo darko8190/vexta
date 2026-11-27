@@ -19,7 +19,11 @@ public interface IFormActionRunner
     /// twelve-question inspection sheet on a roof does not get to fill it again. A failure is
     /// written into the log instead, where the office can see it and act.
     /// </summary>
-    Task<string?> RunAsync(FormSubmission submission, CancellationToken ct = default);
+    /// <param name="fromEmailedLink">
+    /// Filled through a link the company e-mailed: the company chose to write to this person, so
+    /// a client created from it is a client, not a prospect.
+    /// </param>
+    Task<string?> RunAsync(FormSubmission submission, CancellationToken ct = default, bool fromEmailedLink = false);
 }
 
 public class FormActionRunner(
@@ -27,7 +31,7 @@ public class FormActionRunner(
     IMailgunService mailgun,
     ILogger<FormActionRunner> logger) : IFormActionRunner
 {
-    public async Task<string?> RunAsync(FormSubmission submission, CancellationToken ct = default)
+    public async Task<string?> RunAsync(FormSubmission submission, CancellationToken ct = default, bool fromEmailedLink = false)
     {
         // Every read here ignores the query filters and names the tenant from the submission
         // instead.
@@ -80,7 +84,7 @@ public class FormActionRunner(
 
                     case FormActionKind.CreerClient:
                     {
-                        var (line, clientId) = await CreateClientAsync(form, action, submission, targets, ct);
+                        var (line, clientId) = await CreateClientAsync(form, action, submission, targets, fromEmailedLink, ct);
                         createdClientId ??= clientId;
                         log.Add(line);
                         break;
@@ -198,6 +202,7 @@ public class FormActionRunner(
         FormAction action,
         FormSubmission submission,
         IReadOnlyDictionary<FormFieldTarget, string> targets,
+        bool fromEmailedLink,
         CancellationToken ct)
     {
         string? Value(FormFieldTarget target) => targets.GetValueOrDefault(target);
@@ -240,10 +245,44 @@ public class FormActionRunner(
             Email = Value(FormFieldTarget.Courriel),
             Phone = Value(FormFieldTarget.Telephone),
             Notes = string.Join("\n\n", notes),
-            Status = action.NewClientStatus
+            Status = fromEmailedLink ? ClientStatus.Client : action.NewClientStatus
         };
 
         db.Clients.Add(client);
+
+        // The address they gave, as the client's primary billing address: the same row the
+        // client sheet's own address fields write, so it shows in the client's list of addresses.
+        if (Value(FormFieldTarget.AdresseRue) is { } line1)
+        {
+            db.Addresses.Add(new Address
+            {
+                TenantId = form.TenantId,
+                ClientId = client.Id,
+                Type = AddressType.Facturation,
+                IsPrimary = true,
+                Line1 = line1,
+                Line2 = Value(FormFieldTarget.AdresseComplement),
+                City = Value(FormFieldTarget.AdresseVille) ?? "",
+                Province = Value(FormFieldTarget.AdresseProvince),
+                PostalCode = Value(FormFieldTarget.AdresseCodePostal)?.ToUpperInvariant() ?? "",
+                Country = "Canada"
+            });
+        }
+
+        // The person who filled it is the client's first contact, as when the office creates a
+        // client by hand: pickable as a project's contact or its billing contact straight away.
+        if (firstName is not null || lastName is not null)
+        {
+            db.ClientContacts.Add(new ClientContact
+            {
+                TenantId = form.TenantId,
+                ClientId = client.Id,
+                FirstName = firstName ?? "",
+                LastName = lastName ?? "",
+                Email = client.Email,
+                Phone = client.Phone
+            });
+        }
 
         var tracked = await db.FormSubmissions.IgnoreQueryFilters()
             .FirstOrDefaultAsync(s => s.Id == submission.Id && s.TenantId == form.TenantId, ct);

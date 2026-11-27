@@ -73,6 +73,17 @@ export function useProductsQuery(filters: ProductListFilters) {
  * Just the total, for the badge on the inventory rail. One row is asked for because the count
  * comes back with the page either way, and the rail is drawn before any list is opened.
  */
+/**
+ * The products to order: counted, with a minimum, and below it once what is on order is added
+ * to what is available.
+ */
+export function useProductsToReorderQuery() {
+  return useQuery({
+    queryKey: ["products", "a-commander"],
+    queryFn: () => api.get<ProductRecord[]>("products/a-commander"),
+  });
+}
+
 export function useProductCountQuery() {
   return useQuery({
     queryKey: ["products", "count"],

@@ -19,7 +19,7 @@ export function ClickableRow({
   ...props
 }: React.ComponentProps<"tr"> & { onOpen: () => void; label: string }) {
   function isInteractive(target: EventTarget | null) {
-    return target instanceof Element && target.closest('a,button,input,[role="menuitem"],[role="menu"]') !== null;
+    return target instanceof Element && target.closest('a,button,input,[role="checkbox"],[role="menuitem"],[role="menu"]') !== null;
   }
 
   return (

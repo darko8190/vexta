@@ -12,7 +12,14 @@ public enum QuoteStatus
     Refusee = 3,
     Expiree = 4,
     /// <summary>Superseded by a revision: kept to read what was proposed, never answered again.</summary>
-    Remplacee = 5
+    Remplacee = 5,
+
+    /// <summary>
+    /// Became a project. Never stored: read from the quote's link to its project, so a quote
+    /// whose project is deleted goes back to Acceptée by itself. Shown and filtered on like the
+    /// others.
+    /// </summary>
+    EnProjet = 6
 }
 
 /// <summary>Which of the project's sections a quote line will become once the quote is accepted.</summary>

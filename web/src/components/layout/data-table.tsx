@@ -18,6 +18,13 @@ import { Spinner } from "@/components/ui/spinner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ClickableRow } from "@/components/layout/clickable-row";
+import {
+  BulkActionBar,
+  SelectAllHead,
+  SelectRowCell,
+  useRowSelection,
+  type BulkAction,
+} from "@/components/layout/bulk-actions";
 import { SortableHead } from "@/components/layout/sortable-head";
 import type { SortState } from "@/lib/table-sort";
 import { TableFiltersSheet, type FilterableColumn } from "@/components/layout/table-filters-sheet";
@@ -92,6 +99,7 @@ export function DataTable<T>({
   onFiltersChange,
   sort,
   onSortChange,
+  bulkActions,
 }: {
   /** Names the stored column layout. */
   id: string;
@@ -112,6 +120,8 @@ export function DataTable<T>({
   /** The sort, held by the page like the filters, because it goes to the API. */
   sort?: SortState;
   onSortChange?: (sort: SortState) => void;
+  /** What can be done to several ticked rows at once. Omitted: no tick boxes. */
+  bulkActions?: BulkAction<T>[];
 }) {
   const { layout, save } = useTableLayout(
     id,
@@ -121,6 +131,8 @@ export function DataTable<T>({
   const [editing, setEditing] = useState(false);
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const selection = useRowSelection(rows, getRowId);
+  const selectable = Boolean(bulkActions?.length) && !editing;
 
   const byKey = new Map(columns.map((column) => [column.key, column]));
   const visible = layout.order
@@ -204,10 +216,13 @@ export function DataTable<T>({
         </p>
       )}
 
+      {selectable && <BulkActionBar selection={selection} actions={bulkActions!} />}
+
       <div className="overflow-x-auto rounded-lg border border-border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
+              {selectable && <SelectAllHead selection={selection} />}
               {visible.map((column) =>
                 column.sortable && onSortChange && !editing ? (
                   <SortableHead
@@ -230,7 +245,7 @@ export function DataTable<T>({
           <TableBody>
             {rows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={visible.length + 1} className="py-8 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={visible.length + 2} className="py-8 text-center text-sm text-muted-foreground">
                   Aucune ligne ne correspond à ces filtres.
                 </TableCell>
               </TableRow>
@@ -244,7 +259,13 @@ export function DataTable<T>({
                   onSave={(changes) => onSaveRow!(row, changes)}
                 />
               ) : onOpen ? (
-                <ClickableRow key={getRowId(row)} label={rowLabel(row)} onOpen={() => onOpen(row)}>
+                <ClickableRow
+                  key={getRowId(row)}
+                  label={rowLabel(row)}
+                  onOpen={() => onOpen(row)}
+                  data-state={selectable && selection.isSelected(row) ? "selected" : undefined}
+                >
+                  {selectable && <SelectRowCell selection={selection} row={row} label={rowLabel(row)} />}
                   {visible.map((column) => (
                     <TableCell key={column.key} className={column.cellClassName}>
                       {column.cell(row)}
@@ -253,7 +274,8 @@ export function DataTable<T>({
                   {actions && <TableCell>{actions(row)}</TableCell>}
                 </ClickableRow>
               ) : (
-                <TableRow key={getRowId(row)}>
+                <TableRow key={getRowId(row)} data-state={selectable && selection.isSelected(row) ? "selected" : undefined}>
+                  {selectable && <SelectRowCell selection={selection} row={row} label={rowLabel(row)} />}
                   {visible.map((column) => (
                     <TableCell key={column.key} className={column.cellClassName}>
                       {column.cell(row)}

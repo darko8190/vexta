@@ -163,7 +163,7 @@ function ResponseLine({ quote, expired }: { quote: QuoteRecord; expired: boolean
   } else if (quote.status === "Remplacee") {
     // The revision may still be a draft the customer cannot open, so the list is where to look.
     text = "Cette version a été remplacée par une soumission révisée. La nouvelle version se trouve dans vos soumissions dès que votre fournisseur vous l'envoie.";
-  } else if (quote.status === "Acceptee") {
+  } else if (quote.status === "Acceptee" || quote.status === "EnProjet") {
     text = "Acceptée. Les travaux sont planifiés avec vous.";
   } else if (quote.status === "Refusee") {
     text = "Refusée.";

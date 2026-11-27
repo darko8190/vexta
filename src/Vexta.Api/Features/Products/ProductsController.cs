@@ -77,6 +77,25 @@ public class ProductsController(
     }
 
     /// <summary>
+    /// The products to order: counted, with a minimum, and below it once what is already on
+    /// order is added to what is available. Variants included, since each holds its own stock.
+    /// </summary>
+    [HttpGet("a-commander")]
+    public async Task<ActionResult<List<ProductDto>>> ToReorder(CancellationToken ct)
+    {
+        var candidates = await db.Products.AsNoTracking()
+            .Where(p => p.TracksInventory && p.MinimumQuantity != null)
+            .OrderBy(p => p.Title)
+            .Select(ToDto())
+            .ToListAsync(ct);
+
+        var withQuantities = await WithReservedAsync(candidates, ct);
+        return Ok(withQuantities
+            .Where(p => p.QuantityAvailable + p.QuantityOnOrder < p.MinimumQuantity)
+            .ToList());
+    }
+
+    /// <summary>
     /// The catalogue as the invoice line picker searches it: a few columns, matched on anything
     /// someone would have in front of them — the name, the company's own code, the barcode as
     /// scanned, or the article number read off a shelf label.
@@ -685,20 +704,54 @@ public class ProductsController(
 
         if (dto is null) return null;
 
-        var reserved = await ReservedAsync([id], ct);
-        return Reserve(dto, reserved.GetValueOrDefault(id));
+        return (await WithReservedAsync([dto], ct))[0];
     }
 
+    /// <summary>The quantities computed on the way out: reserved, available, and on order.</summary>
     private async Task<List<ProductDto>> WithReservedAsync(List<ProductDto> items, CancellationToken ct)
     {
         if (items.Count == 0) return items;
 
-        var reserved = await ReservedAsync(items.ConvertAll(i => i.Id), ct);
-        return items.ConvertAll(i => Reserve(i, reserved.GetValueOrDefault(i.Id)));
+        var ids = items.ConvertAll(i => i.Id);
+        var reserved = await ReservedAsync(ids, ct);
+        var onOrder = await OnOrderAsync(ids, ct);
+        return items.ConvertAll(i => Reserve(i, reserved.GetValueOrDefault(i.Id), onOrder.GetValueOrDefault(i.Id)));
     }
 
-    private static ProductDto Reserve(ProductDto dto, decimal reserved) =>
-        dto with { QuantityReserved = reserved, QuantityAvailable = dto.QuantityOnHand - reserved };
+    private static ProductDto Reserve(ProductDto dto, decimal reserved, decimal onOrder) =>
+        dto with
+        {
+            QuantityReserved = reserved,
+            QuantityAvailable = dto.QuantityOnHand - reserved,
+            QuantityOnOrder = onOrder
+        };
+
+    /// <summary>
+    /// What is coming: on every purchase order sent to a supplier and not fully received, the
+    /// quantity ordered less what has already arrived. A draft is not an order yet, and a
+    /// cancelled or received one has nothing left to bring.
+    /// </summary>
+    private async Task<Dictionary<Guid, decimal>> OnOrderAsync(List<Guid> productIds, CancellationToken ct)
+    {
+        if (productIds.Count == 0) return [];
+
+        var lines = await db.PurchaseOrderLines.AsNoTracking()
+            .Where(l => l.ProductId != null
+                && productIds.Contains(l.ProductId.Value)
+                && (l.PurchaseOrder!.Status == PurchaseOrderStatus.Envoyee
+                    || l.PurchaseOrder!.Status == PurchaseOrderStatus.PartiellementRecue))
+            .Select(l => new
+            {
+                ProductId = l.ProductId!.Value,
+                Remaining = l.Quantity - (l.ReceiptLines.Sum(r => (decimal?)r.Quantity) ?? 0m)
+            })
+            .ToListAsync(ct);
+
+        // Per line, never below zero: a line received with extra is not a credit on another.
+        return lines
+            .GroupBy(l => l.ProductId)
+            .ToDictionary(g => g.Key, g => g.Sum(l => Math.Max(0m, l.Remaining)));
+    }
 
     /// <summary>
     /// What is promised but not yet gone: the quantity on every material or equipment line of an

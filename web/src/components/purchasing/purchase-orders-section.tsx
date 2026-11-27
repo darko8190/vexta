@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ClipboardList, MoreHorizontal, PackageCheck, Pencil, Plus, Send, Trash2, X } from "lucide-react";
+import { Ban, ClipboardList, MoreHorizontal, PackageCheck, Pencil, Plus, Send, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -38,6 +38,7 @@ import { formatProjectNumber } from "@/lib/types";
 import type { PurchaseOrder, PurchaseOrderStatus } from "@/lib/types";
 import { SortableHead } from "@/components/layout/sortable-head";
 import { byKeys, sortRows, type SortState } from "@/lib/table-sort";
+import { BulkActionBar, SelectAllHead, SelectRowCell, useRowSelection, type BulkAction } from "@/components/layout/bulk-actions";
 
 /** Base UI needs a value for every item, and "" is not one. */
 const ALL_STATUSES = "tous";
@@ -108,6 +109,38 @@ export function PurchaseOrdersSection() {
   const items = data?.items ?? [];
   const [sort, setSort] = useState<SortState | null>({ key: "numero", dir: "desc" });
   const filtered = Boolean(debounced || status);
+  const selection = useRowSelection(items, (order) => order.id);
+  const selectable = true;
+  const bulkActions: BulkAction<PurchaseOrder>[] = [
+    {
+      key: "envoyee",
+      label: "Marquer envoyée",
+      icon: Send,
+      applies: (order) => order.status === "Brouillon",
+      run: (order) => setStatusMutation.mutateAsync({ id: order.id, status: "Envoyee" }),
+      done: (count) => `${count} commande(s) marquée(s) envoyée(s).`,
+    },
+    {
+      key: "annulee",
+      label: "Annuler",
+      icon: Ban,
+      applies: (order) => order.status === "Brouillon" || order.status === "Envoyee",
+      run: (order) => setStatusMutation.mutateAsync({ id: order.id, status: "Annulee" }),
+      done: (count) => `${count} commande(s) annulée(s).`,
+    },
+    {
+      key: "supprimer",
+      label: "Supprimer",
+      icon: Trash2,
+      destructive: true,
+      confirm: {
+        title: "Supprimer la sélection ?",
+        description: (count) => `${count} commande(s) iront à la corbeille (Paramètres). Vous pourrez les restaurer.`,
+      },
+      run: (order) => remove.mutateAsync(order.id),
+      done: (count) => (count > 1 ? `${count} commandes supprimées.` : "Commande supprimée."),
+    },
+  ];
 
   return (
     <div>
@@ -189,9 +222,13 @@ export function PurchaseOrdersSection() {
       ) : (
         <>
           <div className="overflow-hidden rounded-lg border border-border">
+            {selectable && (
+              <BulkActionBar selection={selection} actions={bulkActions} className="mb-0 rounded-none border-0 border-b" />
+            )}
             <Table>
               <TableHeader>
                 <TableRow>
+                  {selectable && <SelectAllHead selection={selection} />}
                   <SortableHead label="Commande" sortKey="numero" sort={sort} onSort={setSort} />
                   <SortableHead label="Fournisseur" sortKey="fournisseur" sort={sort} onSort={setSort} className="hidden sm:table-cell" />
                   <SortableHead label="Projet" sortKey="projet" sort={sort} onSort={setSort} className="hidden lg:table-cell" />
@@ -204,6 +241,7 @@ export function PurchaseOrdersSection() {
               <TableBody>
                 {sortRows(items, sort, byKeys((order) => ({ numero: order.number, fournisseur: order.supplierName, projet: order.projectNumber, statut: order.status, promise: order.expectedOn, total: order.total }))).map((order) => (
                   <TableRow key={order.id}>
+                    {selectable && <SelectRowCell selection={selection} row={order} label={`la commande ${order.number}`} />}
                     <TableCell>
                       <span className="font-medium tabular-nums text-foreground">{order.number}</span>
                       {/* What the hidden columns carried, folded under the number so a phone

@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Building2, ClipboardList, PackageCheck } from "lucide-react";
+import { Building2, ClipboardList, PackageCheck, PackagePlus } from "lucide-react";
+import { ReorderSection } from "@/components/products/reorder-section";
+import { useProductsToReorderQuery } from "@/hooks/use-products";
 import { PageHeader } from "@/components/layout/page-header";
 import { SectionNav, type NavSection } from "@/components/layout/section-nav";
 import { useSectionCountsQuery } from "@/hooks/use-section-counts";
@@ -22,11 +24,13 @@ export default function SupplyPage() {
   // somebody has been recorded to order from, so it is where the work starts.
   const [section, setSection] = useState("fournisseurs");
   const { data: counts } = useSectionCountsQuery();
+  const { data: toReorder } = useProductsToReorderQuery();
 
   const sections: NavSection[] = [
     { key: "fournisseurs", label: "Fournisseurs", count: counts?.suppliers ?? 0, icon: Building2 },
     { key: "commandes", label: "Commandes", count: counts?.purchaseOrders ?? 0, icon: ClipboardList },
     { key: "receptions", label: "Réceptions", count: counts?.goodsReceipts ?? 0, icon: PackageCheck },
+    { key: "a-commander", label: "Produits à commander", count: toReorder?.length ?? 0, icon: PackagePlus },
   ];
 
   return (
@@ -49,6 +53,7 @@ export default function SupplyPage() {
           {section === "fournisseurs" && <SuppliersSection />}
           {section === "commandes" && <PurchaseOrdersSection />}
           {section === "receptions" && <GoodsReceiptsSection />}
+          {section === "a-commander" && <ReorderSection />}
         </div>
       </div>
     </div>

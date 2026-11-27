@@ -48,7 +48,12 @@ public record ProductDto(
     int ImageCount,
     bool IsPublic,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    /// <summary>
+    /// Ordered from a supplier and not in yet: what is left to receive on every purchase order
+    /// already sent. Computed on the way out, like the reserved quantity.
+    /// </summary>
+    decimal QuantityOnOrder = 0);
 
 /// <summary>
 /// A photograph of the product, with a link that works right now. The URL is signed on the way

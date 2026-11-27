@@ -30,6 +30,7 @@ import { ApiError, api } from "@/lib/api";
 import { formatAmount } from "@/lib/money";
 import { SortableHead } from "@/components/layout/sortable-head";
 import { byKeys, sortRows, type SortState } from "@/lib/table-sort";
+import { BulkActionBar, SelectAllHead, SelectRowCell, useRowSelection, type BulkAction } from "@/components/layout/bulk-actions";
 
 function rate(value: number | null, unit: Equipment["unit"]) {
   return value == null ? "—" : `${formatAmount(value)} / ${equipmentUnitLabels[unit]}`;
@@ -47,6 +48,22 @@ export default function EquipmentPage() {
   const debounced = useDebouncedValue(search);
   const { data, isLoading, isError, error, refetch } = useEquipmentListQuery(page, debounced);
   const remove = useDeleteEquipment();
+  const selection = useRowSelection(data?.items ?? [], (equipment) => equipment.id);
+  const selectable = canCreate;
+  const bulkActions: BulkAction<Equipment>[] = [
+    {
+      key: "supprimer",
+      label: "Supprimer",
+      icon: Trash2,
+      destructive: true,
+      confirm: {
+        title: "Supprimer la sélection ?",
+        description: (count) => `${count} équipement(s) iront à la corbeille (Paramètres). Vous pourrez les restaurer.`,
+      },
+      run: (equipment) => remove.mutateAsync(equipment.id),
+      done: (count) => (count > 1 ? `${count} équipements supprimés.` : "Équipement supprimé."),
+    },
+  ];
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Equipment | undefined>(undefined);
@@ -122,9 +139,13 @@ export default function EquipmentPage() {
         />
       ) : (
         <div className="overflow-x-auto rounded-lg border border-border bg-card">
+          {selectable && (
+            <BulkActionBar selection={selection} actions={bulkActions} className="mb-0 rounded-none border-0 border-b" />
+          )}
           <Table>
             <TableHeader>
               <TableRow>
+                {selectable && <SelectAllHead selection={selection} />}
                 <SortableHead label="Numéro" sortKey="numero" sort={sort} onSort={setSort} className="w-24" />
                 <SortableHead label="Équipement" sortKey="nom" sort={sort} onSort={setSort} />
                 <SortableHead label="État" sortKey="etat" sort={sort} onSort={setSort} />
@@ -138,6 +159,7 @@ export default function EquipmentPage() {
               {sortRows(data.items, sort, byKeys((equipment) => ({ numero: equipment.number, nom: equipment.name, etat: equipment.status, cout: equipment.costRate, vendant: equipment.sellingRate, projets: equipment.projectCount }))).map((equipment) => {
                 const cells = (
                   <>
+                    {selectable && <SelectRowCell selection={selection} row={equipment} label={equipment.name} />}
                     <TableCell className="font-mono text-xs text-muted-foreground">
                       {formatEquipmentNumber(equipment.number)}
                     </TableCell>

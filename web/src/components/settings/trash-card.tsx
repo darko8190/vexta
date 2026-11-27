@@ -15,6 +15,7 @@ import { SearchInput } from "@/components/layout/search-input";
 import { ApiError, api } from "@/lib/api";
 import { formatMoment } from "@/lib/dates";
 import { matchesSearch } from "@/lib/text-match";
+import { BulkActionBar, SelectAllHead, SelectRowCell, useRowSelection, type BulkAction } from "@/components/layout/bulk-actions";
 
 interface TrashItem {
   type: string;
@@ -84,6 +85,31 @@ export function TrashCard() {
   const items = (data ?? []).filter((item) =>
     matchesSearch(search, item.title, item.subtitle, typeLabels[item.type], item.deletedBy),
   );
+  const selection = useRowSelection(items, (item) => `${item.type}-${item.id}`);
+  const selectable = true;
+  const bulkActions: BulkAction<TrashItem>[] = [
+    {
+      key: "restaurer",
+      label: "Restaurer",
+      icon: RotateCcw,
+      run: (item) => api.post(`corbeille/${item.type}/${item.id}/restaurer`),
+      done: (count) => (count > 1 ? `${count} éléments restaurés.` : "Élément restauré."),
+      finish: refresh,
+    },
+    {
+      key: "supprimer",
+      label: "Supprimer définitivement",
+      icon: Trash2,
+      destructive: true,
+      confirm: {
+        title: "Supprimer définitivement ?",
+        description: (count) => `${count} élément(s) seront effacés pour de bon. Cette action ne peut pas être annulée.`,
+      },
+      run: (item) => api.delete(`corbeille/${item.type}/${item.id}`),
+      done: (count) => (count > 1 ? `${count} éléments supprimés définitivement.` : "Supprimé définitivement."),
+      finish: () => queryClient.invalidateQueries({ queryKey: ["corbeille"] }),
+    },
+  ];
 
   return (
     <div className="max-w-4xl">
@@ -116,9 +142,13 @@ export function TrashCard() {
         />
       ) : (
         <div className="overflow-hidden rounded-lg border border-border bg-card">
+          {selectable && (
+            <BulkActionBar selection={selection} actions={bulkActions} className="mb-0 rounded-none border-0 border-b" />
+          )}
           <Table>
             <TableHeader>
               <TableRow>
+                {selectable && <SelectAllHead selection={selection} />}
                 <TableHead>Élément</TableHead>
                 <TableHead className="w-32">Type</TableHead>
                 <TableHead className="hidden w-48 md:table-cell">Supprimé</TableHead>
@@ -128,6 +158,7 @@ export function TrashCard() {
             <TableBody>
               {items.map((item) => (
                 <TableRow key={`${item.type}-${item.id}`}>
+                  {selectable && <SelectRowCell selection={selection} row={item} label={item.title} />}
                   <TableCell className="font-medium">
                     {item.title}
                     {item.subtitle && <div className="truncate text-xs font-normal text-muted-foreground">{item.subtitle}</div>}

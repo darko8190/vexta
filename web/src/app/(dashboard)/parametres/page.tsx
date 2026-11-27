@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Building2, ClipboardPen, Clock, Compass, CreditCard, Globe, KeyRound, Mail, Percent, Receipt, Sparkles, Trash2, Wallet } from "lucide-react";
+import { Building2, ClipboardPen, Clock, Compass, CreditCard, Globe, KeyRound, Mail, PanelLeft, Percent, Receipt, Sparkles, Trash2, Wallet } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,6 +35,7 @@ import { SettingsTabs } from "@/components/settings/settings-tabs";
 import { McpKeysCard } from "@/components/settings/mcp-keys-card";
 import { CompanySettings, PublicPageSettings } from "@/components/company/company-settings";
 import { TrashCard } from "@/components/settings/trash-card";
+import { MenuVisibilityCard } from "@/components/settings/menu-visibility-card";
 import { useBillingSettingsQuery } from "@/hooks/use-billing-settings";
 import { useInvoiceAutoFeesQuery } from "@/hooks/use-auto-fees";
 import { usePricePoliciesQuery } from "@/hooks/use-price-policies";
@@ -439,6 +440,7 @@ export default function SettingsPage() {
             status: ai && ai.featureIncluded ? done(ai.hasApiKey && ai.isEnabled) : undefined,
           },
           { key: "integrations", label: "Intégrations", icon: KeyRound },
+          { key: "menu", label: "Menu", icon: PanelLeft },
           // Last: what was deleted, to look at again, restore or erase for good.
           { key: "corbeille", label: "Corbeille", icon: Trash2, count: trash?.length ?? 0 },
         ]
@@ -547,6 +549,7 @@ export default function SettingsPage() {
             {active === "assistant" && <AiAssistantCard />}
             {active === "integrations" && <McpKeysCard />}
             {active === "corbeille" && <TrashCard />}
+            {active === "menu" && <MenuVisibilityCard />}
             {active === "marge" && (
               <SettingsTabs
                 tabs={[

@@ -53,6 +53,52 @@ public class CompanyController(VextaDbContext db, ICurrentUserService currentUse
             tenant.BrandColor, tenant.BusinessNumber, address));
     }
 
+    /// <summary>
+    /// The tabs and sub-tabs hidden from the company's menus. Read by everyone in the company,
+    /// since everyone's menu follows it, and without the subscription gate: a menu must still
+    /// draw while a payment is being sorted out.
+    /// </summary>
+    [HttpGet("menu")]
+    [Authorize]
+    [StaffOnly]
+    public async Task<ActionResult<HiddenNavigationDto>> HiddenNavigation(CancellationToken ct)
+    {
+        if (currentUser.TenantId is not { } tenantId) return Ok(new HiddenNavigationDto([]));
+
+        var json = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
+            .Where(t => t.Id == tenantId)
+            .Select(t => t.HiddenNavigation)
+            .FirstOrDefaultAsync(ct);
+
+        var keys = json is null ? [] : System.Text.Json.JsonSerializer.Deserialize<List<string>>(json) ?? [];
+        return Ok(new HiddenNavigationDto(keys));
+    }
+
+    /// <summary>The owner's choice, for the whole company. The whole list every time.</summary>
+    [HttpPut("menu")]
+    [StaffOnly]
+    [Authorize(Roles = Roles.Owner)]
+    [RequireActiveSubscription]
+    public async Task<IActionResult> SaveHiddenNavigation(HiddenNavigationDto request, CancellationToken ct)
+    {
+        if (currentUser.TenantId is not { } tenantId) return Forbid();
+
+        var keys = (request.Keys ?? [])
+            .Where(k => !string.IsNullOrWhiteSpace(k))
+            .Select(k => k.Trim())
+            .Distinct()
+            .ToList();
+        if (keys.Count > 500 || keys.Any(k => k.Length > 200))
+            return BadRequest(new { message = "Liste d'onglets masqués invalide." });
+
+        var tenant = await db.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.Id == tenantId, ct);
+        if (tenant is null) return NotFound();
+
+        tenant.HiddenNavigation = keys.Count == 0 ? null : System.Text.Json.JsonSerializer.Serialize(keys);
+        await db.SaveChangesAsync(ct);
+        return NoContent();
+    }
+
     /// <summary>The setup guide's progress, as last saved. Null when it was never opened.</summary>
     [HttpGet("guide")]
     [StaffOnly]

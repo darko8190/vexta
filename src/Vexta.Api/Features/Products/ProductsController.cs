@@ -206,6 +206,7 @@ public class ProductsController(
             MinimumQuantity = source.MinimumQuantity,
             MaximumQuantity = source.MaximumQuantity,
             TracksInventory = source.TracksInventory,
+            IsManufactured = source.IsManufactured,
             PurchasePrice = source.PurchasePrice,
             MarginPercent = source.MarginPercent,
             SellingPrice = source.SellingPrice,
@@ -277,6 +278,7 @@ public class ProductsController(
             MinimumQuantity = request.MinimumQuantity,
             MaximumQuantity = request.MaximumQuantity,
             TracksInventory = request.TracksInventory,
+            IsManufactured = request.IsManufactured,
             QuantityOnHand = request.QuantityOnHand,
             PurchasePrice = purchasePrice,
             MarginPercent = marginPercent,
@@ -334,6 +336,7 @@ public class ProductsController(
         product.MinimumQuantity = request.MinimumQuantity;
         product.MaximumQuantity = request.MaximumQuantity;
         product.TracksInventory = request.TracksInventory;
+        product.IsManufactured = request.IsManufactured;
         product.PurchasePrice = purchasePrice;
         product.MarginPercent = marginPercent;
         product.SellingPrice = sellingPrice;
@@ -851,5 +854,7 @@ public class ProductsController(
         p.Images.Count,
         p.IsPublic,
         p.CreatedAt,
-        p.UpdatedAt);
+        p.UpdatedAt,
+        0m,
+        p.IsManufactured);
 }

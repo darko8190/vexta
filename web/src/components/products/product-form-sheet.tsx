@@ -47,6 +47,7 @@ const formSchema = z.object({
   minimumQuantity: z.string(),
   maximumQuantity: z.string(),
   tracksInventory: z.boolean(),
+  isManufactured: z.boolean(),
   quantityOnHand: z.string(),
   purchasePrice: z.string(),
   marginPercent: z.string(),
@@ -71,6 +72,7 @@ function emptyValues(): FormValues {
     maximumQuantity: "",
     // Most of what a contractor stocks is counted, so the box starts ticked.
     tracksInventory: true,
+    isManufactured: false,
     quantityOnHand: "",
     purchasePrice: "",
     marginPercent: "",
@@ -135,6 +137,7 @@ export function ProductFormSheet({
             minimumQuantity: decimalField(product.minimumQuantity),
             maximumQuantity: decimalField(product.maximumQuantity),
             tracksInventory: product.tracksInventory,
+            isManufactured: product.isManufactured,
             quantityOnHand: decimalField(product.quantityOnHand),
             purchasePrice: decimalField(product.purchasePrice),
             marginPercent: decimalField(product.marginPercent),
@@ -244,6 +247,7 @@ export function ProductFormSheet({
           minimumQuantity: values.tracksInventory ? minimumQuantity : null,
           maximumQuantity: values.tracksInventory ? maximumQuantity : null,
           tracksInventory: values.tracksInventory,
+          isManufactured: values.isManufactured,
           quantityOnHand: values.tracksInventory ? (quantityOnHand ?? 0) : 0,
           purchasePrice,
           marginPercent,
@@ -549,6 +553,29 @@ export function ProductFormSheet({
                   <FieldDescription>
                     Décochez-le pour ce qui se vend au mètre ou au voyage : les quantités ne veulent
                     alors rien dire et les écrans le disent plutôt que d&apos;afficher un zéro.
+                  </FieldDescription>
+                </Field>
+              )}
+            />
+
+            <Controller
+              name="isManufactured"
+              control={form.control}
+              render={({ field }) => (
+                <Field>
+                  <div className="flex items-center gap-3">
+                    <Checkbox
+                      id="product-manufactured"
+                      checked={field.value}
+                      onCheckedChange={(checked) => field.onChange(checked === true)}
+                    />
+                    <FieldLabel htmlFor="product-manufactured" className="font-normal">
+                      Fabriqué par l&apos;entreprise
+                    </FieldLabel>
+                  </div>
+                  <FieldDescription>
+                    Cochez-le pour un produit que vous fabriquez vous-même, sur votre chaîne de
+                    production, plutôt que de l&apos;acheter.
                   </FieldDescription>
                 </Field>
               )}

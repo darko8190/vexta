@@ -83,6 +83,9 @@ public class Product : ISoftDeletable
     /// <summary>Shown on the company's public page, where it can be sold.</summary>
     public bool IsPublic { get; set; }
 
+    /// <summary>Made by the company itself, on its own production line, rather than bought.</summary>
+    public bool IsManufactured { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 

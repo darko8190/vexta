@@ -3260,6 +3260,9 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<int?>("InstallationMinutes")
                         .HasColumnType("integer");
 
+                    b.Property<bool>("IsManufactured")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("IsPublic")
                         .HasColumnType("boolean");
 
@@ -5286,6 +5289,9 @@ namespace Vexta.Api.Data.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
+                        .HasColumnType("text");
+
+                    b.Property<string>("HiddenNavigation")
                         .HasColumnType("text");
 
                     b.Property<int>("Kind")

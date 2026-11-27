@@ -130,6 +130,13 @@ public class Tenant
     /// </summary>
     public string? SetupGuide { get; set; }
 
+    /// <summary>
+    /// The menu tabs and screen sub-tabs the company has chosen to hide, as a JSON array of keys:
+    /// a tab's path (« /achats »), or a screen and its sub-tab (« Sections des achats::depenses »).
+    /// Hidden for everyone in the company; the pages themselves still open by their address.
+    /// </summary>
+    public string? HiddenNavigation { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public List<ApplicationUser> Users { get; set; } = [];

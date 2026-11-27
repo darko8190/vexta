@@ -53,7 +53,9 @@ public record ProductDto(
     /// Ordered from a supplier and not in yet: what is left to receive on every purchase order
     /// already sent. Computed on the way out, like the reserved quantity.
     /// </summary>
-    decimal QuantityOnOrder = 0);
+    decimal QuantityOnOrder = 0,
+    /// <summary>Made by the company itself rather than bought.</summary>
+    bool IsManufactured = false);
 
 /// <summary>
 /// A photograph of the product, with a link that works right now. The URL is signed on the way
@@ -147,7 +149,8 @@ public record SaveProductRequest(
     int? InstallationMinutes,
     string? Note,
     Guid? ParentProductId,
-    bool IsPublic);
+    bool IsPublic,
+    bool IsManufactured = false);
 
 /// <param name="MediaAssetIds">
 /// The photographs, in the order they should appear. It is the whole set every time: what is

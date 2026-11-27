@@ -32,6 +32,7 @@ import { TrialBanner } from "@/components/layout/trial-banner";
 import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { useNavigationQuery, type NavigationItem } from "@/hooks/use-navigation";
+import { useHiddenNavigation } from "@/hooks/use-hidden-navigation";
 import { useQuoteStatusCountsQuery } from "@/hooks/use-quotes";
 import { moduleIcon } from "@/lib/module-icons";
 import { useAuth } from "@/lib/auth-context";
@@ -40,12 +41,17 @@ function initials(firstName: string, lastName: string) {
   return `${firstName[0] ?? ""}${lastName[0] ?? ""}`.toUpperCase();
 }
 
-/** One level of nesting, flattened with a depth so a single list can render both. */
-function flatten(items: NavigationItem[], depth = 0): NavItem[] {
-  return items.flatMap((item) => [
-    { href: item.href, label: item.title, icon: moduleIcon(item.icon), depth },
-    ...flatten(item.children, depth + 1),
-  ]);
+/**
+ * One level of nesting, flattened with a depth so a single list can render both. A tab the
+ * company hid in Paramètres › Menu goes, with whatever sits under it.
+ */
+function flatten(items: NavigationItem[], hidden: Set<string>, depth = 0): NavItem[] {
+  return items
+    .filter((item) => !hidden.has(item.href))
+    .flatMap((item) => [
+      { href: item.href, label: item.title, icon: moduleIcon(item.icon), depth },
+      ...flatten(item.children, hidden, depth + 1),
+    ]);
 }
 
 /**
@@ -76,8 +82,9 @@ function useTenantNavItems(): { items: NavItem[]; pending: boolean } {
   // A customer is offered « Mes soumissions » once they have been sent one — a tab that can
   // only ever be empty is a tab for a service their supplier does not use.
   const hasQuotes = (quoteCounts ?? []).some((item) => item.count > 0);
+  const hidden = useHiddenNavigation();
   const builtIn = getNavItems(user?.role, user?.isImpersonating, user?.tenantKind).filter(
-    (item) => !isClient || item.href !== "/soumissions" || hasQuotes,
+    (item) => (!isClient || item.href !== "/soumissions" || hasQuotes) && !hidden.has(item.href),
   );
 
   // The crew's menu, whatever the plan's modules say: the point of the mode is a short one.
@@ -100,7 +107,7 @@ function useTenantNavItems(): { items: NavItem[]; pending: boolean } {
 
   if (!data || data.length === 0) return { items: crewFilter(builtIn), pending: false };
 
-  return { items: crewFilter([dashboardNavItem, ...flatten(data)]), pending: false };
+  return { items: crewFilter([dashboardNavItem, ...flatten(data, hidden)]), pending: false };
 }
 
 

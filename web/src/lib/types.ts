@@ -1380,6 +1380,8 @@ export interface ProductRecord {
   quantityAvailable: number;
   /** Left to receive on purchase orders already sent. */
   quantityOnOrder: number;
+  /** Made by the company itself rather than bought. */
+  isManufactured: boolean;
   purchasePrice: number | null;
   marginPercent: number | null;
   sellingPrice: number | null;

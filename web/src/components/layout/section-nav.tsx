@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowUpDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ReorderViewsDialog } from "@/components/layout/reorder-views-dialog";
 import { applyOrder, useViewOrder } from "@/hooks/use-view-order";
+import { subTabKey, useHiddenNavigation } from "@/hooks/use-hidden-navigation";
 import { cn } from "@/lib/utils";
 
 /** How much of something is set up: 1 of 2 parts, 3 of 3. */
@@ -80,9 +81,21 @@ export function SectionNav({
   // even though the pointer is still on it. Cleared when the pointer leaves.
   const [dismissed, setDismissed] = useState(false);
   const [reordering, setReordering] = useState(false);
+  // The sub-tabs the company hid in Paramètres › Menu. Never all of them: a screen with no tab
+  // left would show nothing at all, so then they all stay.
+  const hidden = useHiddenNavigation();
+  const kept = sections.filter((section) => !hidden.has(subTabKey(label, section.key)));
+  const shown = kept.length > 0 ? kept : sections;
   // Each person puts the views in their own order, remembered per screen.
   const { order, save } = useViewOrder(label, sections.map((section) => section.key));
-  const ordered = applyOrder(sections, order, (section) => section.key);
+  const ordered = applyOrder(shown, order, (section) => section.key);
+
+  // A screen opened on a hidden sub-tab moves to the first one still shown.
+  const activeHidden = !shown.some((section) => section.key === active);
+  const firstShown = ordered[0]?.key;
+  useEffect(() => {
+    if (activeHidden && firstShown) onSelect(firstShown);
+  }, [activeHidden, firstShown, onSelect]);
 
   return (
     <div className="md:w-12 md:shrink-0">

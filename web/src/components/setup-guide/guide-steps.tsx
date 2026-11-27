@@ -18,6 +18,7 @@ import { PayPalCard } from "@/components/settings/paypal-card";
 import { PricePoliciesCard } from "@/components/settings/price-policies-card";
 import { InvoiceReminderCard, QuoteReminderCard, QuoteTermsCard } from "@/components/settings/quote-settings-cards";
 import { QuoteResponsesCard } from "@/components/settings/quote-responses-card";
+import { MenuVisibilityCard } from "@/components/settings/menu-visibility-card";
 import { WageClassificationsCard } from "@/components/settings/wage-classifications-card";
 import {
   GuidedCompanyContact,
@@ -330,6 +331,15 @@ export const guideSteps: GuideStep[] = [
     explain: "Pour les utilisateurs avancés : une clé permet à un agent IA ou à une automatisation de travailler dans Vexta. Si vous ne savez pas ce que c'est, répondez non.",
     ask: { yes: "Oui", no: "Non" },
     render: () => <McpKeysCard />,
+  },
+  {
+    key: "menu",
+    group: "Outils",
+    title: "Menu",
+    question: "Voulez-vous cacher des onglets que votre entreprise n'utilise pas ?",
+    explain: "Décochez les onglets et les sous-onglets dont vous n'avez pas besoin : ils disparaissent du menu pour tout le monde, ce qui le rend plus simple. Vous pourrez les remettre en tout temps dans Paramètres, section Menu.",
+    ask: { yes: "Oui", no: "Non" },
+    render: () => <MenuVisibilityCard />,
   },
 ];
 

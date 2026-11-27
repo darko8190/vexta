@@ -60,14 +60,22 @@ function dayLabel(iso: string): string {
   });
 }
 
-function ShiftSheet({
+/**
+ * One shift, created or changed. `employeeId` fixes the person and hides the picker (one
+ * person's file); `defaultEmployeeId` only fills it in (a cell of the calendar).
+ */
+export function ShiftSheet({
   employeeId,
+  defaultEmployeeId,
+  defaultProjectId,
   shift,
   defaultDate,
   open,
   onOpenChange,
 }: {
   employeeId?: string;
+  defaultEmployeeId?: string;
+  defaultProjectId?: string;
   shift?: ScheduleShift;
   defaultDate: string;
   open: boolean;
@@ -76,8 +84,8 @@ function ShiftSheet({
   const save = useSaveShift();
   const isEditing = Boolean(shift);
 
-  const [owner, setOwner] = useState(shift?.employeeId ?? employeeId ?? "");
-  const [projectId, setProjectId] = useState(shift?.projectId ?? "");
+  const [owner, setOwner] = useState(shift?.employeeId ?? employeeId ?? defaultEmployeeId ?? "");
+  const [projectId, setProjectId] = useState(shift?.projectId ?? defaultProjectId ?? "");
   const [date, setDate] = useState(shift?.date ?? defaultDate);
   const [startTime, setStartTime] = useState(shift?.startTime?.slice(0, 5) ?? "07:00");
   const [endTime, setEndTime] = useState(shift?.endTime?.slice(0, 5) ?? "16:00");

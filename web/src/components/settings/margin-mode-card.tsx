@@ -55,15 +55,19 @@ export function MarginModeCard() {
   // Null until something is picked, so the saved choice shows through without an effect
   // copying it into state.
   const [picked, setPicked] = useState<MarginMode | null>(null);
-  const saved = settings?.marginMode ?? "Multiplication";
+  // Nothing is shown as chosen until the company picks one: the default still prices in the
+  // meantime, but it is not a decision anybody made.
+  const saved = settings?.marginModeChosen ? settings.marginMode : null;
   const chosen = picked ?? saved;
 
   async function onSave() {
+    if (!chosen) return;
     try {
       await save.mutateAsync({
         defaultHourlyRate: settings?.defaultHourlyRate ?? null,
         marginMode: chosen,
         defaultPricePolicyId: settings?.defaultPricePolicyId ?? null,
+        marginModeChosen: true,
       });
       toast.success("Mode de calcul enregistré.");
     } catch (error) {
@@ -127,7 +131,7 @@ export function MarginModeCard() {
       </CardContent>
 
       <CardFooter>
-        <Button onClick={onSave} disabled={save.isPending}>
+        <Button onClick={onSave} disabled={save.isPending || !chosen}>
           {save.isPending && <Spinner />}
           Enregistrer
         </Button>

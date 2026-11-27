@@ -22,6 +22,9 @@ import type {
   SaveLeaveValues,
   SaveScheduleShiftValues,
   ScheduleWeek,
+  Planning,
+  ScheduleBatch,
+  ScheduleBatchResult,
 } from "@/lib/types";
 import type { EmployeeFileCounts, EmployeeWeek } from "@/lib/types";
 
@@ -281,6 +284,34 @@ export function useDeleteShift() {
   const refresh = useRefresh();
   return useMutation({
     mutationFn: (id: string) => api.delete<void>(`horaire/${id}`),
+    onSuccess: refresh,
+  });
+}
+
+export interface PlanningFilters {
+  start: string;
+  end: string;
+  teamId?: string;
+  employeeIds?: string[];
+}
+
+export function usePlanningQuery({ start, end, teamId, employeeIds }: PlanningFilters) {
+  const params = new URLSearchParams({ du: start, au: end });
+  if (teamId) params.set("equipe", teamId);
+  if (employeeIds && employeeIds.length > 0) params.set("employes", employeeIds.join(","));
+
+  return useQuery({
+    queryKey: [...RH, "horaire", "planification", start, end, teamId ?? "toutes", employeeIds?.join(",") ?? "tous"],
+    queryFn: () => api.get<Planning>(`horaire/planification?${params.toString()}`),
+    placeholderData: (previous) => previous,
+  });
+}
+
+/** Several shifts in one save, all or nothing: a paste, a drag, a week copied. */
+export function useScheduleBatch() {
+  const refresh = useRefresh();
+  return useMutation({
+    mutationFn: (batch: ScheduleBatch) => api.post<ScheduleBatchResult>("horaire/lot", batch),
     onSuccess: refresh,
   });
 }

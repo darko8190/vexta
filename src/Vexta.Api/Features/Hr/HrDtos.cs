@@ -124,6 +124,45 @@ public record ScheduleShiftDto(
 /// <param name="Start">The Monday the week runs from.</param>
 public record ScheduleWeekDto(DateOnly Start, DateOnly End, decimal TotalHours, IReadOnlyList<ScheduleShiftDto> Shifts);
 
+// ---- Planification (calendrier) ----
+
+public record PlanningEmployeeDto(Guid Id, string Name, IReadOnlyList<Guid> TeamIds);
+
+public record PlanningTeamDto(Guid Id, string Name);
+
+public record PlanningLeaveDto(
+    Guid Id, Guid EmployeeId, LeaveKind Kind, DateOnly StartDate, DateOnly EndDate, decimal? Hours,
+    LeaveStatus Status, string? Note);
+
+/// <summary>
+/// An open project and what the period plans on it. Assigned means at least one shift in the
+/// period: the planning is what is real, whatever the tasks say.
+/// </summary>
+public record PlanningProjectDto(
+    Guid Id, int Number, string? Description, string ClientName, ProjectStatus Status,
+    DateOnly? StartDate, DateOnly? EndDate, decimal PlannedHours, IReadOnlyList<string> EmployeeNames,
+    bool Assigned);
+
+public record PlanningDto(
+    DateOnly Start,
+    DateOnly End,
+    decimal TotalHours,
+    IReadOnlyList<PlanningEmployeeDto> Employees,
+    IReadOnlyList<PlanningTeamDto> Teams,
+    IReadOnlyList<ScheduleShiftDto> Shifts,
+    IReadOnlyList<PlanningLeaveDto> Leaves,
+    IReadOnlyList<PlanningProjectDto> Projects);
+
+public record ScheduleShiftChange(Guid Id, SaveScheduleShiftRequest Shift);
+
+/// <summary>Several shifts changed in one save: a paste, a drag of a selection, a week copied.</summary>
+public record ScheduleBatchRequest(
+    IReadOnlyList<SaveScheduleShiftRequest>? Create,
+    IReadOnlyList<ScheduleShiftChange>? Update,
+    IReadOnlyList<Guid>? Delete);
+
+public record ScheduleBatchResultDto(int Created, int Updated, int Deleted, IReadOnlyList<Guid> CreatedIds);
+
 public record SaveScheduleShiftRequest(
     Guid? EmployeeId,
     Guid? ProjectId,

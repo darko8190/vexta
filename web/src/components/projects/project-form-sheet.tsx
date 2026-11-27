@@ -105,6 +105,7 @@ function toFormValues(
   project?: ProjectRecord,
   defaultClientId?: string,
   defaultClientAssetId?: string,
+  defaultTemplateId?: string,
 ): FormValues {
   return {
     clientId: project?.clientId ?? defaultClientId ?? "",
@@ -114,7 +115,7 @@ function toFormValues(
     recurrenceEvery: String(project?.recurrenceEvery ?? 1),
     recurrenceUnit: project?.recurrenceUnit ?? "Mois",
     recurrenceEndDate: project?.recurrenceEndDate ?? "",
-    templateId: "",
+    templateId: project ? "" : (defaultTemplateId ?? ""),
     poNumber: project?.poNumber ?? "",
     clientAddressId: project?.clientAddress?.id ?? "",
     // A new project bills and works at the same place until someone says otherwise, which is
@@ -177,6 +178,7 @@ export function ProjectFormSheet({
   project,
   defaultClientId,
   defaultClientAssetId,
+  defaultTemplateId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -184,6 +186,8 @@ export function ProjectFormSheet({
   defaultClientId?: string;
   /** Opened from an asset's file: the job is on that asset until somebody says otherwise. */
   defaultClientAssetId?: string;
+  /** Opened from « Utiliser ce modèle »: the template is picked, the client is what is left. */
+  defaultTemplateId?: string;
 }) {
   const isEditing = Boolean(project);
   const router = useRouter();
@@ -199,12 +203,12 @@ export function ProjectFormSheet({
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: toFormValues(project, defaultClientId, defaultClientAssetId),
+    defaultValues: toFormValues(project, defaultClientId, defaultClientAssetId, defaultTemplateId),
   });
 
   useEffect(() => {
-    if (open) form.reset(toFormValues(project, defaultClientId, defaultClientAssetId));
-  }, [open, project, defaultClientId, defaultClientAssetId, form]);
+    if (open) form.reset(toFormValues(project, defaultClientId, defaultClientAssetId, defaultTemplateId));
+  }, [open, project, defaultClientId, defaultClientAssetId, defaultTemplateId, form]);
 
   async function onSubmit(values: FormValues) {
     const payload: ProjectFormValues = {

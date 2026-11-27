@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ArrowUpDown } from "lucide-react";
 import { SetupFraction, type SetupProgress } from "@/components/layout/section-nav";
+import { Badge } from "@/components/ui/badge";
 import { ReorderViewsDialog } from "@/components/layout/reorder-views-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { applyOrder, useViewOrder } from "@/hooks/use-view-order";
@@ -11,6 +12,8 @@ export interface SettingsTab {
   value: string;
   label: string;
   status?: SetupProgress;
+  /** How many things the tab holds, for a tab that is a list. Shown at zero too. */
+  count?: number;
   content: React.ReactNode;
 }
 
@@ -38,6 +41,11 @@ export function SettingsTabs({ tabs, nested = false }: { tabs: SettingsTab[]; ne
             <TabsTrigger key={tab.value} value={tab.value} className="gap-2 px-2.5">
               {tab.label}
               {tab.status && <SetupFraction progress={tab.status} />}
+              {tab.count !== undefined && (
+                <Badge variant="secondary" className="tabular-nums">
+                  {tab.count}
+                </Badge>
+              )}
             </TabsTrigger>
           ))}
         </TabsList>

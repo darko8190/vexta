@@ -2476,6 +2476,61 @@ export interface SaveScheduleShiftValues {
   note: string | null;
 }
 
+export interface PlanningEmployee {
+  id: string;
+  name: string;
+  teamIds: string[];
+}
+
+export interface PlanningLeave {
+  id: string;
+  employeeId: string;
+  kind: LeaveKind;
+  startDate: string;
+  endDate: string;
+  hours: number | null;
+  status: LeaveStatus;
+  note: string | null;
+}
+
+/** An open project and what the period plans on it. Assigned: at least one shift in the period. */
+export interface PlanningProject {
+  id: string;
+  number: number;
+  description: string | null;
+  clientName: string;
+  status: ProjectStatus;
+  startDate: string | null;
+  endDate: string | null;
+  plannedHours: number;
+  employeeNames: string[];
+  assigned: boolean;
+}
+
+export interface Planning {
+  start: string;
+  end: string;
+  totalHours: number;
+  employees: PlanningEmployee[];
+  teams: { id: string; name: string }[];
+  shifts: ScheduleShift[];
+  leaves: PlanningLeave[];
+  projects: PlanningProject[];
+}
+
+export interface ScheduleBatch {
+  create?: SaveScheduleShiftValues[];
+  update?: { id: string; shift: SaveScheduleShiftValues }[];
+  delete?: string[];
+}
+
+export interface ScheduleBatchResult {
+  created: number;
+  updated: number;
+  deleted: number;
+  createdIds: string[];
+}
+
 export interface EmployeeCredential {
   id: string;
   employeeId: string;

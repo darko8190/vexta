@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Building2, ClipboardPen, Clock, CreditCard, KeyRound, Mail, Percent, Receipt, Sparkles, Trash2, Wallet } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -27,7 +27,6 @@ import { PricePoliciesCard } from "@/components/settings/price-policies-card";
 import {
   InvoiceReminderCard,
   QuoteReminderCard,
-  QuoteTemplatesCard,
   QuoteTermsCard,
 } from "@/components/settings/quote-settings-cards";
 import { WageClassificationsCard } from "@/components/settings/wage-classifications-card";
@@ -36,6 +35,8 @@ import { McpKeysCard } from "@/components/settings/mcp-keys-card";
 import { CompanySettings } from "@/components/company/company-settings";
 import { TrashCard } from "@/components/settings/trash-card";
 import { useBillingSettingsQuery } from "@/hooks/use-billing-settings";
+import { useInvoiceAutoFeesQuery } from "@/hooks/use-auto-fees";
+import { usePricePoliciesQuery } from "@/hooks/use-price-policies";
 import { useOnlinePaymentsQuery } from "@/hooks/use-online-payments";
 import { useAiSettingsQuery } from "@/hooks/use-assistant";
 import { useWageClassificationsQuery } from "@/hooks/use-wage-classifications";
@@ -352,6 +353,14 @@ export default function SettingsPage() {
   const { data: paypal } = usePayPalStateQuery(canManage === true);
   const { data: ai } = useAiSettingsQuery(canManage === true);
   const { data: classifications } = useWageClassificationsQuery(canManage === true);
+  const { data: autoFees } = useInvoiceAutoFeesQuery(canManage === true);
+  const { data: pricePolicies } = usePricePoliciesQuery(canManage === true);
+  // Same key as the Corbeille card, so opening it costs nothing more.
+  const { data: trash } = useQuery({
+    queryKey: ["corbeille"],
+    queryFn: () => api.get<unknown[]>("corbeille"),
+    enabled: canManage === true,
+  });
 
   type Progress = { done: number; total: number } | undefined;
   /** One part: set up or not, unknown while its query is in flight. */
@@ -375,6 +384,18 @@ export default function SettingsPage() {
   const paypalStatus = paypal && paypal.included ? done(paypal.connected) : undefined;
   const paymentParts = [stripeStatus, paypalStatus].filter((part) => part !== undefined);
   const paymentsStatus = paymentParts.length > 0 ? all(...paymentParts) : undefined;
+  // Each answer a customer can give from the e-mail is one part: three of three while all are
+  // offered, fewer once some are turned off.
+  const quoteResponsesStatus: Progress = billing
+    ? {
+        done: [billing.quoteEmailCanApprove, billing.quoteEmailCanRequestChange, billing.quoteEmailCanRefuse].filter(
+          (offered) => offered ?? true,
+        ).length,
+        total: 3,
+      }
+    : undefined;
+  // Not chosen until the company picks one itself, whatever the default prices with meanwhile.
+  const marginModeStatus = done(billing ? billing.marginModeChosen === true : undefined);
 
   // ?section=entreprise from the old Fiche entreprise links. Read once; the server render shows
   // the skeleton either way, so the first client render cannot disagree with it.
@@ -389,7 +410,7 @@ export default function SettingsPage() {
     ...(canManage
       ? [
           { key: "facturation", label: "Facturation", icon: Receipt, status: all(billingStatus, invoiceReminderStatus) },
-          { key: "soumissions", label: "Soumissions", icon: ClipboardPen, status: all(quoteTermsStatus, quoteReminderStatus) },
+          { key: "soumissions", label: "Soumissions", icon: ClipboardPen, status: all(quoteTermsStatus, quoteReminderStatus, quoteResponsesStatus) },
           // The built-in messages work; the section is "done" once either has been made the
           // company's own.
           { key: "courriel", label: "Courriel", icon: Mail, status: all(invoiceEmailStatus, quoteEmailStatus) },
@@ -403,7 +424,7 @@ export default function SettingsPage() {
             status: paymentsStatus,
           },
           { key: "taux", label: "Taux", icon: Clock, status: all(hourlyStatus, classificationsStatus) },
-          { key: "marge", label: "Marge et prix", icon: Percent },
+          { key: "marge", label: "Marge et prix", icon: Percent, status: marginModeStatus },
           // Last, because it is the one section that is set up once and then forgotten.
           {
             key: "assistant",
@@ -413,7 +434,7 @@ export default function SettingsPage() {
           },
           { key: "integrations", label: "Intégrations", icon: KeyRound },
           // Last: what was deleted, to look at again, restore or erase for good.
-          { key: "corbeille", label: "Corbeille", icon: Trash2 },
+          { key: "corbeille", label: "Corbeille", icon: Trash2, count: trash?.length ?? 0 },
         ]
       : []),
   ];
@@ -461,7 +482,7 @@ export default function SettingsPage() {
                 tabs={[
                   { value: "facture", label: "Facture", status: billingStatus, content: <BillingSettingsCard /> },
                   { value: "relances", label: "Relances", status: invoiceReminderStatus, content: <InvoiceReminderCard /> },
-                  { value: "frais-automatiques", label: "Frais automatiques", content: <InvoiceAutoFeesCard /> },
+                  { value: "frais-automatiques", label: "Frais automatiques", count: autoFees?.length ?? 0, content: <InvoiceAutoFeesCard /> },
                 ]}
               />
             )}
@@ -470,8 +491,7 @@ export default function SettingsPage() {
                 tabs={[
                   { value: "conditions", label: "Conditions", status: quoteTermsStatus, content: <QuoteTermsCard /> },
                   { value: "relances", label: "Relances", status: quoteReminderStatus, content: <QuoteReminderCard /> },
-                  { value: "reponses", label: "Réponse par courriel", content: <QuoteResponsesCard /> },
-                  { value: "modeles", label: "Modèles", content: <QuoteTemplatesCard /> },
+                  { value: "reponses", label: "Réponse par courriel", status: quoteResponsesStatus, content: <QuoteResponsesCard /> },
                 ]}
               />
             )}
@@ -515,8 +535,8 @@ export default function SettingsPage() {
             {active === "marge" && (
               <SettingsTabs
                 tabs={[
-                  { value: "mode", label: "Calcul de la marge", content: <MarginModeCard /> },
-                  { value: "politiques", label: "Politiques de prix", content: <PricePoliciesCard /> },
+                  { value: "mode", label: "Calcul de la marge", status: marginModeStatus, content: <MarginModeCard /> },
+                  { value: "politiques", label: "Politiques de prix", count: pricePolicies?.length ?? 0, content: <PricePoliciesCard /> },
                 ]}
               />
             )}

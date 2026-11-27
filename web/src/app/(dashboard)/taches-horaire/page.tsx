@@ -4,7 +4,7 @@ import { useState } from "react";
 import { CalendarRange, ListChecks } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { SectionNav, type NavSection } from "@/components/layout/section-nav";
-import { ScheduleSection } from "@/components/hr/employee/schedule-section";
+import { PlanningCalendar } from "@/components/schedule/planning-calendar";
 import { WorkTasksSection } from "@/components/work/tasks-section";
 import { useIsOwner } from "@/hooks/use-can-create";
 
@@ -50,7 +50,7 @@ export default function TasksAndSchedulePage() {
 
               Writing a shift is the owner's: an employee who could schedule themselves could
               schedule themselves out of a Saturday. */}
-          {section === "horaire" && <ScheduleSection canEdit={isOwner} />}
+          {section === "horaire" && <PlanningCalendar canEdit={isOwner} />}
           {section === "taches" && <WorkTasksSection />}
         </div>
       </div>

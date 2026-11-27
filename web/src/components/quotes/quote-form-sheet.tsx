@@ -86,7 +86,7 @@ const formSchema = z
 
 type FormValues = z.infer<typeof formSchema>;
 
-function toFormValues(quote?: QuoteRecord, defaultClientId?: string): FormValues {
+function toFormValues(quote?: QuoteRecord, defaultClientId?: string, defaultTemplateId?: string): FormValues {
   return {
     clientId: quote?.clientId ?? defaultClientId ?? "",
     poNumber: quote?.poNumber ?? "",
@@ -107,7 +107,7 @@ function toFormValues(quote?: QuoteRecord, defaultClientId?: string): FormValues
     subCategoryId: quote?.subCategoryId ?? "",
     wageClassificationId: quote?.wageClassificationId ?? "",
     depositPercent: quote?.depositPercent != null ? String(quote.depositPercent) : "",
-    templateId: "",
+    templateId: quote ? "" : (defaultTemplateId ?? ""),
     contactId: quote?.contactId ?? "",
     billingContactId: quote?.billingContactId ?? "",
   };
@@ -123,12 +123,15 @@ export function QuoteFormSheet({
   onOpenChange,
   quote,
   defaultClientId,
+  defaultTemplateId,
   onCreated,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   quote?: QuoteRecord;
   defaultClientId?: string;
+  /** Opened from « Utiliser ce modèle »: the template is picked, the client is what is left. */
+  defaultTemplateId?: string;
   onCreated?: (quote: QuoteRecord) => void;
 }) {
   const isEditing = Boolean(quote);
@@ -144,12 +147,12 @@ export function QuoteFormSheet({
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: toFormValues(quote, defaultClientId),
+    defaultValues: toFormValues(quote, defaultClientId, defaultTemplateId),
   });
 
   useEffect(() => {
-    if (open) form.reset(toFormValues(quote, defaultClientId));
-  }, [open, quote, defaultClientId, form]);
+    if (open) form.reset(toFormValues(quote, defaultClientId, defaultTemplateId));
+  }, [open, quote, defaultClientId, defaultTemplateId, form]);
 
   const clientId = useWatch({ control: form.control, name: "clientId" });
   const sameAddress = useWatch({ control: form.control, name: "sameAddressAsClient" });

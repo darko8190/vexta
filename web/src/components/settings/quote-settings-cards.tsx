@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { BellRing, ClipboardPen, FileText } from "lucide-react";
+import { BellRing, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -11,7 +11,6 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
-import { TemplateLibrary } from "@/components/templates/template-library";
 import {
   useBillingSettingsQuery,
   useSaveInvoiceReminder,
@@ -222,26 +221,3 @@ function ReminderCard({ kind }: { kind: keyof typeof reminderCopy }) {
   );
 }
 
-/**
- * The templates kept so far. They are made from a quote (« Enregistrer comme modèle ») and used
- * when creating one (« Partir d'un modèle »), so this card only lists them and removes them.
- */
-export function QuoteTemplatesCard() {
-  return (
-    <Card className="max-w-3xl">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <ClipboardPen className="size-4" />
-          Modèles de soumission
-        </CardTitle>
-        <CardDescription>
-          Créés depuis une soumission avec « Enregistrer comme modèle », et choisis avec « Partir
-          d&apos;un modèle » en créant une nouvelle soumission.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <TemplateLibrary kind="soumission" />
-      </CardContent>
-    </Card>
-  );
-}

@@ -216,13 +216,15 @@ function ClosedMarker({ section }: { section: NavSection }) {
       />
     );
   }
-  if (section.count !== undefined && section.count > 0) {
+  // Zero is shown too: an empty section says so rather than looking like one with no count.
+  if (section.count !== undefined) {
     return (
       <span
         aria-hidden
         className={cn(
           hidden,
-          "absolute -top-2 -right-2.5 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] leading-4 font-semibold text-primary-foreground tabular-nums ring-2 ring-background",
+          "absolute -top-2 -right-2.5 min-w-4 items-center justify-center rounded-full px-1 text-[10px] leading-4 font-semibold tabular-nums ring-2 ring-background",
+          section.count > 0 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
         )}
       >
         {section.count > 99 ? "99+" : section.count}

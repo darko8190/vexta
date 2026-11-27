@@ -545,6 +545,9 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<int>("MarginMode")
                         .HasColumnType("integer");
 
+                    b.Property<DateTimeOffset?>("MarginModeChosenAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("NextCreditNumber")
                         .HasColumnType("integer");
 

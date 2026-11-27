@@ -57,6 +57,8 @@ export interface BillingSettings {
   quoteEmailCanApprove?: boolean;
   quoteEmailCanRequestChange?: boolean;
   quoteEmailCanRefuse?: boolean;
+  /** False until the company picks a margin convention itself. */
+  marginModeChosen?: boolean;
 }
 
 /** Which document's email a template card edits. */
@@ -94,6 +96,7 @@ export type SaveBillingSettingsValues = Omit<
   | "quoteEmailCanApprove"
   | "quoteEmailCanRequestChange"
   | "quoteEmailCanRefuse"
+  | "marginModeChosen"
 >;
 
 /**
@@ -135,6 +138,8 @@ export interface SavePricingValues {
   defaultHourlyRate: number | null;
   marginMode: MarginMode;
   defaultPricePolicyId: string | null;
+  /** Sent by the Marge card only: the company has picked a convention. */
+  marginModeChosen?: boolean;
 }
 
 /**

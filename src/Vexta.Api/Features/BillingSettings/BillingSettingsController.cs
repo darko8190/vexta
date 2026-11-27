@@ -80,7 +80,9 @@ public record BillingSettingsDto(
     /// <summary>What the client may answer straight from the quote's email.</summary>
     bool QuoteEmailCanApprove = true,
     bool QuoteEmailCanRequestChange = true,
-    bool QuoteEmailCanRefuse = true);
+    bool QuoteEmailCanRefuse = true,
+    /// <summary>False until the company picks a margin convention itself; the default still prices meanwhile.</summary>
+    bool MarginModeChosen = false);
 
 /// <summary>One field a template may drop in, and what it stands for.</summary>
 public record InvoiceEmailFieldDto(string Field, string Description);
@@ -212,6 +214,7 @@ public class BillingSettingsController(VextaDbContext db, ICurrentUserService cu
         settings.DefaultHourlyRate = request.DefaultHourlyRate;
         settings.MarginMode = request.MarginMode;
         settings.DefaultPricePolicyId = request.DefaultPricePolicyId;
+        if (request.MarginModeChosen) settings.MarginModeChosenAt ??= DateTimeOffset.UtcNow;
         await MirrorDefaultPolicyAsync(request.DefaultPricePolicyId, ct);
 
         settings.UpdatedAt = DateTimeOffset.UtcNow;
@@ -646,7 +649,8 @@ public class BillingSettingsController(VextaDbContext db, ICurrentUserService cu
             model.InvoiceReminderCount,
             model.QuoteEmailCanApprove,
             model.QuoteEmailCanRequestChange,
-            model.QuoteEmailCanRefuse);
+            model.QuoteEmailCanRefuse,
+            model.MarginModeChosenAt is not null);
     }
 }
 
@@ -675,7 +679,9 @@ public record PreviewInvoiceEmailRequest(string? Subject, string? Body);
 public record SavePricingRequest(
     decimal? DefaultHourlyRate,
     MarginMode MarginMode,
-    Guid? DefaultPricePolicyId);
+    Guid? DefaultPricePolicyId,
+    /// <summary>True from the Marge card: the company has picked a convention, not left the default.</summary>
+    bool MarginModeChosen = false);
 
 /// <summary>Shared so the invoice that is created and the preview that is shown agree.</summary>
 public static class InvoiceNumbering

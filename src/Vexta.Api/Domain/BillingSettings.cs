@@ -69,6 +69,9 @@ public class BillingSettings
     /// </summary>
     public MarginMode MarginMode { get; set; } = MarginMode.Multiplication;
 
+    /// <summary>When the company picked the convention itself. Null: still on the default, nothing chosen.</summary>
+    public DateTimeOffset? MarginModeChosenAt { get; set; }
+
     /// <summary>The policy used by a project or an invoice that names none.</summary>
     public Guid? DefaultPricePolicyId { get; set; }
     public PricePolicy? DefaultPricePolicy { get; set; }

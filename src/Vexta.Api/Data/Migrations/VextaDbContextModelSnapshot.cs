@@ -5239,6 +5239,9 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<Guid?>("PlanId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("SetupGuide")
+                        .HasColumnType("text");
+
                     b.Property<string>("Slug")
                         .IsRequired()
                         .HasColumnType("text");

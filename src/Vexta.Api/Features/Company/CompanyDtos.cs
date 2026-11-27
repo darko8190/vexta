@@ -115,3 +115,8 @@ public record PublicJobDocumentDto(
     long SizeBytes,
     /// <summary>Null when storage could not be reached. The posting still belongs on the page.</summary>
     string? Url);
+
+/// <summary>The setup guide's progress as the screen wrote it, or null before it was opened.</summary>
+public record SetupGuideDto(System.Text.Json.JsonElement? State);
+
+public record SaveSetupGuideRequest(System.Text.Json.JsonElement State);

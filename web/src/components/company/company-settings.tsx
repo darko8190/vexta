@@ -12,8 +12,8 @@ import { useCompanyProfileQuery } from "@/hooks/use-company";
 import { ApiError } from "@/lib/api";
 
 /**
- * The company's own card, as the first section of Paramètres: what appears on its documents and
- * what somebody outside sees of it. One tab per part, like the other sections.
+ * The company's own card, as the first section of Paramètres: what appears on its documents.
+ * The public page has a section of its own, below.
  */
 export function CompanySettings({ canEdit }: { canEdit: boolean }) {
   const { data: profile, isLoading, error } = useCompanyProfileQuery();
@@ -36,29 +36,22 @@ export function CompanySettings({ canEdit }: { canEdit: boolean }) {
       tabs={[
         { value: "informations", label: "Informations", content: <CompanyInfoSection profile={profile} canEdit={canEdit} /> },
         { value: "lieux", label: "Lieux", content: <LocationsSection /> },
-        {
-          // One tab for everything the public sees: the page itself, its galleries and the
-          // builder that lays it out.
-          value: "page-publique",
-          label: "Page publique",
-          content: canEdit ? (
-            <SettingsTabs
-              nested
-              tabs={[
-                { value: "page", label: "Page publique", content: <PublicPageSection /> },
-                { value: "galeries", label: "Galeries", content: <GalleriesSection canEdit={canEdit} /> },
-                { value: "constructeur", label: "Constructeur de page", content: <PageBuilderSection canEdit={canEdit} /> },
-              ]}
-            />
-          ) : (
-            <Alert>
-              <AlertTitle>Réservé au propriétaire</AlertTitle>
-              <AlertDescription>
-                Seul le propriétaire de l&apos;entreprise peut modifier la page publique.
-              </AlertDescription>
-            </Alert>
-          ),
-        },
+      ]}
+    />
+  );
+}
+
+/**
+ * Everything the public sees, as its own section of Paramètres: the page itself, its galleries
+ * and the builder that lays it out. Only the owner reaches it.
+ */
+export function PublicPageSettings() {
+  return (
+    <SettingsTabs
+      tabs={[
+        { value: "page", label: "Page publique", content: <PublicPageSection /> },
+        { value: "galeries", label: "Galeries", content: <GalleriesSection canEdit /> },
+        { value: "constructeur", label: "Constructeur de page", content: <PageBuilderSection canEdit /> },
       ]}
     />
   );

@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AdminDashboardStats } from "@/components/dashboard/admin-dashboard-stats";
 import { DashboardStats } from "@/components/dashboard/dashboard-stats";
 import { PageHeader } from "@/components/layout/page-header";
+import { SetupGuideBanner } from "@/components/setup-guide/setup-guide-banner";
 import { useProjectsQuery } from "@/hooks/use-projects";
 import { useInvoicesQuery } from "@/hooks/use-invoices";
 import { useQuoteStatusCountsQuery } from "@/hooks/use-quotes";
@@ -122,7 +123,10 @@ export default function DashboardPage() {
       ) : user?.role === "Client" ? (
         <ClientDashboard />
       ) : personal ? null : (
-        <TenantDashboard />
+        <>
+          <SetupGuideBanner />
+          <TenantDashboard />
+        </>
       )}
     </div>
   );

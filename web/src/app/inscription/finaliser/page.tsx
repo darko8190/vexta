@@ -153,7 +153,7 @@ function CompanyStep() {
         window.location.assign(data.checkoutUrl);
       } else {
         await refresh();
-        router.push("/tableau-de-bord");
+        router.push(values.accountType === "personal" ? "/tableau-de-bord" : "/guide");
       }
     } catch (caught) {
       setServerError(caught instanceof Error ? caught.message : "Une erreur est survenue.");

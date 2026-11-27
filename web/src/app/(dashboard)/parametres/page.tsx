@@ -1,12 +1,13 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Building2, ClipboardPen, Clock, CreditCard, KeyRound, Mail, Percent, Receipt, Sparkles, Trash2, Wallet } from "lucide-react";
+import { Building2, ClipboardPen, Clock, Compass, CreditCard, Globe, KeyRound, Mail, Percent, Receipt, Sparkles, Trash2, Wallet } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -32,7 +33,7 @@ import {
 import { WageClassificationsCard } from "@/components/settings/wage-classifications-card";
 import { SettingsTabs } from "@/components/settings/settings-tabs";
 import { McpKeysCard } from "@/components/settings/mcp-keys-card";
-import { CompanySettings } from "@/components/company/company-settings";
+import { CompanySettings, PublicPageSettings } from "@/components/company/company-settings";
 import { TrashCard } from "@/components/settings/trash-card";
 import { useBillingSettingsQuery } from "@/hooks/use-billing-settings";
 import { useInvoiceAutoFeesQuery } from "@/hooks/use-auto-fees";
@@ -405,7 +406,12 @@ export default function SettingsPage() {
 
   const sections: NavSection[] = [
     // First: the company's own card, the page every other setting is about.
-    ...(canManage ? [{ key: "entreprise", label: "Entreprise", icon: Building2 }] : []),
+    ...(canManage
+      ? [
+          { key: "entreprise", label: "Entreprise", icon: Building2 },
+          { key: "page-publique", label: "Page publique", icon: Globe },
+        ]
+      : []),
     { key: "abonnement", label: "Abonnement", icon: CreditCard },
     ...(canManage
       ? [
@@ -449,6 +455,14 @@ export default function SettingsPage() {
       <PageHeader
         title="Paramètres"
         description="Votre entreprise, son abonnement et vos règles de travail."
+        action={
+          canManage ? (
+            <Link href="/guide" className={cn(buttonVariants({ variant: "outline" }))}>
+              <Compass />
+              Guide de configuration
+            </Link>
+          ) : undefined
+        }
       />
 
       <Suspense fallback={null}>
@@ -471,6 +485,7 @@ export default function SettingsPage() {
 
           <div className="min-w-0 flex-1">
             {active === "entreprise" && <CompanySettings canEdit />}
+            {active === "page-publique" && <PublicPageSettings />}
             {active === "abonnement" &&
               (data.kind === "Personal" ? (
                 <PersonalSpace state={data} />

@@ -123,6 +123,13 @@ public class Tenant
     /// </summary>
     public DateTimeOffset? BaseFormsCreatedAt { get; set; }
 
+    /// <summary>
+    /// Where the owner is in the setup guide: the answers given and the steps gone through, as
+    /// the JSON the screen writes. Opaque to the server, which only keeps it, so a step added to
+    /// the guide later needs no migration. Null until the guide is first opened.
+    /// </summary>
+    public string? SetupGuide { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public List<ApplicationUser> Users { get; set; } = [];

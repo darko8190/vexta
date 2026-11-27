@@ -172,7 +172,8 @@ function RegisterForm({
       if (result.checkoutUrl) {
         window.location.assign(result.checkoutUrl);
       } else {
-        router.push(retour ?? "/tableau-de-bord");
+        // A new company starts on the setup guide; a personal space goes straight in.
+        router.push(retour ?? (values.accountType === "personal" ? "/tableau-de-bord" : "/guide"));
       }
     } catch (error) {
       setServerError(error instanceof Error ? error.message : "Une erreur est survenue.");

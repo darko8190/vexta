@@ -46,7 +46,7 @@ function toFormValues(profile?: CompanyProfile): FormValues {
   };
 }
 
-function LogoCard({ profile }: { profile: CompanyProfile }) {
+export function LogoCard({ profile }: { profile: CompanyProfile }) {
   const upload = useUploadCompanyLogo();
   const remove = useDeleteCompanyLogo();
   const fileInput = useRef<HTMLInputElement>(null);

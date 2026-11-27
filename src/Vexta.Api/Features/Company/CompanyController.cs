@@ -53,6 +53,50 @@ public class CompanyController(VextaDbContext db, ICurrentUserService currentUse
             tenant.BrandColor, tenant.BusinessNumber, address));
     }
 
+    /// <summary>The setup guide's progress, as last saved. Null when it was never opened.</summary>
+    [HttpGet("guide")]
+    [StaffOnly]
+    [Authorize(Roles = Roles.Owner)]
+    [RequireActiveSubscription]
+    public async Task<ActionResult<SetupGuideDto>> Guide(CancellationToken ct)
+    {
+        if (currentUser.TenantId is not { } tenantId) return Forbid();
+
+        var state = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
+            .Where(t => t.Id == tenantId)
+            .Select(t => t.SetupGuide)
+            .FirstOrDefaultAsync(ct);
+
+        return Ok(new SetupGuideDto(state is null ? null : System.Text.Json.JsonDocument.Parse(state).RootElement));
+    }
+
+    /// <summary>
+    /// Kept as given: the screen owns its shape, so a new step needs no change here. Only its
+    /// size and that it is a JSON object are checked.
+    /// </summary>
+    [HttpPut("guide")]
+    [StaffOnly]
+    [Authorize(Roles = Roles.Owner)]
+    [RequireActiveSubscription]
+    public async Task<IActionResult> SaveGuide(SaveSetupGuideRequest request, CancellationToken ct)
+    {
+        if (currentUser.TenantId is not { } tenantId) return Forbid();
+        if (request.State.ValueKind != System.Text.Json.JsonValueKind.Object)
+        {
+            return BadRequest(new { message = "État du guide invalide." });
+        }
+
+        var json = request.State.GetRawText();
+        if (json.Length > 20_000) return BadRequest(new { message = "État du guide trop volumineux." });
+
+        var tenant = await db.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.Id == tenantId, ct);
+        if (tenant is null) return NotFound();
+
+        tenant.SetupGuide = json;
+        await db.SaveChangesAsync(ct);
+        return NoContent();
+    }
+
     [HttpPut("profile")]
     [StaffOnly]
     [Authorize(Roles = Roles.Owner)]

@@ -1,5 +1,6 @@
 "use client";
 
+import { ClientContactLinks } from "@/components/clients/client-contact-links";
 import { use, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -311,6 +312,7 @@ function StaffQuoteDetail({ id }: { id: string }) {
                 {quote.clientName}
               </button>
             </h1>
+            <ClientContactLinks clientId={quote.clientId} className="mt-1" />
             <p className="mt-1 text-sm text-muted-foreground">
               Total avant taxes :{" "}
               <span className="font-medium text-foreground tabular-nums">{formatAmount(quote.subtotal)}</span>

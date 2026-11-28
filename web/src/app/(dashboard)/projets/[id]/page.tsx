@@ -1,5 +1,6 @@
 "use client";
 
+import { ClientContactLinks } from "@/components/clients/client-contact-links";
 import { use, useState } from "react";
 import Link from "next/link";
 import {
@@ -257,6 +258,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                 </button>
               )}
             </h1>
+            {!isClient && <ClientContactLinks clientId={project.clientId} className="mt-1" />}
             {project.description && (
               <p className="mt-2 max-w-prose whitespace-pre-line text-sm text-muted-foreground">
                 {project.description}
@@ -289,7 +291,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                   className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
                 >
                   <Package />
-                  Fiche de l&apos;actif
+                  Voir la fiche de l&apos;actif
                 </Link>
               )}
             </div>

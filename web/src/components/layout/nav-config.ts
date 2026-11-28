@@ -38,6 +38,8 @@ export interface NavItem {
   icon: typeof LayoutDashboard;
   /** 0 for a tab, 1 for a sub-tab. One level deep: a sidebar that nests further stops scanning. */
   depth?: number;
+  /** A count of what waits behind the tab; shown only above zero. */
+  badge?: number;
 }
 
 // Adresses and Bibliothèque are deliberately absent: addresses belong inside a client's own

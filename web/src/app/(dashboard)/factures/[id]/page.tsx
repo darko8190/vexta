@@ -1,5 +1,6 @@
 "use client";
 
+import { ClientContactLinks } from "@/components/clients/client-contact-links";
 import { use, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -125,6 +126,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             <h1 className="mt-1 text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
               {invoice.clientName}
             </h1>
+            {!isClient && <ClientContactLinks clientId={invoice.clientId} className="mt-1" />}
           </div>
 
           {invoice.projectId && (

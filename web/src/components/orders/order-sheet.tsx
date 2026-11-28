@@ -1,5 +1,6 @@
 "use client";
 
+import { ClientContactLinks } from "@/components/clients/client-contact-links";
 import Link from "next/link";
 import { CreditCard, FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -113,8 +114,12 @@ export function OrderSheet({
 
                 <div className="min-w-0">
                   <dt className="text-xs text-muted-foreground">Pour joindre</dt>
-                  <dd className="mt-0.5 truncate text-sm text-foreground">
-                    {[order.contactPhone, order.contactEmail].filter(Boolean).join(" · ") || "—"}
+                  <dd className="mt-0.5 text-sm text-foreground">
+                    {order.contactPhone || order.contactEmail ? (
+                      <ClientContactLinks phone={order.contactPhone} email={order.contactEmail} className="flex-col items-start gap-y-0" />
+                    ) : (
+                      "—"
+                    )}
                   </dd>
                 </div>
 

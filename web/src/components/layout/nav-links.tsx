@@ -61,8 +61,20 @@ export function NavLinks({
                 : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
             )}
           >
-            <Icon className="size-4 shrink-0" />
+            <span className="relative flex shrink-0">
+              <Icon className="size-4 shrink-0" />
+              {/* On the icon, so the count is there while the rail is closed too. */}
+              {(item.badge ?? 0) > 0 && (
+                <span
+                  aria-hidden
+                  className="absolute -top-2 -right-2.5 min-w-4 rounded-full bg-destructive px-1 text-center text-[10px] leading-4 font-semibold tabular-nums text-white ring-2 ring-sidebar"
+                >
+                  {item.badge! > 99 ? "99+" : item.badge}
+                </span>
+              )}
+            </span>
             <span className="truncate">{item.label}</span>
+            {(item.badge ?? 0) > 0 && <span className="sr-only">({item.badge} en attente)</span>}
           </Link>
         );
       })}
@@ -89,6 +101,7 @@ export function NavGrid({
     label: item.label,
     icon: item.icon,
     active: pathname === item.href || pathname.startsWith(`${item.href}/`),
+    badge: item.badge ? item.badge : undefined,
   }));
 
   return (

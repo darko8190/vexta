@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import Link from "next/link";
 import { Bug, Building2, Eye, LogOut, Settings, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
+import { useAdminFeedbackQuery } from "@/hooks/use-feedback";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -87,6 +88,15 @@ function useTenantNavItems(): { items: NavItem[]; pending: boolean } {
     (item) => (!isClient || item.href !== "/soumissions" || hasQuotes) && !hidden.has(item.href),
   );
 
+  // The super admin's Signalements tab counts what is still open: Envoyée and En traitement.
+  const platformAdmin = user?.role === "SuperAdmin" && !user.isImpersonating;
+  const { data: reports } = useAdminFeedbackQuery(platformAdmin);
+  const openReports = (reports ?? []).filter((report) => report.status !== "Resolved").length;
+  const withBadges = (items: NavItem[]) =>
+    platformAdmin
+      ? items.map((item) => (item.href === "/admin/signalements" ? { ...item, badge: openReports } : item))
+      : items;
+
   // The crew's menu, whatever the plan's modules say: the point of the mode is a short one.
   if (employeeMode) return { items: employeeModeNavItems(), pending: false };
 
@@ -101,7 +111,7 @@ function useTenantNavItems(): { items: NavItem[]; pending: boolean } {
   };
 
   // A fixed menu has nothing in flight, so it draws at once.
-  if (!fromModules) return { items: crewFilter(builtIn), pending: false };
+  if (!fromModules) return { items: withBadges(crewFilter(builtIn)), pending: false };
 
   if (isPending) return { items: isCrew ? [] : [dashboardNavItem], pending: true };
 

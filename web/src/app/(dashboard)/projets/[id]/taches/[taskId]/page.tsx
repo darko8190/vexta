@@ -1,9 +1,10 @@
 "use client";
 
+import { ClientContactLinks } from "@/components/clients/client-contact-links";
 import { use, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowLeft, Blocks, CircleCheck, Clock, FolderOpen, HardHat, Info, ListChecks, Plus, Receipt, Wrench } from "lucide-react";
+import { ArrowLeft, Blocks, CircleCheck, Clock, Package, FolderOpen, HardHat, Info, ListChecks, Plus, Receipt, Wrench } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -124,6 +125,17 @@ export default function ProjectTaskPage({
           )}
         </div>
         <h1 className="mt-1 text-xl font-semibold tracking-tight text-foreground sm:text-2xl">{task.title}</h1>
+        {project && <ClientContactLinks clientId={project.clientId} className="mt-1" />}
+        {/* The asset the work is on comes with the task's project. */}
+        {project?.clientAssetId && (
+          <Link
+            href={`/clients/${project.clientId}/actifs/${project.clientAssetId}`}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "mt-3 mr-2")}
+          >
+            <Package />
+            Voir l&apos;actif{project.clientAssetLabel ? ` · ${project.clientAssetLabel}` : ""}
+          </Link>
+        )}
         {/* The crew ends its assignment here once hours are in on it; the API checks they are its own. */}
         {crew &&
           task.status !== "Terminee" &&

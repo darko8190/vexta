@@ -51,10 +51,11 @@ export function useDeleteFeedback() {
   });
 }
 
-export function useAdminFeedbackQuery() {
+export function useAdminFeedbackQuery(enabled = true) {
   return useQuery({
     queryKey: ["feedback", "admin"],
     queryFn: () => api.get<AdminFeedbackRequest[]>("admin/signalements"),
+    enabled,
   });
 }
 

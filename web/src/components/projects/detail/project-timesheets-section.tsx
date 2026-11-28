@@ -148,8 +148,10 @@ export function ProjectTimesheetsSection({
     // hours with no clock times, is saved on its rate, note or employee alone.
     const sameTimes =
       raw.startDate === entry.startDate && raw.startTime === entry.startTime && raw.endTime === entry.endTime;
-    const values = sameTimes ? { ...raw, endDate: entry.endDate } : withEndDate(raw);
-    if (!sameTimes && !isSavable(values)) return;
+    const timed = sameTimes ? { ...raw, endDate: entry.endDate } : withEndDate(raw);
+    // Nobody named yet on a line of hours: the empty id, which the API reads as "leave it".
+    const values = timed.employeeId ? timed : { ...timed, employeeId: SELF_EMPLOYEE };
+    if (!sameTimes && !isSavable(timed)) return;
     const payload = JSON.stringify(values);
     const baseline = sent.current[entry.id] ?? JSON.stringify(toValues(entry));
     if (payload === baseline) return;

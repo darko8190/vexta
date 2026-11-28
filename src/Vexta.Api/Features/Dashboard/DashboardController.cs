@@ -62,7 +62,7 @@ public class DashboardController(VextaDbContext db, ICurrentUserService currentU
                 i.DueDate,
                 i.Status,
                 i.IsTaxExempt,
-                Lines = i.Lines.Select(l => new { l.Quantity, l.UnitPrice, l.IsTaxable }).ToList()
+                Lines = i.Lines.Select(l => new { l.Quantity, l.UnitPrice, l.IsTaxable, l.PurchasePrice }).ToList()
             })
             .ToListAsync(ct);
 
@@ -101,6 +101,9 @@ public class DashboardController(VextaDbContext db, ICurrentUserService currentU
                 i.DueDate,
                 i.Status,
                 Total = totals.Total,
+                // Before taxes, less what each line cost: the same arithmetic as a project's
+                // totals table, where labour has no cost.
+                Profit = i.Lines.Sum(l => l.Quantity * (l.UnitPrice - (l.PurchasePrice ?? 0m))),
                 Paid = settled,
                 Balance = InvoiceSettlement.Outstanding(
                     totals.Total, credited.GetValueOrDefault(i.Id, 0m), settled)
@@ -192,7 +195,9 @@ public class DashboardController(VextaDbContext db, ICurrentUserService currentU
             attention,
             recent,
             tasks,
-            receivables));
+            receivables,
+            Math.Round(rows.Where(r => r.IssueDate >= monthStart).Sum(r => r.Profit), 2),
+            Math.Round(rows.Where(r => r.IssueDate >= lastMonthStart && r.IssueDate < monthStart).Sum(r => r.Profit), 2)));
     }
 
     private async Task<(decimal Gst, decimal Qst)> RatesAsync(CancellationToken ct)

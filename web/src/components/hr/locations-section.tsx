@@ -54,7 +54,7 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-function toFormValues(location?: CompanyLocation): FormValues {
+function toFormValues(location?: CompanyLocation, defaultPrimary = false): FormValues {
   return {
     label: location?.label ?? "",
     line1: location?.line1 ?? "",
@@ -64,25 +64,28 @@ function toFormValues(location?: CompanyLocation): FormValues {
     postalCode: location?.postalCode ?? "",
     country: location?.country ?? defaultCountryName,
     phone: location?.phone ?? "",
-    isPrimary: location?.isPrimary ?? false,
+    isPrimary: location?.isPrimary ?? defaultPrimary,
   };
 }
 
-function LocationFormSheet({
+export function LocationFormSheet({
   open,
   onOpenChange,
   location,
+  defaultPrimary = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   location?: CompanyLocation;
+  /** A new place starts as the main address — from the company's own record. */
+  defaultPrimary?: boolean;
 }) {
   const isEditing = Boolean(location);
   const save = useSaveLocation();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: toFormValues(location),
+    defaultValues: toFormValues(location, defaultPrimary),
   });
 
   // Watched rather than read once: the province field is a list for some countries and a
@@ -90,8 +93,8 @@ function LocationFormSheet({
   const country = useWatch({ control: form.control, name: "country" });
 
   useEffect(() => {
-    if (open) form.reset(toFormValues(location));
-  }, [open, location, form]);
+    if (open) form.reset(toFormValues(location, defaultPrimary));
+  }, [open, location, defaultPrimary, form]);
 
   async function onSubmit(values: FormValues) {
     try {

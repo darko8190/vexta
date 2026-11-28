@@ -14,12 +14,17 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { useSetLabourRate } from "@/hooks/use-timesheets";
+import { useSaveTimesheet, useSetLabourRate, useTimesheetsQuery } from "@/hooks/use-timesheets";
+import { useProjectMaterialsQuery } from "@/hooks/use-project-materials";
+import { useProjectEquipmentQuery } from "@/hooks/use-equipment";
+import { useProjectAssembliesQuery } from "@/hooks/use-assemblies";
+import { useExpensesQuery } from "@/hooks/use-expenses";
+import { useExtraChargesQuery } from "@/hooks/use-extra-charges";
 import { ApiError } from "@/lib/api";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import type { ProjectCostLine, ProjectCostTable as CostTable } from "@/lib/types";
+import type { ProjectCostLine, ProjectCostTable as CostTable, TimesheetEntry } from "@/lib/types";
 
 /** What each line adds up, in the words the office uses, for the window its title opens. */
 const explanations: Record<string, { cost: string; revenue: string; note?: string }> = {
@@ -88,7 +93,9 @@ export function ProjectCostTable({
   projectId?: string;
   canEditRate?: boolean;
 }) {
+  // The line stays set while the window closes, so it does not go blank on its way out.
   const [explaining, setExplaining] = useState<ProjectCostLine | null>(null);
+  const [explainOpen, setExplainOpen] = useState(false);
 
   if (isLoading || !costs) {
     return <Skeleton className="h-72 w-full" />;
@@ -115,7 +122,10 @@ export function ProjectCostTable({
               <TableCell className="font-medium">
                 <button
                   type="button"
-                  onClick={() => setExplaining(line)}
+                  onClick={() => {
+                    setExplaining(line);
+                    setExplainOpen(true);
+                  }}
                   className="text-left underline decoration-dotted underline-offset-4 hover:text-primary focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
                   title="Voir ce qui est calculé"
                 >
@@ -219,8 +229,8 @@ export function ProjectCostTable({
       </dl>
       )}
 
-      <Dialog open={explaining !== null} onOpenChange={(open) => !open && setExplaining(null)}>
-        <DialogContent className="sm:max-w-md">
+      <Dialog open={explainOpen} onOpenChange={setExplainOpen}>
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{explaining?.label}</DialogTitle>
             <DialogDescription>Ce qui est calculé dans cette ligne.</DialogDescription>
@@ -247,6 +257,22 @@ export function ProjectCostTable({
                 <p className="text-muted-foreground">{explanations[explaining.key]?.note}</p>
               )}
             </dl>
+          )}
+          {/* On a project's page, the rows behind the figure. */}
+          {explaining && projectId && (
+            <div className="max-h-[50vh] overflow-y-auto px-4">
+              {explaining.key === "feuilles-de-temps" && (
+                <div className="mb-3">
+                  <LabourRateField
+                    projectId={projectId}
+                    rate={costs.labourRate ?? null}
+                    hours={costs.labourHours ?? 0}
+                    canEdit={canEditRate}
+                  />
+                </div>
+              )}
+              <SectionLines sectionKey={explaining.key} projectId={projectId} canEditRate={canEditRate} />
+            </div>
           )}
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>Fermer</DialogClose>
@@ -315,6 +341,227 @@ function LabourRateField({
         <span className="tabular-nums">{rate == null ? "taux mixtes" : money(rate)}</span>
       )}
       <span>$/h</span>
+    </div>
+  );
+}
+
+interface DetailRow {
+  id: string;
+  label: string;
+  sub?: string | null;
+  quantity: number | null;
+  cost: number;
+  revenue: number;
+}
+
+/** The rows of one section of the project, for the window its title opens. */
+function SectionLines({ sectionKey, projectId, canEditRate }: { sectionKey: string; projectId: string; canEditRate: boolean }) {
+  switch (sectionKey) {
+    case "materiaux":
+      return <MaterialLines projectId={projectId} />;
+    case "equipements":
+      return <EquipmentLines projectId={projectId} />;
+    case "assemblages":
+      return <AssemblyLines projectId={projectId} />;
+    case "feuilles-de-temps":
+      return <LabourLines projectId={projectId} canEditRate={canEditRate} />;
+    case "depenses":
+      return <ExpenseLines projectId={projectId} />;
+    case "frais-supplementaires":
+      return <ChargeLines projectId={projectId} />;
+    default:
+      return null;
+  }
+}
+
+function MaterialLines({ projectId }: { projectId: string }) {
+  const { data, isLoading } = useProjectMaterialsQuery(projectId);
+  // An assembly's materials are counted in the Assemblages line.
+  const rows = (data ?? [])
+    .filter((m) => !m.projectAssemblyId)
+    .map((m) => ({
+      id: m.id,
+      label: m.description,
+      sub: m.projectTaskTitle,
+      quantity: m.quantity,
+      cost: m.quantity * (m.purchasePrice ?? 0),
+      revenue: m.quantity * m.unitPrice,
+    }));
+  return <DetailTable rows={rows} isLoading={isLoading} />;
+}
+
+function EquipmentLines({ projectId }: { projectId: string }) {
+  const { data, isLoading } = useProjectEquipmentQuery(projectId);
+  const rows = (data ?? []).map((x) => ({
+    id: x.id,
+    label: x.name,
+    sub: x.projectTaskTitle,
+    quantity: x.quantity,
+    cost: x.quantity * (x.costRate ?? 0),
+    revenue: x.quantity * (x.sellingRate ?? 0),
+  }));
+  return <DetailTable rows={rows} isLoading={isLoading} />;
+}
+
+function AssemblyLines({ projectId }: { projectId: string }) {
+  const { data, isLoading } = useProjectAssembliesQuery(projectId);
+  const rows = (data ?? []).map((x) => ({
+    id: x.id,
+    label: x.name,
+    sub: x.projectTaskTitle,
+    quantity: x.quantity,
+    cost: x.quantity * x.unitCost,
+    revenue: x.quantity * x.unitPrice,
+  }));
+  return <DetailTable rows={rows} isLoading={isLoading} />;
+}
+
+function ExpenseLines({ projectId }: { projectId: string }) {
+  const { data, isLoading } = useExpensesQuery(projectId);
+  const rows = (data ?? []).map((x) => ({
+    id: x.id,
+    label: x.name,
+    sub: x.projectTaskTitle,
+    quantity: null,
+    cost: x.cost ?? 0,
+    revenue: x.sellingPrice ?? 0,
+  }));
+  return <DetailTable rows={rows} isLoading={isLoading} />;
+}
+
+function ChargeLines({ projectId }: { projectId: string }) {
+  const { data, isLoading } = useExtraChargesQuery(projectId);
+  const rows = (data ?? []).map((x) => ({
+    id: x.id,
+    label: x.name,
+    sub: x.description,
+    quantity: null,
+    cost: x.cost ?? 0,
+    revenue: x.sellingPrice ?? 0,
+  }));
+  return <DetailTable rows={rows} isLoading={isLoading} />;
+}
+
+function DetailTable({ rows, isLoading }: { rows: DetailRow[]; isLoading: boolean }) {
+  if (isLoading) return <Skeleton className="h-24 w-full" />;
+  if (rows.length === 0) return <p className="text-sm text-muted-foreground">Aucune ligne dans cette section.</p>;
+  return (
+    <div className="overflow-hidden rounded-lg border border-border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Ligne</TableHead>
+            <TableHead className="text-right">Qté</TableHead>
+            <TableHead className="text-right">Coût</TableHead>
+            <TableHead className="text-right">Vendant</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((row) => (
+            <TableRow key={row.id}>
+              <TableCell className="max-w-56">
+                <span className="block truncate">{row.label}</span>
+                {row.sub && <span className="block truncate text-xs text-muted-foreground">{row.sub}</span>}
+              </TableCell>
+              <TableCell className="text-right tabular-nums text-muted-foreground">
+                {row.quantity == null ? "—" : row.quantity.toLocaleString("fr-CA", { maximumFractionDigits: 3 })}
+              </TableCell>
+              <TableCell className="text-right tabular-nums text-muted-foreground">{money(row.cost)}</TableCell>
+              <TableCell className="text-right tabular-nums">{money(row.revenue)}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+/** The labour lines: who, how long, and at what rate — each rate editable for the office. */
+function LabourLines({ projectId, canEditRate }: { projectId: string; canEditRate: boolean }) {
+  const { data, isLoading } = useTimesheetsQuery(projectId);
+  const save = useSaveTimesheet(projectId);
+  const [rates, setRates] = useState<Record<string, string>>({});
+
+  async function commit(entry: TimesheetEntry) {
+    const raw = rates[entry.id];
+    if (raw === undefined) return;
+    const next = Number(raw.replace(",", "."));
+    setRates((previous) => {
+      const copy = { ...previous };
+      delete copy[entry.id];
+      return copy;
+    });
+    if (raw.trim() === "" || !Number.isFinite(next) || next < 0 || next === entry.hourlyRate) return;
+    try {
+      await save.mutateAsync({
+        id: entry.id,
+        values: {
+          // The empty id: the API keeps the line as it is, with nobody named yet.
+          employeeId: entry.employeeId ?? "00000000-0000-0000-0000-000000000000",
+          startDate: entry.startDate,
+          endDate: entry.endDate,
+          startTime: entry.startTime,
+          endTime: entry.endTime,
+          note: entry.note,
+          projectTaskId: entry.projectTaskId,
+          hourlyRate: next,
+        },
+      });
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Impossible de changer ce taux.");
+    }
+  }
+
+  if (isLoading) return <Skeleton className="h-24 w-full" />;
+  const entries = (data ?? []).filter((entry) => (entry.punchState ?? "Aucun") === "Aucun");
+  if (entries.length === 0) return <p className="text-sm text-muted-foreground">Aucune ligne dans cette section.</p>;
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Ligne</TableHead>
+            <TableHead className="text-right">Heures</TableHead>
+            <TableHead className="text-right">Taux ($/h)</TableHead>
+            <TableHead className="text-right">Vendant</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {entries.map((entry) => (
+            <TableRow key={entry.id}>
+              <TableCell className="max-w-56">
+                <span className="block truncate">{entry.employeeName ?? entry.note ?? "Sans employé"}</span>
+                <span className="block truncate text-xs text-muted-foreground">
+                  {[entry.startDate, entry.projectTaskTitle].filter(Boolean).join(" · ")}
+                </span>
+              </TableCell>
+              <TableCell className="text-right tabular-nums text-muted-foreground">
+                {entry.hours.toLocaleString("fr-CA", { maximumFractionDigits: 2 })}
+              </TableCell>
+              <TableCell className="text-right">
+                {canEditRate ? (
+                  <Input
+                    aria-label={`Taux horaire de la ligne du ${entry.startDate}`}
+                    inputMode="decimal"
+                    className="ml-auto h-8 w-24 text-right tabular-nums"
+                    value={rates[entry.id] ?? (entry.hourlyRate == null ? "" : String(entry.hourlyRate))}
+                    placeholder="Taux"
+                    onChange={(event) => setRates((previous) => ({ ...previous, [entry.id]: event.target.value }))}
+                    onBlur={() => void commit(entry)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") event.currentTarget.blur();
+                    }}
+                  />
+                ) : (
+                  <span className="tabular-nums">{entry.hourlyRate == null ? "—" : money(entry.hourlyRate)}</span>
+                )}
+              </TableCell>
+              <TableCell className="text-right tabular-nums">{money(entry.hours * (entry.hourlyRate ?? 0))}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }

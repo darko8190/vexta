@@ -434,7 +434,21 @@ export default function SettingsPage() {
             status: paymentsStatus,
           },
           { key: "taux", label: "Taux", icon: Clock, status: all(hourlyStatus, classificationsStatus) },
-          { key: "projets", label: "Projets", icon: FolderKanban },
+          {
+            key: "projets",
+            label: "Projets",
+            icon: FolderKanban,
+            // The three lists the company fills in: task types, priorities, automatic lines.
+            status: projectSettings
+              ? {
+                  done:
+                    Number(projectSettings.taskTypes.length > 0) +
+                    Number(projectSettings.priorities.length > 0) +
+                    Number(projectSettings.autoLines.length > 0),
+                  total: 3,
+                }
+              : undefined,
+          },
           { key: "marge", label: "Marge et prix", icon: Percent, status: marginModeStatus },
           // Last, because it is the one section that is set up once and then forgotten.
           {

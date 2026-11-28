@@ -13,6 +13,7 @@
   FileText,
   FileUser,
   FolderKanban,
+  Inbox,
   LayoutDashboard,
   ListChecks,
   Palette,
@@ -73,10 +74,9 @@ const tenantNav: NavItem[] = [
   // Beside Inventaire: both are what the company has, one sold off the shelf, the other
   // brought back after each job and billed for its time.
   { href: "/equipements", label: "Équipements", icon: Wrench },
-  // Right after Inventaire, because that is where what it sells comes from. "En ligne" is
-  // doing real work in the label: Fournisseurs & Commandes above is the company buying, and
-  // somebody who opened the wrong one would only find out from the names on the rows.
-  { href: "/commandes", label: "Commandes en ligne", icon: ShoppingBag },
+  // What is waiting for the office: the customers' orders and the projects nobody has been
+  // handed yet. The route kept its old name so hidden tabs and plans still match.
+  { href: "/commandes", label: "À traiter", icon: Inbox },
   // Outils, not "Outils & Formation": the formations went to Ressources humaines, where the
   // people they belong to are. A heading that still named them would send somebody here first.
   { href: "/outils", label: "Outils", icon: ClipboardPen },

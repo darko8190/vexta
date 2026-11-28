@@ -1240,6 +1240,9 @@ export interface DashboardSummary {
   overdue: number;
   overdueInvoiceCount: number;
   spentThisMonth: number;
+  /** Invoiced this month before taxes, less what the lines cost. */
+  profitThisMonth: number;
+  profitLastMonth: number;
   activeProjects: number;
   toInvoice: number;
   hoursThisWeek: number;

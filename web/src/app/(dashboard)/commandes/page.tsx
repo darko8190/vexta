@@ -1,28 +1,37 @@
 "use client";
 
+import { useState } from "react";
+import { FolderKanban, ShoppingBag } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
+import { SectionNav, type NavSection } from "@/components/layout/section-nav";
 import { OrdersSection } from "@/components/orders/orders-section";
+import { ProjectsToAssignSection } from "@/components/projects/projects-to-assign-section";
+import { useCanManage } from "@/hooks/use-can-create";
 
 /**
- * Pattern 1 — List / Index.
- *
- * One job on this URL: see what customers have ordered and move it along. No rail, because
- * there is one kind of record here — an order — and a rail with a single entry is a rail that
- * takes up a column to say nothing.
- *
- * "Commandes en ligne" rather than "Commandes", because the menu already has Fournisseurs &
- * Commandes. Those are the company buying; these come the other way, and somebody who opened
- * the wrong one would not find out until they read the names on the rows.
+ * What is waiting for the office: the orders customers placed, and the projects nobody has been
+ * handed yet. The route kept its old name, /commandes, so hidden tabs and plans still match.
  */
-export default function OnlineOrdersPage() {
+export default function ToHandlePage() {
+  const canManage = useCanManage();
+  const [section, setSection] = useState("commandes");
+
+  const sections: NavSection[] = [
+    { key: "commandes", label: "Commandes clients", icon: ShoppingBag },
+    ...(canManage ? [{ key: "projets-a-assigner", label: "Projets à assigner", icon: FolderKanban }] : []),
+  ];
+
   return (
     <div>
-      <PageHeader
-        title="Commandes en ligne"
-        description="Les commandes reçues par votre page publique, et les factures qui en sortent."
-      />
+      <PageHeader title="À traiter" description="Les commandes de vos clients et les projets qui attendent une équipe." />
 
-      <OrdersSection />
+      <div className="flex flex-col gap-4 md:flex-row md:gap-6">
+        <SectionNav sections={sections} active={section} onSelect={setSection} label="Sections à traiter" />
+        <div className="min-w-0 flex-1">
+          {section === "commandes" && <OrdersSection />}
+          {section === "projets-a-assigner" && canManage && <ProjectsToAssignSection />}
+        </div>
+      </div>
     </div>
   );
 }

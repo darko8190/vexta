@@ -220,6 +220,14 @@ export function DashboardStats() {
           icon={FileText}
         />
         <StatTile
+          href="/rapports"
+          label="Profit du mois"
+          value={money(data.profitThisMonth)}
+          tone={data.profitThisMonth < 0 ? "warning" : undefined}
+          hint={<MonthOverMonth now={data.profitThisMonth} before={data.profitLastMonth} />}
+          icon={TrendingUp}
+        />
+        <StatTile
           href="/factures"
           label="À recevoir"
           value={money(data.outstanding)}
@@ -268,17 +276,6 @@ export function DashboardStats() {
           hint="Toute l'équipe, tous les chantiers"
           icon={Clock}
         />
-        {/* The spending tile moves here when the overdue tile took its place above: six tiles
-            either way, and the figure is never simply dropped. */}
-        {data.overdue > 0 && (
-          <StatTile
-            href="/achats"
-            label="Dépensé ce mois-ci"
-            value={money(data.spentThisMonth)}
-            hint="Dépenses et frais sur les projets"
-            icon={Receipt}
-          />
-        )}
       </div>
 
       <ReceivablesCard data={data.receivables} />

@@ -328,6 +328,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               </InlineSheet>
               {/* Below xl there is no third column, so the figures sit under the record. */}
               <div className="xl:hidden">
+                <AmountsHeading projectId={project.id} clientId={project.clientId} canInvoice={canManage} />
                 <ProjectCostTable costs={summary?.costs} isLoading={summaryLoading} projectId={project.id} canEditRate={canManage && !locked} />
               </div>
             </div>
@@ -457,7 +458,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             // strip of icons, and the room it gave back goes to the figures.
             className="hidden w-[30rem] shrink-0 self-start xl:sticky xl:top-0 xl:block 2xl:w-[36rem] [&_td]:px-2 [&_th]:px-2"
           >
-            <h2 className="mb-3 text-base font-semibold text-foreground">Montants</h2>
+            <AmountsHeading projectId={project.id} clientId={project.clientId} canInvoice={canManage} />
             <ProjectCostTable costs={summary?.costs} isLoading={summaryLoading} projectId={project.id} canEditRate={canManage && !locked} />
           </aside>
         )}
@@ -467,6 +468,24 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         <ClientQuickView clientId={project.clientId} open={viewingClient} onOpenChange={setViewingClient} />
       )}
       {savingTemplate && <SaveProjectTemplateDialog projectId={project.id} defaultName={project.description} onClose={() => setSavingTemplate(false)} />}
+    </div>
+  );
+}
+
+/** « Montants », and beside it the way to bill the job: a new invoice for this project. */
+function AmountsHeading({ projectId, clientId, canInvoice }: { projectId: string; clientId: string; canInvoice: boolean }) {
+  return (
+    <div className="mb-3 flex items-center justify-between gap-2">
+      <h2 className="text-base font-semibold text-foreground">Montants</h2>
+      {canInvoice && (
+        <Link
+          href={`/factures/nouvelle?clientId=${clientId}&projectId=${projectId}`}
+          className={cn(buttonVariants({ size: "sm" }))}
+        >
+          <FileText />
+          Créer une facture
+        </Link>
+      )}
     </div>
   );
 }

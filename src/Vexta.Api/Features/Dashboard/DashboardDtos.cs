@@ -42,7 +42,14 @@ public record DashboardDto(
     List<DashboardTaskDto> UpcomingTasks,
 
     /// <summary>What is owed, by how late it is, and the invoices furthest behind.</summary>
-    DashboardReceivablesDto Receivables);
+    DashboardReceivablesDto Receivables,
+
+    /// <summary>
+    /// The invoices issued this month, before taxes, less what their lines cost. Drafts and
+    /// cancelled invoices are out, as everywhere on this screen.
+    /// </summary>
+    decimal ProfitThisMonth = 0m,
+    decimal ProfitLastMonth = 0m);
 
 /// <summary>
 /// The money still owed, sorted by age. The total alone says how much; the buckets say how

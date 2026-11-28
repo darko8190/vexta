@@ -47,10 +47,10 @@ public static class CatalogSeeder
             "Les fournisseurs, les bons de commande et les réceptions de marchandise.", "Truck"),
         new("/inventaire", "Inventaire",
             "Les produits, leurs prix, leurs catégories et ce qui est en stock.", "Boxes"),
-        // "en ligne" is doing real work in that title: the menu already has Fournisseurs &
-        // Commandes, which is the company buying. These come the other way.
-        new("/commandes", "Commandes en ligne",
-            "Les commandes reçues par la page publique, et les factures qui en sortent.", "ShoppingBag"),
+        // What is waiting for the office: the customers' orders and the projects nobody has
+        // been handed yet. The route kept its old name so hidden tabs and plans still match.
+        new("/commandes", "À traiter",
+            "Les commandes des clients et les projets qui attendent une équipe.", "Inbox"),
         new("/outils", "Outils",
             "Les formulaires de l'entreprise, leurs réponses et la page publique.", "ClipboardPen"),
         new("/temps", "Feuilles de temps et poinçons",

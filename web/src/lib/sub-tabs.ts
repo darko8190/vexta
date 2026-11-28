@@ -64,6 +64,14 @@ export const subTabScreens: SubTabScreen[] = [
     ],
   },
   {
+    screen: "Sections à traiter",
+    title: "À traiter",
+    tabs: [
+      { key: "commandes", label: "Commandes clients" },
+      { key: "projets-a-assigner", label: "Projets à assigner" },
+    ],
+  },
+  {
     screen: "Sections des tâches et de l'horaire",
     title: "Tâches et horaire",
     tabs: [

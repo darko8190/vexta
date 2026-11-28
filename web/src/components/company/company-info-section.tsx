@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
 import * as z from "zod";
 import { Building2, MapPin, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
+import { LocationFormSheet } from "@/components/hr/locations-section";
+import { useLocationsQuery } from "@/hooks/use-hr";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -16,7 +17,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { BrandColorCard } from "@/components/settings/brand-color-card";
 import { useDeleteCompanyLogo, useSaveCompanyProfile, useUploadCompanyLogo } from "@/hooks/use-company";
 import { ApiError } from "@/lib/api";
-import { cn } from "@/lib/utils";
 import type { CompanyProfile } from "@/lib/types";
 import { ex } from "@/lib/placeholders";
 
@@ -131,6 +131,11 @@ export function LogoCard({ profile }: { profile: CompanyProfile }) {
 }
 
 function AddressCard({ profile }: { profile: CompanyProfile }) {
+  // Edited here, in the company's own record: the main address is the primary location.
+  const [editing, setEditing] = useState(false);
+  const { data: locations } = useLocationsQuery();
+  const primary = locations?.find((location) => location.isPrimary);
+
   return (
     <Card>
       <CardHeader>
@@ -166,12 +171,12 @@ function AddressCard({ profile }: { profile: CompanyProfile }) {
       </CardContent>
 
       <CardFooter>
-        {/* A styled link, not a Button rendering one: Base UI drops native button semantics
-            when its render target is not a <button>, and this is a navigation. */}
-        <Link href="/ressources-humaines" className={cn(buttonVariants({ variant: "outline" }))}>
-          {profile.address ? "Gérer les adresses" : "Ajouter une adresse"}
-        </Link>
+        <Button variant="outline" onClick={() => setEditing(true)} disabled={profile.address != null && !primary}>
+          <MapPin />
+          {profile.address ? "Modifier l'adresse" : "Ajouter une adresse"}
+        </Button>
       </CardFooter>
+      <LocationFormSheet open={editing} onOpenChange={setEditing} location={primary} defaultPrimary />
     </Card>
   );
 }

@@ -334,13 +334,13 @@ export function DashboardStats() {
                 {data.upcomingTasks.map((task) => (
                   <li key={task.id}>
                     <Link
-                      href={`/projets/${task.projectId}`}
+                      href={task.projectId ? `/projets/${task.projectId}` : "/taches-horaire"}
                       className="flex items-center gap-3 py-2.5 text-sm transition-colors hover:text-primary"
                     >
                       <span className="min-w-0 flex-1">
                         <span className="block truncate">{task.title}</span>
                         <span className="block font-mono text-xs tabular-nums text-muted-foreground">
-                          {formatProjectNumber(task.projectNumber)}
+                          {task.projectNumber != null ? formatProjectNumber(task.projectNumber) : "Sans projet"}
                         </span>
                       </span>
                       <span

@@ -39,6 +39,7 @@ export interface ProjectFormValues {
   recurrenceEndDate?: string | null;
   /** On creation only: start from this project template's lines. */
   templateId?: string | null;
+  priorityId?: string | null;
 }
 
 export function useProjectsQuery(

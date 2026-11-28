@@ -92,8 +92,9 @@ public record DashboardInvoiceDto(
 
 public record DashboardTaskDto(
     Guid Id,
-    Guid ProjectId,
-    int ProjectNumber,
+    /// <summary>Both null for a task that belongs to no project.</summary>
+    Guid? ProjectId,
+    int? ProjectNumber,
     string Title,
     DateOnly? DueDate,
     bool IsLate);

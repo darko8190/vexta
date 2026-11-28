@@ -36,7 +36,7 @@ public class ProjectTimesheetsController(VextaDbContext db, ICurrentUserService 
             .Select(Fields())
             .ToListAsync(ct);
 
-        return Ok(rows.Select(ToDto).ToList());
+        return Ok(rows.Select(Present).ToList());
     }
 
     [HttpPost]
@@ -65,8 +65,10 @@ public class ProjectTimesheetsController(VextaDbContext db, ICurrentUserService 
             EndTime = request.EndTime,
             Hours = WorkHours.Between(request.StartDate, request.StartTime, request.EndDate, request.EndTime),
             Note = Clean(request.Note),
-            ProjectTaskId = request.ProjectTaskId
+            ProjectTaskId = request.ProjectTaskId,
+            HourlyRate = Crew ? null : request.HourlyRate
         };
+        entry.HourlyRate ??= await ProjectRateAsync(projectId, ct);
 
         db.TimesheetEntries.Add(entry);
         await db.SaveChangesAsync(ct);
@@ -85,6 +87,30 @@ public class ProjectTimesheetsController(VextaDbContext db, ICurrentUserService 
             .FirstOrDefaultAsync(x => x.Id == id && x.ProjectId == projectId, ct);
         if (entry is null) return NotFound();
         if (await LockedAsync(projectId, ct) is { } locked) return BadRequest(new { message = locked });
+
+        // A line with no span of clock time — hours added by an automatic rule, or a punch too
+        // short to count — whose times are left alone: its rate, note, employee and task change,
+        // its stored hours stay, and nobody has to be named on it yet.
+        var hoursOnly = entry.StartDate == entry.EndDate && entry.StartTime == entry.EndTime
+            && request.StartDate == entry.StartDate && request.EndDate == entry.EndDate
+            && request.StartTime == entry.StartTime && request.EndTime == entry.EndTime;
+        if (hoursOnly)
+        {
+            if (request.Note is { Length: > 500 }) return BadRequest(new { message = "La note est trop longue." });
+            if (request.HourlyRate is < 0 or > 100_000m) return BadRequest(new { message = "Ce taux horaire n'est pas valide." });
+            if (request.EmployeeId != Guid.Empty && !await db.Employees.AnyAsync(e => e.Id == request.EmployeeId, ct))
+                return BadRequest(new { message = "Cet employé n'existe pas." });
+            if (await ProjectTaskLink.ProblemAsync(db, projectId, request.ProjectTaskId, ct) is { } wrong)
+                return BadRequest(new { message = wrong });
+            entry.EmployeeId = request.EmployeeId == Guid.Empty ? entry.EmployeeId : request.EmployeeId;
+            entry.Note = Clean(request.Note);
+            entry.ProjectTaskId = request.ProjectTaskId;
+            if (!Crew && request.HourlyRate is { } fixedRate) entry.HourlyRate = fixedRate;
+            entry.UpdatedAt = DateTimeOffset.UtcNow;
+            await db.SaveChangesAsync(ct);
+            return await GetAsync(id, ct);
+        }
+
         request = await OwnHoursAsync(request, ct);
         if (await ProblemAsync(request, ct) is { } problem) return BadRequest(new { message = problem });
         if (await ProjectTaskLink.ProblemAsync(db, projectId, request.ProjectTaskId, ct) is { } wrongTask)
@@ -100,6 +126,10 @@ public class ProjectTimesheetsController(VextaDbContext db, ICurrentUserService 
         entry.Hours = WorkHours.Between(request.StartDate, request.StartTime, request.EndDate, request.EndTime);
         entry.Note = Clean(request.Note);
         entry.ProjectTaskId = request.ProjectTaskId;
+        if (!Crew && request.HourlyRate is { } rate) entry.HourlyRate = rate;
+        // A punch typed over by hand is closed: its four moments are now the ones on the form.
+        entry.PunchState = PunchState.Aucun;
+        entry.PausedAt = null;
         entry.UpdatedAt = DateTimeOffset.UtcNow;
 
         await db.SaveChangesAsync(ct);
@@ -120,6 +150,174 @@ public class ProjectTimesheetsController(VextaDbContext db, ICurrentUserService 
         return NoContent();
     }
 
+    /// <summary>
+    /// One rate on every labour entry of the job, from the totals table. The office's call only:
+    /// it reprices what the client is billed.
+    /// </summary>
+    [HttpPut("taux")]
+    [Authorize(Roles = Roles.Managers)]
+    public async Task<IActionResult> SetRate(Guid projectId, SetLabourRateRequest request, CancellationToken ct)
+    {
+        if (!await db.Projects.AnyAsync(p => p.Id == projectId, ct)) return NotFound();
+        if (await LockedAsync(projectId, ct) is { } locked) return BadRequest(new { message = locked });
+        if (request.HourlyRate is < 0 or > 100_000m) return BadRequest(new { message = "Ce taux horaire n'est pas valide." });
+
+        var rate = Math.Round(request.HourlyRate, 2);
+        await db.TimesheetEntries.Where(x => x.ProjectId == projectId)
+            .ExecuteUpdateAsync(set => set
+                .SetProperty(x => x.HourlyRate, rate)
+                .SetProperty(x => x.UpdatedAt, DateTimeOffset.UtcNow), ct);
+        return NoContent();
+    }
+
+    // ---- Punch: Commencer, Pause, Continuer, Terminer ----
+
+    /// <summary>My punch still open, on whatever job it is, or null.</summary>
+    [HttpGet("punch")]
+    public async Task<ActionResult<TimesheetEntryDto?>> MyPunch(Guid projectId, CancellationToken ct)
+    {
+        if (await MyEmployeeIdAsync(ct) is not { } me) return Ok(null);
+        var row = await db.TimesheetEntries.AsNoTracking()
+            .Where(x => x.EmployeeId == me && x.PunchState != PunchState.Aucun)
+            .Select(Fields())
+            .FirstOrDefaultAsync(ct);
+        return Ok(row is null ? null : Present(row));
+    }
+
+    [HttpPost("punch")]
+    [RequireBusinessTenant]
+    public async Task<ActionResult<TimesheetEntryDto>> StartPunch(Guid projectId, StartPunchRequest request, CancellationToken ct)
+    {
+        if (currentUser.TenantId is not { } tenantId) return Forbid();
+        if (!await db.Projects.AnyAsync(p => p.Id == projectId, ct)) return NotFound();
+        if (await LockedAsync(projectId, ct) is { } locked) return BadRequest(new { message = locked });
+        if (await MyEmployeeIdAsync(ct) is not { } me)
+            return BadRequest(new { message = "Votre compte n'est rattaché à aucun employé." });
+        if (await ProjectTaskLink.ProblemAsync(db, projectId, request.ProjectTaskId, ct) is { } wrongTask)
+            return BadRequest(new { message = wrongTask });
+
+        var open = await db.TimesheetEntries.AsNoTracking()
+            .Where(x => x.EmployeeId == me && x.PunchState != PunchState.Aucun)
+            .Select(x => (int?)x.Project!.Number)
+            .FirstOrDefaultAsync(ct);
+        if (open is { } number)
+            return BadRequest(new { message = $"Terminez d'abord le punch en cours sur le projet P-{number:0000}." });
+
+        var now = BusinessDay.Now;
+        var date = DateOnly.FromDateTime(now.DateTime);
+        var time = TimeOnly.FromDateTime(now.DateTime);
+        var entry = new TimesheetEntry
+        {
+            TenantId = tenantId,
+            ProjectId = projectId,
+            ProjectTaskId = request.ProjectTaskId,
+            EmployeeId = me,
+            StartDate = date,
+            EndDate = date,
+            StartTime = time,
+            EndTime = time,
+            Hours = 0m,
+            Note = Clean(request.Note),
+            HourlyRate = await ProjectRateAsync(projectId, ct),
+            PunchState = PunchState.EnCours,
+            PunchStartedAt = DateTimeOffset.UtcNow
+        };
+        db.TimesheetEntries.Add(entry);
+        await db.SaveChangesAsync(ct);
+        return await GetAsync(entry.Id, ct);
+    }
+
+    [HttpPost("punch/{id:guid}/pause")]
+    public Task<ActionResult<TimesheetEntryDto>> Pause(Guid projectId, Guid id, CancellationToken ct) =>
+        PunchStepAsync(projectId, id, entry =>
+        {
+            if (entry.PunchState != PunchState.EnCours) return "Ce punch n'est pas en cours.";
+            entry.PunchState = PunchState.EnPause;
+            entry.PausedAt = DateTimeOffset.UtcNow;
+            return null;
+        }, ct);
+
+    [HttpPost("punch/{id:guid}/continuer")]
+    public Task<ActionResult<TimesheetEntryDto>> Resume(Guid projectId, Guid id, CancellationToken ct) =>
+        PunchStepAsync(projectId, id, entry =>
+        {
+            if (entry.PunchState != PunchState.EnPause) return "Ce punch n'est pas en pause.";
+            CloseCurrentPause(entry);
+            entry.PunchState = PunchState.EnCours;
+            return null;
+        }, ct);
+
+    [HttpPost("punch/{id:guid}/terminer")]
+    public Task<ActionResult<TimesheetEntryDto>> EndPunch(Guid projectId, Guid id, EndPunchRequest request, CancellationToken ct) =>
+        PunchStepAsync(projectId, id, entry =>
+        {
+            if (entry.PunchState == PunchState.Aucun) return "Ce punch est déjà terminé.";
+            if (request.Note is { Length: > 500 }) return "La note est trop longue.";
+            CloseCurrentPause(entry);
+
+            var started = entry.PunchStartedAt ?? DateTimeOffset.UtcNow;
+            var ended = DateTimeOffset.UtcNow;
+            var local = BusinessDay.ToLocal(ended);
+            entry.EndDate = DateOnly.FromDateTime(local.DateTime);
+            entry.EndTime = TimeOnly.FromDateTime(local.DateTime);
+            entry.Hours = WorkHours.FromMinutes((ended - started).TotalMinutes - entry.PausedSeconds / 60.0);
+            entry.PunchState = PunchState.Aucun;
+            if (Clean(request.Note) is { } note) entry.Note = note;
+            return null;
+        }, ct);
+
+    /// <summary>One step of my own punch. Nobody moves somebody else's clock.</summary>
+    private async Task<ActionResult<TimesheetEntryDto>> PunchStepAsync(
+        Guid projectId, Guid id, Func<TimesheetEntry, string?> step, CancellationToken ct)
+    {
+        var me = await MyEmployeeIdAsync(ct);
+        var entry = await db.TimesheetEntries.FirstOrDefaultAsync(x => x.Id == id && x.ProjectId == projectId, ct);
+        if (entry is null || me is null || entry.EmployeeId != me) return NotFound();
+        if (step(entry) is { } problem) return BadRequest(new { message = problem });
+        entry.UpdatedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(ct);
+        return await GetAsync(id, ct);
+    }
+
+    private static void CloseCurrentPause(TimesheetEntry entry)
+    {
+        if (entry.PausedAt is { } since)
+            entry.PausedSeconds += (int)Math.Max(0, (DateTimeOffset.UtcNow - since).TotalSeconds);
+        entry.PausedAt = null;
+    }
+
+    private bool Crew => currentUser.Role == UserRole.TenantUser;
+
+    /// <summary>
+    /// The rate a new line on this job starts at: the one its latest priced line carries — what
+    /// the totals table last set — or the company's when the job has none yet.
+    /// </summary>
+    private async Task<decimal?> ProjectRateAsync(Guid projectId, CancellationToken ct) =>
+        await db.TimesheetEntries.AsNoTracking()
+            .Where(x => x.ProjectId == projectId && x.HourlyRate != null)
+            .OrderByDescending(x => x.UpdatedAt)
+            .Select(x => x.HourlyRate)
+            .FirstOrDefaultAsync(ct)
+        ?? await DefaultRateAsync(ct);
+
+    private async Task<decimal?> DefaultRateAsync(CancellationToken ct) =>
+        await db.BillingSettings.AsNoTracking()
+            .Where(b => b.TenantId == currentUser.TenantId)
+            .Select(b => b.DefaultHourlyRate)
+            .FirstOrDefaultAsync(ct);
+
+    private Task<Guid?> MyEmployeeIdAsync(CancellationToken ct) =>
+        db.Employees.AsNoTracking()
+            .Where(e => e.UserId == currentUser.UserId)
+            .Select(e => (Guid?)e.Id)
+            .FirstOrDefaultAsync(ct);
+
+    private TimesheetEntryDto Present(TimesheetRow row)
+    {
+        var dto = ToDto(row);
+        return Crew ? dto with { HourlyRate = null } : dto;
+    }
+
     private async Task<ActionResult<TimesheetEntryDto>> GetAsync(Guid id, CancellationToken ct)
     {
         var row = await db.TimesheetEntries.AsNoTracking()
@@ -127,7 +325,7 @@ public class ProjectTimesheetsController(VextaDbContext db, ICurrentUserService 
             .Select(Fields())
             .FirstOrDefaultAsync(ct);
 
-        return row is null ? NotFound() : Ok(ToDto(row));
+        return row is null ? NotFound() : Ok(Present(row));
     }
 
     /// <summary>
@@ -159,6 +357,7 @@ public class ProjectTimesheetsController(VextaDbContext db, ICurrentUserService 
         }
 
         if (request.Note is { Length: > 500 }) return "La note est trop longue.";
+        if (request.HourlyRate is < 0 or > 100_000m) return "Ce taux horaire n'est pas valide.";
 
         // Zero is how WorkHours says the end is not after the start, which covers both a shift
         // typed backwards and one that lasts no time at all. Neither is an entry worth storing.
@@ -208,7 +407,12 @@ public class ProjectTimesheetsController(VextaDbContext db, ICurrentUserService 
             x.ProjectTaskId,
             x.ProjectTask == null ? null : x.ProjectTask.Title,
             x.CreatedAt,
-            x.UpdatedAt);
+            x.UpdatedAt,
+            x.HourlyRate,
+            x.PunchState,
+            x.PunchStartedAt,
+            x.PausedAt,
+            x.PausedSeconds);
 
     private static TimesheetEntryDto ToDto(TimesheetRow row) =>
         new(row.Id,
@@ -223,7 +427,12 @@ public class ProjectTimesheetsController(VextaDbContext db, ICurrentUserService 
             row.ProjectTaskId,
             row.ProjectTaskTitle,
             row.CreatedAt,
-            row.UpdatedAt);
+            row.UpdatedAt,
+            row.HourlyRate,
+            row.PunchState,
+            row.PunchStartedAt,
+            row.PausedAt,
+            row.PausedSeconds);
 
     private record TimesheetRow(
         Guid Id,
@@ -239,5 +448,10 @@ public class ProjectTimesheetsController(VextaDbContext db, ICurrentUserService 
         Guid? ProjectTaskId,
         string? ProjectTaskTitle,
         DateTimeOffset CreatedAt,
-        DateTimeOffset UpdatedAt);
+        DateTimeOffset UpdatedAt,
+        decimal? HourlyRate,
+        PunchState PunchState,
+        DateTimeOffset? PunchStartedAt,
+        DateTimeOffset? PausedAt,
+        int PausedSeconds);
 }

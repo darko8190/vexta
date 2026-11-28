@@ -299,7 +299,9 @@ public class InvoicePdfService(VextaDbContext db, ICurrentUserService currentUse
             isTaxExempt);
 
         var subtotal = totals.Subtotal;
-        var taxes = isTaxExempt ? ExemptLine : TaxLines(totals, settings);
+        // An invoice prints both taxes with their numbers every time — at zero when nothing on
+        // it is taxed, so the client sees the company is registered and charged none on purpose.
+        var taxes = isTaxExempt || totals.TaxTotal == 0 ? ZeroTaxLines(settings) : TaxLines(totals, settings);
 
         return new InvoicePdfModel
         {
@@ -355,6 +357,16 @@ public class InvoicePdfService(VextaDbContext db, ICurrentUserService currentUse
             new InvoicePdfAmount(TaxLabel("TVQ", settings.QstRate, settings.QstNumber), totals.Qst)
         ];
     }
+
+    /// <summary>TPS and TVQ at zero, each with its registration number, for an invoice that is not taxed.</summary>
+    private static List<InvoicePdfAmount> ZeroTaxLines(Domain.BillingSettings? settings) =>
+    [
+        new InvoicePdfAmount(ZeroLabel("TPS", settings?.GstNumber), 0m),
+        new InvoicePdfAmount(ZeroLabel("TVQ", settings?.QstNumber), 0m)
+    ];
+
+    private static string ZeroLabel(string name, string? registration) =>
+        string.IsNullOrWhiteSpace(registration) ? $"{name} (non taxable)" : $"{name} #{registration.Trim()} (non taxable)";
 
     private static string TaxLabel(string name, decimal rate, string? registration)
     {

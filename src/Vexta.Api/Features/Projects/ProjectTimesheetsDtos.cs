@@ -28,7 +28,22 @@ public record TimesheetEntryDto(
     Guid? ProjectTaskId,
     string? ProjectTaskTitle,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    /// <summary>What an hour of it is billed at. Null to the crew, who do not see the money.</summary>
+    decimal? HourlyRate = null,
+    Domain.PunchState PunchState = Domain.PunchState.Aucun,
+    DateTimeOffset? PunchStartedAt = null,
+    DateTimeOffset? PausedAt = null,
+    int PausedSeconds = 0);
+
+/// <summary>The rate to put on every labour entry of the project.</summary>
+public record SetLabourRateRequest(decimal HourlyRate);
+
+/// <summary>Starting a punch: optionally on one task of the job.</summary>
+public record StartPunchRequest(Guid? ProjectTaskId = null, string? Note = null);
+
+/// <summary>Ending a punch, with what was done.</summary>
+public record EndPunchRequest(string? Note = null);
 
 /// <summary>
 /// What the sheet sends to file or amend an entry.
@@ -45,4 +60,6 @@ public record SaveTimesheetEntryRequest(
     TimeOnly EndTime,
     string? Note,
     /// <summary>Optional: the task these hours went into.</summary>
-    Guid? ProjectTaskId = null);
+    Guid? ProjectTaskId = null,
+    /// <summary>Null takes the company's rate on a new entry and keeps the entry's own on an edit.</summary>
+    decimal? HourlyRate = null);

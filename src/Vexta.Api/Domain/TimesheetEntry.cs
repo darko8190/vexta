@@ -51,6 +51,24 @@ public class TimesheetEntry
 
     public string? Note { get; set; }
 
+    /// <summary>
+    /// What an hour of this entry is billed at. Null on the entries filed before it existed,
+    /// which bill at the company's rate.
+    /// </summary>
+    public decimal? HourlyRate { get; set; }
+
+    /// <summary>A punch still running or paused; Aucun once it is closed, and on every typed entry.</summary>
+    public PunchState PunchState { get; set; } = PunchState.Aucun;
+
+    /// <summary>The moment a running punch started, in UTC.</summary>
+    public DateTimeOffset? PunchStartedAt { get; set; }
+
+    /// <summary>When the current pause began, while the punch is paused.</summary>
+    public DateTimeOffset? PausedAt { get; set; }
+
+    /// <summary>The pauses already closed, in seconds, taken off the hours when the punch ends.</summary>
+    public int PausedSeconds { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

@@ -228,6 +228,16 @@
  * The reveal moves `translate` and the lift moves `transform`, two separate properties, so a
  * card can do both without the finished reveal pinning the hover in place.
  */
+/* The tiles of the phone menu while they are being moved. Used through motion-safe only. */
+@keyframes vx-wiggle {
+  from {
+    transform: rotate(-1.5deg);
+  }
+  to {
+    transform: rotate(1.5deg);
+  }
+}
+
 @keyframes vx-rise {
   from {
     opacity: 0;

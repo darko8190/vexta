@@ -118,7 +118,7 @@ export const subTabScreens: SubTabScreen[] = [
       { key: "materiaux", label: "Matériaux" },
       { key: "equipements", label: "Équipements" },
       { key: "assemblages", label: "Assemblages" },
-      { key: "feuilles-de-temps", label: "Poinçons" },
+      { key: "feuilles-de-temps", label: "Main-d'œuvre" },
       { key: "depenses", label: "Dépenses" },
       { key: "frais", label: "Frais supplémentaires" },
       { key: "soumission", label: "Soumission" },
@@ -130,7 +130,7 @@ export const subTabScreens: SubTabScreen[] = [
     screen: "Sections de la tâche",
     title: "Fiche d'une tâche",
     tabs: [
-      { key: "feuilles-de-temps", label: "Poinçons" },
+      { key: "feuilles-de-temps", label: "Main-d'œuvre" },
       { key: "materiaux", label: "Matériaux" },
       { key: "equipements", label: "Équipements" },
       { key: "assemblages", label: "Assemblages" },

@@ -34,6 +34,7 @@ import { ClientQuickView } from "@/components/clients/client-quick-view";
 import { useProjectTemplatesQuery } from "@/hooks/use-project-templates";
 import { ProjectCategoryFields } from "@/components/projects/project-category-fields";
 import { useWageClassificationsQuery } from "@/hooks/use-wage-classifications";
+import { useProjectSettingsQuery } from "@/hooks/use-project-settings";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FieldDescription } from "@/components/ui/field";
 import { useClientContactsQuery, useClientQuery } from "@/hooks/use-clients";
@@ -56,6 +57,7 @@ const statuses = Object.keys(projectStatusLabels) as ProjectStatus[];
 /** Base UI needs a value for every item, and "" is not one. */
 const NO_POLICY = "aucune";
 const NO_CLASSIFICATION = "aucun";
+const NO_PRIORITY = "aucune-priorite";
 
 const RECURRENCE_UNITS: Record<RecurrenceUnit, string> = { Semaine: "semaine(s)", Mois: "mois", Annee: "année(s)" };
 
@@ -84,6 +86,7 @@ const formSchema = z
   categoryId: z.string(),
   subCategoryId: z.string(),
   wageClassificationId: z.string(),
+  priorityId: z.string(),
 })
   // Work somewhere else than the billing address has to say where: a crew sent to "not
   // there" is a phone call from the truck.
@@ -136,6 +139,7 @@ function toFormValues(
     categoryId: project?.categoryId ?? "",
     subCategoryId: project?.subCategoryId ?? "",
     wageClassificationId: project?.wageClassificationId ?? "",
+    priorityId: project?.priorityId ?? "",
   };
 }
 
@@ -164,6 +168,7 @@ export function storedValues(project: ProjectRecord): ProjectFormValues {
     categoryId: project.categoryId,
     subCategoryId: project.subCategoryId,
     wageClassificationId: project.wageClassificationId,
+    priorityId: project.priorityId ?? null,
     contactId: project.contactId,
     billingContactId: project.billingContactId,
     recurrenceEvery: project.recurrenceEvery,
@@ -228,6 +233,7 @@ export function ProjectFormSheet({
       categoryId: values.categoryId || null,
       subCategoryId: values.categoryId ? values.subCategoryId || null : null,
       wageClassificationId: values.wageClassificationId || null,
+      priorityId: values.priorityId || null,
       contactId: values.contactId || null,
       billingContactId: values.billingContactId || null,
       recurrenceEvery: values.recurring ? Number(values.recurrenceEvery) : null,
@@ -283,6 +289,8 @@ export function ProjectFormSheet({
   const categoryId = useWatch({ control: form.control, name: "categoryId" });
   const subCategoryId = useWatch({ control: form.control, name: "subCategoryId" });
   const { data: classifications, isLoading: classificationsLoading } = useWageClassificationsQuery();
+  const { data: projectSettings } = useProjectSettingsQuery();
+  const priorities = projectSettings?.priorities ?? [];
 
   // Shares its cache with the settings screen that manages them; this form only reads.
   const { data: policies } = useQuery({
@@ -566,6 +574,39 @@ export function ProjectFormSheet({
               subCategoryId={subCategoryId}
               onCategoryChange={(id) => form.setValue("categoryId", id, { shouldDirty: true })}
               onSubCategoryChange={(id) => form.setValue("subCategoryId", id, { shouldDirty: true })}
+            />
+
+            <Controller
+              name="priorityId"
+              control={form.control}
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel htmlFor="project-priority">Priorité</FieldLabel>
+                  <Select
+                    value={field.value || NO_PRIORITY}
+                    onValueChange={(value: string | null) => field.onChange(!value || value === NO_PRIORITY ? "" : value)}
+                  >
+                    <SelectTrigger id="project-priority" className="w-full">
+                      <SelectValue>
+                        {(value: string) =>
+                          !value || value === NO_PRIORITY
+                            ? "Aucune priorité"
+                            : (priorities.find((item) => item.id === value)?.name ?? project?.priorityName ?? "Chargement…")
+                        }
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_PRIORITY}>Aucune priorité</SelectItem>
+                      {priorities.map((item) => (
+                        <SelectItem key={item.id} value={item.id}>
+                          {item.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FieldDescription>La liste se modifie dans Paramètres › Projets.</FieldDescription>
+                </Field>
+              )}
             />
 
             <Controller

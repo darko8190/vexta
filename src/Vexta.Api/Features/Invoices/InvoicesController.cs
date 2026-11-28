@@ -103,7 +103,28 @@ public class InvoicesController(
         if (invoice is null) return NotFound();
 
         var (gst, qst) = await RatesAsync();
-        return Ok(ToDto(invoice, gst, qst));
+        var dto = ToDto(invoice, gst, qst);
+
+        // Both taxes with their registration numbers, as on the paper — at zero when nothing on
+        // the invoice is taxed.
+        var numbers = await db.BillingSettings.AsNoTracking()
+            .Where(b => b.TenantId == invoice.TenantId)
+            .Select(b => new { b.GstNumber, b.QstNumber })
+            .FirstOrDefaultAsync();
+        static string Numbered(string label, string? number) =>
+            string.IsNullOrWhiteSpace(number) ? label : $"{label} #{number.Trim()}";
+        dto = dto.TaxTotal == 0
+            ? dto with
+            {
+                Tax1Label = Numbered("TPS", numbers?.GstNumber) + " (non taxable)",
+                Tax2Label = Numbered("TVQ", numbers?.QstNumber) + " (non taxable)"
+            }
+            : dto with
+            {
+                Tax1Label = Numbered(dto.Tax1Label, numbers?.GstNumber),
+                Tax2Label = Numbered(dto.Tax2Label, numbers?.QstNumber)
+            };
+        return Ok(dto);
     }
 
     /// <summary>
@@ -209,16 +230,18 @@ public class InvoicesController(
                 // nothing to compute it with.
                 FirstName = t.Employee == null ? null : t.Employee.FirstName,
                 LastName = t.Employee == null ? null : t.Employee.LastName,
-                t.Hours
+                t.Hours,
+                Rate = t.HourlyRate ?? hourlyRate
             })
             .ToListAsync(ct);
 
         // One line per person, not per shift. A fortnight of entries printed one by one is a
         // page the client reads as padding, and the total of hours is the same either way.
         // Grouped here rather than in SQL so the order is the order they first appear on the job.
+        // By person and by rate: hours billed at two rates cannot share one line.
         var byPerson = entries
-            .GroupBy(e => e.EmployeeId)
-            .Select(g => new { First = g.First(), Hours = g.Sum(e => e.Hours) })
+            .GroupBy(e => new { e.EmployeeId, e.Rate })
+            .Select(g => new { First = g.First(), Hours = g.Sum(e => e.Hours), g.Key.Rate })
             // Someone with no hours on the job has nothing to bill, and a zero-quantity line is
             // a line the form would refuse to save.
             .Where(g => g.Hours > 0);
@@ -232,7 +255,7 @@ public class InvoicesController(
             // figure that belongs on the client's invoice.
             null,
             null,
-            hourlyRate,
+            g.Rate,
             taxable)));
 
         var assemblies = await db.ProjectAssemblies.AsNoTracking()

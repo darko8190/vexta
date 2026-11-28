@@ -69,15 +69,22 @@ public class WorkController(VextaDbContext db) : ControllerBase
             .Select(t => new WorkTaskDto(
                 t.Id,
                 t.ProjectId,
-                t.Project!.Number,
-                t.Project.Client!.Name,
+                t.Project == null ? null : (int?)t.Project.Number,
+                t.Project == null ? null : t.Project.Client!.Name,
                 t.Title,
                 t.Status,
                 t.Priority,
                 t.DueDate,
                 t.DueDate != null && t.Status != ProjectTaskStatus.Terminee && t.DueDate < today,
                 t.AssignedTeam != null ? t.AssignedTeam.Name : null,
-                t.Assignees.Select(a => a.FirstName + " " + a.LastName).ToList()))
+                t.Assignees.Select(a => a.FirstName + " " + a.LastName).ToList(),
+                t.Description,
+                t.StartDate,
+                t.EstimatedHours,
+                t.AssignedTeamId,
+                t.Assignees.Select(a => a.Id).ToList(),
+                t.TaskTypeId,
+                t.TaskType == null ? null : t.TaskType.Name))
             .ToListAsync(ct);
 
         return Ok(items);

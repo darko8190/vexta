@@ -1,7 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { ListChecks, Users } from "lucide-react";
+import { CircleCheck, ListChecks, Users } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
+import { useChangeWorkTaskStatus } from "@/hooks/use-work";
+import { ApiError } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/layout/empty-state";
@@ -22,8 +27,8 @@ import { formatProjectNumber } from "@/lib/types";
  * sometimes the crew it came through, and that does not fit a row at phone width — which is
  * where somebody is standing when they check what they are supposed to be doing today.
  *
- * The status is not changed from here. A task is ticked off on its project, where the rest of
- * the job is, and two places to change the same thing is two places that disagree.
+ * A task is ended from here with « Terminer l'assignation » once at least one timesheet is in on
+ * it — typed, or a punch started and ended. A task on no project keeps no hours and ends at once.
  */
 export default function MyAssignmentsPage() {
   const { data, isLoading, isError, error, refetch } = useMyAssignmentsQuery();
@@ -32,7 +37,17 @@ export default function MyAssignmentsPage() {
   // The assignments open once the day is under way: the poinçons on each job go inside the day.
   const dayRunning = Boolean(myDay?.today && !myDay.today.endedAt);
 
+  const finish = useChangeWorkTaskStatus();
   const open = assignments.filter((task) => task.status !== "Terminee");
+
+  async function finishTask(id: string) {
+    try {
+      await finish.mutateAsync({ id, status: "Terminee" });
+      toast.success("Assignation terminée.");
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Impossible de terminer cette assignation.");
+    }
+  }
   const late = open.filter((task) => task.isLate);
 
   return (
@@ -88,7 +103,7 @@ export default function MyAssignmentsPage() {
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    {dayRunning ? (
+                    {dayRunning && task.projectId ? (
                       // Stretched over the card: the whole card opens the task.
                       <Link
                         href={`/projets/${task.projectId}/taches/${task.id}`}
@@ -111,13 +126,19 @@ export default function MyAssignmentsPage() {
                   </div>
 
                   <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                    <Link
-                      href={`/projets/${task.projectId}`}
-                      className="relative z-10 font-medium underline-offset-4 hover:underline"
-                    >
-                      {formatProjectNumber(task.projectNumber)}
-                    </Link>
-                    <span className="truncate">{task.clientName}</span>
+                    {task.projectId && task.projectNumber != null ? (
+                      <>
+                        <Link
+                          href={`/projets/${task.projectId}`}
+                          className="relative z-10 font-medium underline-offset-4 hover:underline"
+                        >
+                          {formatProjectNumber(task.projectNumber)}
+                        </Link>
+                        <span className="truncate">{task.clientName}</span>
+                      </>
+                    ) : (
+                      <span>Sans projet</span>
+                    )}
                     {task.dueDate && (
                       <span className="tabular-nums">Pour le {formatDateOnly(task.dueDate)}</span>
                     )}
@@ -135,6 +156,19 @@ export default function MyAssignmentsPage() {
                     <p className="mt-1.5 line-clamp-2 text-sm text-muted-foreground">
                       {task.description}
                     </p>
+                  )}
+
+                  {/* Over the stretched link, so the button is its own target. */}
+                  {task.status !== "Terminee" && (task.myEntries > 0 || !task.projectId) && (
+                    <Button
+                      size="sm"
+                      className="relative z-10 mt-2"
+                      disabled={finish.isPending}
+                      onClick={() => void finishTask(task.id)}
+                    >
+                      {finish.isPending && finish.variables?.id === task.id ? <Spinner /> : <CircleCheck />}
+                      Terminer l&apos;assignation
+                    </Button>
                   )}
                 </div>
                 {dayRunning ? (

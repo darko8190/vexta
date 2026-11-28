@@ -74,6 +74,10 @@ public class Project : ISoftDeletable
     /// How the company files this job. Both optional and both SetNull on delete: tidying the
     /// list of categories must never take a job with it.
     /// </summary>
+    /// <summary>How pressing the job is, from the company's list. Null is not said.</summary>
+    public Guid? PriorityId { get; set; }
+    public ProjectPriority? Priority { get; set; }
+
     public Guid? CategoryId { get; set; }
     public ProjectCategory? Category { get; set; }
 

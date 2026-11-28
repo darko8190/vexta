@@ -107,7 +107,12 @@ public class DashboardController(VextaDbContext db, ICurrentUserService currentU
             };
         }).ToList();
 
-        var outstanding = rows.Where(r => r.Balance > 0).ToList();
+        // Only the invoices waiting to be paid: sent, partly paid or late. One marked paid or
+        // handed to the accountant is closed, whatever cents a rounding left on it.
+        var outstanding = rows
+            .Where(r => r.Status is InvoiceStatus.Envoyee or InvoiceStatus.PartiellementPayee or InvoiceStatus.EnRetard)
+            .Where(r => r.Balance > 0)
+            .ToList();
         var overdue = outstanding.Where(r => r.DueDate < today).ToList();
 
         int DaysLate(DateOnly due) => today.DayNumber - due.DayNumber;
@@ -154,7 +159,7 @@ public class DashboardController(VextaDbContext db, ICurrentUserService currentU
             .Select(t => new DashboardTaskDto(
                 t.Id,
                 t.ProjectId,
-                t.Project!.Number,
+                t.Project == null ? null : (int?)t.Project.Number,
                 t.Title,
                 t.DueDate,
                 t.DueDate < today))

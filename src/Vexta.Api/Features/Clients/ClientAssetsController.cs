@@ -73,7 +73,7 @@ public class ClientAssetsController(VextaDbContext db, ICurrentUserService curre
             .ThenBy(t => t.SortOrder)
             .Select(t => new
             {
-                t.Id, t.ProjectId, ProjectNumber = t.Project!.Number, t.Title, t.Status, t.Priority,
+                t.Id, ProjectId = t.ProjectId ?? Guid.Empty, ProjectNumber = t.Project!.Number, t.Title, t.Status, t.Priority,
                 t.DueDate, t.CompletedAt, Task = t,
             })
             .ToListAsync(ct);

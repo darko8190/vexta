@@ -42,3 +42,39 @@ export function useDeleteTimesheet(projectId: string) {
     onSuccess: () => invalidate(queryClient, projectId),
   });
 }
+
+/** One rate on every labour entry of the job, from the totals table. */
+export function useSetLabourRate(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (hourlyRate: number) => api.put(`projects/${projectId}/timesheets/taux`, { hourlyRate }),
+    onSuccess: () => invalidate(queryClient, projectId),
+  });
+}
+
+/** My punch still open, on whatever job it is, or null. */
+export function useMyPunchQuery(projectId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: ["punch", "mine"],
+    queryFn: () => api.get<TimesheetEntry | null>(`projects/${projectId}/timesheets/punch`),
+    enabled: Boolean(projectId) && enabled,
+  });
+}
+
+export type PunchStep = "commencer" | "pause" | "continuer" | "terminer";
+
+/** Commencer, Pause, Continuer, Terminer. */
+export function usePunch(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ step, id, projectTaskId, note }: { step: PunchStep; id?: string; projectTaskId?: string | null; note?: string | null }) =>
+      step === "commencer"
+        ? api.post<TimesheetEntry>(`projects/${projectId}/timesheets/punch`, { projectTaskId: projectTaskId ?? null, note: note ?? null })
+        : api.post<TimesheetEntry>(`projects/${projectId}/timesheets/punch/${id}/${step}`, step === "terminer" ? { note: note ?? null } : {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["punch"] });
+      queryClient.invalidateQueries({ queryKey: ["moi"] });
+      invalidate(queryClient, projectId);
+    },
+  });
+}

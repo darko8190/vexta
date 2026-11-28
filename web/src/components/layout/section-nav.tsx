@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowUpDown } from "lucide-react";
+import { ArrowUpDown, LayoutGrid, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { TileGrid } from "@/components/layout/tile-grid";
 import { Badge } from "@/components/ui/badge";
 import { ReorderViewsDialog } from "@/components/layout/reorder-views-dialog";
 import { applyOrder, useViewOrder } from "@/hooks/use-view-order";
@@ -58,8 +61,9 @@ export function SetupFraction({ progress, className }: { progress: SetupProgress
 }
 
 /**
- * The navigation inside a screen: a narrow rail of icons on the left from md up, a horizontal
- * scroller above the content on a phone.
+ * The navigation inside a screen: a narrow rail of icons on the left from md up. On a phone, a
+ * button naming the open section, which opens every section as tiles over the whole screen —
+ * the same grid as the main menu, held to reorder.
  *
  * The rail behaves like the main menu: icons only, opening over the content when the pointer
  * rests on it, and falling shut again once a section is chosen. The content beside it keeps
@@ -81,6 +85,7 @@ export function SectionNav({
   // even though the pointer is still on it. Cleared when the pointer leaves.
   const [dismissed, setDismissed] = useState(false);
   const [reordering, setReordering] = useState(false);
+  const [tilesOpen, setTilesOpen] = useState(false);
   // The sub-tabs the company hid in Paramètres › Menu. Never all of them: a screen with no tab
   // left would show nothing at all, so then they all stay.
   const hidden = useHiddenNavigation();
@@ -97,15 +102,72 @@ export function SectionNav({
     if (activeHidden && firstShown) onSelect(firstShown);
   }, [activeHidden, firstShown, onSelect]);
 
+  const current = ordered.find((section) => section.key === active) ?? ordered[0];
+  const CurrentIcon = current?.icon;
+
   return (
     <div className="md:w-12 md:shrink-0">
+      {/* Phone: one button, the sections as tiles behind it. */}
+      {current && CurrentIcon && (
+        <div className="md:hidden">
+          <button
+            type="button"
+            onClick={() => setTilesOpen(true)}
+            aria-haspopup="dialog"
+            className="flex h-11 w-full items-center gap-2 rounded-lg border border-border bg-card px-3 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            <CurrentIcon className="size-4 shrink-0" />
+            <span className="min-w-0 flex-1 truncate text-left">{current.label}</span>
+            {current.count !== undefined && (
+              <Badge variant="secondary" className="tabular-nums">
+                {current.count}
+              </Badge>
+            )}
+            <LayoutGrid className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+            <span className="sr-only">Voir toutes les sections</span>
+          </button>
+          <Sheet open={tilesOpen} onOpenChange={setTilesOpen}>
+            <SheetContent
+              side="left"
+              showCloseButton={false}
+              className="gap-0 bg-sidebar p-0 data-[side=left]:w-full data-[side=left]:sm:max-w-none"
+            >
+              <SheetTitle className="sr-only">{label}</SheetTitle>
+              <div className="flex h-16 shrink-0 items-center justify-between px-5">
+                <span className="text-base font-semibold text-sidebar-foreground">Sections</span>
+                <Button variant="ghost" size="icon" aria-label="Fermer" onClick={() => setTilesOpen(false)}>
+                  <X />
+                </Button>
+              </div>
+              <div className="flex-1 overflow-y-auto px-3 py-2">
+                <TileGrid
+                  label={label}
+                  orderId={label}
+                  tiles={ordered.map((section) => ({
+                    key: section.key,
+                    label: section.label,
+                    icon: section.icon,
+                    active: section.key === active,
+                    badge: section.count,
+                    alert: (section.alert ?? 0) > 0,
+                  }))}
+                  onPick={(key) => {
+                    onSelect(key);
+                    setTilesOpen(false);
+                  }}
+                />
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
+      )}
       <nav
         aria-label={label}
         onPointerLeave={() => setDismissed(false)}
         className={cn(
           "group/secnav",
-          // Phone: a scrollable row, with the page gutter bled through.
-          "-mx-4 flex gap-1 overflow-x-auto px-4 pb-2",
+          // Phone: replaced by the button and its tiles above.
+          "hidden md:flex",
           // md and up: a rail of icons that stays put while the section beside it scrolls.
           "md:sticky md:top-0 md:z-20 md:mx-0 md:w-12 md:flex-col md:overflow-hidden md:rounded-xl md:border md:border-transparent md:bg-background md:p-1",
           "md:transition-[width,box-shadow,border-color] md:duration-200 md:ease-out motion-reduce:transition-none",

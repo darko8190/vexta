@@ -169,7 +169,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         { key: "materiaux", label: "Matériaux", count: counts?.materials ?? 0, icon: HardHat },
         { key: "equipements", label: "Équipements", count: counts?.equipment ?? 0, icon: Wrench },
         { key: "assemblages", label: "Assemblages", count: counts?.assemblies ?? 0, icon: Blocks },
-        { key: "feuilles-de-temps", label: "Poinçons", count: counts?.timesheets ?? 0, icon: Clock },
+        { key: "feuilles-de-temps", label: "Main-d'œuvre", count: counts?.timesheets ?? 0, icon: Clock },
         { key: "depenses", label: "Dépenses", count: counts?.expenses ?? 0, icon: Receipt },
         { key: "documents", label: "Documents et notes", count: counts?.documentsAndNotes ?? 0, icon: FolderOpen },
       ]
@@ -197,7 +197,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         { key: "assemblages", label: "Assemblages", count: counts?.assemblies ?? 0, icon: Blocks },
         {
           key: "feuilles-de-temps",
-          label: "Poinçons",
+          label: "Main-d'œuvre",
           count: counts?.timesheets ?? 0,
           icon: Clock,
           alert: review(counts?.timesheetsToReview),
@@ -244,6 +244,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                 <ProjectStatusSelect project={project} />
               )}
               {project.recurrenceEvery != null && <Badge variant="outline">Récurrent</Badge>}
+              {project.priorityName && <Badge variant="outline">Priorité {project.priorityName.toLowerCase()}</Badge>}
               {project.poNumber && <Badge variant="secondary">PO {project.poNumber}</Badge>}
               {project.isTaxExempt && <Badge variant="outline">Non taxable</Badge>}
             </div>
@@ -327,7 +328,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               </InlineSheet>
               {/* Below xl there is no third column, so the figures sit under the record. */}
               <div className="xl:hidden">
-                <ProjectCostTable costs={summary?.costs} isLoading={summaryLoading} />
+                <ProjectCostTable costs={summary?.costs} isLoading={summaryLoading} projectId={project.id} canEditRate={canManage && !locked} />
               </div>
             </div>
           )}
@@ -457,7 +458,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             className="hidden w-[30rem] shrink-0 self-start xl:sticky xl:top-0 xl:block 2xl:w-[36rem] [&_td]:px-2 [&_th]:px-2"
           >
             <h2 className="mb-3 text-base font-semibold text-foreground">Montants</h2>
-            <ProjectCostTable costs={summary?.costs} isLoading={summaryLoading} />
+            <ProjectCostTable costs={summary?.costs} isLoading={summaryLoading} projectId={project.id} canEditRate={canManage && !locked} />
           </aside>
         )}
       </div>

@@ -98,8 +98,10 @@ public class MyWorkController(VextaDbContext db, ICurrentUserService currentUser
             {
                 t.Id,
                 t.ProjectId,
-                ProjectNumber = t.Project!.Number,
-                ClientName = t.Project!.Client!.Name,
+                ProjectNumber = t.Project == null ? null : (int?)t.Project.Number,
+                ClientName = t.Project == null ? null : t.Project.Client!.Name,
+                MyEntries = db.TimesheetEntries.Count(x => x.ProjectTaskId == t.Id && x.EmployeeId == employeeId
+                    && x.PunchState == PunchState.Aucun),
                 t.Title,
                 t.Description,
                 t.Status,
@@ -131,7 +133,8 @@ public class MyWorkController(VextaDbContext db, ICurrentUserService currentUser
                 t.StartDate,
                 t.DueDate,
                 t.Status != ProjectTaskStatus.Terminee && t.DueDate is { } due && due < today,
-                t.ViaTeam))
+                t.ViaTeam,
+                t.MyEntries))
             .ToList();
 
         return Ok(new MyAssignmentsDto(true, assignments));

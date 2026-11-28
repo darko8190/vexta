@@ -30,6 +30,7 @@ import {
   GuidedPublish,
 } from "@/components/setup-guide/guided-forms";
 import { useCompanyProfileQuery } from "@/hooks/use-company";
+import { AutoLinesCard, LabourModeCard, NamedListCard } from "@/components/settings/project-settings-cards";
 import type { GuideAnswer } from "@/hooks/use-setup-guide";
 
 /**
@@ -323,6 +324,46 @@ export const guideSteps: GuideStep[] = [
     explain: "Par exemple « Client régulier » avec une marge de 25 %. Vous la choisissez sur un projet ou une facture, et Vexta calcule les prix de vente.",
     ask: { yes: "Oui", no: "Non" },
     render: () => <PricePoliciesCard />,
+  },
+
+  // ---- Projets ----
+  {
+    key: "projets-main-doeuvre",
+    group: "Projets",
+    title: "Entrée des heures",
+    question: "Comment vos employés entrent-ils leurs heures ?",
+    explain:
+      "En saisie manuelle, l'employé écrit l'heure de début et l'heure de fin. En punch, il appuie sur Commencer, Mettre en pause, Continuer et Terminer, et Vexta calcule les heures.",
+    render: () => <LabourModeCard />,
+  },
+  {
+    key: "projets-types",
+    group: "Projets",
+    title: "Types de tâche",
+    question: "Faites-vous des sortes de tâches qui reviennent souvent ?",
+    explain:
+      "Par exemple une inspection ou une installation. Donnez un type à vos tâches : vous pourrez ensuite ajouter des lignes automatiques pour ce type.",
+    ask: { yes: "Oui", no: "Non" },
+    render: () => <NamedListCard list="types" />,
+  },
+  {
+    key: "projets-priorites",
+    group: "Projets",
+    title: "Priorités des projets",
+    question: "Les priorités Basse, Moyenne et Haute vous conviennent-elles ?",
+    explain: "Chaque projet peut avoir une priorité. Ajoutez, renommez ou retirez celles que vous voulez.",
+    ask: { yes: "Je les modifie", no: "Elles me conviennent" },
+    render: () => <NamedListCard list="priorites" />,
+  },
+  {
+    key: "projets-lignes-automatiques",
+    group: "Projets",
+    title: "Lignes automatiques",
+    question: "Ajoutez-vous toujours la même ligne à vos projets ?",
+    explain:
+      "Par exemple des frais de déplacement à chaque nouveau projet, ou une heure de main-d'œuvre à chaque inspection. Choisissez quand la ligne est ajoutée et dans quelle section du projet.",
+    ask: { yes: "Oui", no: "Non" },
+    render: () => <AutoLinesCard />,
   },
 
   // ---- Outils ----

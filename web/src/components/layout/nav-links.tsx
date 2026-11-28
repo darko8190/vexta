@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "cn";
 import type { NavItem } from "@/components/layout/nav-config";
+import { TileGrid, type Tile } from "@/components/layout/tile-grid";
 
 export function NavLinks({
   items,
@@ -82,39 +83,20 @@ export function NavGrid({
   onNavigate?: (event: React.MouseEvent<HTMLAnchorElement>) => void;
 }) {
   const pathname = usePathname();
+  const tiles: Tile[] = items.map((item) => ({
+    key: item.href,
+    href: item.href,
+    label: item.label,
+    icon: item.icon,
+    active: pathname === item.href || pathname.startsWith(`${item.href}/`),
+  }));
 
   return (
-    <nav className="grid grid-cols-3 gap-2">
-      {items.map((item) => {
-        const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-        const Icon = item.icon;
-
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            onClick={onNavigate}
-            aria-current={active ? "page" : undefined}
-            className={cn(
-              "flex min-h-24 flex-col items-center justify-start gap-2 rounded-2xl p-2 pt-3 text-center",
-              "transition-colors",
-              active ? "bg-sidebar-accent" : "hover:bg-sidebar-accent/60 active:bg-sidebar-accent/60",
-            )}
-          >
-            <span
-              className={cn(
-                "flex size-12 shrink-0 items-center justify-center rounded-2xl",
-                active ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary",
-              )}
-            >
-              <Icon className="size-6" />
-            </span>
-            <span className="line-clamp-2 text-xs leading-tight font-medium text-sidebar-foreground">
-              {item.label}
-            </span>
-          </Link>
-        );
-      })}
-    </nav>
+    <TileGrid
+      tiles={tiles}
+      orderId="menu-mobile"
+      label="Menu"
+      onPick={(_, event) => onNavigate?.(event as React.MouseEvent<HTMLAnchorElement>)}
+    />
   );
 }

@@ -23,11 +23,16 @@ import {
 } from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { useQuery } from "@tanstack/react-query";
 import {
   useCreateProjectTask,
   useTaskAssignablesQuery,
   useUpdateProjectTask,
 } from "@/hooks/use-project-tasks";
+import { useProjectSettingsQuery } from "@/hooks/use-project-settings";
+import { useSaveWorkTask } from "@/hooks/use-work";
+import { ProjectPicker } from "@/components/invoices/project-picker";
+import { api } from "@/lib/api";
 import { ApiError } from "@/lib/api";
 import { dayIso, todayIso } from "@/lib/dates";
 import { taskPriorityLabels, taskStatusLabels } from "@/lib/labels";
@@ -36,6 +41,7 @@ import type {
   ProjectTaskPriority,
   ProjectTaskStatus,
   SaveProjectTaskValues,
+  TaskAssignables,
 } from "@/lib/types";
 import { ex } from "@/lib/placeholders";
 
@@ -50,6 +56,8 @@ const formSchema = z
     estimatedHours: z.string().optional().or(z.literal("")),
     assignedTeamId: z.string().optional().or(z.literal("")),
     assigneeIds: z.array(z.string()),
+    taskTypeId: z.string(),
+    projectId: z.string(),
   })
   .refine((values) => !values.startDate || !values.dueDate || values.dueDate >= values.startDate, {
     message: "L'échéance ne peut pas précéder le début.",
@@ -63,11 +71,12 @@ const DEFAULT_DURATION_IN_DAYS = 7;
 
 /** The value a Select uses for "aucune", because an empty string is not a selectable item. */
 const NO_TEAM = "aucune";
+const NO_TYPE = "aucun";
 
 const statuses: ProjectTaskStatus[] = ["AFaire", "EnCours", "Bloquee", "Terminee"];
 const priorities: ProjectTaskPriority[] = ["Basse", "Normale", "Haute", "Urgente"];
 
-function toFormValues(task?: ProjectTask): FormValues {
+function toFormValues(task?: ProjectTask, projectId?: string): FormValues {
   return {
     title: task?.title ?? "",
     description: task?.description ?? "",
@@ -80,6 +89,8 @@ function toFormValues(task?: ProjectTask): FormValues {
     estimatedHours: task?.estimatedHours != null ? String(task.estimatedHours) : "",
     assignedTeamId: task?.assignedTeamId ?? "",
     assigneeIds: task?.assignees.map((a) => a.id) ?? [],
+    taskTypeId: task?.taskTypeId ?? "",
+    projectId: task?.projectId ?? projectId ?? "",
   };
 }
 
@@ -98,26 +109,38 @@ export function TaskFormSheet({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  projectId: string;
+  /** Omitted from Tâches et horaire: the task may then be on any project, or on none. */
+  projectId?: string;
   task?: ProjectTask;
 }) {
   const isEditing = Boolean(task);
-  const create = useCreateProjectTask(projectId);
-  const update = useUpdateProjectTask(projectId);
+  const onProject = Boolean(projectId);
+  const create = useCreateProjectTask(projectId ?? "");
+  const update = useUpdateProjectTask(projectId ?? "");
+  const saveAnywhere = useSaveWorkTask();
 
   // Only while the panel is open: two lists nobody needs in order to read the tasks.
-  const { data: assignables } = useTaskAssignablesQuery(projectId, open);
+  const { data: projectAssignables } = useTaskAssignablesQuery(projectId, open && onProject);
+  const { data: anyAssignables } = useQuery({
+    queryKey: ["taches", "assignables"],
+    queryFn: () => api.get<TaskAssignables>("taches/assignables"),
+    enabled: open && !onProject,
+    staleTime: 5 * 60 * 1000,
+  });
+  const assignables = onProject ? projectAssignables : anyAssignables;
+  const { data: projectSettings } = useProjectSettingsQuery(open);
+  const taskTypes = projectSettings?.taskTypes ?? [];
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: toFormValues(task),
+    defaultValues: toFormValues(task, projectId),
   });
 
   useEffect(() => {
-    if (open) form.reset(toFormValues(task));
-  }, [open, task, form]);
+    if (open) form.reset(toFormValues(task, projectId));
+  }, [open, task, projectId, form]);
 
-  const pending = create.isPending || update.isPending;
+  const pending = create.isPending || update.isPending || saveAnywhere.isPending;
 
   async function onSubmit(values: FormValues) {
     const payload: SaveProjectTaskValues = {
@@ -130,10 +153,15 @@ export function TaskFormSheet({
       estimatedHours: values.estimatedHours ? Number(values.estimatedHours) : null,
       assignedTeamId: values.assignedTeamId || null,
       assigneeIds: values.assigneeIds,
+      taskTypeId: values.taskTypeId || null,
+      projectId: values.projectId || null,
     };
 
     try {
-      if (task) {
+      if (!onProject) {
+        await saveAnywhere.mutateAsync({ id: task?.id, values: payload });
+        toast.success(task ? "Tâche enregistrée." : "Tâche ajoutée.");
+      } else if (task) {
         await update.mutateAsync({ id: task.id, values: payload });
         toast.success("Tâche enregistrée.");
       } else {
@@ -184,6 +212,59 @@ export function TaskFormSheet({
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              )}
+            />
+
+            {/* From Tâches et horaire: a project, or none for an errand or a shop chore. Once a
+                task is on a job it stays there — its hours were filed against that job. */}
+            {!onProject && (
+              <Controller
+                name="projectId"
+                control={form.control}
+                render={({ field }) => (
+                  <Field>
+                    <FieldLabel htmlFor="task-project">Projet</FieldLabel>
+                    {task?.projectId ? (
+                      <p className="text-sm text-muted-foreground">Cette tâche reste sur son projet.</p>
+                    ) : (
+                      <>
+                        <ProjectPicker id="task-project" value={field.value} onChange={field.onChange} />
+                        <FieldDescription>Facultatif : une tâche peut n&apos;appartenir à aucun projet.</FieldDescription>
+                      </>
+                    )}
+                  </Field>
+                )}
+              />
+            )}
+
+            <Controller
+              name="taskTypeId"
+              control={form.control}
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel htmlFor="task-type">Type de tâche</FieldLabel>
+                  <Select
+                    value={field.value || NO_TYPE}
+                    onValueChange={(value) => field.onChange(value === NO_TYPE || !value ? "" : value)}
+                  >
+                    <SelectTrigger id="task-type" className="w-full">
+                      <SelectValue>
+                        {(value: string) =>
+                          !value || value === NO_TYPE ? "Aucun" : (taskTypes.find((t) => t.id === value)?.name ?? "Aucun")
+                        }
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_TYPE}>Aucun</SelectItem>
+                      {taskTypes.map((type) => (
+                        <SelectItem key={type.id} value={type.id}>
+                          {type.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FieldDescription>Les types se gèrent dans Paramètres › Projets, avec les lignes automatiques.</FieldDescription>
                 </Field>
               )}
             />

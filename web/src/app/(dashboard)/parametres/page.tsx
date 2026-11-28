@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Building2, ClipboardPen, Clock, Compass, CreditCard, Globe, KeyRound, Mail, PanelLeft, Percent, Receipt, Sparkles, Trash2, Wallet } from "lucide-react";
+import { Building2, ClipboardPen, Clock, Compass, CreditCard, FolderKanban, Globe, KeyRound, Mail, PanelLeft, Percent, Receipt, Sparkles, Trash2, Wallet } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,6 +36,8 @@ import { McpKeysCard } from "@/components/settings/mcp-keys-card";
 import { CompanySettings, PublicPageSettings } from "@/components/company/company-settings";
 import { TrashCard } from "@/components/settings/trash-card";
 import { MenuVisibilityCard } from "@/components/settings/menu-visibility-card";
+import { AutoLinesCard, LabourModeCard, NamedListCard } from "@/components/settings/project-settings-cards";
+import { useProjectSettingsQuery } from "@/hooks/use-project-settings";
 import { useBillingSettingsQuery } from "@/hooks/use-billing-settings";
 import { useInvoiceAutoFeesQuery } from "@/hooks/use-auto-fees";
 import { usePricePoliciesQuery } from "@/hooks/use-price-policies";
@@ -357,6 +359,7 @@ export default function SettingsPage() {
   const { data: classifications } = useWageClassificationsQuery(canManage === true);
   const { data: autoFees } = useInvoiceAutoFeesQuery(canManage === true);
   const { data: pricePolicies } = usePricePoliciesQuery(canManage === true);
+  const { data: projectSettings } = useProjectSettingsQuery(canManage === true);
   // Same key as the Corbeille card, so opening it costs nothing more.
   const { data: trash } = useQuery({
     queryKey: ["corbeille"],
@@ -431,6 +434,7 @@ export default function SettingsPage() {
             status: paymentsStatus,
           },
           { key: "taux", label: "Taux", icon: Clock, status: all(hourlyStatus, classificationsStatus) },
+          { key: "projets", label: "Projets", icon: FolderKanban },
           { key: "marge", label: "Marge et prix", icon: Percent, status: marginModeStatus },
           // Last, because it is the one section that is set up once and then forgotten.
           {
@@ -543,6 +547,21 @@ export default function SettingsPage() {
                     status: classificationsStatus,
                     content: <WageClassificationsCard />,
                   },
+                ]}
+              />
+            )}
+            {active === "projets" && (
+              <SettingsTabs
+                tabs={[
+                  { value: "main-doeuvre", label: "Main-d'œuvre", content: <LabourModeCard /> },
+                  {
+                    value: "lignes-automatiques",
+                    label: "Lignes automatiques",
+                    count: projectSettings?.autoLines.length ?? 0,
+                    content: <AutoLinesCard />,
+                  },
+                  { value: "types", label: "Types de tâche", count: projectSettings?.taskTypes.length ?? 0, content: <NamedListCard list="types" /> },
+                  { value: "priorites", label: "Priorités", count: projectSettings?.priorities.length ?? 0, content: <NamedListCard list="priorites" /> },
                 ]}
               />
             )}

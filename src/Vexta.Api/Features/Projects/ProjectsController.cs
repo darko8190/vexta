@@ -145,9 +145,10 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
             .Select(x => new { x.Quantity, x.UnitCost, x.UnitPrice })
             .ToListAsync();
 
-        var hours = await db.TimesheetEntries.AsNoTracking()
+        var labour = await db.TimesheetEntries.AsNoTracking()
             .Where(t => t.ProjectId == id)
-            .SumAsync(t => (decimal?)t.Hours) ?? 0m;
+            .Select(t => new { t.Hours, t.HourlyRate })
+            .ToListAsync();
 
         var rateSettings = await db.BillingSettings.AsNoTracking()
             .Where(b => b.TenantId == currentUser.TenantId)
@@ -158,7 +159,8 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
             m.ProjectId == id && m.ProductId == null && m.ProjectAssemblyId == null && m.UnitPrice == 0);
         var equipmentToReview = await db.ProjectEquipment.CountAsync(x =>
             x.ProjectId == id && x.EquipmentId == null && (x.SellingRate == null || x.SellingRate == 0));
-        var timesheetsToReview = await db.TimesheetEntries.CountAsync(t => t.ProjectId == id && (noRate || t.Hours <= 0));
+        var timesheetsToReview = await db.TimesheetEntries.CountAsync(t => t.ProjectId == id
+            && ((noRate && t.HourlyRate == null) || t.HourlyRate == 0 || (t.Hours <= 0 && t.PunchState == PunchState.Aucun)));
 
         var quote = await db.Quotes.AsNoTracking()
             .Where(q => q.ProjectId == id)
@@ -189,7 +191,12 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
         // Hours are revenue and no cost: what the company charges for an hour is settled, what
         // an hour of that person's time costs it is payroll, which this application does not
         // know. A guessed wage here would turn the profit column into fiction.
-        var labourRevenue = hours * (settings?.DefaultHourlyRate ?? 0m);
+        var defaultRate = settings?.DefaultHourlyRate ?? 0m;
+        var labourRevenue = labour.Sum(t => t.Hours * (t.HourlyRate ?? defaultRate));
+        // The rate shown beside the labour line: the one every entry shares, the company's when
+        // there are none, and null when the entries disagree.
+        var rates = labour.Select(t => t.HourlyRate ?? defaultRate).Distinct().ToList();
+        decimal? labourRate = rates.Count == 0 ? defaultRate : rates.Count == 1 ? rates[0] : null;
 
         var lines = new List<ProjectCostLineDto>
         {
@@ -202,7 +209,7 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
             new("assemblages", "Assemblages",
                 assemblies.Sum(x => x.Quantity * x.UnitCost),
                 assemblies.Sum(x => x.Quantity * x.UnitPrice)),
-            new("feuilles-de-temps", "Poinçons", 0m, labourRevenue),
+            new("feuilles-de-temps", "Main-d'œuvre", 0m, labourRevenue),
             new("depenses", "Dépenses",
                 expenses.Sum(x => x.Cost ?? 0m),
                 expenses.Sum(x => x.SellingPrice ?? 0m)),
@@ -256,7 +263,9 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
             invoiced,
             Math.Max(0m, Round(projectTotal - invoiced)),
             Round(paid),
-            Math.Max(0m, Round(invoiced - credited - paid)));
+            Math.Max(0m, Round(invoiced - credited - paid)),
+            labourRate,
+            labour.Sum(t => t.Hours));
 
         // The crew sees how much there is of each thing, never what it is worth.
         if (currentUser.Role == UserRole.TenantUser)
@@ -323,6 +332,7 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
             && await ProjectTemplatesController.ApplyAsync(db, project, templateId, HttpContext.RequestAborted) is { } templateError)
             return BadRequest(new { message = templateError });
         db.Projects.Add(project);
+        await ProjectAutomation.AddLinesAsync(db, tenantId, project.Id, AutoLineEvent.ProjetCree, null, null, HttpContext.RequestAborted);
         await db.SaveChangesAsync();
 
         var dto = await GetDtoAsync(project.Id);
@@ -500,6 +510,11 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
             return "Ce classement n'existe plus.";
         }
 
+        if (request.PriorityId is { } priorityId && !await db.ProjectPriorities.AnyAsync(p => p.Id == priorityId))
+        {
+            return "Cette priorité n'existe plus.";
+        }
+
         return null;
     }
 
@@ -530,6 +545,7 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
     /// <summary>A sub-category without its category is dropped rather than kept dangling.</summary>
     private static void ApplyFiling(Project project, UpsertProjectRequest request)
     {
+        project.PriorityId = request.PriorityId;
         project.CategoryId = request.CategoryId;
         project.SubCategoryId = request.CategoryId is null ? null : request.SubCategoryId;
         project.WageClassificationId = request.WageClassificationId;
@@ -594,5 +610,7 @@ public class ProjectsController(VextaDbContext db, ICurrentUserService currentUs
         p.RecurrenceUnit,
         p.RecurrenceNextDate,
         p.RecurrenceEndDate,
-        p.RecurringFromId);
+        p.RecurringFromId,
+        p.PriorityId,
+        p.Priority == null ? null : p.Priority.Name);
 }

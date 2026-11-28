@@ -39,11 +39,16 @@ public class ProjectTask
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid TenantId { get; set; }
 
-    public Guid ProjectId { get; set; }
+    /// <summary>Null for a task that belongs to no project: an errand, a shop chore.</summary>
+    public Guid? ProjectId { get; set; }
     public Project? Project { get; set; }
 
     public required string Title { get; set; }
     public string? Description { get; set; }
+
+    /// <summary>The kind of task, from Paramètres › Projets. What the automatic lines key on.</summary>
+    public Guid? TaskTypeId { get; set; }
+    public TaskType? TaskType { get; set; }
 
     public ProjectTaskStatus Status { get; set; } = ProjectTaskStatus.AFaire;
     public ProjectTaskPriority Priority { get; set; } = ProjectTaskPriority.Normale;

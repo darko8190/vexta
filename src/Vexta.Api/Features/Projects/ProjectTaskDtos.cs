@@ -28,7 +28,11 @@ public record ProjectTaskDto(
     DateTimeOffset? CompletedAt,
     /// <summary>Computed here rather than in the browser, so every reader agrees on today.</summary>
     bool IsLate,
-    int SortOrder);
+    int SortOrder,
+    Guid? TaskTypeId = null,
+    string? TaskTypeName = null,
+    /// <summary>Null for a task on no project.</summary>
+    Guid? ProjectId = null);
 
 public record SaveProjectTaskRequest(
     string Title,
@@ -40,7 +44,11 @@ public record SaveProjectTaskRequest(
     decimal? EstimatedHours = null,
     /// <summary>A crew, named people, both, or neither — all four are real states.</summary>
     Guid? AssignedTeamId = null,
-    IReadOnlyList<Guid>? AssigneeIds = null);
+    IReadOnlyList<Guid>? AssigneeIds = null,
+    /// <summary>The kind of task, from Paramètres › Projets.</summary>
+    Guid? TaskTypeId = null,
+    /// <summary>Read by the company-wide task route only: the project, or null for none.</summary>
+    Guid? ProjectId = null);
 
 /// <summary>Moving a task along, which is all an employee may do to one.</summary>
 public record ChangeTaskStatusRequest(ProjectTaskStatus Status);

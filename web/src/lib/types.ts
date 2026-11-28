@@ -386,6 +386,9 @@ export interface ProjectRecord {
   recurrenceEndDate: string | null;
   /** On a copy: the model it came from. */
   recurringFromId: string | null;
+  /** How pressing the job is, from Paramètres › Projets. */
+  priorityId?: string | null;
+  priorityName?: string | null;
 }
 
 /** One of the company's own categories for its jobs, separate from the catalogue's. */
@@ -944,6 +947,9 @@ export interface ProjectCostTable {
   remainingToInvoice?: number | null;
   paid?: number | null;
   remainingToPay?: number | null;
+  /** The rate every labour entry shares, or null when they differ. */
+  labourRate?: number | null;
+  labourHours?: number;
 }
 
 export interface ProjectSummary {
@@ -1028,6 +1034,10 @@ export interface ProjectTask {
   /** Decided by the API, so every reader agrees on what today is. */
   isLate: boolean;
   sortOrder: number;
+  taskTypeId?: string | null;
+  taskTypeName?: string | null;
+  /** Null for a task on no project. */
+  projectId?: string | null;
 }
 
 export interface SaveProjectTaskValues {
@@ -1040,6 +1050,9 @@ export interface SaveProjectTaskValues {
   estimatedHours: number | null;
   assignedTeamId: string | null;
   assigneeIds: string[];
+  taskTypeId?: string | null;
+  /** Read by the company-wide task route only. */
+  projectId?: string | null;
 }
 
 export interface SaveProjectMaterialValues {
@@ -1075,6 +1088,48 @@ export interface TimesheetEntry {
   projectTaskTitle: string | null;
   createdAt: string;
   updatedAt: string;
+  /** What an hour is billed at. Null to the crew, and on old entries (the company's rate). */
+  hourlyRate?: number | null;
+  punchState?: PunchState;
+  punchStartedAt?: string | null;
+  pausedAt?: string | null;
+  pausedSeconds?: number;
+}
+
+export type PunchState = "Aucun" | "EnCours" | "EnPause";
+export type LabourEntryMode = "Manuel" | "Punch";
+export type AutoLineEvent = "ProjetCree" | "TacheCreee";
+export type AutoLineSection = "MainDoeuvre" | "Materiaux" | "Equipements" | "FraisSupplementaires";
+
+export interface NamedItem {
+  id: string;
+  name: string;
+  sortOrder: number;
+}
+
+export interface ProjectAutoLine {
+  id: string;
+  event: AutoLineEvent;
+  taskTypeId: string | null;
+  taskTypeName: string | null;
+  section: AutoLineSection;
+  description: string;
+  quantity: number;
+  unitCost: number | null;
+  unitPrice: number;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+export type ProjectAutoLineValues = Omit<ProjectAutoLine, "id" | "taskTypeName" | "sortOrder">;
+
+/** Paramètres › Projets. */
+export interface ProjectSettings {
+  labourMode: LabourEntryMode;
+  defaultHourlyRate: number | null;
+  taskTypes: NamedItem[];
+  priorities: NamedItem[];
+  autoLines: ProjectAutoLine[];
 }
 
 export interface SaveTimesheetValues {
@@ -1086,6 +1141,8 @@ export interface SaveTimesheetValues {
   note: string | null;
   /** Optional: the task on this job it belongs to. */
   projectTaskId: string | null;
+  /** Null takes the company's rate on a new entry and keeps the entry's own on an edit. */
+  hourlyRate?: number | null;
 }
 
 /** A file filed against a job. The URL is signed and short-lived, so it is never stored. */
@@ -1233,8 +1290,8 @@ export interface DashboardInvoice {
 
 export interface DashboardTask {
   id: string;
-  projectId: string;
-  projectNumber: number;
+  projectId: string | null;
+  projectNumber: number | null;
   title: string;
   dueDate: string | null;
   isLate: boolean;
@@ -1268,9 +1325,10 @@ export interface AdminDashboardSummary {
 /** A task as the company-wide list shows it: which job it is on, and who has it. */
 export interface WorkTask {
   id: string;
-  projectId: string;
-  projectNumber: number;
-  clientName: string;
+  /** The three are null for a task on no project. */
+  projectId: string | null;
+  projectNumber: number | null;
+  clientName: string | null;
   title: string;
   status: ProjectTaskStatus;
   priority: ProjectTaskPriority;
@@ -1278,6 +1336,13 @@ export interface WorkTask {
   isLate: boolean;
   assignedTeamName: string | null;
   assigneeNames: string[];
+  description?: string | null;
+  startDate?: string | null;
+  estimatedHours?: number | null;
+  assignedTeamId?: string | null;
+  assigneeIds?: string[] | null;
+  taskTypeId?: string | null;
+  taskTypeName?: string | null;
 }
 
 export interface WorkTimesheet {
@@ -2141,9 +2206,10 @@ export interface MyWeek {
 
 export interface MyAssignment {
   id: string;
-  projectId: string;
-  projectNumber: number;
-  clientName: string;
+  /** The three are null for a task on no project. */
+  projectId: string | null;
+  projectNumber: number | null;
+  clientName: string | null;
   title: string;
   description: string | null;
   status: ProjectTaskStatus;
@@ -2153,6 +2219,8 @@ export interface MyAssignment {
   isLate: boolean;
   /** The crew's name when the task came through a crew, null when it came by name. */
   viaTeam: string | null;
+  /** My closed entries on it: the task can be ended from my list once there is one. */
+  myEntries: number;
 }
 
 export interface MyAssignments {

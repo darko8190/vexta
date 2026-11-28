@@ -1,6 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, buildQuery } from "@/lib/api";
-import type { ProjectTaskStatus, WorkTask, WorkTimesheets } from "@/lib/types";
+import type { ProjectTask, ProjectTaskStatus, SaveProjectTaskValues, WorkTask, WorkTimesheets } from "@/lib/types";
 
 /** Every open task in the company. Omitting the status means everything not finished. */
 export function useWorkTasksQuery(filters: {
@@ -52,5 +52,39 @@ export function useWorkTimesheetsQuery(filters: {
     // Keeps last week's table on screen while this one loads, so moving between weeks does not
     // flash an empty state at somebody who is reading hours.
     placeholderData: (previous) => previous,
+  });
+}
+
+/** Every task-shaped list on screen, refreshed after a write from the company-wide routes. */
+function invalidateTasks(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({ queryKey: ["travail", "taches"] });
+  queryClient.invalidateQueries({ queryKey: ["projects"] });
+  queryClient.invalidateQueries({ queryKey: ["moi"] });
+}
+
+/** A task created or edited from Tâches et horaire: on a project or on none. */
+export function useSaveWorkTask() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, values }: { id?: string; values: SaveProjectTaskValues }) =>
+      id ? api.put<ProjectTask>(`taches/${id}`, values) : api.post<ProjectTask>("taches", values),
+    onSuccess: () => invalidateTasks(queryClient),
+  });
+}
+
+export function useChangeWorkTaskStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: ProjectTaskStatus }) =>
+      api.patch<ProjectTask>(`taches/${id}/statut`, { status }),
+    onSuccess: () => invalidateTasks(queryClient),
+  });
+}
+
+export function useDeleteWorkTask() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`taches/${id}`),
+    onSuccess: () => invalidateTasks(queryClient),
   });
 }

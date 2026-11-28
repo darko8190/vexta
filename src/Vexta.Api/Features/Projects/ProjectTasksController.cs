@@ -33,6 +33,7 @@ public class ProjectTasksController(VextaDbContext db, ICurrentUserService curre
         var tasks = await db.ProjectTasks.AsNoTracking()
             .Include(t => t.Assignees)
             .Include(t => t.AssignedTeam)
+            .Include(t => t.TaskType)
             .Where(t => t.ProjectId == projectId)
             // Open work first, then by the order someone put them in. A finished task stays on
             // the list — it is the record of what was done — but it stops being in the way.
@@ -78,6 +79,7 @@ public class ProjectTasksController(VextaDbContext db, ICurrentUserService curre
         var assignees = await ResolveAssigneesAsync(request.AssigneeIds, ct);
         if (assignees is null) return BadRequest(new { message = UnknownAssignee });
         if (await UnknownTeamAsync(request.AssignedTeamId, ct)) return BadRequest(new { message = UnknownTeam });
+        if (await UnknownTypeAsync(db, request.TaskTypeId, ct)) return BadRequest(new { message = UnknownType });
 
         // Max + 1 rather than a count: deleting the third of four would otherwise hand its rank
         // to the next task added, and two rows sharing a rank is a list that reshuffles itself.
@@ -97,14 +99,17 @@ public class ProjectTasksController(VextaDbContext db, ICurrentUserService curre
             DueDate = request.DueDate,
             EstimatedHours = request.EstimatedHours,
             AssignedTeamId = request.AssignedTeamId,
+            TaskTypeId = request.TaskTypeId,
             SortOrder = (lastSortOrder ?? -1) + 1
         };
 
         task.Assignees.AddRange(assignees);
-        ApplyCompletion(task, request.Status);
+        ApplyCompletion(task, request.Status, currentUser.UserId);
 
         db.ProjectTasks.Add(task);
+        await ProjectAutomation.AddLinesAsync(db, tenantId, projectId, AutoLineEvent.TacheCreee, task.TaskTypeId, task.Id, ct);
         await db.SaveChangesAsync(ct);
+        await ProjectAutomation.MarkReadyToBillAsync(db, projectId, ct);
 
         // Re-read so the team's name comes back with it: the row holds an id, and the list the
         // form is about to refresh shows a name.
@@ -125,6 +130,7 @@ public class ProjectTasksController(VextaDbContext db, ICurrentUserService curre
         var assignees = await ResolveAssigneesAsync(request.AssigneeIds, ct);
         if (assignees is null) return BadRequest(new { message = UnknownAssignee });
         if (await UnknownTeamAsync(request.AssignedTeamId, ct)) return BadRequest(new { message = UnknownTeam });
+        if (await UnknownTypeAsync(db, request.TaskTypeId, ct)) return BadRequest(new { message = UnknownType });
 
         task.Title = request.Title.Trim();
         task.Description = Clean(request.Description);
@@ -133,15 +139,17 @@ public class ProjectTasksController(VextaDbContext db, ICurrentUserService curre
         task.DueDate = request.DueDate;
         task.EstimatedHours = request.EstimatedHours;
         task.AssignedTeamId = request.AssignedTeamId;
+        task.TaskTypeId = request.TaskTypeId;
         task.UpdatedAt = DateTimeOffset.UtcNow;
 
         task.Assignees.Clear();
         task.Assignees.AddRange(assignees);
 
-        ApplyCompletion(task, request.Status);
+        ApplyCompletion(task, request.Status, currentUser.UserId);
 
         await db.SaveChangesAsync(ct);
-        return Ok(Map(task));
+        await ProjectAutomation.MarkReadyToBillAsync(db, projectId, ct);
+        return Ok(Map(await LoadAsync(projectId, id, ct) ?? task));
     }
 
     /// <summary>
@@ -154,11 +162,14 @@ public class ProjectTasksController(VextaDbContext db, ICurrentUserService curre
     {
         var task = await LoadAsync(projectId, id, ct);
         if (task is null) return NotFound();
+        if (await FinishProblemAsync(db, currentUser, task, request.Status, ct) is { } problem)
+            return BadRequest(new { message = problem });
 
-        ApplyCompletion(task, request.Status);
+        ApplyCompletion(task, request.Status, currentUser.UserId);
         task.UpdatedAt = DateTimeOffset.UtcNow;
 
         await db.SaveChangesAsync(ct);
+        await ProjectAutomation.MarkReadyToBillAsync(db, projectId, ct);
         return Ok(Map(task));
     }
 
@@ -177,22 +188,50 @@ public class ProjectTasksController(VextaDbContext db, ICurrentUserService curre
         return NoContent();
     }
 
-    private const string UnknownAssignee = "Un des employés choisis n'existe pas.";
-    private const string UnknownTeam = "Cette équipe n'existe pas.";
+    internal const string UnknownAssignee = "Un des employés choisis n'existe pas.";
+    internal const string UnknownTeam = "Cette équipe n'existe pas.";
+    internal const string UnknownType = "Ce type de tâche n'existe pas.";
 
     private Task<ProjectTask?> LoadAsync(Guid projectId, Guid id, CancellationToken ct) =>
         db.ProjectTasks
             .Include(t => t.Assignees)
             .Include(t => t.AssignedTeam)
+            .Include(t => t.TaskType)
             .FirstOrDefaultAsync(t => t.Id == id && t.ProjectId == projectId, ct);
+
+    internal static async Task<bool> UnknownTypeAsync(VextaDbContext db, Guid? typeId, CancellationToken ct) =>
+        typeId is { } id && !await db.TaskTypes.AnyAsync(t => t.Id == id, ct);
+
+    /// <summary>
+    /// An employee ends a task on a project only once they have hours on it: at least one entry,
+    /// typed or punched and closed. The office closes tasks as it likes, and a task on no
+    /// project, where no hours are kept, is ended by anyone.
+    /// </summary>
+    internal static async Task<string?> FinishProblemAsync(
+        VextaDbContext db, ICurrentUserService currentUser, ProjectTask task, ProjectTaskStatus status, CancellationToken ct)
+    {
+        if (status != ProjectTaskStatus.Terminee || task.Status == ProjectTaskStatus.Terminee) return null;
+        if (currentUser.Role != UserRole.TenantUser || task.ProjectId is null) return null;
+
+        var employeeId = await db.Employees.AsNoTracking()
+            .Where(e => e.UserId == currentUser.UserId)
+            .Select(e => (Guid?)e.Id)
+            .FirstOrDefaultAsync(ct);
+        var hasHours = employeeId is { } me && await db.TimesheetEntries.AnyAsync(
+            x => x.ProjectTaskId == task.Id && x.EmployeeId == me && x.PunchState == PunchState.Aucun, ct);
+        return hasHours ? null : "Entrez au moins une feuille de temps sur cette tâche avant de la terminer.";
+    }
 
     /// <summary>
     /// The employees behind those ids, or null when one of them is not this company's. Null
     /// rather than a silently shorter list: a task assigned to two people out of the three that
     /// were picked is worse than a refusal.
     /// </summary>
-    private async Task<List<Employee>?> ResolveAssigneesAsync(
-        IReadOnlyList<Guid>? ids, CancellationToken ct)
+    private Task<List<Employee>?> ResolveAssigneesAsync(IReadOnlyList<Guid>? ids, CancellationToken ct) =>
+        ResolveAssigneesAsync(db, ids, ct);
+
+    internal static async Task<List<Employee>?> ResolveAssigneesAsync(
+        VextaDbContext db, IReadOnlyList<Guid>? ids, CancellationToken ct)
     {
         if (ids is null || ids.Count == 0) return [];
 
@@ -201,7 +240,9 @@ public class ProjectTasksController(VextaDbContext db, ICurrentUserService curre
         return found.Count == wanted.Count ? found : null;
     }
 
-    private async Task<bool> UnknownTeamAsync(Guid? teamId, CancellationToken ct) =>
+    private Task<bool> UnknownTeamAsync(Guid? teamId, CancellationToken ct) => UnknownTeamAsync(db, teamId, ct);
+
+    internal static async Task<bool> UnknownTeamAsync(VextaDbContext db, Guid? teamId, CancellationToken ct) =>
         teamId is { } id && !await db.Teams.AnyAsync(t => t.Id == id, ct);
 
     /// <summary>
@@ -209,7 +250,7 @@ public class ProjectTasksController(VextaDbContext db, ICurrentUserService curre
     /// when, reopening clears both. Left to the form, a reopened task would keep the date it was
     /// once closed on and every report counting finished work would be wrong.
     /// </summary>
-    private void ApplyCompletion(ProjectTask task, ProjectTaskStatus status)
+    internal static void ApplyCompletion(ProjectTask task, ProjectTaskStatus status, Guid? userId)
     {
         var wasDone = task.Status == ProjectTaskStatus.Terminee;
         task.Status = status;
@@ -219,7 +260,7 @@ public class ProjectTasksController(VextaDbContext db, ICurrentUserService curre
             if (!wasDone)
             {
                 task.CompletedAt = DateTimeOffset.UtcNow;
-                task.CompletedByUserId = currentUser.UserId;
+                task.CompletedByUserId = userId;
             }
 
             return;
@@ -229,7 +270,7 @@ public class ProjectTasksController(VextaDbContext db, ICurrentUserService curre
         task.CompletedByUserId = null;
     }
 
-    private static ProjectTaskDto Map(ProjectTask t) =>
+    internal static ProjectTaskDto Map(ProjectTask t) =>
         new(
             t.Id,
             t.Title,
@@ -249,12 +290,15 @@ public class ProjectTasksController(VextaDbContext db, ICurrentUserService curre
             // The company's own day, not the container's: in UTC a task due today reads
             // as late from 19 h every evening. See Common.BusinessDay.
             t.IsLate(BusinessDay.Today),
-            t.SortOrder);
+            t.SortOrder,
+            t.TaskTypeId,
+            t.TaskType?.Name,
+            t.ProjectId);
 
-    private static string? Clean(string? value) =>
+    internal static string? Clean(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    private static string? Problem(SaveProjectTaskRequest r)
+    internal static string? Problem(SaveProjectTaskRequest r)
     {
         if (string.IsNullOrWhiteSpace(r.Title)) return "Le titre est obligatoire.";
         if (r.Title.Trim().Length > 200) return "Le titre ne peut pas dépasser 200 caractères.";

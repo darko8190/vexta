@@ -62,6 +62,12 @@ public class BillingSettings
     /// </summary>
     public decimal? DefaultHourlyRate { get; set; }
 
+    /// <summary>How the crew records its hours on a job: typed in, or punched. Paramètres › Projets.</summary>
+    public LabourEntryMode LabourMode { get; set; } = LabourEntryMode.Manuel;
+
+    /// <summary>Set once Basse, Moyenne and Haute were given to the company, so deleting them sticks.</summary>
+    public bool ProjectPrioritiesSeeded { get; set; }
+
     /// <summary>
     /// How a purchase price becomes a selling price here. Both conventions are called "la
     /// marge" on site and they give different numbers, so the company says which one it means

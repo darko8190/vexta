@@ -44,9 +44,10 @@ public record MyWeekDto(
 /// </summary>
 public record MyAssignmentDto(
     Guid Id,
-    Guid ProjectId,
-    int ProjectNumber,
-    string ClientName,
+    /// <summary>The three are null for a task that belongs to no project.</summary>
+    Guid? ProjectId,
+    int? ProjectNumber,
+    string? ClientName,
     string Title,
     string? Description,
     ProjectTaskStatus Status,
@@ -54,6 +55,11 @@ public record MyAssignmentDto(
     DateOnly? StartDate,
     DateOnly? DueDate,
     bool IsLate,
-    string? ViaTeam);
+    string? ViaTeam,
+    /// <summary>
+    /// How many closed entries I filed on this task. The task can be ended from my list once
+    /// there is at least one — or at once when it is on no project, where no hours are kept.
+    /// </summary>
+    int MyEntries = 0);
 
 public record MyAssignmentsDto(bool HasEmployeeRecord, IReadOnlyList<MyAssignmentDto> Assignments);

@@ -53,7 +53,10 @@ public record ProjectDto(
     RecurrenceUnit RecurrenceUnit = RecurrenceUnit.Mois,
     DateOnly? RecurrenceNextDate = null,
     DateOnly? RecurrenceEndDate = null,
-    Guid? RecurringFromId = null);
+    Guid? RecurringFromId = null,
+    /// <summary>How pressing the job is, from the company's list.</summary>
+    Guid? PriorityId = null,
+    string? PriorityName = null);
 
 public record UpsertProjectRequest(
     Guid ClientId,
@@ -85,7 +88,8 @@ public record UpsertProjectRequest(
     RecurrenceUnit RecurrenceUnit = RecurrenceUnit.Mois,
     DateOnly? RecurrenceEndDate = null,
     /// <summary>On creation only: the project template whose lines the new job starts with.</summary>
-    Guid? TemplateId = null);
+    Guid? TemplateId = null,
+    Guid? PriorityId = null);
 
 // ---- What the project's own page needs beyond the record itself ----
 
@@ -148,7 +152,10 @@ public record ProjectCostTableDto(
     decimal? Invoiced = null,
     decimal? RemainingToInvoice = null,
     decimal? Paid = null,
-    decimal? RemainingToPay = null);
+    decimal? RemainingToPay = null,
+    /// <summary>The rate every labour entry shares, or null when they differ.</summary>
+    decimal? LabourRate = null,
+    decimal LabourHours = 0m);
 
 public record ProjectSummaryDto(
     ProjectSectionCountsDto Counts, ProjectCostTableDto Costs, Guid? QuoteId = null, string? QuoteLabel = null);

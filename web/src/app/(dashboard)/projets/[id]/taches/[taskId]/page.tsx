@@ -2,9 +2,12 @@
 
 import { use, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Blocks, Clock, FolderOpen, HardHat, Info, ListChecks, Plus, Receipt, Wrench } from "lucide-react";
+import { toast } from "sonner";
+import { ArrowLeft, Blocks, CircleCheck, Clock, FolderOpen, HardHat, Info, ListChecks, Plus, Receipt, Wrench } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
+import { ApiError } from "@/lib/api";
 import { InlineSheet } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/layout/empty-state";
@@ -22,7 +25,7 @@ import { useExpensesQuery } from "@/hooks/use-expenses";
 import { useProjectEquipmentQuery } from "@/hooks/use-equipment";
 import { useExtraChargesQuery } from "@/hooks/use-extra-charges";
 import { useProjectMaterialsQuery } from "@/hooks/use-project-materials";
-import { useProjectTasksQuery } from "@/hooks/use-project-tasks";
+import { useChangeTaskStatus, useProjectTasksQuery } from "@/hooks/use-project-tasks";
 import { useProjectQuery } from "@/hooks/use-projects";
 import { useTimesheetsQuery } from "@/hooks/use-timesheets";
 import { formatDateOnly } from "@/lib/dates";
@@ -46,6 +49,7 @@ export default function ProjectTaskPage({
   const canManage = useCanManage();
   const crew = useIsCrewView();
   const [section, setSection] = useState("details");
+  const changeStatus = useChangeTaskStatus(projectId);
 
   // The project's own lists, shared with its tabs through the cache; counted here for the rail.
   const { data: materials } = useProjectMaterialsQuery(projectId);
@@ -89,7 +93,7 @@ export default function ProjectTaskPage({
   const sections: NavSection[] = [
     { key: "details", label: "Détails", icon: Info },
     // The hours first: on a task, what somebody opens it for is to point their time.
-    { key: "feuilles-de-temps", label: "Poinçons", count: count(timesheets), icon: Clock },
+    { key: "feuilles-de-temps", label: "Main-d'œuvre", count: count(timesheets), icon: Clock },
     { key: "materiaux", label: "Matériaux", count: count(materials), icon: HardHat },
     { key: "equipements", label: "Équipements", count: count(equipment), icon: Wrench },
     { key: "assemblages", label: "Assemblages", count: 0, icon: Blocks },
@@ -120,6 +124,29 @@ export default function ProjectTaskPage({
           )}
         </div>
         <h1 className="mt-1 text-xl font-semibold tracking-tight text-foreground sm:text-2xl">{task.title}</h1>
+        {/* The crew ends its assignment here once hours are in on it; the API checks they are its own. */}
+        {crew &&
+          task.status !== "Terminee" &&
+          (timesheets ?? []).some(
+            (entry) => entry.projectTaskId === taskId && (entry.punchState ?? "Aucun") === "Aucun",
+          ) && (
+            <Button
+              size="sm"
+              className="mt-3"
+              disabled={changeStatus.isPending}
+              onClick={async () => {
+                try {
+                  await changeStatus.mutateAsync({ id: taskId, status: "Terminee" });
+                  toast.success("Assignation terminée.");
+                } catch (error) {
+                  toast.error(error instanceof ApiError ? error.message : "Impossible de terminer cette assignation.");
+                }
+              }}
+            >
+              {changeStatus.isPending ? <Spinner /> : <CircleCheck />}
+              Terminer l&apos;assignation
+            </Button>
+          )}
         {(task.assignedTeamName || task.assignees.length > 0) && (
           <p className="mt-0.5 text-sm text-muted-foreground">
             {[task.assignedTeamName, ...task.assignees.map((person) => person.name)].filter(Boolean).join(", ")}

@@ -1384,6 +1384,8 @@ public class QuotesController(
         }
 
         db.Projects.Add(project);
+        await Features.Projects.ProjectAutomation.AddLinesAsync(
+            db, tenantId, project.Id, AutoLineEvent.ProjetCree, null, null, CancellationToken.None);
         quote.ProjectId = project.Id;
         quote.Status = QuoteStatus.Acceptee;
         quote.UpdatedAt = DateTimeOffset.UtcNow;

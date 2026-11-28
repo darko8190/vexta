@@ -21,6 +21,13 @@ public static class WorkHours
         var minutes = (endDate.ToDateTime(endTime) - startDate.ToDateTime(startTime)).TotalMinutes;
         if (minutes <= 0) return 0m;
 
+        return FromMinutes(minutes);
+    }
+
+    /// <summary>A number of minutes worked, to the nearest quarter hour. Zero at or below zero.</summary>
+    public static decimal FromMinutes(double minutes)
+    {
+        if (minutes <= 0) return 0m;
         var quarters = Math.Round(minutes / RoundingMinutes, MidpointRounding.AwayFromZero);
         return (decimal)quarters * RoundingMinutes / 60m;
     }

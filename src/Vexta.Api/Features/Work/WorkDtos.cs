@@ -9,9 +9,10 @@ namespace Vexta.Api.Features.Work;
 /// </summary>
 public record WorkTaskDto(
     Guid Id,
-    Guid ProjectId,
-    int ProjectNumber,
-    string ClientName,
+    /// <summary>The three are null for a task that belongs to no project.</summary>
+    Guid? ProjectId,
+    int? ProjectNumber,
+    string? ClientName,
     string Title,
     ProjectTaskStatus Status,
     ProjectTaskPriority Priority,
@@ -19,7 +20,14 @@ public record WorkTaskDto(
     /// <summary>Computed on the server, so every reader agrees on what day it is.</summary>
     bool IsLate,
     string? AssignedTeamName,
-    List<string> AssigneeNames);
+    List<string> AssigneeNames,
+    string? Description = null,
+    DateOnly? StartDate = null,
+    decimal? EstimatedHours = null,
+    Guid? AssignedTeamId = null,
+    List<Guid>? AssigneeIds = null,
+    Guid? TaskTypeId = null,
+    string? TaskTypeName = null);
 
 /// <summary>
 /// One stretch of time, with the job and the person it belongs to spelled out: this list crosses

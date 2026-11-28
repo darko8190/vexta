@@ -82,7 +82,13 @@ public class ProjectTaskTotalsController(VextaDbContext db, ICurrentUserService 
         var hours = await db.TimesheetEntries.AsNoTracking()
             .Where(x => x.ProjectId == projectId)
             .GroupBy(x => x.ProjectTaskId)
-            .Select(g => new { g.Key, Hours = g.Sum(x => x.Hours) })
+            .Select(g => new
+            {
+                g.Key,
+                Hours = g.Sum(x => x.Hours),
+                // Each entry at its own rate; the ones filed before rates existed at the company's.
+                Revenue = g.Sum(x => x.Hours * (x.HourlyRate ?? rate))
+            })
             .ToListAsync(ct);
 
         var materials = await db.ProjectMaterials.AsNoTracking()
@@ -131,7 +137,7 @@ public class ProjectTaskTotalsController(VextaDbContext db, ICurrentUserService 
                 (materials.FirstOrDefault(x => x.Key == taskId)?.Revenue ?? 0m)
                 + (expenses.FirstOrDefault(x => x.Key == taskId)?.Revenue ?? 0m)
                 + (charges.FirstOrDefault(x => x.Key == taskId)?.Revenue ?? 0m)
-                + taskHours * rate;
+                + (hours.FirstOrDefault(x => x.Key == taskId)?.Revenue ?? 0m);
 
             return new ProjectTaskTotalsDto(
                 taskId, title, status, Round(taskHours), Round(cost), Round(revenue));

@@ -85,6 +85,9 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
     public DbSet<ProjectTemplate> ProjectTemplates => Set<ProjectTemplate>();
     public DbSet<ProjectTemplateLine> ProjectTemplateLines => Set<ProjectTemplateLine>();
     public DbSet<InvoiceAutoFee> InvoiceAutoFees => Set<InvoiceAutoFee>();
+    public DbSet<TaskType> TaskTypes => Set<TaskType>();
+    public DbSet<ProjectPriority> ProjectPriorities => Set<ProjectPriority>();
+    public DbSet<ProjectAutoLine> ProjectAutoLines => Set<ProjectAutoLine>();
     public DbSet<QuoteDocument> QuoteDocuments => Set<QuoteDocument>();
     public DbSet<QuoteNote> QuoteNotes => Set<QuoteNote>();
     public DbSet<ProductImage> ProductImages => Set<ProductImage>();
@@ -485,6 +488,8 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
                 .HasForeignKey(p => p.CategoryId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne(p => p.SubCategory).WithMany(c => c.Projects)
                 .HasForeignKey(p => p.SubCategoryId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(p => p.Priority).WithMany()
+                .HasForeignKey(p => p.PriorityId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne(p => p.WageClassification).WithMany(c => c.Projects)
                 .HasForeignKey(p => p.WageClassificationId).OnDelete(DeleteBehavior.SetNull);
             e.HasQueryFilter(p => (p.TenantId == CurrentTenantId
@@ -1138,6 +1143,9 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.HasOne(t => t.AssignedTeam).WithMany()
                 .HasForeignKey(t => t.AssignedTeamId).OnDelete(DeleteBehavior.SetNull);
 
+            e.HasOne(t => t.TaskType).WithMany()
+                .HasForeignKey(t => t.TaskTypeId).OnDelete(DeleteBehavior.SetNull);
+
             // The named people a task went to. Cascade from both sides is what a join table
             // wants: removing an employee or deleting the task should take the link, and only
             // the link, with it.
@@ -1189,6 +1197,7 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
 
             e.Property(t => t.Hours).HasPrecision(8, 2);
             e.Property(t => t.Note).HasMaxLength(500);
+            e.Property(t => t.HourlyRate).HasPrecision(10, 2);
 
             e.HasIndex(t => new { t.ProjectId, t.StartDate });
             e.HasQueryFilter(t => t.TenantId == CurrentTenantId
@@ -1414,6 +1423,31 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.Property(l => l.UnitPrice).HasPrecision(14, 2);
             e.HasOne(l => l.Template).WithMany(t => t.Lines).HasForeignKey(l => l.TemplateId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(l => new { l.TemplateId, l.Kind, l.SortOrder });
+            e.HasQueryFilter(l => l.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<TaskType>(e =>
+        {
+            e.Property(t => t.Name).HasMaxLength(100);
+            e.HasIndex(t => new { t.TenantId, t.SortOrder });
+            e.HasQueryFilter(t => t.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<ProjectPriority>(e =>
+        {
+            e.Property(t => t.Name).HasMaxLength(100);
+            e.HasIndex(t => new { t.TenantId, t.SortOrder });
+            e.HasQueryFilter(t => t.TenantId == CurrentTenantId);
+        });
+
+        builder.Entity<ProjectAutoLine>(e =>
+        {
+            e.Property(l => l.Description).HasMaxLength(500);
+            e.Property(l => l.Quantity).HasPrecision(14, 3);
+            e.Property(l => l.UnitCost).HasPrecision(14, 2);
+            e.Property(l => l.UnitPrice).HasPrecision(14, 2);
+            e.HasOne(l => l.TaskType).WithMany().HasForeignKey(l => l.TaskTypeId).OnDelete(DeleteBehavior.SetNull);
+            e.HasIndex(l => new { l.TenantId, l.SortOrder });
             e.HasQueryFilter(l => l.TenantId == CurrentTenantId);
         });
 
@@ -1992,14 +2026,15 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
                 .Where(e => taskIds.Contains(e.Entity.Id))
                 .ToDictionary(e => e.Entity.Id, e => e);
             // The task's project; when it is a project being created, the check below skips it.
-            foreach (var entry in tracked.Values) projectIds.Add(entry.Entity.ProjectId);
+            foreach (var entry in tracked.Values)
+                if (entry.Entity.ProjectId is { } trackedProject) projectIds.Add(trackedProject);
 
             var missing = taskIds.Where(id => !tracked.ContainsKey(id)).ToList();
             if (missing.Count > 0)
             {
                 projectIds.UnionWith(await ProjectTasks.IgnoreQueryFilters().AsNoTracking()
-                    .Where(t => missing.Contains(t.Id))
-                    .Select(t => t.ProjectId)
+                    .Where(t => missing.Contains(t.Id) && t.ProjectId != null)
+                    .Select(t => t.ProjectId!.Value)
                     .ToListAsync(ct));
             }
         }

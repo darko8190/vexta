@@ -3,6 +3,7 @@ import { api } from "@/lib/api";
 import type {
   Gallery,
   GalleryDetail,
+  PagePreview,
   PageSection,
   SaveGalleryImageValues,
   SaveGalleryValues,
@@ -100,5 +101,14 @@ export function useSavePageSections() {
     mutationFn: (sections: SavePageSectionValues[]) =>
       api.put<PageSection[]>("company/sections", { sections }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["page-sections"] }),
+  });
+}
+
+/** The page as a visitor would read it, with every gallery and form the builder can place. */
+export function usePagePreviewQuery(enabled = true) {
+  return useQuery({
+    queryKey: ["page-sections", "preview"],
+    queryFn: () => api.get<PagePreview>("company/sections/preview"),
+    enabled,
   });
 }

@@ -31,19 +31,7 @@ public class PublicCompanyController(VextaDbContext db, IR2StorageService storag
 
         var tenant = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
             .Where(t => t.Slug == slug)
-            .Select(t => new
-            {
-                t.Id,
-                t.Name,
-                t.Slug,
-                t.ContactEmail,
-                t.Phone,
-                t.BrandColor,
-                t.SubscriptionStatus,
-                t.TrialEndsAt,
-                CanCharge = t.StripeAccountId != null && t.StripeChargesEnabled,
-                LogoETag = t.Logo!.ETag
-            })
+            .Select(t => new { t.Id, t.SubscriptionStatus, t.TrialEndsAt })
             .FirstOrDefaultAsync(ct);
 
         if (tenant is null) return NotFound();
@@ -53,7 +41,7 @@ public class PublicCompanyController(VextaDbContext db, IR2StorageService storag
         // could not take its own page off the internet if we kept serving it.
         if (!TenantLive.IsLive(tenant.SubscriptionStatus, tenant.TrialEndsAt)) return NotFound();
 
-        var page = await db.PublicPages.AsNoTracking()
+        var page = await db.PublicPages.IgnoreQueryFilters().AsNoTracking()
             .FirstOrDefaultAsync(p => p.TenantId == tenant.Id, ct);
 
         // An unpublished page is a 404 and not a 403: a visitor who asked for a slug that has
@@ -61,284 +49,12 @@ public class PublicCompanyController(VextaDbContext db, IR2StorageService storag
         // exist. The answer is the same either way.
         if (page is null || !page.IsPublished) return NotFound();
 
-        var address = await db.CompanyLocations.IgnoreQueryFilters().AsNoTracking()
-            .Where(l => l.TenantId == tenant.Id && l.IsPrimary)
-            .Select(l => new CompanyAddressDto(
-                l.Label, l.Line1, l.Line2, l.City, l.Province, l.PostalCode, l.Country))
-            .FirstOrDefaultAsync(ct);
+        var content = new PublicPageContent(db, storage);
+        var company = await content.CompanyAsync(tenant.Id, page, await content.SavedSectionsAsync(tenant.Id, ct), ct);
 
-        var products = page.ShowProducts ? await ProductsAsync(tenant.Id, ct) : [];
-
-        var jobs = page.ShowJobs ? await JobsAsync(tenant.Id, ct) : [];
-
-        // Titles only. The questions are fetched when somebody opens one, like a posting's:
-        // most visitors read a page and fill nothing.
-        // How the company arranged its own page, when it has. Empty means it never opened the
-        // builder, and the web app then draws the arrangement it has always drawn -- which is
-        // what makes the builder safe to have: no page changes until somebody builds one.
-        var sections = await SectionsAsync(tenant.Id, ct);
-
-        var forms = page.ShowForms
-            ? (await PublicFormGate.ListAsync(db, tenant.Id, ct))
-                .Select(f => new PublicPageFormDto(f.FormId, f.Title, f.Description, f.Kind))
-                .ToList()
-            : [];
-
-        return Ok(new PublicCompanyDto(
-            tenant.Name,
-            tenant.Slug,
-            page.Headline,
-            page.About,
-            page.ContactNote,
-            tenant.ContactEmail,
-            tenant.Phone,
-            tenant.LogoETag,
-            tenant.Id,
-            tenant.BrandColor,
-            page.Style,
-            // Products and orders are two switches, and both have to be on: a basket on a page
-            // that is not showing its products would be a basket with nothing to put in it. A
-            // company that asks to be paid at its counter needs a third thing -- a Stripe
-            // account that can take the money -- and the same answer ShopGate gives, or the
-            // page would offer a basket that refuses at the till.
-            page.ShowProducts && page.AcceptsOrders
-                && (!page.RequiresOnlinePayment || tenant.CanCharge),
-            page.RequiresOnlinePayment,
-            address,
-            products,
-            jobs,
-            forms,
-            sections));
+        return company is null ? NotFound() : Ok(company);
     }
 
-    /// <summary>
-    /// The positions on the public page, each with whatever the company hung on it.
-    ///
-    /// A posting whose form is still a draft reports no form rather than a form that cannot be
-    /// filled: the visitor is shown where to write instead, which is what the posting said
-    /// before a form was ever attached.
-    /// </summary>
-    private async Task<List<PublicJobDto>> JobsAsync(Guid tenantId, CancellationToken ct)
-    {
-        var rows = await db.JobPostings.IgnoreQueryFilters().AsNoTracking()
-            .Where(j => j.TenantId == tenantId && j.IsPublished)
-            .OrderByDescending(j => j.CreatedAt)
-            .Select(j => new
-            {
-                j.Id,
-                j.Title,
-                j.Description,
-                j.Location,
-                j.EmploymentType,
-                j.Compensation,
-                j.ApplyTo,
-                HasForm = j.FormTemplateId != null && j.FormTemplate!.IsPublished,
-                j.CreatedAt,
-                Documents = j.Documents
-                    .OrderBy(d => d.SortOrder)
-                    .Select(d => new
-                    {
-                        d.Id,
-                        d.Label,
-                        d.MediaAsset!.ObjectKey,
-                        d.MediaAsset!.FileName,
-                        d.MediaAsset!.ContentType,
-                        d.MediaAsset!.SizeBytes
-                    })
-                    .ToList()
-            })
-            .ToListAsync(ct);
-
-        var jobs = new List<PublicJobDto>(rows.Count);
-
-        foreach (var row in rows)
-        {
-            var documents = new List<PublicJobDocumentDto>(row.Documents.Count);
-
-            foreach (var document in row.Documents)
-            {
-                string? url = null;
-                try
-                {
-                    url = await storage.CreateDownloadUrlAsync(document.ObjectKey, document.FileName, ct);
-                }
-                catch (InvalidOperationException)
-                {
-                    // Storage is not configured, or its credentials are wrong. The posting still
-                    // belongs on the page; the attachment simply cannot be opened.
-                }
-
-                documents.Add(new PublicJobDocumentDto(
-                    document.Id,
-                    // The company's own label when it gave one, the file's name otherwise: a
-                    // visitor should never be shown an object key or a bare id.
-                    string.IsNullOrWhiteSpace(document.Label) ? document.FileName : document.Label!,
-                    document.ContentType,
-                    document.SizeBytes,
-                    url));
-            }
-
-            jobs.Add(new PublicJobDto(
-                row.Id, row.Title, row.Description, row.Location, row.EmploymentType,
-                row.Compensation, row.ApplyTo, row.HasForm, documents, row.CreatedAt));
-        }
-
-        return jobs;
-    }
-
-    /// <summary>
-    /// The bands the company arranged, with their photographs already signed.
-    ///
-    /// A band that lost what it pointed at is dropped rather than printed empty: the gallery
-    /// was deleted or the file was, and a heading over nothing tells a visitor nothing. The
-    /// owner still sees the empty slot in the builder, which is where it can be fixed.
-    /// </summary>
-    private async Task<List<PublicSectionDto>> SectionsAsync(Guid tenantId, CancellationToken ct)
-    {
-        var rows = await db.PublicPageSections.IgnoreQueryFilters().AsNoTracking()
-            .Where(s => s.TenantId == tenantId && s.IsVisible)
-            .OrderBy(s => s.SortOrder)
-            .Select(s => new
-            {
-                s.Id,
-                s.Kind,
-                s.Title,
-                s.Text,
-                s.Columns,
-                s.GalleryId,
-                ImageKey = s.MediaAsset == null ? null : s.MediaAsset.ObjectKey,
-                ImageName = s.MediaAsset == null ? null : s.MediaAsset.FileName
-            })
-            .ToListAsync(ct);
-
-        if (rows.Count == 0) return [];
-
-        // One read for every gallery on the page rather than one per band: a page showing the
-        // same gallery twice would otherwise pay for it twice.
-        var galleryIds = rows.Select(r => r.GalleryId).OfType<Guid>().Distinct().ToList();
-
-        var galleryImages = galleryIds.Count == 0
-            ? []
-            : await db.GalleryImages.IgnoreQueryFilters().AsNoTracking()
-                .Where(i => galleryIds.Contains(i.GalleryId) && i.TenantId == tenantId)
-                .OrderBy(i => i.SortOrder)
-                .Select(i => new
-                {
-                    i.Id,
-                    i.GalleryId,
-                    i.Caption,
-                    i.MediaAsset!.ObjectKey,
-                    i.MediaAsset!.FileName
-                })
-                .ToListAsync(ct);
-
-        var sections = new List<PublicSectionDto>(rows.Count);
-
-        foreach (var row in rows)
-        {
-            var images = new List<PublicGalleryImageDto>();
-            string? imageUrl = null;
-
-            if (row.Kind == PublicPageSectionKind.Galerie)
-            {
-                if (row.GalleryId is not { } galleryId) continue;
-
-                foreach (var image in galleryImages.Where(i => i.GalleryId == galleryId))
-                {
-                    images.Add(new PublicGalleryImageDto(
-                        image.Id, image.Caption, await UrlOrNullAsync(image.ObjectKey, image.FileName, ct)));
-                }
-
-                // An empty gallery is a heading over nothing.
-                if (images.Count == 0) continue;
-            }
-
-            if (row.Kind == PublicPageSectionKind.Image)
-            {
-                if (row.ImageKey is null || row.ImageName is null) continue;
-                imageUrl = await UrlOrNullAsync(row.ImageKey, row.ImageName, ct);
-
-                // Unlike a gallery whose pictures merely fail to load, an Image band is nothing
-                // but its picture: without a link there is no band.
-                if (imageUrl is null) continue;
-            }
-
-            sections.Add(new PublicSectionDto(
-                row.Id, row.Kind, row.Title, row.Text, row.Columns, images, imageUrl));
-        }
-
-        return sections;
-    }
-
-    /// <summary>
-    /// A signed link, or null when storage cannot be reached. Never an exception: an unreachable
-    /// bucket must not take a company's whole page down with it.
-    /// </summary>
-    private async Task<string?> UrlOrNullAsync(string objectKey, string fileName, CancellationToken ct)
-    {
-        try
-        {
-            return await storage.CreateDownloadUrlAsync(objectKey, fileName, ct);
-        }
-        catch (InvalidOperationException)
-        {
-            return null;
-        }
-    }
-
-    /// <summary>
-    /// The products the company ticked as public, each with its first photograph.
-    ///
-    /// A missing signature is a product without a picture, not a page without products: storage
-    /// that is unconfigured or unreachable must not take the whole company's page down with it.
-    /// </summary>
-    private async Task<List<PublicProductDto>> ProductsAsync(Guid tenantId, CancellationToken ct)
-    {
-        var rows = await db.Products.IgnoreQueryFilters().AsNoTracking()
-            .Where(p => p.TenantId == tenantId && p.IsPublic)
-            .OrderBy(p => p.Title)
-            .Select(p => new
-            {
-                p.Id,
-                p.Number,
-                p.Title,
-                p.Description,
-                p.Unit,
-                CategoryName = p.Category == null ? null : p.Category.Name,
-                p.SellingPrice,
-                Image = p.Images
-                    .OrderBy(i => i.SortOrder)
-                    .Select(i => new { i.MediaAsset!.ObjectKey, i.MediaAsset!.FileName })
-                    .FirstOrDefault()
-            })
-            .ToListAsync(ct);
-
-        var products = new List<PublicProductDto>(rows.Count);
-
-        foreach (var row in rows)
-        {
-            string? imageUrl = null;
-
-            if (row.Image is not null)
-            {
-                try
-                {
-                    imageUrl = await storage.CreateDownloadUrlAsync(row.Image.ObjectKey, row.Image.FileName, ct);
-                }
-                catch (InvalidOperationException)
-                {
-                    // Storage is not configured, or its credentials are wrong. The product still
-                    // belongs on the page; it simply shows without a photograph.
-                }
-            }
-
-            products.Add(new PublicProductDto(
-                row.Id, row.Number, row.Title, row.Description, row.Unit, row.CategoryName,
-                row.SellingPrice, imageUrl));
-        }
-
-        return products;
-    }
 }
 
 /// <summary>
@@ -358,7 +74,7 @@ public record PublicCompanyDto(
     /// <summary>Only so the page can build the logo URL, which is anonymous by design.</summary>
     Guid TenantId,
     string? BrandColor,
-    /// <summary>Which of the four arrangements the page is drawn with.</summary>
+    /// <summary>Which of the arrangements the page is drawn with.</summary>
     PublicPageStyle Style,
     /// <summary>Whether a visitor may order the products rather than only look at them.</summary>
     bool AcceptsOrders,
@@ -375,23 +91,29 @@ public record PublicCompanyDto(
     /// </summary>
     List<PublicSectionDto> Sections);
 
-/// <summary>
-/// One band of a built page, with its content already resolved.
-///
-/// Resolved here rather than by the page: a visitor's browser must not be told a gallery's id
-/// and then allowed to ask for its contents, because that would be a second route into the
-/// company's library with its own rules to get right. Everything a band needs arrives with it.
-/// </summary>
+/// <summary>One band of a built page: a heading over one to twelve columns.</summary>
 public record PublicSectionDto(
     Guid Id,
+    string? Title,
+    PageSectionBackground Background,
+    List<PublicCellDto> Cells);
+
+/// <summary>
+/// One column, with its content already resolved. Resolved here rather than by the page: a
+/// visitor's browser must not be told a gallery's id and then allowed to ask for its contents.
+/// </summary>
+public record PublicCellDto(
     PublicPageSectionKind Kind,
     string? Title,
     string? Text,
-    int Columns,
+    int ItemsPerRow,
+    PageItemShape Shape,
     /// <summary>The photographs, for a Galerie. Signed for this response.</summary>
     List<PublicGalleryImageDto> Images,
-    /// <summary>The single photograph, for an Image. Null when storage could not be reached.</summary>
-    string? ImageUrl);
+    /// <summary>The single photograph, for an Image.</summary>
+    string? ImageUrl,
+    /// <summary>The form, for a Formulaire. Null when it was unpublished since.</summary>
+    PublicPageFormDto? Form);
 
 public record PublicGalleryImageDto(Guid Id, string? Caption, string? Url);
 
@@ -405,4 +127,16 @@ public record PublicProductDto(
     string? Unit,
     string? CategoryName,
     decimal? SellingPrice,
-    string? ImageUrl);
+    string? ImageUrl,
+    string? SubCategoryName,
+    /// <summary>Every photograph, the main one first, for the product's own window.</summary>
+    List<PublicProductImageDto> Images,
+    /// <summary>
+    /// For a parent: the sizes or versions a visitor chooses between. What goes in the basket is
+    /// the variant, at the variant's price.
+    /// </summary>
+    List<PublicVariantDto> Variants);
+
+public record PublicProductImageDto(string Url, string? Name);
+
+public record PublicVariantDto(Guid Id, string Title, string? Unit, decimal? SellingPrice);

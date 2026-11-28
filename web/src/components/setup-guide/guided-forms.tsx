@@ -14,6 +14,7 @@ import { ToggleSwitch } from "@/components/company/toggle-switch";
 import { useCompanyProfileQuery, useSaveCompanyProfile, type SaveCompanyValues } from "@/hooks/use-company";
 import { usePublicPageQuery, useSavePublicPage, type PublicPageValues } from "@/hooks/use-public-page";
 import { ApiError } from "@/lib/api";
+import { StylePreview } from "@/components/company/style-preview";
 import { publicPageStyleOptions } from "@/lib/public-page-style";
 import { cn } from "@/lib/utils";
 import { ex } from "@/lib/placeholders";
@@ -405,7 +406,8 @@ function PublicStyleForm({ settings, onDone }: Done & { settings: PublicPageSett
                 style === option.value ? "border-primary bg-primary/5" : "border-border hover:bg-accent",
               )}
             >
-              <span className="block text-sm font-medium text-foreground">{option.label}</span>
+              <StylePreview style={option.value} />
+              <span className="mt-2 block text-sm font-medium text-foreground">{option.label}</span>
               <span className="mt-0.5 block text-xs text-muted-foreground">{option.hint}</span>
             </button>
           ))}

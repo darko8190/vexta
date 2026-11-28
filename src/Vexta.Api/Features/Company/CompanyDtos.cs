@@ -102,7 +102,9 @@ public record PublicJobDto(
     /// </summary>
     bool HasForm,
     List<PublicJobDocumentDto> Documents,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    /// <summary>The group it is listed under. Null lists it under « Autres ».</summary>
+    string? Category = null);
 
 /// <summary>
 /// A file the company hung on a posting. The link is a signed URL minted for this response, as

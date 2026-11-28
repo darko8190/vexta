@@ -72,12 +72,9 @@ export function AddToBasketButton({
 /**
  * The basket, and the order that comes out of it.
  *
- * A bar fixed to the bottom of the window rather than a section of the page: somebody adding a
- * fourth item is halfway down a catalogue, and a basket they have to scroll back up to find is
- * a basket they forget they have.
- *
- * Nothing is shown at all while it is empty. An empty basket on a page is an invitation to
- * explain what a basket is, and the page has better things to say.
+ * A button in the bar that stays at the top right of the window while the visitor scrolls,
+ * where every shop keeps it: somebody adding a fourth item is halfway down a catalogue, and a
+ * basket they have to scroll back to find is a basket they forget they have.
  *
  * Ordering needs an account — the dialog says so plainly to a visitor who has none, and offers
  * the same sign-in as applying for a job rather than a second one of its own.
@@ -146,8 +143,6 @@ export function BasketPanel({ slug, companyName }: { slug: string; companyName: 
     }
   }
 
-  if (basket.items.length === 0 && !done) return null;
-
   const ready = Boolean(user) && eligibility.data?.canOrder === true;
 
   // Said before the button rather than discovered after it: "Commander" and "Payer et
@@ -157,23 +152,19 @@ export function BasketPanel({ slug, companyName }: { slug: string; companyName: 
 
   return (
     <>
-      {basket.items.length > 0 && (
-        <div className="sticky bottom-0 z-40 border-t border-border bg-card/95 backdrop-blur">
-          <div className="mx-auto flex w-full max-w-4xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
-            <p className="text-sm text-foreground">
-              <ShoppingBag className="mr-2 inline size-4 align-text-bottom" aria-hidden="true" />
-              {basket.count} article{basket.count > 1 ? "s" : ""}
-              <span className="text-muted-foreground"> · </span>
-              <strong className="tabular-nums">{money.format(basket.subtotal)}</strong>
-              <span className="ml-1 text-xs text-muted-foreground">avant taxes</span>
-            </p>
-
-            <Button type="button" onClick={() => onOpenChange(true)}>
-              Voir mon panier
-            </Button>
-          </div>
-        </div>
-      )}
+      <Button
+        type="button"
+        variant={basket.count > 0 ? "default" : "outline"}
+        size="sm"
+        onClick={() => onOpenChange(true)}
+        aria-label={`Mon panier, ${basket.count} article${basket.count > 1 ? "s" : ""}`}
+      >
+        <ShoppingBag className="size-4" aria-hidden="true" />
+        <span className="tabular-nums">{basket.count}</span>
+        {basket.count > 0 && (
+          <span className="hidden tabular-nums sm:inline">· {money.format(basket.subtotal)}</span>
+        )}
+      </Button>
 
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-lg">
@@ -196,6 +187,10 @@ export function BasketPanel({ slug, companyName }: { slug: string; companyName: 
               </Alert>
             ) : !user ? (
               <SignInToOrder slug={slug} />
+            ) : basket.items.length === 0 && !done ? (
+              <p className="py-4 text-sm text-muted-foreground">
+                Votre panier est vide. Ajoutez un produit pour commander.
+              </p>
             ) : eligibility.isLoading ? (
               <p className="py-4 text-sm text-muted-foreground">Un instant…</p>
             ) : eligibility.data?.canOrder === false ? (
@@ -305,7 +300,7 @@ export function BasketPanel({ slug, companyName }: { slug: string; companyName: 
           </div>
 
           <DialogFooter>
-            {ready && !done ? (
+            {ready && !done && basket.items.length > 0 ? (
               <>
                 <Button type="button" onClick={() => void send()} disabled={place.isPending}>
                   {place.isPending && <Spinner />}

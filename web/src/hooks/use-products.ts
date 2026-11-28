@@ -46,6 +46,8 @@ export interface ProductListFilters {
   categoryId?: string | null;
   subCategoryId?: string | null;
   lowStock?: boolean;
+  /** "inclure": every variant under its parent. "seules": only variants. Left out: none. */
+  variants?: "inclure" | "seules";
 }
 
 /**
@@ -60,13 +62,13 @@ function invalidate(queryClient: ReturnType<typeof useQueryClient>, id?: string)
 }
 
 export function useProductsQuery(filters: ProductListFilters) {
-  const { page, search, categoryId, subCategoryId, lowStock } = filters;
+  const { page, search, categoryId, subCategoryId, lowStock, variants } = filters;
 
   return useQuery({
-    queryKey: ["products", "list", page, search, categoryId ?? "", subCategoryId ?? "", lowStock ?? false],
+    queryKey: ["products", "list", page, search, categoryId ?? "", subCategoryId ?? "", lowStock ?? false, variants ?? ""],
     queryFn: () =>
       api.get<PagedResult<ProductRecord>>(
-        `products${buildQuery({ page, search, categoryId, subCategoryId, lowStock: lowStock || undefined })}`,
+        `products${buildQuery({ page, search, categoryId, subCategoryId, lowStock: lowStock || undefined, variants })}`,
       ),
   });
 }

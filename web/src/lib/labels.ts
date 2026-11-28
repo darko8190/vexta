@@ -11,6 +11,8 @@ import type {
   FormFieldTarget,
   FormKind,
   PublicPageSectionKind,
+  PageItemShape,
+  PageSectionBackground,
   FormFieldType,
   InvoiceLineKind,
   InvoiceStatus,
@@ -189,18 +191,32 @@ export const pageSectionKindLabels: Record<PublicPageSectionKind, string> = {
   Galerie: "Galerie de photos",
   Produits: "Mes produits",
   Emplois: "Mes offres d'emploi",
-  Formulaires: "Mes formulaires",
-  Image: "Une photo pleine largeur",
+  Formulaires: "Mes formulaires (boutons)",
+  Image: "Une photo",
+  Formulaire: "Un formulaire à remplir",
 };
 
 /** The line under the choice: what placing this band actually does. */
 export const pageSectionKindHints: Record<PublicPageSectionKind, string> = {
   Texte: "Un titre et des paragraphes. Celui qui porte tout ce que les autres ne portent pas.",
-  Galerie: "Une de vos galeries, en grille. Le nombre de colonnes dit combien de photos par rangée.",
+  Galerie: "Une de vos galeries, en grille.",
   Produits: "Les produits cochés comme publics, avec leur prix et le panier s'il est activé.",
   Emplois: "Les offres publiées, avec le bouton Postuler.",
   Formulaires: "Les formulaires cochés « sur la page publique ».",
-  Image: "Une seule photo, sur toute la largeur. Un chantier, une équipe, une toiture finie.",
+  Image: "Une seule photo, sur la largeur de la colonne. Un chantier, une équipe, une toiture finie.",
+  Formulaire: "Le formulaire choisi, ses questions directement dans la colonne.",
+};
+
+export const pageItemShapeLabels: Record<PageItemShape, string> = {
+  Rectangle: "Rectangulaire",
+  Carre: "Carré",
+  Rond: "Rond",
+};
+
+export const pageSectionBackgroundLabels: Record<PageSectionBackground, string> = {
+  Aucun: "Aucun fond",
+  Doux: "Fond gris doux",
+  Couleur: "Teinte de votre couleur",
 };
 
 export const formActionKindLabels: Record<FormActionKind, string> = {

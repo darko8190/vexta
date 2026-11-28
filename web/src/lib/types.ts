@@ -1472,6 +1472,8 @@ export interface JobPosting {
   documents: JobPostingDocument[];
   createdAt: string;
   updatedAt: string;
+  /** The group it is listed under on the public page. */
+  category: string | null;
 }
 
 /** A file hung on a posting. The bytes live in the library; this is the link. */
@@ -1499,6 +1501,7 @@ export interface SaveJobPostingValues {
   closesOn: string | null;
   /** The form to ask applicants to fill, or null to only say where to write. */
   formTemplateId: string | null;
+  category: string | null;
 }
 
 /** The same position as a visitor reads it: the advertisement, and nothing the company keeps. */
@@ -1514,6 +1517,8 @@ export interface PublicJob {
   hasForm: boolean;
   documents: PublicJobDocument[];
   createdAt: string;
+  /** The group it is listed under on the page. Null lists it under « Autres ». */
+  category: string | null;
 }
 
 /** A file the company hung on a posting, with a link signed for this page load. */
@@ -1714,27 +1719,44 @@ export interface PublicCompany {
   sections: PublicSection[];
 }
 
-/** What one band of a built page holds. */
+/** What one column of a built page holds. */
 export type PublicPageSectionKind =
   | "Texte"
   | "Galerie"
   | "Produits"
   | "Emplois"
   | "Formulaires"
-  | "Image";
+  | "Image"
+  | "Formulaire";
 
-/** One band of a built page, with its content already resolved by the API. */
+/** How the products or postings of a column are drawn. */
+export type PageItemShape = "Rectangle" | "Carre" | "Rond";
+
+/** What is behind a band. */
+export type PageSectionBackground = "Aucun" | "Doux" | "Couleur";
+
+/** One band of a built page: a heading over one to twelve columns. */
 export interface PublicSection {
   id: string;
+  title: string | null;
+  background: PageSectionBackground;
+  cells: PublicCell[];
+}
+
+/** One column, with its content already resolved by the API. */
+export interface PublicCell {
   kind: PublicPageSectionKind;
   title: string | null;
   text: string | null;
-  /** One, two or three across. What it arranges depends on the kind. */
-  columns: number;
+  /** How many products, postings or photographs side by side, 1 to 6. */
+  itemsPerRow: number;
+  shape: PageItemShape;
   /** The photographs, for a Galerie. Signed for this response. */
   images: PublicGalleryImage[];
   /** The single photograph, for an Image. */
   imageUrl: string | null;
+  /** The form, for a Formulaire. */
+  form: PublicPageForm | null;
 }
 
 export interface PublicGalleryImage {
@@ -1783,8 +1805,7 @@ export interface SaveGalleryImageValues {
   caption: string | null;
 }
 
-export interface PageSection {
-  id: string;
+export interface PageCell {
   kind: PublicPageSectionKind;
   title: string | null;
   text: string | null;
@@ -1792,21 +1813,48 @@ export interface PageSection {
   galleryName: string | null;
   mediaAssetId: string | null;
   imageUrl: string | null;
-  columns: number;
+  formTemplateId: string | null;
+  itemsPerRow: number;
+  shape: PageItemShape;
+}
+
+export interface PageSection {
+  id: string;
+  title: string | null;
+  background: PageSectionBackground;
+  cells: PageCell[];
   isVisible: boolean;
   sortOrder: number;
 }
 
-/** Null id for a new section. One left out of the list is deleted. */
-export interface SavePageSectionValues {
-  id: string | null;
+export interface SavePageCellValues {
   kind: PublicPageSectionKind;
   title: string | null;
   text: string | null;
   galleryId: string | null;
   mediaAssetId: string | null;
-  columns: number;
+  formTemplateId: string | null;
+  itemsPerRow: number;
+  shape: PageItemShape;
+}
+
+/** Null id for a new section. One left out of the list is deleted. */
+export interface SavePageSectionValues {
+  id: string | null;
+  title: string | null;
+  background: PageSectionBackground;
+  cells: SavePageCellValues[];
   isVisible: boolean;
+}
+
+/** What the builder draws its live page from. */
+export interface PagePreview {
+  company: PublicCompany;
+  galleries: Record<string, PublicGalleryImage[]>;
+  forms: PublicPageForm[];
+  showProducts: boolean;
+  showJobs: boolean;
+  showForms: boolean;
 }
 
 /** A form on a company's public page, before anybody opens it. */
@@ -1946,8 +1994,26 @@ export interface PublicProduct {
   /** How it is sold: un, pi², sac. What the price is per. */
   unit: string | null;
   categoryName: string | null;
+  /** For a parent: its cheapest variant's price, the « à partir de » figure. */
   sellingPrice: number | null;
   imageUrl: string | null;
+  subCategoryName: string | null;
+  /** Every photograph, the main one first. */
+  images: PublicProductImage[];
+  /** For a parent: the choices a visitor picks from. The basket takes the variant. */
+  variants: PublicVariant[];
+}
+
+export interface PublicProductImage {
+  url: string;
+  name: string | null;
+}
+
+export interface PublicVariant {
+  id: string;
+  title: string;
+  unit: string | null;
+  sellingPrice: number | null;
 }
 
 /**

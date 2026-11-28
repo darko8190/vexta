@@ -180,6 +180,9 @@ public class JobPosting
     /// <summary>What it pays, as the company wants to say it: "28 à 34 $/h", "à discuter".</summary>
     public string? Compensation { get; set; }
 
+    /// <summary>The group the posting is listed under on the public page: Chantier, Bureau.</summary>
+    public string? Category { get; set; }
+
     /// <summary>Where to apply. An address, a telephone number, a link.</summary>
     public string? ApplyTo { get; set; }
 

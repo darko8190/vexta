@@ -199,6 +199,7 @@ public class JobPostingsController(VextaDbContext db, ICurrentUserService curren
         job.Location = Clean(request.Location);
         job.EmploymentType = request.EmploymentType;
         job.Compensation = Clean(request.Compensation);
+        job.Category = Clean(request.Category);
         job.ApplyTo = Clean(request.ApplyTo);
         job.Notes = Clean(request.Notes);
         job.Openings = request.Openings < 1 ? 1 : request.Openings;
@@ -222,6 +223,7 @@ public class JobPostingsController(VextaDbContext db, ICurrentUserService curren
         if (request.Description is { Length: > 4000 }) return "La description ne peut pas dépasser 4000 caractères.";
         if (request.Location is { Length: > 200 }) return "Le lieu ne peut pas dépasser 200 caractères.";
         if (request.Compensation is { Length: > 200 }) return "La rémunération ne peut pas dépasser 200 caractères.";
+        if (request.Category is { Length: > 100 }) return "La catégorie ne peut pas dépasser 100 caractères.";
         if (request.ApplyTo is { Length: > 300 }) return "Ce champ ne peut pas dépasser 300 caractères.";
         if (request.Notes is { Length: > 4000 }) return "Les notes ne peuvent pas dépasser 4000 caractères.";
 
@@ -276,7 +278,7 @@ public class JobPostingsController(VextaDbContext db, ICurrentUserService curren
                     d.Id, d.MediaAssetId, d.MediaAsset!.FileName, d.MediaAsset.ContentType,
                     d.MediaAsset.SizeBytes, d.Label, d.SortOrder))
                 .ToList(),
-            j.CreatedAt, j.UpdatedAt);
+            j.CreatedAt, j.UpdatedAt, j.Category);
 
     /// <summary>
     /// Re-read rather than built from the entity in hand, so a create or an update answers with

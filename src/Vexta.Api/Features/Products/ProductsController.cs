@@ -34,6 +34,7 @@ public class ProductsController(
         [FromQuery] Guid? subCategoryId,
         [FromQuery] bool? lowStock,
         [FromQuery] Guid? parentId,
+        [FromQuery] string? variants,
         CancellationToken ct)
     {
         var products = db.Products.AsNoTracking().AsQueryable();
@@ -41,12 +42,31 @@ public class ProductsController(
         // A variant belongs on its parent's page, not beside it in the catalogue: a product
         // sold in four lengths would otherwise fill the list with four near-identical rows and
         // bury everything else. Asking for a parent is asking for exactly those rows.
+        //
+        // Inventaire asks otherwise, by name: "inclure" lists every variant right under its
+        // parent, "seules" lists only the variants. Anything else keeps the catalogue as it was.
+        var withVariants = variants == "inclure";
         products = parentId is { } parent
             ? products.Where(p => p.ParentProductId == parent)
-            : products.Where(p => p.ParentProductId == null);
+            : variants switch
+            {
+                "inclure" => products,
+                "seules" => products.Where(p => p.ParentProductId != null),
+                _ => products.Where(p => p.ParentProductId == null)
+            };
 
-        if (categoryId is not null) products = products.Where(p => p.CategoryId == categoryId);
-        if (subCategoryId is not null) products = products.Where(p => p.SubCategoryId == subCategoryId);
+        // A variant often carries no category of its own and is filed under its parent's.
+        if (categoryId is not null)
+        {
+            products = products.Where(p => p.CategoryId == categoryId
+                || (p.CategoryId == null && p.ParentProduct != null && p.ParentProduct.CategoryId == categoryId));
+        }
+
+        if (subCategoryId is not null)
+        {
+            products = products.Where(p => p.SubCategoryId == subCategoryId
+                || (p.SubCategoryId == null && p.ParentProduct != null && p.ParentProduct.SubCategoryId == subCategoryId));
+        }
 
         if (lowStock == true)
         {
@@ -60,8 +80,15 @@ public class ProductsController(
 
         var totalCount = await products.CountAsync(ct);
 
-        var items = await products
-            .OrderBy(p => p.Title)
+        // Each variant straight after its parent: sorted by the family's name first.
+        var ordered = withVariants || variants == "seules"
+            ? products
+                .OrderBy(p => p.ParentProduct != null ? p.ParentProduct.Title : p.Title)
+                .ThenBy(p => p.ParentProductId != null)
+                .ThenBy(p => p.Title)
+            : products.OrderBy(p => p.Title);
+
+        var items = await ordered
             .Skip((query.Page - 1) * query.PageSize)
             .Take(query.PageSize)
             .Select(ToDto())

@@ -60,6 +60,7 @@ const formSchema = z
     location: z.string().trim().max(200, "200 caractères maximum."),
     employmentType: z.enum(["TempsPlein", "TempsPartiel", "Contrat", "Saisonnier", "Stage"]),
     compensation: z.string().trim().max(200, "200 caractères maximum."),
+    category: z.string().trim().max(100, "100 caractères maximum."),
     applyTo: z.string().trim().max(300, "300 caractères maximum."),
     notes: z.string().trim().max(4000, "4000 caractères maximum."),
     // A string, like every other number in this codebase's forms. A coerced number would make
@@ -92,6 +93,7 @@ function toFormValues(job?: JobPosting): FormValues {
     // so the sheet opens on an answer rather than on four more decisions.
     employmentType: job?.employmentType ?? "TempsPlein",
     compensation: job?.compensation ?? "",
+    category: job?.category ?? "",
     applyTo: job?.applyTo ?? "",
     notes: job?.notes ?? "",
     openings: String(job?.openings ?? 1),
@@ -121,6 +123,11 @@ function JobFormSheet({
 }) {
   const isEditing = Boolean(job);
   const save = useSaveJobPosting();
+  const postings = useJobPostingsQuery();
+  // The groups already in use, offered as suggestions so "Chantier" is not typed three ways.
+  const categories = [
+    ...new Set((postings.data ?? []).map((posting) => posting.category).filter((value): value is string => Boolean(value))),
+  ].sort((a, b) => a.localeCompare(b, "fr"));
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -141,6 +148,7 @@ function JobFormSheet({
           location: values.location || null,
           employmentType: values.employmentType,
           compensation: values.compensation || null,
+          category: values.category || null,
           applyTo: values.applyTo || null,
           notes: values.notes || null,
           openings: Number(values.openings),
@@ -355,6 +363,35 @@ function JobFormSheet({
                     <FieldError errors={[fieldState.error]} />
                   ) : (
                     <FieldDescription>Dites-le comme vous le diriez de vive voix.</FieldDescription>
+                  )}
+                </Field>
+              )}
+            />
+
+            <Controller
+              name="category"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor="job-category">Catégorie</FieldLabel>
+                  <Input
+                    {...field}
+                    id="job-category"
+                    list="job-categories"
+                    placeholder={ex("Chantier")}
+                    aria-invalid={fieldState.invalid}
+                  />
+                  <datalist id="job-categories">
+                    {categories.map((category) => (
+                      <option key={category} value={category} />
+                    ))}
+                  </datalist>
+                  {fieldState.invalid ? (
+                    <FieldError errors={[fieldState.error]} />
+                  ) : (
+                    <FieldDescription>
+                      Sur votre page publique, les offres sont classées par catégorie.
+                    </FieldDescription>
                   )}
                 </Field>
               )}

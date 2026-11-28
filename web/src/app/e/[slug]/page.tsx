@@ -8,8 +8,8 @@ import {
   AboutBlock,
   ContactFooter,
   FormsBlock,
-  JobsBlock,
-  ProductsBlock,
+  JobCatalog,
+  ProductCatalog,
   SectionBand,
 } from "@/components/public/page-blocks";
 import { PublicAccountBar } from "@/components/public/public-account-bar";
@@ -150,16 +150,22 @@ async function CompanyPageContent({ params }: Pick<PageProps<"/e/[slug]">, "para
             thing the chosen arrangement changes about it. */}
         <div className={s.accentBar} aria-hidden="true" />
 
-        <header className={s.header}>
-          {/* Above the company's own header and outside it: this belongs to Vexta, not to the
-              company, and it must not take on whichever arrangement the company chose. */}
-          <div className={cn(s.container, "flex items-center justify-between gap-2 pt-3")}>
+        {/* Above the company's own header and outside it: this belongs to Vexta, not to the
+            company, and it must not take on whichever arrangement the company chose. It stays
+            at the top while the visitor scrolls, with the basket at its right, where every
+            shop keeps it. */}
+        <div className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
+          <div className={cn(s.container, "flex items-center justify-between gap-2 py-2")}>
             <PublicBackLink />
             {/* ml-auto keeps the account bar on the right when there is no way back to show. */}
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-2">
               <PublicAccountBar slug={company.slug} />
+              {company.acceptsOrders && <BasketPanel slug={company.slug} companyName={company.name} />}
             </div>
           </div>
+        </div>
+
+        <header className={s.header}>
 
           <div className={cn(s.container, "py-10 sm:py-14")}>
             <div className={s.headerInner}>
@@ -214,8 +220,8 @@ async function CompanyPageContent({ params }: Pick<PageProps<"/e/[slug]">, "para
               // until they decide to build one.
               <>
                 <AboutBlock company={company} s={s} />
-                <ProductsBlock company={company} s={s} />
-                <JobsBlock company={company} s={s} />
+                <ProductCatalog company={company} s={s} perRow={s.perRow} />
+                <JobCatalog company={company} s={s} />
                 <FormsBlock company={company} s={s} />
               </>
             )}
@@ -227,11 +233,6 @@ async function CompanyPageContent({ params }: Pick<PageProps<"/e/[slug]">, "para
             that lets a company fail at the only job its page has. */}
         <ContactFooter company={company} s={s} lines={lines} />
 
-        {/* Outside the main column and after it: a basket is the visitor's, not the company's,
-            and it must not take on whichever arrangement the page is drawn with. */}
-        {company.acceptsOrders && (
-          <BasketPanel slug={company.slug} companyName={company.name} />
-        )}
       </div>
     </>
   );

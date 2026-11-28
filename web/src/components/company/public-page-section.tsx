@@ -20,6 +20,7 @@ import { ToggleSwitch } from "@/components/company/toggle-switch";
 import { usePublicPageQuery, useSavePublicPage } from "@/hooks/use-public-page";
 import { ApiError } from "@/lib/api";
 import { publicPageStyleOptions } from "@/lib/public-page-style";
+import { StylePreview } from "@/components/company/style-preview";
 import { cn } from "@/lib/utils";
 import type { PublicPageSettings } from "@/lib/types";
 import { ex } from "@/lib/placeholders";
@@ -393,7 +394,7 @@ function ContentCard({ settings }: { settings: PublicPageSettings }) {
               render={({ field }) => (
                 <Field>
                   <FieldLabel>Style visuel</FieldLabel>
-                  <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                     {publicPageStyleOptions.map((option) => (
                       <button
                         key={option.value}
@@ -407,13 +408,14 @@ function ContentCard({ settings }: { settings: PublicPageSettings }) {
                             : "border-border hover:bg-accent",
                         )}
                       >
-                        <span className="block text-sm font-medium text-foreground">{option.label}</span>
+                        <StylePreview style={option.value} />
+                        <span className="mt-2 block text-sm font-medium text-foreground">{option.label}</span>
                         <span className="mt-0.5 block text-xs text-muted-foreground">{option.hint}</span>
                       </button>
                     ))}
                   </div>
                   <FieldDescription>
-                    Les quatre utilisent votre couleur et votre logo. Seule la mise en page change.
+                    Tous utilisent votre couleur et votre logo. Seule la mise en page change.
                   </FieldDescription>
                 </Field>
               )}

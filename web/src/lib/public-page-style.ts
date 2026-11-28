@@ -26,6 +26,8 @@ export type PublicPageStyleTokens = {
   card: string;
   /** How many products sit side by side. */
   productGrid: string;
+  /** The same, as a number, for the page Vexta draws when nothing was arranged. */
+  perRow: number;
   logoFrame: string;
   sectionGap: string;
 };
@@ -41,6 +43,7 @@ const classique: PublicPageStyleTokens = {
   sectionTitle: "text-lg font-semibold text-foreground",
   card: "rounded-xl border border-border bg-card",
   productGrid: "grid gap-4 sm:grid-cols-2 lg:grid-cols-3",
+  perRow: 3,
   logoFrame: "flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-card",
   sectionGap: "space-y-12 sm:space-y-16",
 };
@@ -60,6 +63,7 @@ const chantier: PublicPageStyleTokens = {
   sectionTitle: "text-sm font-bold uppercase tracking-widest text-foreground",
   card: "rounded-none border-l-4 border-primary border-y border-r border-border bg-card",
   productGrid: "grid gap-4 sm:grid-cols-2 lg:grid-cols-3",
+  perRow: 3,
   logoFrame: "flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-none border-2 border-background/30 bg-background",
   sectionGap: "space-y-12 sm:space-y-16",
 };
@@ -76,6 +80,7 @@ const epure: PublicPageStyleTokens = {
   sectionTitle: "text-xs font-medium uppercase tracking-widest text-muted-foreground",
   card: "rounded-none border-0 border-t border-border bg-transparent",
   productGrid: "grid gap-8 sm:grid-cols-2",
+  perRow: 2,
   logoFrame: "flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-card",
   sectionGap: "space-y-16 sm:space-y-20",
 };
@@ -92,6 +97,7 @@ const vitrine: PublicPageStyleTokens = {
   sectionTitle: "text-xl font-semibold text-foreground",
   card: "rounded-2xl border border-border bg-card shadow-sm",
   productGrid: "grid gap-6 sm:grid-cols-2 lg:grid-cols-4",
+  perRow: 4,
   logoFrame: "flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-border bg-card",
   sectionGap: "space-y-10 sm:space-y-14",
 };
@@ -112,6 +118,7 @@ const journal: PublicPageStyleTokens = {
   sectionTitle: "border-b border-border pb-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground",
   card: "rounded-none border-0 border-b border-border bg-transparent",
   productGrid: "grid gap-6 sm:grid-cols-2",
+  perRow: 2,
   logoFrame: "flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-sm border border-border bg-card",
   sectionGap: "space-y-14 sm:space-y-20",
 };
@@ -128,6 +135,7 @@ const panneau: PublicPageStyleTokens = {
   sectionTitle: "text-lg font-semibold text-foreground",
   card: "rounded-xl border border-border bg-card shadow-sm ring-1 ring-foreground/5",
   productGrid: "grid gap-5 sm:grid-cols-2 lg:grid-cols-3",
+  perRow: 3,
   logoFrame: "flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-background shadow-sm",
   sectionGap: "space-y-8 sm:space-y-12",
 };
@@ -147,6 +155,7 @@ const affiche: PublicPageStyleTokens = {
   sectionTitle: "text-center text-xl font-semibold text-foreground",
   card: "rounded-xl border border-border bg-card",
   productGrid: "grid gap-4 sm:grid-cols-2",
+  perRow: 2,
   logoFrame: "flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-border bg-card",
   sectionGap: "space-y-12 sm:space-y-16",
 };

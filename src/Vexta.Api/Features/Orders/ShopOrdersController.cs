@@ -101,10 +101,35 @@ public class ShopOrdersController(
         // found, and the order is refused rather than quietly shortened.
         var ids = wanted.Select(l => l.ProductId).ToList();
 
-        var products = await db.Products.IgnoreQueryFilters().AsNoTracking()
-            .Where(p => ids.Contains(p.Id) && p.TenantId == shop.TenantId && p.IsPublic)
-            .Select(p => new { p.Id, p.Title, p.Unit, p.SellingPrice })
-            .ToDictionaryAsync(p => p.Id, p => p, ct);
+        var found = await db.Products.IgnoreQueryFilters().AsNoTracking()
+            // A variant is sold when its parent is in the shop window: the visitor picks Petit,
+            // Moyen or Grand on the parent's card, and the variant's own price is the one paid.
+            // A parent itself is never sold.
+            .Where(p => ids.Contains(p.Id) && p.TenantId == shop.TenantId && !p.IsParent
+                && (p.IsPublic || (p.ParentProduct != null && p.ParentProduct.IsPublic)))
+            .Select(p => new
+            {
+                p.Id,
+                p.Title,
+                ParentTitle = p.ParentProduct == null ? null : p.ParentProduct.Title,
+                p.Unit,
+                p.SellingPrice
+            })
+            .ToListAsync(ct);
+
+        // A variant is written on the order with its parent's name, so "Grand" on an invoice
+        // still says grand what.
+        var products = found.ToDictionary(
+            p => p.Id,
+            p => new
+            {
+                p.Id,
+                Title = p.ParentTitle is null || p.Title.StartsWith(p.ParentTitle, StringComparison.OrdinalIgnoreCase)
+                    ? p.Title
+                    : $"{p.ParentTitle} — {p.Title}",
+                p.Unit,
+                p.SellingPrice
+            });
 
         if (products.Count != wanted.Count)
         {

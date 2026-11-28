@@ -1,13 +1,19 @@
-import { BriefcaseBusiness, ClipboardPen, FileText, Mail, MapPin, Phone } from "lucide-react";
-import { AddToBasketButton } from "@/components/public/basket-panel";
-import { JobApplicationDialog } from "@/components/public/job-application-dialog";
+import { ClipboardPen, Mail, MapPin, Phone } from "lucide-react";
+import { itemsGridClass, JobCatalog, ProductCatalog } from "@/components/public/catalog";
 import { PublicFormDialog } from "@/components/public/public-form-dialog";
-import { employmentTypeLabels, formKindLabels } from "@/lib/labels";
+import { PublicFormInline } from "@/components/public/public-form-inline";
+import { formKindLabels } from "@/lib/labels";
 import type { PublicPageStyleTokens } from "@/lib/public-page-style";
-import type { PublicCompany, PublicSection } from "@/lib/types";
+import type {
+  PageSectionBackground,
+  PublicCell,
+  PublicCompany,
+  PublicGalleryImage,
+  PublicSection,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const money = new Intl.NumberFormat("fr-CA", { style: "currency", currency: "CAD" });
+export { JobCatalog, ProductCatalog };
 
 /**
  * The bands a public page is made of.
@@ -25,18 +31,6 @@ interface BlockProps {
   s: PublicPageStyleTokens;
   /** Printed above the block. Null leaves the block without a heading. */
   title?: string | null;
-}
-
-/**
- * How many across, on screens wide enough for it.
- *
- * Always one column on a telephone, whatever was chosen. That is not a compromise: two columns
- * of text at 375px is a column of two words, and a company that could produce that would.
- */
-export function columnsClass(columns: number): string {
-  if (columns >= 3) return "grid gap-4 sm:grid-cols-2 lg:grid-cols-3";
-  if (columns === 2) return "grid gap-4 sm:grid-cols-2";
-  return "grid gap-4";
 }
 
 /** A heading, or nothing at all when there is none to print. */
@@ -67,37 +61,27 @@ export function AboutBlock({ company, s, title = "À propos" }: BlockProps) {
   );
 }
 
-/** A band of text the company placed itself, laid out in one, two or three columns. */
+/** A column of text the company placed itself. */
 export function TextBlock({
   s,
   title,
   text,
-  columns,
 }: {
   s: PublicPageStyleTokens;
   title: string | null;
   text: string;
-  columns: number;
 }) {
   return (
     <section>
       <Heading s={s}>{title}</Heading>
-      <div
-        className={cn(
-          "mt-3 whitespace-pre-line text-base leading-relaxed text-muted-foreground",
-          // CSS columns rather than a grid: the text is one piece and should flow between the
-          // columns, not be cut into equal blocks that read out of order.
-          columns >= 3 ? "sm:columns-2 lg:columns-3" : columns === 2 ? "sm:columns-2" : "max-w-prose",
-          columns > 1 ? "gap-8" : undefined,
-        )}
-      >
+      <div className={cn("max-w-prose whitespace-pre-line text-base leading-relaxed text-muted-foreground", title ? "mt-3" : undefined)}>
         {text}
       </div>
     </section>
   );
 }
 
-/** One photograph, the full width of the page. */
+/** One photograph, the width of its column. */
 export function ImageBlock({
   s,
   title,
@@ -126,18 +110,22 @@ export function ImageBlock({
 export function GalleryBlock({
   s,
   title,
-  section,
+  images,
+  perRow,
 }: {
   s: PublicPageStyleTokens;
   title: string | null;
-  section: PublicSection;
+  images: PublicGalleryImage[];
+  perRow: number;
 }) {
+  if (images.length === 0) return null;
+
   return (
-    <section>
+    <section className="@container">
       <Heading s={s}>{title}</Heading>
 
-      <ul className={cn("mt-4", columnsClass(section.columns))}>
-        {section.images.map((image) => (
+      <ul className={cn(title ? "mt-4" : undefined, itemsGridClass(perRow))} style={{ "--per": perRow } as React.CSSProperties}>
+        {images.map((image) => (
           <li key={image.id} className={cn("overflow-hidden", s.card)}>
             {image.url ? (
               /* eslint-disable-next-line @next/next/no-img-element */
@@ -154,154 +142,6 @@ export function GalleryBlock({
 
             {image.caption && (
               <p className="p-3 text-sm text-muted-foreground">{image.caption}</p>
-            )}
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-/** The products the company ticked as public, with the basket when it takes orders. */
-export function ProductsBlock({
-  company,
-  s,
-  title = "Produits et services",
-  columns,
-}: BlockProps & { columns?: number }) {
-  if (company.products.length === 0) return null;
-
-  return (
-    <section>
-      <Heading s={s}>{title}</Heading>
-
-      <ul className={cn("mt-4", columns ? columnsClass(columns) : s.productGrid)}>
-        {company.products.map((product) => (
-          <li key={product.id} className={cn("flex flex-col overflow-hidden", s.card)}>
-            {product.imageUrl && (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                src={product.imageUrl}
-                alt={product.title}
-                className="aspect-[4/3] w-full object-cover"
-              />
-            )}
-
-            <div className="flex flex-1 flex-col p-4">
-              {product.categoryName && (
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  {product.categoryName}
-                </p>
-              )}
-              <h3 className="mt-1 font-medium text-foreground">{product.title}</h3>
-              {product.description && (
-                <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">
-                  {product.description}
-                </p>
-              )}
-              {product.sellingPrice !== null && (
-                <p className="mt-3 text-base font-semibold tabular-nums text-foreground">
-                  {money.format(product.sellingPrice)}
-                  {/* The unit beside the figure, because "12,50 $" for a square foot and for a
-                      pallet are very different offers. */}
-                  {product.unit && (
-                    <span className="text-sm font-normal text-muted-foreground">
-                      {" / "}
-                      {product.unit}
-                    </span>
-                  )}
-                </p>
-              )}
-
-              {/* mt-auto on the wrapper, not the button: a grid of cards whose descriptions are
-                  different lengths should still line its buttons up along the bottom. */}
-              {company.acceptsOrders && (
-                <div className="mt-auto">
-                  <AddToBasketButton
-                    slug={company.slug}
-                    product={{
-                      id: product.id,
-                      title: product.title,
-                      unit: product.unit,
-                      sellingPrice: product.sellingPrice,
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-/** The positions being advertised, each with whatever was hung on it. */
-export function JobsBlock({ company, s, title = "Nous embauchons" }: BlockProps) {
-  if (company.jobs.length === 0) return null;
-
-  return (
-    <section>
-      <Heading s={s} icon={<BriefcaseBusiness className="size-5 shrink-0" aria-hidden="true" />}>
-        {title}
-      </Heading>
-
-      <ul className="mt-4 space-y-4">
-        {company.jobs.map((job) => (
-          <li key={job.id} className={cn(s.card, "p-4 sm:p-5")}>
-            <h3 className="text-base font-medium text-foreground">{job.title}</h3>
-
-            <p className="mt-1 text-sm text-muted-foreground">
-              {[employmentTypeLabels[job.employmentType], job.location, job.compensation]
-                .filter(Boolean)
-                .join(" · ")}
-            </p>
-
-            {job.description && (
-              <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
-                {job.description}
-              </p>
-            )}
-
-            {job.documents.length > 0 && (
-              <ul className="mt-3 flex flex-wrap gap-2">
-                {job.documents.map((document) => (
-                  <li key={document.id}>
-                    {document.url ? (
-                      <a
-                        href={document.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-sm text-foreground hover:bg-accent"
-                      >
-                        <FileText className="size-4 shrink-0" aria-hidden="true" />
-                        {document.label}
-                      </a>
-                    ) : (
-                      /* Storage could not be reached. The attachment is named rather than
-                         hidden: a visitor who was told about a document and cannot find it is
-                         better served than one who never saw it. */
-                      <span className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-border px-2.5 py-1.5 text-sm text-muted-foreground">
-                        <FileText className="size-4 shrink-0" aria-hidden="true" />
-                        {document.label}
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {/* Offered on every published posting, with or without a form attached: the CV is
-                the application, and the form is only the company's extra questions. The line the
-                company wrote stays beside it, because some people would rather telephone -- but
-                it is no longer the only way in. */}
-            <JobApplicationDialog slug={company.slug} jobId={job.id} jobTitle={job.title} />
-
-            {job.applyTo && (
-              <p className="mt-3 text-sm text-foreground">
-                <span className="text-muted-foreground">Ou écrivez à : </span>
-                {job.applyTo}
-              </p>
             )}
           </li>
         ))}
@@ -436,11 +276,90 @@ export function ContactFooter({
 }
 
 /**
- * One band the company placed, drawn as whatever it holds.
- *
- * A section whose content has gone is not reached here: the API drops it rather than sending a
- * heading over nothing. What remains is a straight translation from a kind to a block.
+ * How many columns side by side, measured on the page's own width. One on a telephone, two on
+ * a tablet, all of them once there is room. Every class written out in full, so the stylesheet
+ * generator can find it.
  */
+export function cellsGridClass(columns: number): string {
+  if (columns >= 2) return "grid gap-8 @xl:grid-cols-2 @3xl:grid-cols-[repeat(var(--cols),minmax(0,1fr))]";
+  return "grid gap-8";
+}
+
+export const backgroundClass: Record<PageSectionBackground, string> = {
+  Aucun: "",
+  Doux: "rounded-xl bg-muted/50 p-5 sm:p-8",
+  Couleur: "rounded-xl border border-primary/20 bg-primary/10 p-5 sm:p-8",
+};
+
+/** One column, drawn as whatever it holds. */
+export function CellBlock({
+  cell,
+  company,
+  s,
+  preview = false,
+}: {
+  cell: PublicCell;
+  company: PublicCompany;
+  s: PublicPageStyleTokens;
+  preview?: boolean;
+}) {
+  switch (cell.kind) {
+    case "Texte":
+      return cell.text ? <TextBlock s={s} title={cell.title} text={cell.text} /> : null;
+
+    case "Galerie":
+      return <GalleryBlock s={s} title={cell.title} images={cell.images} perRow={cell.itemsPerRow} />;
+
+    case "Image":
+      return cell.imageUrl ? <ImageBlock s={s} title={cell.title} url={cell.imageUrl} /> : null;
+
+    case "Produits":
+      return (
+        <ProductCatalog
+          company={company}
+          s={s}
+          title={cell.title}
+          perRow={cell.itemsPerRow}
+          shape={cell.shape}
+          preview={preview}
+        />
+      );
+
+    case "Emplois":
+      return (
+        <JobCatalog
+          company={company}
+          s={s}
+          title={cell.title}
+          perRow={cell.itemsPerRow}
+          shape={cell.shape}
+          preview={preview}
+        />
+      );
+
+    case "Formulaires":
+      return <FormsBlock company={company} s={s} title={cell.title} />;
+
+    case "Formulaire":
+      return cell.form ? (
+        <section>
+          <Heading s={s}>{cell.title}</Heading>
+          <PublicFormInline
+            slug={company.slug}
+            form={cell.form}
+            preview={preview}
+            className={cn(s.card, "p-4 sm:p-5", cell.title ? "mt-4" : undefined)}
+          />
+        </section>
+      ) : null;
+
+    default:
+      // A kind this build does not recognise, from a newer API.
+      return null;
+  }
+}
+
+/** One band the company placed: its heading, then its columns side by side. */
 export function SectionBand({
   section,
   company,
@@ -450,32 +369,21 @@ export function SectionBand({
   company: PublicCompany;
   s: PublicPageStyleTokens;
 }) {
-  switch (section.kind) {
-    case "Texte":
-      return section.text ? (
-        <TextBlock s={s} title={section.title} text={section.text} columns={section.columns} />
-      ) : null;
+  const columns = Math.max(1, section.cells.length);
 
-    case "Galerie":
-      return <GalleryBlock s={s} title={section.title} section={section} />;
-
-    case "Image":
-      return section.imageUrl ? (
-        <ImageBlock s={s} title={section.title} url={section.imageUrl} />
-      ) : null;
-
-    case "Produits":
-      return <ProductsBlock company={company} s={s} title={section.title} columns={section.columns} />;
-
-    case "Emplois":
-      return <JobsBlock company={company} s={s} title={section.title} />;
-
-    case "Formulaires":
-      return <FormsBlock company={company} s={s} title={section.title} />;
-
-    default:
-      // A kind this build does not recognise, from a newer API. Nothing is drawn, rather than a
-      // frame that says a word nobody here can read.
-      return null;
-  }
+  return (
+    <section className={cn("@container", backgroundClass[section.background] ?? "")}>
+      <Heading s={s}>{section.title}</Heading>
+      <div
+        className={cn(cellsGridClass(columns), section.title ? "mt-4" : undefined)}
+        style={{ "--cols": columns } as React.CSSProperties}
+      >
+        {section.cells.map((cell, index) => (
+          <div key={index} className="min-w-0">
+            <CellBlock cell={cell} company={company} s={s} />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 }

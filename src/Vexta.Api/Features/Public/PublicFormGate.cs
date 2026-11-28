@@ -49,11 +49,18 @@ public static class PublicFormGate
     {
         if (string.IsNullOrWhiteSpace(slug)) return null;
 
-        var tenantId = await TenantIdAsync(db, slug, ct);
-        if (tenantId is not { } id) return null;
+        var page = await PageAsync(db, slug, ct);
+        if (page is not { } found) return null;
+        var (id, showsForms) = found;
+
+        // Reachable two ways: ticked for the page's list of forms, or printed in a column the
+        // owner placed. A form taken out of both is gone from the page and from this route.
+        var inSection = await db.PublicPageSections.IgnoreQueryFilters().AsNoTracking()
+            .AnyAsync(s => s.TenantId == id && s.IsVisible && s.FormTemplateIds.Contains(formId), ct);
 
         return await db.FormTemplates.IgnoreQueryFilters().AsNoTracking()
-            .Where(f => f.Id == formId && f.TenantId == id && f.ShowOnPublicPage && f.IsPublished)
+            .Where(f => f.Id == formId && f.TenantId == id && f.IsPublished
+                && (inSection || (showsForms && f.ShowOnPublicPage)))
             .Select(f => new PublicFormContext(
                 f.TenantId, f.Id, f.Title, f.Description, f.Kind, f.SuccessMessage, f.RequiresIdentification))
             .FirstOrDefaultAsync(ct);
@@ -102,7 +109,8 @@ public static class PublicFormGate
     /// the same gate, so a company that stopped paying could not take its own forms off the
     /// internet if we kept serving them.
     /// </summary>
-    private static async Task<Guid?> TenantIdAsync(VextaDbContext db, string slug, CancellationToken ct)
+    private static async Task<(Guid TenantId, bool ShowsForms)?> PageAsync(
+        VextaDbContext db, string slug, CancellationToken ct)
     {
         var tenant = await db.Tenants.IgnoreQueryFilters().AsNoTracking()
             .Where(t => t.Slug == slug)
@@ -111,11 +119,11 @@ public static class PublicFormGate
 
         if (tenant is null || !TenantLive.IsLive(tenant.SubscriptionStatus, tenant.TrialEndsAt)) return null;
 
-        var pageShowsForms = await db.PublicPages.IgnoreQueryFilters().AsNoTracking()
+        var page = await db.PublicPages.IgnoreQueryFilters().AsNoTracking()
             .Where(p => p.TenantId == tenant.Id)
-            .Select(p => p.IsPublished && p.ShowForms)
+            .Select(p => new { p.IsPublished, p.ShowForms })
             .FirstOrDefaultAsync(ct);
 
-        return pageShowsForms ? tenant.Id : null;
+        return page is { IsPublished: true } ? (tenant.Id, page.ShowForms) : null;
     }
 }

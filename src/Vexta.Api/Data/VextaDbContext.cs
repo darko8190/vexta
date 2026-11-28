@@ -860,17 +860,8 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
 
         builder.Entity<PublicPageSection>(e =>
         {
-            // SetNull for both: losing a gallery or a photograph must not take the arrangement
-            // with it. The page skips a section with nothing in it, and the builder shows the
-            // owner an empty slot they can fill or remove.
-            e.HasOne(s => s.Gallery).WithMany()
-                .HasForeignKey(s => s.GalleryId).OnDelete(DeleteBehavior.SetNull);
-
-            e.HasOne(s => s.MediaAsset).WithMany()
-                .HasForeignKey(s => s.MediaAssetId).OnDelete(DeleteBehavior.SetNull);
-
             e.Property(s => s.Title).HasMaxLength(200);
-            e.Property(s => s.Text).HasMaxLength(8000);
+            e.Property(s => s.CellsJson).HasColumnType("jsonb");
 
             // What the public page asks for on every visit: this company's bands, in order.
             e.HasIndex(s => new { s.TenantId, s.SortOrder });
@@ -1679,6 +1670,7 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.Property(j => j.Description).HasMaxLength(4000);
             e.Property(j => j.Location).HasMaxLength(200);
             e.Property(j => j.Compensation).HasMaxLength(200);
+            e.Property(j => j.Category).HasMaxLength(100);
             e.Property(j => j.ApplyTo).HasMaxLength(300);
             e.Property(j => j.Notes).HasMaxLength(4000);
             e.HasIndex(j => new { j.TenantId, j.CreatedAt });

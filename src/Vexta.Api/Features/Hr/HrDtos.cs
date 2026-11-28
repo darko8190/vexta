@@ -288,7 +288,8 @@ public record JobPostingDto(
     bool FormIsPublished,
     List<JobPostingDocumentDto> Documents,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    string? Category);
 
 /// <summary>A file hung on a posting. The URL is minted on demand, like every other asset.</summary>
 public record JobPostingDocumentDto(
@@ -313,7 +314,9 @@ public record SaveJobPostingRequest(
     DateOnly? PostedOn,
     DateOnly? ClosesOn,
     /// <summary>The form to ask applicants to fill, or null to only say where to write.</summary>
-    Guid? FormTemplateId = null);
+    Guid? FormTemplateId = null,
+    /// <summary>The group it is listed under on the public page.</summary>
+    string? Category = null);
 
 /// <summary>What to hang on a posting, and what to call it.</summary>
 public record AddJobPostingDocumentRequest(Guid MediaAssetId, string? Label);

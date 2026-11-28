@@ -41,9 +41,8 @@ public record SaveGalleryImagesRequest(IReadOnlyList<SaveGalleryImageRequest> Im
 // ---- The page builder ----
 
 /// <param name="GalleryName">So the builder can name the gallery without fetching the list.</param>
-/// <param name="ImageUrl">The chosen photograph, for an Image section. Signed for this response.</param>
-public record PageSectionDto(
-    Guid Id,
+/// <param name="ImageUrl">The chosen photograph, for an Image column. Signed for this response.</param>
+public record PageCellDto(
     PublicPageSectionKind Kind,
     string? Title,
     string? Text,
@@ -51,24 +50,41 @@ public record PageSectionDto(
     string? GalleryName,
     Guid? MediaAssetId,
     string? ImageUrl,
-    int Columns,
+    Guid? FormTemplateId,
+    int ItemsPerRow,
+    PageItemShape Shape);
+
+public record PageSectionDto(
+    Guid Id,
+    string? Title,
+    PageSectionBackground Background,
+    List<PageCellDto> Cells,
     bool IsVisible,
     int SortOrder);
 
-public record SavePageSectionRequest(
-    Guid? Id,
+public record SavePageCellRequest(
     PublicPageSectionKind Kind,
     string? Title = null,
     string? Text = null,
     Guid? GalleryId = null,
     Guid? MediaAssetId = null,
-    int Columns = 1,
+    Guid? FormTemplateId = null,
+    int ItemsPerRow = 3,
+    PageItemShape Shape = PageItemShape.Rectangle);
+
+public record SavePageSectionRequest(
+    Guid? Id,
+    string? Title,
+    IReadOnlyList<SavePageCellRequest> Cells,
+    PageSectionBackground Background = PageSectionBackground.Aucun,
     bool IsVisible = true);
 
 /// <summary>
 /// The bands of the page, in the order they are to be read. The whole list replaces the whole
 /// list, like a form's questions: arranging a page is reordering, retitling and removing in one
-/// sitting, and a screen that saved each change on its own would be a screen where half an
-/// arrangement is a page nobody chose.
+/// sitting.
 /// </summary>
 public record SavePageSectionsRequest(IReadOnlyList<SavePageSectionRequest> Sections);
+
+/// <summary>A form the owner may print in a column: published, whether ticked for the page or not.</summary>
+public record PageFormChoiceDto(Guid Id, string Title, string? Description, FormKind Kind);

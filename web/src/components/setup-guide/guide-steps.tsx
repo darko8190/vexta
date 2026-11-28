@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LogoCard } from "@/components/company/company-info-section";
 import { GalleriesSection } from "@/components/company/galleries-section";
+import { PageBuilderSection } from "@/components/company/page-builder-section";
 import { LocationsSection } from "@/components/hr/locations-section";
 import { AiAssistantCard } from "@/components/settings/ai-assistant-card";
 import { BillingSettingsCard } from "@/components/settings/billing-settings-card";
@@ -172,6 +173,17 @@ export const guideSteps: GuideStep[] = [
     when: wantsPublicPage,
     ask: { yes: "Oui, j'ajoute des photos", no: "Pas maintenant" },
     render: () => <GalleriesSection canEdit />,
+  },
+  {
+    key: "page-constructeur",
+    group: "Page publique",
+    title: "Disposition de la page",
+    question: "Voulez-vous placer vous-même le contenu de votre page ?",
+    explain:
+      "Sans rien faire, Vexta dispose votre page pour vous. Si vous préférez, ajoutez des sections de 1 à 12 colonnes et choisissez ce que chaque colonne montre : un texte, une photo, vos produits, vos offres d'emploi ou un formulaire. Vous voyez la page telle qu'elle sera en ligne pendant que vous la modifiez.",
+    when: wantsPublicPage,
+    ask: { yes: "Oui, je dispose ma page", no: "Laisser Vexta s'en occuper" },
+    render: () => <PageBuilderSection canEdit />,
   },
   {
     key: "page-publier",

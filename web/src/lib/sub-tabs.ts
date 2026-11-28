@@ -106,6 +106,7 @@ export const subTabScreens: SubTabScreen[] = [
       { key: "factures", label: "Factures" },
       { key: "formulaires", label: "Formulaires" },
       { key: "compte", label: "Compte" },
+      { key: "etat-de-compte", label: "État de compte" },
     ],
   },
   {

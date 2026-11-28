@@ -374,7 +374,7 @@ public class InvoicePdfService(VextaDbContext db, ICurrentUserService currentUse
         return string.IsNullOrWhiteSpace(registration) ? label : $"{label} #{registration.Trim()}";
     }
 
-    private static IReadOnlyList<string> CompanyLines(
+    internal static IReadOnlyList<string> CompanyLines(
         CompanyLocation? location, Tenant? tenant, Domain.BillingSettings? settings)
     {
         var lines = new List<string>();
@@ -392,7 +392,7 @@ public class InvoicePdfService(VextaDbContext db, ICurrentUserService currentUse
         return lines;
     }
 
-    private static IReadOnlyList<string> AddressLines(Address? address) => address is null
+    internal static IReadOnlyList<string> AddressLines(Address? address) => address is null
         ? []
         : AddressLines(address.Line1, address.Line2, address.City, address.Province, address.PostalCode);
 

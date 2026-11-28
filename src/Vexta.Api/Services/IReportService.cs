@@ -24,7 +24,7 @@ public interface IReportService
     Task<ReportResultDto?> RunAsync(string key, ReportPeriod period, CancellationToken ct = default);
 }
 
-public class ReportService(VextaDbContext db) : IReportService
+public partial class ReportService(VextaDbContext db) : IReportService
 {
     /// <summary>
     /// Every key, its name for the super admin's list, and the query that answers it. A key with
@@ -40,12 +40,27 @@ public class ReportService(VextaDbContext db) : IReportService
         [ReportKeys.UnpaidInvoices] = "Factures impayées",
         [ReportKeys.SalesByMonth] = "Ventes par mois",
         [ReportKeys.InventoryValue] = "Valeur de l'inventaire",
-        [ReportKeys.ExpensesByType] = "Dépenses par type"
+        [ReportKeys.ExpensesByType] = "Dépenses par type",
+        [ReportKeys.SalesByClient] = "Ventes par client",
+        [ReportKeys.SalesByProduct] = "Ventes par produit",
+        [ReportKeys.PaymentsReceived] = "Paiements reçus",
+        [ReportKeys.ClientBalances] = "Soldes des clients",
+        [ReportKeys.InventoryBelowMinimum] = "Produits sous le minimum",
+        [ReportKeys.PurchasesBySupplier] = "Achats par fournisseur",
+        [ReportKeys.CompletedTasks] = "Tâches terminées",
+        [ReportKeys.HoursByProject] = "Heures par projet",
+        [ReportKeys.LabourByEmployee] = "Main-d'œuvre par employé",
+        [ReportKeys.LabourByProject] = "Main-d'œuvre par projet"
     };
 
     private static readonly IReadOnlySet<string> Implemented = new HashSet<string>(StringComparer.Ordinal)
     {
-        ReportKeys.HoursByEmployee, ReportKeys.TaskLoad, ReportKeys.ProjectPipeline
+        ReportKeys.HoursByEmployee, ReportKeys.TaskLoad, ReportKeys.ProjectPipeline,
+        ReportKeys.ProjectProfitability, ReportKeys.UnpaidInvoices, ReportKeys.SalesByMonth,
+        ReportKeys.InventoryValue, ReportKeys.ExpensesByType, ReportKeys.SalesByClient,
+        ReportKeys.SalesByProduct, ReportKeys.PaymentsReceived, ReportKeys.ClientBalances,
+        ReportKeys.InventoryBelowMinimum, ReportKeys.PurchasesBySupplier, ReportKeys.CompletedTasks,
+        ReportKeys.HoursByProject, ReportKeys.LabourByEmployee, ReportKeys.LabourByProject
     };
 
     public IReadOnlyList<ReportKeyDto> Catalog() =>
@@ -63,7 +78,7 @@ public class ReportService(VextaDbContext db) : IReportService
             ReportKeys.HoursByEmployee => HoursByEmployeeAsync(period, ct),
             ReportKeys.TaskLoad => TaskLoadAsync(ct),
             ReportKeys.ProjectPipeline => ProjectPipelineAsync(period, ct),
-            _ => Task.FromResult<ReportResultDto?>(null)
+            _ => RunMoreAsync(key, period, ct)
         };
 
     /// <summary>

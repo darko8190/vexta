@@ -5,7 +5,8 @@ import { FolderKanban, ShoppingBag } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { SectionNav, type NavSection } from "@/components/layout/section-nav";
 import { OrdersSection } from "@/components/orders/orders-section";
-import { ProjectsToAssignSection } from "@/components/projects/projects-to-assign-section";
+import { ProjectsToAssignSection, useProjectsToAssignQuery } from "@/components/projects/projects-to-assign-section";
+import { useOrdersQuery } from "@/hooks/use-orders";
 import { useCanManage } from "@/hooks/use-can-create";
 
 /**
@@ -16,9 +17,19 @@ export default function ToHandlePage() {
   const canManage = useCanManage();
   const [section, setSection] = useState("commandes");
 
+  // The badges count what is still to do: orders not yet delivered or cancelled, and the
+  // projects nobody has been handed.
+  const { data: orders } = useOrdersQuery("", "");
+  const { data: toAssign } = useProjectsToAssignQuery(canManage);
+  const openOrders = (orders ?? []).filter(
+    (order) => order.status === "Recue" || order.status === "EnPreparation" || order.status === "Prete",
+  ).length;
+
   const sections: NavSection[] = [
-    { key: "commandes", label: "Commandes clients", icon: ShoppingBag },
-    ...(canManage ? [{ key: "projets-a-assigner", label: "Projets à assigner", icon: FolderKanban }] : []),
+    { key: "commandes", label: "Commandes clients", icon: ShoppingBag, count: openOrders },
+    ...(canManage
+      ? [{ key: "projets-a-assigner", label: "Projets à assigner", icon: FolderKanban, count: toAssign?.length ?? 0 }]
+      : []),
   ];
 
   return (

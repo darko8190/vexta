@@ -47,11 +47,17 @@ const NO_TEAM = "aucune";
  * The jobs waiting for a crew: À faire or Commencé, and no open task handed to anyone. Assigning
  * one gives its open tasks to the people chosen — or a « Travaux » task when it has none.
  */
-export function ProjectsToAssignSection() {
-  const { data, isLoading, isError, error, refetch } = useQuery({
+/** The projects waiting for a crew; also what counts the sub-tab's badge. */
+export function useProjectsToAssignQuery(enabled = true) {
+  return useQuery({
     queryKey: KEY,
     queryFn: () => api.get<ProjectToAssign[]>("projects/a-assigner"),
+    enabled,
   });
+}
+
+export function ProjectsToAssignSection() {
+  const { data, isLoading, isError, error, refetch } = useProjectsToAssignQuery();
   const [assigning, setAssigning] = useState<ProjectToAssign | null>(null);
   const projects = data ?? [];
 

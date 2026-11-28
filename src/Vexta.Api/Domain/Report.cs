@@ -69,10 +69,23 @@ public static class ReportKeys
     /// <summary>Expenses per project and per type.</summary>
     public const string ExpensesByType = "projets.depenses-par-type";
 
+    public const string SalesByClient = "ventes.par-client";
+    public const string SalesByProduct = "ventes.par-produit";
+    public const string PaymentsReceived = "facturation.paiements";
+    public const string ClientBalances = "facturation.soldes-clients";
+    public const string InventoryBelowMinimum = "inventaire.sous-minimum";
+    public const string PurchasesBySupplier = "achats.par-fournisseur";
+    public const string CompletedTasks = "production.taches-terminees";
+    public const string HoursByProject = "temps.heures-par-projet";
+    public const string LabourByEmployee = "main-oeuvre.par-employe";
+    public const string LabourByProject = "main-oeuvre.par-projet";
+
     public static readonly IReadOnlySet<string> Allowed = new HashSet<string>(StringComparer.Ordinal)
     {
         ProjectProfitability, ProjectPipeline, HoursByEmployee, TaskLoad,
-        UnpaidInvoices, SalesByMonth, InventoryValue, ExpensesByType
+        UnpaidInvoices, SalesByMonth, InventoryValue, ExpensesByType,
+        SalesByClient, SalesByProduct, PaymentsReceived, ClientBalances, InventoryBelowMinimum,
+        PurchasesBySupplier, CompletedTasks, HoursByProject, LabourByEmployee, LabourByProject
     };
 
     public static bool IsAllowed(string? key) => key is not null && Allowed.Contains(key);

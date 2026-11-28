@@ -66,6 +66,7 @@ public static class ModuleIcons
         // A bag, not a trolley: the trolley is already Achats, and the two tabs point opposite
         // ways -- one is the company buying, the other its customers buying from it.
         "ShoppingBag",
+        "Inbox",
         // Features draw from the same set as modules, and the assistant needs a face.
         "Sparkles", "Bot"
     };

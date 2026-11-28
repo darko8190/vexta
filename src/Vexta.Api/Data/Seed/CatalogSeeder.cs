@@ -95,6 +95,7 @@ public static class CatalogSeeder
 
         await SeedModulesAsync(db, logger);
         await SeedFeaturesAsync(db, logger);
+        await SeedReportsAsync(db, logger);
     }
 
     private static async Task SeedModulesAsync(VextaDbContext db, ILogger logger)
@@ -136,6 +137,79 @@ public static class CatalogSeeder
         logger.LogInformation(
             "{Count} module(s) manquant(s) ajouté(s) au catalogue : {Routes}",
             missing.Count, string.Join(", ", missing.Select(m => m.Href)));
+    }
+
+    private record BuiltInReport(string Key, string ModuleHref, string Title, string Description, string Icon);
+
+    /// <summary>
+    /// The reports every company starts with, each under the module that sells it. Matched on
+    /// the key: a report the super admin renamed, moved or unpublished stays as they left it,
+    /// and one they deleted on purpose comes back only if its key is gone — a deploy adds the
+    /// new ones and touches nothing else.
+    /// </summary>
+    private static readonly BuiltInReport[] Reports =
+    [
+        // Ventes et facturation
+        new(ReportKeys.SalesByMonth, "/factures", "Ventes par mois", "Facturé par mois, avant et après taxes, et ce qui a été encaissé.", "TrendingUp"),
+        new(ReportKeys.SalesByClient, "/factures", "Ventes par client", "Ce que chaque client a été facturé sur la période, payé et dû.", "Users"),
+        new(ReportKeys.SalesByProduct, "/factures", "Ventes par produit", "Quantités vendues, vendant, coût et marge par produit.", "Package"),
+        new(ReportKeys.UnpaidInvoices, "/factures", "Factures impayées", "Les factures à payer aujourd'hui et leur retard.", "FileText"),
+        new(ReportKeys.PaymentsReceived, "/factures", "Paiements reçus", "Chaque paiement reçu sur la période, par mode.", "Wallet"),
+        new(ReportKeys.ClientBalances, "/factures", "Soldes des clients", "Ce que chaque client doit aujourd'hui, par âge. Les états de compte s'envoient depuis la fiche du client.", "HandCoins"),
+        // Inventaire
+        new(ReportKeys.InventoryValue, "/inventaire", "Valeur de l'inventaire", "Le stock au prix d'achat et au prix de vente.", "Boxes"),
+        new(ReportKeys.InventoryBelowMinimum, "/inventaire", "Produits sous le minimum", "Ce qui est sous le minimum, et combien commander.", "PackageCheck"),
+        // Achats
+        new(ReportKeys.ExpensesByType, "/achats", "Dépenses par type", "Les dépenses de projets par type, au coût et refacturées.", "Receipt"),
+        new(ReportKeys.PurchasesBySupplier, "/approvisionnement", "Achats par fournisseur", "Les commandes fournisseurs de la période par fournisseur.", "Truck"),
+        // Production
+        new(ReportKeys.ProjectProfitability, "/projets", "Rentabilité par projet", "Coût, vendant, bénéfice et facturé de chaque projet de la période.", "ChartBar"),
+        new(ReportKeys.ProjectPipeline, "/projets", "Projets par statut", "Combien de projets sont à faire, commencés, à facturer ou facturés.", "FolderKanban"),
+        new(ReportKeys.CompletedTasks, "/taches-horaire", "Tâches terminées", "Les tâches terminées par employé ou équipe, estimé contre réel.", "ListChecks"),
+        new(ReportKeys.TaskLoad, "/taches-horaire", "Charge de tâches", "Les tâches de chacun par état, et celles en retard.", "ClipboardList"),
+        // Feuilles de temps et main-d'œuvre
+        new(ReportKeys.HoursByEmployee, "/temps", "Heures par employé", "Les heures de chaque employé sur la période.", "Clock"),
+        new(ReportKeys.HoursByProject, "/temps", "Heures par projet", "Les heures entrées sur chaque projet.", "CalendarClock"),
+        new(ReportKeys.LabourByEmployee, "/temps", "Main-d'œuvre par employé", "Heures, taux moyen et main-d'œuvre facturable de chaque employé.", "UsersRound"),
+        new(ReportKeys.LabourByProject, "/temps", "Main-d'œuvre par projet", "Heures, taux moyen et main-d'œuvre facturable de chaque projet.", "Wrench"),
+    ];
+
+    private static async Task SeedReportsAsync(VextaDbContext db, ILogger logger)
+    {
+        var known = (await db.Reports.Select(r => r.Key).ToListAsync()).ToHashSet(StringComparer.Ordinal);
+        var missing = Reports.Where(r => !known.Contains(r.Key)).ToList();
+        if (missing.Count == 0) return;
+
+        var modules = await db.Modules
+            .Where(m => m.NavHref != null)
+            .Select(m => new { m.Id, m.NavHref })
+            .ToListAsync();
+        var byHref = modules
+            .GroupBy(m => m.NavHref!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First().Id, StringComparer.OrdinalIgnoreCase);
+
+        var added = new List<string>();
+        var order = 0;
+        foreach (var item in Reports)
+        {
+            order++;
+            if (known.Contains(item.Key) || !byHref.TryGetValue(item.ModuleHref, out var moduleId)) continue;
+            db.Reports.Add(new Report
+            {
+                Key = item.Key,
+                ModuleId = moduleId,
+                Title = item.Title,
+                Description = item.Description,
+                Icon = item.Icon,
+                SortOrder = order,
+                IsPublished = true
+            });
+            added.Add(item.Key);
+        }
+
+        if (added.Count == 0) return;
+        await db.SaveChangesAsync();
+        logger.LogInformation("{Count} rapport(s) ajouté(s) : {Keys}", added.Count, string.Join(", ", added));
     }
 
     private static async Task SeedFeaturesAsync(VextaDbContext db, ILogger logger)

@@ -11,6 +11,7 @@ import {
   IdCard,
   Lock,
   MapPin,
+  ScrollText,
   Send,
   UserRound,
   Wallet,
@@ -27,6 +28,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { BlockClientDialog } from "@/components/clients/block-client-dialog";
 import { ClientAccountSection } from "@/components/clients/detail/client-account-section";
+import { ClientStatementSection } from "@/components/clients/detail/client-statement-section";
+import { useCanManage } from "@/hooks/use-can-create";
 import { ClientAssetsSection } from "@/components/clients/detail/client-assets-section";
 import { ClientContactsSection } from "@/components/clients/detail/client-contacts-section";
 import { ClientDetailsSection } from "@/components/clients/detail/client-details-section";
@@ -48,6 +51,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
   const { id } = use(params);
   const { data: client, isLoading, isError } = useClientQuery(id);
   const isOwner = useIsOwner();
+  const canManage = useCanManage();
   // Détails first, and the one the file opens on: somebody opening a client is looking for a
   // telephone number or an address far more often than for their list of invoices.
   const [section, setSection] = useState("details");
@@ -90,6 +94,8 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
     // No count: a balance is one figure, not a number of things, and it is shown on the card
     // above rather than squeezed into a badge.
     { key: "compte", label: "Compte", icon: Wallet },
+    // What the client owes over a period, to print or send. The office's: it is a document.
+    ...(canManage ? [{ key: "etat-de-compte", label: "État de compte", icon: ScrollText }] : []),
   ];
 
   return (
@@ -204,6 +210,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
           {section === "contacts" && <ClientContactsSection clientId={client.id} />}
           {section === "actifs" && <ClientAssetsSection clientId={client.id} />}
           {section === "compte" && <ClientAccountSection clientId={client.id} />}
+          {section === "etat-de-compte" && canManage && <ClientStatementSection clientId={client.id} />}
           {section === "adresses" && <ClientAddressesSection clientId={client.id} />}
           {section === "soumissions" && <ClientQuotesSection clientId={client.id} />}
           {section === "projets" && <ClientProjectsSection clientId={client.id} />}

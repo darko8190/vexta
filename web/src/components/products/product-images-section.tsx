@@ -1,9 +1,20 @@
 "use client";
 
-import { useRef } from "react";
+import { useState } from "react";
 import { ImagePlus, Images, Star, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
@@ -12,6 +23,7 @@ import { LoadErrorState } from "@/components/layout/load-error-state";
 import { MAX_UPLOAD_BYTES, useUploadMedia } from "@/hooks/use-media";
 import { useProductImagesQuery, useSaveProductImages } from "@/hooks/use-products";
 import { ApiError } from "@/lib/api";
+import { ex } from "@/lib/placeholders";
 import type { ProductImage } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -42,7 +54,7 @@ export function ProductImagesSection({ productId }: { productId: string }) {
   } = useProductImagesQuery(productId);
   const save = useSaveProductImages(productId);
   const upload = useUploadMedia();
-  const fileInput = useRef<HTMLInputElement>(null);
+  const [adding, setAdding] = useState(false);
 
   const current = images ?? [];
 
@@ -55,29 +67,27 @@ export function ProductImagesSection({ productId }: { productId: string }) {
     }
   }
 
-  async function onPick(files: FileList) {
-    const added: ImageInput[] = [];
-
-    for (const file of Array.from(files)) {
-      if (file.size > MAX_UPLOAD_BYTES) {
-        toast.error(`${file.name} dépasse la taille permise.`);
-        continue;
-      }
-
-      try {
-        const asset = await upload.mutateAsync(file);
-        added.push({ mediaAssetId: asset.id, name: null, isPrimary: false });
-      } catch (error) {
-        toast.error(
-          error instanceof ApiError || error instanceof Error
-            ? error.message
-            : `Impossible de téléverser ${file.name}.`,
-        );
-      }
+  /** Uploads the file, then saves the set with it added — and, when asked, as the main one. */
+  async function onAdd(file: File, name: string, isPrimary: boolean): Promise<boolean> {
+    if (file.size > MAX_UPLOAD_BYTES) {
+      toast.error(`${file.name} dépasse la taille permise.`);
+      return false;
     }
 
-    if (added.length === 0) return;
-    await saveAll([...current.map(inputOf), ...added], added.length === 1 ? "Image ajoutée." : "Images ajoutées.");
+    try {
+      const asset = await upload.mutateAsync(file);
+      const added: ImageInput = { mediaAssetId: asset.id, name: name.trim() || null, isPrimary };
+      const existing = current.map(inputOf).map((image) => (isPrimary ? { ...image, isPrimary: false } : image));
+      // The main picture goes first; the API also places it there.
+      await save.mutateAsync(isPrimary ? [added, ...existing] : [...existing, added]);
+      toast.success("Image ajoutée.");
+      return true;
+    } catch (error) {
+      toast.error(
+        error instanceof ApiError || error instanceof Error ? error.message : `Impossible d'ajouter ${file.name}.`,
+      );
+      return false;
+    }
   }
 
   function onRemove(mediaAssetId: string) {
@@ -112,10 +122,10 @@ export function ProductImagesSection({ productId }: { productId: string }) {
     <Button
       variant="outline"
       disabled={busy || isLoading || isError}
-      onClick={() => fileInput.current?.click()}
+      onClick={() => setAdding(true)}
     >
-      {busy ? <Spinner /> : <ImagePlus />}
-      Ajouter des images
+      <ImagePlus />
+      Ajouter une image
     </Button>
   );
 
@@ -132,18 +142,13 @@ export function ProductImagesSection({ productId }: { productId: string }) {
         {addButton}
       </div>
 
-      <input
-        ref={fileInput}
-        id="product-images-input"
-        type="file"
-        accept="image/*"
-        multiple
-        className="sr-only"
-        onChange={(event) => {
-          const files = event.target.files;
-          if (files && files.length > 0) onPick(files);
-          event.target.value = "";
-        }}
+      <AddImageDialog
+        open={adding}
+        onOpenChange={setAdding}
+        // The first picture of a product is its main one unless said otherwise.
+        firstImage={current.length === 0}
+        pending={busy}
+        onAdd={onAdd}
       />
 
       {isLoading ? (
@@ -236,5 +241,126 @@ export function ProductImagesSection({ productId }: { productId: string }) {
         </ul>
       )}
     </div>
+  );
+}
+
+/** The window an image is added through: the file, what to call it, and whether it is the main one. */
+function AddImageDialog({
+  open,
+  onOpenChange,
+  firstImage,
+  pending,
+  onAdd,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  firstImage: boolean;
+  pending: boolean;
+  onAdd: (file: File, name: string, isPrimary: boolean) => Promise<boolean>;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [name, setName] = useState("");
+  const [isPrimary, setIsPrimary] = useState(firstImage);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [missingFile, setMissingFile] = useState(false);
+
+  function reset() {
+    setFile(null);
+    setName("");
+    setIsPrimary(firstImage);
+    setPreview(null);
+    setMissingFile(false);
+  }
+
+  async function submit() {
+    if (!file) {
+      setMissingFile(true);
+      return;
+    }
+    if (await onAdd(file, name, isPrimary)) onOpenChange(false);
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (next) reset();
+        onOpenChange(next);
+      }}
+    >
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Ajouter une image</DialogTitle>
+          <DialogDescription>L&apos;image reste aussi dans votre bibliothèque.</DialogDescription>
+        </DialogHeader>
+
+        <form
+          className="px-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void submit();
+          }}
+        >
+          <FieldGroup>
+            <Field data-invalid={missingFile}>
+              <FieldLabel htmlFor="product-image-file">Image</FieldLabel>
+              {preview && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={preview} alt="" className="max-h-48 w-full rounded-md border border-border object-contain" />
+              )}
+              <Input
+                id="product-image-file"
+                type="file"
+                accept="image/*"
+                aria-invalid={missingFile}
+                onChange={(event) => {
+                  const picked = event.target.files?.[0] ?? null;
+                  setFile(picked);
+                  setMissingFile(false);
+                  setPreview(picked ? URL.createObjectURL(picked) : null);
+                  // The file's own name as a starting point, without its extension.
+                  if (picked && !name.trim()) setName(picked.name.replace(/\.[^.]+$/, ""));
+                }}
+              />
+              {missingFile ? (
+                <p className="text-sm text-destructive">Choisissez une image.</p>
+              ) : (
+                <FieldDescription>Une photo, un dessin ou une fiche en image.</FieldDescription>
+              )}
+            </Field>
+
+            <Field>
+              <FieldLabel htmlFor="product-image-name">Nom</FieldLabel>
+              <Input
+                id="product-image-name"
+                value={name}
+                maxLength={200}
+                onChange={(event) => setName(event.target.value)}
+                placeholder={ex("Vue de face")}
+              />
+            </Field>
+
+            <Field orientation="horizontal">
+              <Checkbox
+                id="product-image-primary"
+                checked={isPrimary}
+                onCheckedChange={(checked) => setIsPrimary(checked === true)}
+              />
+              <FieldLabel htmlFor="product-image-primary" className="font-normal">
+                Image principale
+              </FieldLabel>
+            </Field>
+          </FieldGroup>
+        </form>
+
+        <DialogFooter>
+          <Button type="button" onClick={() => void submit()} disabled={pending}>
+            {pending && <Spinner />}
+            Ajouter l&apos;image
+          </Button>
+          <DialogClose render={<Button type="button" variant="outline" />}>Annuler</DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

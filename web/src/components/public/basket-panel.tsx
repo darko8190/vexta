@@ -40,6 +40,8 @@ export function AddToBasketButton({
   product: { id: string; title: string; unit: string | null; sellingPrice: number | null };
 }) {
   const basket = useBasket(slug);
+  // How many go in with the next press. Typed or stepped, and back to one once they are in.
+  const [quantity, setQuantity] = useState(1);
 
   // A product with no price is "prix sur demande" on the page, and the API refuses it on an
   // order: the customer would be agreeing to a figure nobody has named. No button, rather than
@@ -47,25 +49,64 @@ export function AddToBasketButton({
   if (product.sellingPrice === null) return null;
 
   const inBasket = basket.items.find((line) => line.productId === product.id);
+  const valid = Number.isInteger(quantity) && quantity >= 1 && quantity <= 10_000;
 
   return (
-    <Button
-      type="button"
-      variant={inBasket ? "secondary" : "outline"}
-      size="sm"
-      className="mt-3 w-full"
-      onClick={() =>
-        basket.add({
-          productId: product.id,
-          title: product.title,
-          unit: product.unit,
-          unitPrice: product.sellingPrice ?? 0,
-        })
-      }
-    >
-      <Plus className="size-4" />
-      {inBasket ? `Au panier (${inBasket.quantity})` : "Ajouter au panier"}
-    </Button>
+    <div className="mt-3 flex items-center gap-1.5">
+      <div className="flex shrink-0 items-center rounded-lg border border-input">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Un de moins"
+          disabled={quantity <= 1}
+          onClick={() => setQuantity((value) => Math.max(1, value - 1))}
+        >
+          <Minus className="size-3.5" />
+        </Button>
+        <input
+          type="number"
+          inputMode="numeric"
+          min={1}
+          max={10000}
+          value={Number.isNaN(quantity) ? "" : quantity}
+          onChange={(event) => setQuantity(Math.floor(Number(event.target.value)))}
+          aria-label={`Quantité de ${product.title}`}
+          className="w-10 [appearance:textfield] bg-transparent text-center text-sm tabular-nums outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Un de plus"
+          onClick={() => setQuantity((value) => (Number.isNaN(value) ? 1 : value + 1))}
+        >
+          <Plus className="size-3.5" />
+        </Button>
+      </div>
+      <Button
+        type="button"
+        variant={inBasket ? "secondary" : "outline"}
+        size="sm"
+        className="min-w-0 flex-1"
+        disabled={!valid}
+        onClick={() => {
+          basket.add(
+            {
+              productId: product.id,
+              title: product.title,
+              unit: product.unit,
+              unitPrice: product.sellingPrice ?? 0,
+            },
+            quantity,
+          );
+          setQuantity(1);
+        }}
+      >
+        <ShoppingBag className="size-4" />
+        <span className="truncate">{inBasket ? `Ajouter (${inBasket.quantity} au panier)` : "Ajouter"}</span>
+      </Button>
+    </div>
   );
 }
 

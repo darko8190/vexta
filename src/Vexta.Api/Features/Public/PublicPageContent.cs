@@ -62,15 +62,17 @@ public class PublicPageContent(VextaDbContext db, IR2StorageService storage)
                 .ToList()
             : [];
 
+        // What the owner chose to hide is left out here rather than hidden by the page: a visitor
+        // is not sent what the company decided not to show.
         return new PublicCompanyDto(
             tenant.Name,
             tenant.Slug,
-            page.Headline,
-            page.About,
+            page.ShowHeadline ? page.Headline : null,
+            page.ShowAbout ? page.About : null,
             page.ContactNote,
-            tenant.ContactEmail,
-            tenant.Phone,
-            tenant.LogoETag,
+            page.FooterShowEmail ? tenant.ContactEmail : null,
+            page.FooterShowPhone ? tenant.Phone : null,
+            page.ShowLogo ? tenant.LogoETag : null,
             tenant.Id,
             tenant.BrandColor,
             page.Style,
@@ -80,11 +82,13 @@ public class PublicPageContent(VextaDbContext db, IR2StorageService storage)
             page.ShowProducts && page.AcceptsOrders
                 && (!page.RequiresOnlinePayment || tenant.CanCharge),
             page.RequiresOnlinePayment,
-            address,
+            page.FooterShowAddress ? address : null,
             products,
             jobs,
             forms,
-            await SectionsAsync(tenant.Id, sections, ct));
+            await SectionsAsync(tenant.Id, sections, ct),
+            page.FooterTitle,
+            page.FooterText);
     }
 
     /// <summary>The visible bands, in order, as they were saved.</summary>

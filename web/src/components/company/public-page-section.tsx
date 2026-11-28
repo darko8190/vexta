@@ -12,12 +12,11 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleSwitch } from "@/components/company/toggle-switch";
-import { usePublicPageQuery, useSavePublicPage } from "@/hooks/use-public-page";
+import { pageValues, usePublicPageQuery, useSavePublicPage } from "@/hooks/use-public-page";
 import { ApiError } from "@/lib/api";
 import { publicPageStyleOptions } from "@/lib/public-page-style";
 import { StylePreview } from "@/components/company/style-preview";
@@ -26,9 +25,8 @@ import type { PublicPageSettings } from "@/lib/types";
 import { ex } from "@/lib/placeholders";
 
 const formSchema = z.object({
-  headline: z.string().trim().max(200, "200 caractères maximum."),
   about: z.string().trim().max(4000, "4000 caractères maximum."),
-  contactNote: z.string().trim().max(1000, "1000 caractères maximum."),
+  showAbout: z.boolean(),
   showProducts: z.boolean(),
   showJobs: z.boolean(),
   showForms: z.boolean(),
@@ -41,9 +39,8 @@ type FormValues = z.infer<typeof formSchema>;
 
 function toFormValues(settings?: PublicPageSettings): FormValues {
   return {
-    headline: settings?.headline ?? "",
     about: settings?.about ?? "",
-    contactNote: settings?.contactNote ?? "",
+    showAbout: settings?.showAbout ?? true,
     showProducts: settings?.showProducts ?? true,
     showJobs: settings?.showJobs ?? true,
     showForms: settings?.showForms ?? false,
@@ -66,20 +63,9 @@ function PublishCard({ settings }: { settings: PublicPageSettings }) {
 
   async function onToggle(isPublished: boolean) {
     try {
-      await save.mutateAsync({
-        isPublished,
-        headline: settings.headline,
-        about: settings.about,
-        contactNote: settings.contactNote,
-        showProducts: settings.showProducts,
-        showJobs: settings.showJobs,
-        showForms: settings.showForms,
-        acceptsOrders: settings.acceptsOrders,
-        requiresOnlinePayment: settings.requiresOnlinePayment,
-        // Carried through unchanged: this switch publishes the page, and leaving the style out
-        // would reset the company's choice every time it went online.
-        style: settings.style,
-      });
+      // Everything else carried through unchanged: this switch publishes the page and nothing
+      // more.
+      await save.mutateAsync({ ...pageValues(settings), isPublished });
       toast.success(isPublished ? "Votre page est en ligne." : "Votre page est hors ligne.");
     } catch (error) {
       toast.error(error instanceof ApiError ? error.message : "Impossible de changer la publication.");
@@ -181,12 +167,11 @@ function ContentCard({ settings }: { settings: PublicPageSettings }) {
   async function onSubmit(values: FormValues) {
     try {
       await save.mutateAsync({
-        // Left exactly as the switch above set it: this form writes the text, not the decision
-        // to publish.
-        isPublished: settings.isPublished,
-        headline: values.headline || null,
+        // Left exactly as the switch above set it, and the head and foot as their own tabs set
+        // them: this form writes the content.
+        ...pageValues(settings),
         about: values.about || null,
-        contactNote: values.contactNote || null,
+        showAbout: values.showAbout,
         showProducts: values.showProducts,
         showJobs: values.showJobs,
         showForms: values.showForms,
@@ -211,30 +196,6 @@ function ContentCard({ settings }: { settings: PublicPageSettings }) {
         <CardContent>
           <FieldGroup>
             <Controller
-              name="headline"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="public-headline">Accroche</FieldLabel>
-                  <Input
-                    {...field}
-                    id="public-headline"
-                    placeholder={ex("Rénovation résidentielle à Québec depuis 2008")}
-                    aria-invalid={fieldState.invalid}
-                  />
-                  {fieldState.invalid ? (
-                    <FieldError errors={[fieldState.error]} />
-                  ) : (
-                    <FieldDescription>
-                      La ligne en haut de la page. Sans elle, c&apos;est le nom de
-                      l&apos;entreprise qui s&apos;affiche.
-                    </FieldDescription>
-                  )}
-                </Field>
-              )}
-            />
-
-            <Controller
               name="about"
               control={form.control}
               render={({ field, fieldState }) => (
@@ -253,25 +214,16 @@ function ContentCard({ settings }: { settings: PublicPageSettings }) {
             />
 
             <Controller
-              name="contactNote"
+              name="showAbout"
               control={form.control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="public-contact-note">Note de contact</FieldLabel>
-                  <Textarea
-                    {...field}
-                    id="public-contact-note"
-                    rows={3}
-                    placeholder={ex("Appelez-nous du lundi au vendredi, de 7 h à 17 h.")}
-                    aria-invalid={fieldState.invalid}
+              render={({ field }) => (
+                <Field orientation="horizontal">
+                  <Checkbox
+                    id="public-show-about"
+                    checked={field.value}
+                    onCheckedChange={(checked) => field.onChange(checked === true)}
                   />
-                  {fieldState.invalid ? (
-                    <FieldError errors={[fieldState.error]} />
-                  ) : (
-                    <FieldDescription>
-                      Ce qu&apos;un visiteur devrait faire pour vous joindre.
-                    </FieldDescription>
-                  )}
+                  <FieldLabel htmlFor="public-show-about">Afficher la section « À propos »</FieldLabel>
                 </Field>
               )}
             />

@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react";
 import Link from "next/link";
-import { Bug, Building2, Eye, LogOut, Settings, UserRound } from "lucide-react";
+import { Bug, Building2, Eye, LogOut, Settings, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -25,7 +25,7 @@ import { GlobalSearch } from "@/components/layout/global-search";
 import { crewOwnNav, dashboardNavItem, employeeModeNavItems, getNavItems, type NavItem } from "@/components/layout/nav-config";
 import { ViewModeToggle } from "@/components/layout/view-mode-toggle";
 import { useViewMode } from "@/lib/view-mode";
-import { NavLinks } from "@/components/layout/nav-links";
+import { NavGrid, NavLinks } from "@/components/layout/nav-links";
 import { FeedbackButton } from "@/components/layout/feedback-button";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { TrialBanner } from "@/components/layout/trial-banner";
@@ -245,21 +245,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
+      {/* The whole screen on a telephone, the destinations as tiles three to a row. */}
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetContent side="left" className="w-64 bg-sidebar p-0">
+        <SheetContent
+          side="left"
+          showCloseButton={false}
+          className="gap-0 bg-sidebar p-0 data-[side=left]:w-full data-[side=left]:sm:max-w-none"
+        >
           <SheetTitle className="sr-only">Menu de navigation</SheetTitle>
-          <div className="flex h-16 items-center px-5">
-            <button
-              type="button"
-              aria-label="Fermer le menu"
-              onClick={() => setMobileOpen(false)}
-              className="flex items-center rounded-lg transition-opacity hover:opacity-70"
-            >
-              <VextaLockup iconClassName="size-7" />
-            </button>
+          <div className="flex h-16 shrink-0 items-center justify-between px-5">
+            <VextaLockup iconClassName="size-7" />
+            <Button variant="ghost" size="icon" aria-label="Fermer le menu" onClick={() => setMobileOpen(false)}>
+              <X />
+            </Button>
           </div>
           <div className="flex-1 overflow-y-auto px-3 py-2">
-            <NavLinks items={navItems} onNavigate={() => setMobileOpen(false)} />
+            <NavGrid items={navItems} onNavigate={() => setMobileOpen(false)} />
             {navPending && <NavPending />}
           </div>
           {/* The invitation lives at the foot of the menu rather than in the header: the header

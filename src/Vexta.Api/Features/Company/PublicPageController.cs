@@ -49,12 +49,15 @@ public class PublicPageController(VextaDbContext db, ICurrentUserService current
         return Ok(page is null
             ? new PublicPageSettingsDto(
                 false, null, null, null, true, true, false, false, false, company.CanCharge,
-                PublicPageStyle.Classique, slug, null)
+                PublicPageStyle.Classique, slug, null,
+                true, true, true, null, null, true, true, true)
             : new PublicPageSettingsDto(
                 page.IsPublished, page.Headline, page.About, page.ContactNote,
                 page.ShowProducts, page.ShowJobs, page.ShowForms, page.AcceptsOrders,
                 page.RequiresOnlinePayment, company.CanCharge,
-                page.Style, slug, page.UpdatedAt));
+                page.Style, slug, page.UpdatedAt,
+                page.ShowAbout, page.ShowLogo, page.ShowHeadline, page.FooterTitle, page.FooterText,
+                page.FooterShowAddress, page.FooterShowPhone, page.FooterShowEmail));
     }
 
     [HttpPut("public-page")]
@@ -65,6 +68,10 @@ public class PublicPageController(VextaDbContext db, ICurrentUserService current
 
         if (request.Headline is { Length: > 200 })
             return BadRequest(new { message = "L'accroche ne peut pas dépasser 200 caractères." });
+        if (request.FooterTitle is { Length: > 100 })
+            return BadRequest(new { message = "Le titre du pied de page ne peut pas dépasser 100 caractères." });
+        if (request.FooterText is { Length: > 1000 })
+            return BadRequest(new { message = "Le texte du pied de page ne peut pas dépasser 1000 caractères." });
         if (request.About is { Length: > 4000 })
             return BadRequest(new { message = "La présentation ne peut pas dépasser 4000 caractères." });
         if (request.ContactNote is { Length: > 1000 })
@@ -93,6 +100,14 @@ public class PublicPageController(VextaDbContext db, ICurrentUserService current
         page.Headline = Clean(request.Headline);
         page.About = Clean(request.About);
         page.ContactNote = Clean(request.ContactNote);
+        page.ShowAbout = request.ShowAbout ?? page.ShowAbout;
+        page.ShowLogo = request.ShowLogo ?? page.ShowLogo;
+        page.ShowHeadline = request.ShowHeadline ?? page.ShowHeadline;
+        page.FooterShowAddress = request.FooterShowAddress ?? page.FooterShowAddress;
+        page.FooterShowPhone = request.FooterShowPhone ?? page.FooterShowPhone;
+        page.FooterShowEmail = request.FooterShowEmail ?? page.FooterShowEmail;
+        page.FooterTitle = Clean(request.FooterTitle);
+        page.FooterText = Clean(request.FooterText);
         page.ShowProducts = request.ShowProducts;
         page.ShowJobs = request.ShowJobs;
         page.ShowForms = request.ShowForms;

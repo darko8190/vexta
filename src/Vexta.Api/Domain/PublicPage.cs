@@ -65,6 +65,29 @@ public class PublicPage
     /// <summary>What a visitor should do — telephone, email, a form later on.</summary>
     public string? ContactNote { get; set; }
 
+    /// <summary>The À propos band, hidden without emptying it.</summary>
+    public bool ShowAbout { get; set; } = true;
+
+    // ---- The head of the page ----
+
+    /// <summary>The logo beside the name.</summary>
+    public bool ShowLogo { get; set; } = true;
+
+    /// <summary>The accroche under the name.</summary>
+    public bool ShowHeadline { get; set; } = true;
+
+    // ---- The foot of the page ----
+
+    /// <summary>The heading over the way to reach the company. Null says « Nous joindre ».</summary>
+    public string? FooterTitle { get; set; }
+
+    /// <summary>A last line under everything: a licence number, a copyright, the hours.</summary>
+    public string? FooterText { get; set; }
+
+    public bool FooterShowAddress { get; set; } = true;
+    public bool FooterShowPhone { get; set; } = true;
+    public bool FooterShowEmail { get; set; } = true;
+
     /// <summary>Each section can be hidden without emptying it.</summary>
     public bool ShowProducts { get; set; } = true;
     public bool ShowJobs { get; set; } = true;

@@ -68,3 +68,53 @@ export function NavLinks({
     </nav>
   );
 }
+
+/**
+ * The menu on a telephone: the whole screen, the destinations as tiles three to a row, like the
+ * applications on the phone itself. A list of rows in a narrow drawer is the desktop rail
+ * squeezed down; a grid is what a thumb expects.
+ */
+export function NavGrid({
+  items,
+  onNavigate,
+}: {
+  items: NavItem[];
+  onNavigate?: (event: React.MouseEvent<HTMLAnchorElement>) => void;
+}) {
+  const pathname = usePathname();
+
+  return (
+    <nav className="grid grid-cols-3 gap-2">
+      {items.map((item) => {
+        const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+        const Icon = item.icon;
+
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            onClick={onNavigate}
+            aria-current={active ? "page" : undefined}
+            className={cn(
+              "flex min-h-24 flex-col items-center justify-start gap-2 rounded-2xl p-2 pt-3 text-center",
+              "transition-colors",
+              active ? "bg-sidebar-accent" : "hover:bg-sidebar-accent/60 active:bg-sidebar-accent/60",
+            )}
+          >
+            <span
+              className={cn(
+                "flex size-12 shrink-0 items-center justify-center rounded-2xl",
+                active ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary",
+              )}
+            >
+              <Icon className="size-6" />
+            </span>
+            <span className="line-clamp-2 text-xs leading-tight font-medium text-sidebar-foreground">
+              {item.label}
+            </span>
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}

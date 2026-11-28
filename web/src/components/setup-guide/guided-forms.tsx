@@ -12,7 +12,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleSwitch } from "@/components/company/toggle-switch";
 import { useCompanyProfileQuery, useSaveCompanyProfile, type SaveCompanyValues } from "@/hooks/use-company";
-import { usePublicPageQuery, useSavePublicPage, type PublicPageValues } from "@/hooks/use-public-page";
+import { pageValues, usePublicPageQuery, useSavePublicPage, type PublicPageValues } from "@/hooks/use-public-page";
 import { ApiError } from "@/lib/api";
 import { StylePreview } from "@/components/company/style-preview";
 import { publicPageStyleOptions } from "@/lib/public-page-style";
@@ -196,20 +196,6 @@ function CompanyContactForm({ profile, onDone }: Done & { profile: CompanyProfil
   );
 }
 
-function pageValues(settings: PublicPageSettings): PublicPageValues {
-  return {
-    isPublished: settings.isPublished,
-    headline: settings.headline,
-    about: settings.about,
-    contactNote: settings.contactNote,
-    showProducts: settings.showProducts,
-    showJobs: settings.showJobs,
-    showForms: settings.showForms,
-    acceptsOrders: settings.acceptsOrders,
-    requiresOnlinePayment: settings.requiresOnlinePayment,
-    style: settings.style,
-  };
-}
 
 function usePublicPagePart(settings: PublicPageSettings | undefined, onDone: () => void) {
   const save = useSavePublicPage();

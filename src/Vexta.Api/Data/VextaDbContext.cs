@@ -1659,6 +1659,8 @@ public class VextaDbContext(DbContextOptions<VextaDbContext> options, IHttpConte
             e.Property(p => p.Headline).HasMaxLength(200);
             e.Property(p => p.About).HasMaxLength(4000);
             e.Property(p => p.ContactNote).HasMaxLength(1000);
+            e.Property(p => p.FooterTitle).HasMaxLength(100);
+            e.Property(p => p.FooterText).HasMaxLength(1000);
 
             // No query filter: this page is read by a visitor with no session at all, scoped by
             // the slug in the route — the same way the company's logo is.

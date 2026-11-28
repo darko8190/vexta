@@ -1687,6 +1687,18 @@ export interface PublicPageSettings {
   /** Where the page lives: /e/{slug}. */
   slug: string;
   updatedAt: string | null;
+  showAbout: boolean;
+  /** The logo beside the name, at the head of the page. */
+  showLogo: boolean;
+  /** The accroche under the name. */
+  showHeadline: boolean;
+  /** The heading over the way to reach the company. Null says « Nous joindre ». */
+  footerTitle: string | null;
+  /** A last line under everything: a licence number, a copyright, the hours. */
+  footerText: string | null;
+  footerShowAddress: boolean;
+  footerShowPhone: boolean;
+  footerShowEmail: boolean;
 }
 
 /** The same page as a visitor reads it, with nothing private on it. */
@@ -1712,6 +1724,8 @@ export interface PublicCompany {
   jobs: PublicJob[];
   /** Titles only. The questions are fetched when a visitor opens one. */
   forms: PublicPageForm[];
+  footerTitle: string | null;
+  footerText: string | null;
   /**
    * The bands the company arranged, in order. Empty for a company that never opened the
    * builder, and the page is then drawn the way it always was.

@@ -4271,6 +4271,23 @@ namespace Vexta.Api.Data.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
+                    b.Property<bool>("FooterShowAddress")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("FooterShowEmail")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("FooterShowPhone")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("FooterText")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("FooterTitle")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<string>("Headline")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
@@ -4281,10 +4298,19 @@ namespace Vexta.Api.Data.Migrations
                     b.Property<bool>("RequiresOnlinePayment")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("ShowAbout")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("ShowForms")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("ShowHeadline")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("ShowJobs")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("ShowLogo")
                         .HasColumnType("boolean");
 
                     b.Property<bool>("ShowProducts")

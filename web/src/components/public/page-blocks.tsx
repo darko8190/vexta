@@ -209,7 +209,11 @@ export function ContactFooter({
   lines: string[];
 }) {
   const hasAnything = Boolean(
-    company.email || company.phone || company.contactNote?.trim() || lines.length > 0,
+    company.email ||
+      company.phone ||
+      company.contactNote?.trim() ||
+      company.footerText?.trim() ||
+      lines.length > 0,
   );
 
   if (!hasAnything) return null;
@@ -217,7 +221,7 @@ export function ContactFooter({
   return (
     <footer className="mt-12 border-t border-border sm:mt-16">
       <div className={cn(s.container, "py-10 sm:py-14")}>
-        <h2 className={s.sectionTitle}>Nous joindre</h2>
+        <h2 className={s.sectionTitle}>{company.footerTitle?.trim() || "Nous joindre"}</h2>
 
         {company.contactNote?.trim() && (
           <p className="mt-3 max-w-prose whitespace-pre-line text-base leading-relaxed text-muted-foreground">
@@ -270,6 +274,12 @@ export function ContactFooter({
             </div>
           )}
         </dl>
+
+        {company.footerText?.trim() && (
+          <p className="mt-8 border-t border-border pt-4 text-xs whitespace-pre-line text-muted-foreground">
+            {company.footerText.trim()}
+          </p>
+        )}
       </div>
     </footer>
   );

@@ -68,7 +68,15 @@ public record PublicPageSettingsDto(
     PublicPageStyle Style,
     string Slug,
     /// <summary>Null while nothing has ever been saved — the page is defaults, not a record.</summary>
-    DateTimeOffset? UpdatedAt);
+    DateTimeOffset? UpdatedAt,
+    bool ShowAbout,
+    bool ShowLogo,
+    bool ShowHeadline,
+    string? FooterTitle,
+    string? FooterText,
+    bool FooterShowAddress,
+    bool FooterShowPhone,
+    bool FooterShowEmail);
 
 public record SavePublicPageRequest(
     bool IsPublished,
@@ -80,7 +88,17 @@ public record SavePublicPageRequest(
     bool ShowForms,
     bool AcceptsOrders,
     bool RequiresOnlinePayment,
-    PublicPageStyle Style);
+    PublicPageStyle Style,
+    // Optional, and kept as they are when left out: the switch that publishes the page and the
+    // guide's steps save the page too, and know nothing of its head and foot.
+    bool? ShowAbout = null,
+    bool? ShowLogo = null,
+    bool? ShowHeadline = null,
+    string? FooterTitle = null,
+    string? FooterText = null,
+    bool? FooterShowAddress = null,
+    bool? FooterShowPhone = null,
+    bool? FooterShowEmail = null);
 
 /// <summary>
 /// A position on the shop window. Deliberately not the row the company reads: a posting also

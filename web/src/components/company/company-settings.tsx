@@ -6,6 +6,7 @@ import { CompanyInfoSection } from "@/components/company/company-info-section";
 import { LocationsSection } from "@/components/hr/locations-section";
 import { GalleriesSection } from "@/components/company/galleries-section";
 import { PageBuilderSection } from "@/components/company/page-builder-section";
+import { PublicFooterSection, PublicHeaderSection } from "@/components/company/public-page-parts";
 import { PublicPageSection } from "@/components/company/public-page-section";
 import { SettingsTabs } from "@/components/settings/settings-tabs";
 import { useCompanyProfileQuery } from "@/hooks/use-company";
@@ -50,6 +51,8 @@ export function PublicPageSettings() {
     <SettingsTabs
       tabs={[
         { value: "page", label: "Page publique", content: <PublicPageSection /> },
+        { value: "en-tete", label: "En-tête", content: <PublicHeaderSection /> },
+        { value: "pied", label: "Pied de page", content: <PublicFooterSection /> },
         { value: "galeries", label: "Galeries", content: <GalleriesSection canEdit /> },
         { value: "constructeur", label: "Constructeur de page", content: <PageBuilderSection canEdit /> },
       ]}

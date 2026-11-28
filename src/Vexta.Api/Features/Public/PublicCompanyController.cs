@@ -89,7 +89,11 @@ public record PublicCompanyDto(
     /// The bands the company arranged, in order. Empty for a company that never opened the
     /// builder, and the page is then drawn the way it always was.
     /// </summary>
-    List<PublicSectionDto> Sections);
+    List<PublicSectionDto> Sections,
+    /// <summary>The heading over the way to reach the company. Null says « Nous joindre ».</summary>
+    string? FooterTitle = null,
+    /// <summary>A last line under everything: a licence number, a copyright, the hours.</summary>
+    string? FooterText = null);
 
 /// <summary>One band of a built page: a heading over one to twelve columns.</summary>
 public record PublicSectionDto(
